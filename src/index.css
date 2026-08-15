@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  header, aside, .toolbar-panel, .no-print {
+    display: none !important;
+  }
+}
