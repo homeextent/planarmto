@@ -44,9 +44,20 @@ $$A_{\text{deduct}} = W_a \times H_a$$
 
 ## 3. Dual-Cost Estimation & Take-Off Mathematical Formulations
 
-Every take-off line item computes both **Material Cost** and **Labor Cost**:
-$$\text{Cost}_{\text{Line}} = Q \times (\text{Rate}_{\text{Material}} + \text{Rate}_{\text{Labor}})$$
-where $Q$ is the calculated engineering quantity.
+Every take-off line item computes both **Material Cost** and **Labor Cost** with an adjustable **Waste Factor**:
+$$\text{Cost}_{\text{Line}} = Q \times (1 + \text{Waste}_{\text{site}}) \times (\text{Rate}_{\text{Material}} + \text{Rate}_{\text{Labor}})$$
+where $Q$ is the calculated engineering quantity and $\text{Waste}_{\text{site}}$ is the global project waste percentage (e.g., 0.10 for 10%).
+
+### 3.5 Financial Rollup & Markups
+The system aggregates base direct costs into a hierarchical contractor bid:
+1. **Base Direct Cost**: $\sum \text{Cost}_{\text{Line}}$ (includes material/labor waste).
+2. **Indirect Costs**:
+   - Project Management: $\text{Base Direct Cost} \times \%_{\text{PM}}$
+   - Contingency: $\text{Base Direct Cost} \times \%_{\text{Cont}}$
+3. **Gross Margin**:
+   - Company Overhead: $(\text{Base} + \text{Indirects}) \times \%_{\text{OH}}$
+   - Company Profit: $(\text{Base} + \text{Indirects}) \times \%_{\text{Profit}}$
+4. **Contractor Grand Total**: $\text{Subtotal} + \text{Overhead} + \text{Profit}$
 
 ### 3.1 Division 06 — Carpentry & Structural Framing
 

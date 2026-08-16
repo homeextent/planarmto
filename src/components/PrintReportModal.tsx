@@ -47,7 +47,8 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
     mto,
     activeRates,
     state.settings.categoryInclusions,
-    state.settings.itemInclusions
+    state.settings.itemInclusions,
+    state.settings
   );
   const printDate = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
@@ -323,8 +324,8 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
 
   <div class="total-banner">
     <div>
-      <div class="total-banner-title">Total Installed Specification Estimate</div>
-      <div style="font-size: 11px; color: #15803d; margin-top: 2px;">Comprehensive material quantities & trade labor allocation</div>
+      <div class="total-banner-title">Contractor Grand Total / Bid Price</div>
+      <div style="font-size: 11px; color: #15803d; margin-top: 2px;">Includes Material/Labor Waste (${state.settings.wasteFactorPercentage}%), Indirects, Overhead & Profit</div>
     </div>
     <div class="total-banner-val">$${costAnalysis.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
   </div>
@@ -583,15 +584,27 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
 
       <!-- Totals -->
       <tr class="total-row">
-        <td colspan="5">MATERIAL DIRECT COST SUBTOTAL</td>
+        <td colspan="5">MATERIAL DIRECT COST SUBTOTAL (w/ Waste)</td>
         <td class="num" colspan="3">$${costAnalysis.materialSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       </tr>
       <tr class="total-row">
-        <td colspan="5">LABOR INSTALLATION COST SUBTOTAL</td>
+        <td colspan="5">LABOR INSTALLATION COST SUBTOTAL (w/ Waste)</td>
         <td class="num" colspan="3">$${costAnalysis.laborSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       </tr>
+      <tr class="total-row">
+        <td colspan="5">BASE DIRECT COST (Material + Labor)</td>
+        <td class="num" colspan="3">$${costAnalysis.baseDirectCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      </tr>
+      <tr class="total-row">
+        <td colspan="5">PROJECT MANAGEMENT (${state.settings.projectManagementPercentage}%) + CONTINGENCY (${state.settings.projectContingencyPercentage}%)</td>
+        <td class="num" colspan="3">$${(costAnalysis.indirectProjectManagement + costAnalysis.indirectContingency).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      </tr>
+      <tr class="total-row">
+        <td colspan="5">OVERHEAD (${state.settings.overheadPercentage}%) + PROFIT (${state.settings.profitPercentage}%)</td>
+        <td class="num" colspan="3">$${(costAnalysis.grossMarginOverhead + costAnalysis.grossMarginProfit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      </tr>
       <tr class="grand-total-row">
-        <td colspan="5">ESTIMATED TOTAL INSTALLED COST</td>
+        <td colspan="5">CONTRACTOR GRAND TOTAL / BID PRICE</td>
         <td class="num" colspan="3" style="color: #15803d;">$${costAnalysis.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       </tr>
     </tbody>

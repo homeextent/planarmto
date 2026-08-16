@@ -62,7 +62,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
 
   const inclusions = state.settings.categoryInclusions;
   const itemInclusions = state.settings.itemInclusions;
-  const costAnalysis = calculateEstimatedCost(mto, costRates, inclusions, itemInclusions);
+  const costAnalysis = calculateEstimatedCost(mto, costRates, inclusions, itemInclusions, state.settings);
   const activeRates = costRates || DEFAULT_UNIT_COST_RATES;
   const isInteriorMode = state.settings.calculationMode === 'interior_finish';
 
@@ -584,24 +584,52 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
           ${costAnalysis.totalCost.toLocaleString()}
         </div>
 
-        {/* Dual Material / Labor Rollup Pills */}
+        {/* Financial Rollup Details */}
         {showLaborSplit && (
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-2">
-              <div className="text-[10px] text-slate-400 font-medium flex items-center justify-between">
-                <span className="text-emerald-400 font-semibold">Material ({matPercent}%)</span>
+          <div className="space-y-2 pt-1 border-t border-slate-800/40">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-2">
+                <div className="text-[10px] text-slate-400 font-medium flex items-center justify-between">
+                  <span className="text-emerald-400 font-semibold">Material ({matPercent}%)</span>
+                </div>
+                <div className="text-xs font-mono font-bold text-slate-100 mt-0.5">
+                  ${costAnalysis.materialSubtotal.toLocaleString()}
+                </div>
               </div>
-              <div className="text-xs font-mono font-bold text-slate-100 mt-0.5">
-                ${costAnalysis.materialSubtotal.toLocaleString()}
+
+              <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-2">
+                <div className="text-[10px] text-slate-400 font-medium flex items-center justify-between">
+                  <span className="text-sky-400 font-semibold">Labor ({labPercent}%)</span>
+                </div>
+                <div className="text-xs font-mono font-bold text-slate-100 mt-0.5">
+                  ${costAnalysis.laborSubtotal.toLocaleString()}
+                </div>
               </div>
             </div>
 
-            <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-2">
-              <div className="text-[10px] text-slate-400 font-medium flex items-center justify-between">
-                <span className="text-sky-400 font-semibold">Labor ({labPercent}%)</span>
+            <div className="bg-slate-950/40 rounded-lg p-2 space-y-1">
+              <div className="flex justify-between text-[10px]">
+                <span className="text-slate-400 font-semibold uppercase">Base Direct Cost:</span>
+                <span className="text-slate-200 font-mono">${costAnalysis.baseDirectCost.toLocaleString()}</span>
               </div>
-              <div className="text-xs font-mono font-bold text-slate-100 mt-0.5">
-                ${costAnalysis.laborSubtotal.toLocaleString()}
+              <div className="flex justify-between text-[10px]">
+                <span className="text-slate-500">Project Management ({state.settings.projectManagementPercentage}%):</span>
+                <span className="text-slate-400 font-mono">+${costAnalysis.indirectProjectManagement.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-slate-500">Contingency ({state.settings.projectContingencyPercentage}%):</span>
+                <span className="text-slate-400 font-mono">+${costAnalysis.indirectContingency.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-[10px] pt-1 border-t border-slate-800/40">
+                <span className="text-slate-400 font-semibold uppercase">Gross Margin:</span>
+              </div>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-slate-500">Overhead ({state.settings.overheadPercentage}%):</span>
+                <span className="text-slate-400 font-mono">+${costAnalysis.grossMarginOverhead.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-slate-500">Profit ({state.settings.profitPercentage}%):</span>
+                <span className="text-slate-400 font-mono">+${costAnalysis.grossMarginProfit.toLocaleString()}</span>
               </div>
             </div>
           </div>

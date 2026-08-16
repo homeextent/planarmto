@@ -11,7 +11,7 @@ import {
   ProjectSettings,
 } from './types';
 import { createModernTwoBedroomRancher, createBlankProject } from './engine/samplePlans';
-import { calculateMTO, DEFAULT_UNIT_COST_RATES } from './engine/estimator';
+import { calculateMTO, calculateEstimatedCost, DEFAULT_UNIT_COST_RATES } from './engine/estimator';
 import { detectRoomFaces, isPointInPolygon } from './engine/cadMath';
 import { hydrateSettingsWithBranding, saveAutoSaveState } from './utils/storage';
 import { HeaderBar } from './components/HeaderBar';
@@ -270,6 +270,16 @@ export default function App() {
   const mtoReport = useMemo(() => {
     return calculateMTO(state);
   }, [state]);
+
+  const estimatedCost = useMemo(() => {
+    return calculateEstimatedCost(
+      mtoReport,
+      costRates,
+      state.settings.categoryInclusions,
+      state.settings.itemInclusions,
+      state.settings
+    );
+  }, [mtoReport, costRates, state.settings]);
 
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans select-none">

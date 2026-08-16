@@ -1,7 +1,7 @@
 export type UnitSystem = 'imperial' | 'metric'; // imperial: feet/inches & SF, metric: meters & m²
 export type CanvasTheme = 'dark' | 'light' | 'blueprint';
 
-export type WallType = 'exterior_2x6' | 'interior_2x4' | 'partition_2x4' | 'plumbing_2x6' | 'bearing_2x6';
+export type WallType = 'exterior_2x6' | 'interior_2x4' | 'partition_2x4' | 'plumbing_2x6' | 'bearing_2x6' | 'foundation_wall';
 
 export interface CadNode {
   id: string;
@@ -365,6 +365,11 @@ export interface ProjectSettings {
   showDimensions: boolean;
   showRoomLabels: boolean;
   showMepIcons: boolean;
+  wasteFactorPercentage: number; // e.g. 10 for 10%
+  overheadPercentage: number;
+  profitPercentage: number;
+  projectContingencyPercentage: number;
+  projectManagementPercentage: number;
   costRates?: UnitCostRates;
   categoryInclusions?: CategoryInclusions;
   itemInclusions?: ItemInclusions;

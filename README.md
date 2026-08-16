@@ -20,6 +20,8 @@
 
 ### 3. Dual-Cost Estimation & Multi-Trade Quantity Surveying
 - **Split Material & Labor Rates**: Configurable unit rates for all items across 7 construction divisions.
+- **Commercial Markups & Financial Rollups**: Built-in logic for Company Overhead, Profit, Project Management, and Contingency percentages.
+- **Jobsite Waste Factors**: Adjustable Waste/Scrap multipliers applied directly to base quantities prior to markup.
 - **Precise Deduction Formulas**:
   - Net Wall Drywall & Paint: Subtracts door/window rough openings and deductions based on interior/exterior wall configurations.
   - Stud & Plate Framing: Bottom sole plates, top double plates, corner studs, partition junctions, and jack/king/header timber framing for all openings.

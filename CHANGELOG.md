@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] - 2026-08-16
+
+### Added
+- **Financial Multipliers & Waste Factor Controls**:
+  - Global project Waste/Scrap % factor applied directly to material and labor quantities.
+  - Commercial Markups: Project Management, Project Contingency, Company Overhead, and Company Profit percentages.
+  - New "Waste & Markups" settings tab for granular financial control.
+- **Smart Wall Assembly Defaults**:
+  - Intelligent preset logic based on Wall Framing Type selection in the Inspector Panel.
+  - **Foundation Wall**: New framing type with 10" default thickness and damp-proofing label logic.
+  - **Partition 2x4**: Automatically defaults exterior cladding skin to "None".
+  - **Exterior 2x6**: Automatically defaults assembly thickness to 6.5".
+- **Hierarchical Financial Rollup**:
+  - New rollup hierarchy in MTO Matrix and PDF Reports: Base Direct Cost (w/ Waste) -> Indirect Costs -> Gross Margin -> Contractor Grand Total / Bid Price.
+
+### Updated
+- **Cost Estimation Engine**: Refactored `estimator.ts` to support global settings injection for waste and markup calculations.
+- **Documentation**: Updated `README.md`, `SYSTEM_BIBLE.md`, and `CHANGELOG.md` with latest feature specifications and mathematical formulations.
+
+---
+
 ## [1.3.0] - 2026-08-15
 
 ### Added

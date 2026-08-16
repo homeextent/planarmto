@@ -36,15 +36,32 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
     const geom = getWallGeometry(wall, nodeMap);
 
     const handleWallTypeChange = (type: WallType) => {
-      const updatedWalls = state.walls.map((w) =>
-        w.id === wall.id
-          ? {
-              ...w,
-              wallType: type,
-              thickness: type.includes('2x6') ? 0.5 : 0.375,
-            }
-          : w
-      );
+      const updatedWalls = state.walls.map((w) => {
+        if (w.id === wall.id) {
+          let thickness = w.thickness;
+          let finishExterior = w.finishExterior;
+
+          if (type === 'partition_2x4') {
+            finishExterior = 'none';
+          } else if (type === 'exterior_2x6') {
+            thickness = 6.5 / 12; // 0.5417 ft
+          } else if (type === 'foundation_wall') {
+            thickness = 10 / 12; // 0.8333 ft
+            finishExterior = 'none'; // Damp-proofing logic
+          } else {
+            // Default thickness logic for other types
+            thickness = type.includes('2x6') ? 0.5 : 0.375;
+          }
+
+          return {
+            ...w,
+            wallType: type,
+            thickness,
+            finishExterior,
+          };
+        }
+        return w;
+      });
       onChange({ ...state, walls: updatedWalls });
     };
 
@@ -92,6 +109,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               <option value="partition_2x4">Partition 2x4</option>
               <option value="plumbing_2x6">Plumbing Wet Wall 2x6</option>
               <option value="bearing_2x6">Load Bearing 2x6</option>
+              <option value="foundation_wall">Foundation Wall</option>
             </select>
           </div>
 
@@ -163,7 +181,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                     key={p.label}
                     type="button"
                     onClick={() => {
-                      const updatedWalls = state.walls.map((w) =>
+                      const updatedWalls = state.walls.map((w: any) =>
                         w.id === wall.id ? { ...w, thickness: p.val } : w
                       );
                       onChange({ ...state, walls: updatedWalls });
@@ -203,14 +221,14 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                 type="checkbox"
                 checked={wall.soundInsulated || false}
                 onChange={(e) => {
-                  const updatedWalls = state.walls.map((w) =>
+                  const updatedWalls = state.walls.map((w: any) =>
                     w.id === wall.id ? { ...w, soundInsulated: e.target.checked } : w
                   );
                   onChange({ ...state, walls: updatedWalls });
                 }}
                 className="rounded bg-slate-950 border-slate-700 text-sky-500"
               />
-              <span>Sound Batt Insulation</span>
+              <span>{wall.wallType === 'foundation_wall' ? 'Damp-proofing Applied' : 'Sound Batt Insulation'}</span>
             </label>
 
             <button

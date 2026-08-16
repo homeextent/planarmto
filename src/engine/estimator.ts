@@ -481,16 +481,26 @@ export interface EstimatedCostResult {
     concreteFoundations: CategoryCost;
     roofingEnvelope: CategoryCost;
   };
+  // Financial Rollup
+  baseDirectCost: number;
+  indirectProjectManagement: number;
+  indirectContingency: number;
+  grossMarginOverhead: number;
+  grossMarginProfit: number;
+  contractorGrandTotal: number;
 }
 
 export function calculateEstimatedCost(
   mto: MTOReport,
   rates: UnitCostRates = DEFAULT_UNIT_COST_RATES,
   inclusions: CategoryInclusions = DEFAULT_CATEGORY_INCLUSIONS,
-  itemInclusions: ItemInclusions = DEFAULT_ITEM_INCLUSIONS
+  itemInclusions: ItemInclusions = DEFAULT_ITEM_INCLUSIONS,
+  settings?: FloorplanState['settings']
 ): EstimatedCostResult {
   const inc = { ...DEFAULT_CATEGORY_INCLUSIONS, ...inclusions };
   const itemInc = { ...DEFAULT_ITEM_INCLUSIONS, ...itemInclusions };
+
+  const wasteMultiplier = 1 + (settings?.wasteFactorPercentage || 0) / 100;
 
   // Helper to accumulate material and labor
   let matFinishes = 0;
@@ -498,23 +508,23 @@ export function calculateEstimatedCost(
 
   // 1. Finishes
   if (itemInc.drywallBoard !== false) {
-    matFinishes += mto.drywallBoardSf * rates.drywallPerSf.material;
-    labFinishes += mto.drywallBoardSf * rates.drywallPerSf.labor;
+    matFinishes += mto.drywallBoardSf * rates.drywallPerSf.material * wasteMultiplier;
+    labFinishes += mto.drywallBoardSf * rates.drywallPerSf.labor * wasteMultiplier;
   }
 
   if (itemInc.paintCoverage !== false) {
-    matFinishes += mto.paintCoverageSf * rates.paintPerSf.material;
-    labFinishes += mto.paintCoverageSf * rates.paintPerSf.labor;
+    matFinishes += mto.paintCoverageSf * rates.paintPerSf.material * wasteMultiplier;
+    labFinishes += mto.paintCoverageSf * rates.paintPerSf.labor * wasteMultiplier;
   }
 
   if (itemInc.flooringPackage !== false) {
-    matFinishes += mto.flooringPackageSf * rates.flooringPerSf.material;
-    labFinishes += mto.flooringPackageSf * rates.flooringPerSf.labor;
+    matFinishes += mto.flooringPackageSf * rates.flooringPerSf.material * wasteMultiplier;
+    labFinishes += mto.flooringPackageSf * rates.flooringPerSf.labor * wasteMultiplier;
   }
 
   if (itemInc.extWallInsulation !== false) {
-    matFinishes += mto.extWallInsulationSf * rates.extInsulationPerSf.material;
-    labFinishes += mto.extWallInsulationSf * rates.extInsulationPerSf.labor;
+    matFinishes += mto.extWallInsulationSf * rates.extInsulationPerSf.material * wasteMultiplier;
+    labFinishes += mto.extWallInsulationSf * rates.extInsulationPerSf.labor * wasteMultiplier;
   }
 
   // 2. Carpentry & Framing
@@ -522,38 +532,38 @@ export function calculateEstimatedCost(
   let labCarpentry = 0;
 
   if (itemInc.wallStudFraming !== false) {
-    matCarpentry += mto.wallStudFramingLf * rates.studFramingPerLf.material;
-    labCarpentry += mto.wallStudFramingLf * rates.studFramingPerLf.labor;
+    matCarpentry += mto.wallStudFramingLf * rates.studFramingPerLf.material * wasteMultiplier;
+    labCarpentry += mto.wallStudFramingLf * rates.studFramingPerLf.labor * wasteMultiplier;
   }
 
   if (itemInc.osbSubfloorDecking !== false) {
-    matCarpentry += mto.osbSubfloorDeckingSf * rates.osbSubfloorPerSf.material;
-    labCarpentry += mto.osbSubfloorDeckingSf * rates.osbSubfloorPerSf.labor;
+    matCarpentry += mto.osbSubfloorDeckingSf * rates.osbSubfloorPerSf.material * wasteMultiplier;
+    labCarpentry += mto.osbSubfloorDeckingSf * rates.osbSubfloorPerSf.labor * wasteMultiplier;
   }
 
   if (itemInc.structuralBeams !== false) {
-    matCarpentry += mto.structuralBeamsLf * rates.beamPerLf.material;
-    labCarpentry += mto.structuralBeamsLf * rates.beamPerLf.labor;
+    matCarpentry += mto.structuralBeamsLf * rates.beamPerLf.material * wasteMultiplier;
+    labCarpentry += mto.structuralBeamsLf * rates.beamPerLf.labor * wasteMultiplier;
   }
 
   if (itemInc.supportColumnsPosts !== false) {
-    matCarpentry += mto.supportColumnsPosts * rates.postPerUnit.material;
-    labCarpentry += mto.supportColumnsPosts * rates.postPerUnit.labor;
+    matCarpentry += mto.supportColumnsPosts * rates.postPerUnit.material * wasteMultiplier;
+    labCarpentry += mto.supportColumnsPosts * rates.postPerUnit.labor * wasteMultiplier;
   }
 
   if (itemInc.baseboardTrims !== false) {
-    matCarpentry += mto.baseboardTrimsLf * rates.baseboardPerLf.material;
-    labCarpentry += mto.baseboardTrimsLf * rates.baseboardPerLf.labor;
+    matCarpentry += mto.baseboardTrimsLf * rates.baseboardPerLf.material * wasteMultiplier;
+    labCarpentry += mto.baseboardTrimsLf * rates.baseboardPerLf.labor * wasteMultiplier;
   }
 
   if (itemInc.apertureCasing !== false) {
-    matCarpentry += mto.apertureCasingLf * rates.casingPerLf.material;
-    labCarpentry += mto.apertureCasingLf * rates.casingPerLf.labor;
+    matCarpentry += mto.apertureCasingLf * rates.casingPerLf.material * wasteMultiplier;
+    labCarpentry += mto.apertureCasingLf * rates.casingPerLf.labor * wasteMultiplier;
   }
 
   if (itemInc.calculatedStairRisers !== false) {
-    matCarpentry += mto.calculatedStairRisers * rates.stairRiserPerUnit.material;
-    labCarpentry += mto.calculatedStairRisers * rates.stairRiserPerUnit.labor;
+    matCarpentry += mto.calculatedStairRisers * rates.stairRiserPerUnit.material * wasteMultiplier;
+    labCarpentry += mto.calculatedStairRisers * rates.stairRiserPerUnit.labor * wasteMultiplier;
   }
 
   // 3. Fenestration
@@ -561,33 +571,33 @@ export function calculateEstimatedCost(
   let labFenestration = 0;
 
   if (itemInc.totalWindows !== false) {
-    matFenestration += mto.totalWindowsUnits * rates.windowPerUnit.material;
-    labFenestration += mto.totalWindowsUnits * rates.windowPerUnit.labor;
+    matFenestration += mto.totalWindowsUnits * rates.windowPerUnit.material * wasteMultiplier;
+    labFenestration += mto.totalWindowsUnits * rates.windowPerUnit.labor * wasteMultiplier;
   }
 
   if (itemInc.passageDoors !== false) {
-    matFenestration += mto.passageDoorsUnits * rates.passageDoorPerUnit.material;
-    labFenestration += mto.passageDoorsUnits * rates.passageDoorPerUnit.labor;
+    matFenestration += mto.passageDoorsUnits * rates.passageDoorPerUnit.material * wasteMultiplier;
+    labFenestration += mto.passageDoorsUnits * rates.passageDoorPerUnit.labor * wasteMultiplier;
   }
 
   if (itemInc.pocketDoors !== false) {
-    matFenestration += mto.pocketDoorsUnits * rates.pocketDoorPerUnit.material;
-    labFenestration += mto.pocketDoorsUnits * rates.pocketDoorPerUnit.labor;
+    matFenestration += mto.pocketDoorsUnits * rates.pocketDoorPerUnit.material * wasteMultiplier;
+    labFenestration += mto.pocketDoorsUnits * rates.pocketDoorPerUnit.labor * wasteMultiplier;
   }
 
   if (itemInc.exteriorDoors !== false) {
-    matFenestration += mto.exteriorDoorsUnits * rates.exteriorDoorPerUnit.material;
-    labFenestration += mto.exteriorDoorsUnits * rates.exteriorDoorPerUnit.labor;
+    matFenestration += mto.exteriorDoorsUnits * rates.exteriorDoorPerUnit.material * wasteMultiplier;
+    labFenestration += mto.exteriorDoorsUnits * rates.exteriorDoorPerUnit.labor * wasteMultiplier;
   }
 
   if (itemInc.overheadGarageBays !== false) {
-    matFenestration += mto.overheadGarageBays * rates.garageDoorPerBay.material;
-    labFenestration += mto.overheadGarageBays * rates.garageDoorPerBay.labor;
+    matFenestration += mto.overheadGarageBays * rates.garageDoorPerBay.material * wasteMultiplier;
+    labFenestration += mto.overheadGarageBays * rates.garageDoorPerBay.labor * wasteMultiplier;
   }
 
   if (itemInc.doorHardwareSets !== false) {
-    matFenestration += mto.doorHardwareSets * rates.doorHardwarePerSet.material;
-    labFenestration += mto.doorHardwareSets * rates.doorHardwarePerSet.labor;
+    matFenestration += mto.doorHardwareSets * rates.doorHardwarePerSet.material * wasteMultiplier;
+    labFenestration += mto.doorHardwareSets * rates.doorHardwarePerSet.labor * wasteMultiplier;
   }
 
   // 4. Electrical & Safety
@@ -595,53 +605,53 @@ export function calculateEstimatedCost(
   let labElectrical = 0;
 
   if (itemInc.stdSwitches !== false) {
-    matElectrical += mto.stdSwitchesUnits * rates.switchPerUnit.material;
-    labElectrical += mto.stdSwitchesUnits * rates.switchPerUnit.labor;
+    matElectrical += mto.stdSwitchesUnits * rates.switchPerUnit.material * wasteMultiplier;
+    labElectrical += mto.stdSwitchesUnits * rates.switchPerUnit.labor * wasteMultiplier;
   }
 
   if (itemInc.dimmers !== false) {
-    matElectrical += mto.dimmersUnits * rates.switchPerUnit.material * 1.5;
-    labElectrical += mto.dimmersUnits * rates.switchPerUnit.labor * 1.2;
+    matElectrical += mto.dimmersUnits * rates.switchPerUnit.material * 1.5 * wasteMultiplier;
+    labElectrical += mto.dimmersUnits * rates.switchPerUnit.labor * 1.2 * wasteMultiplier;
   }
 
   if (itemInc.stdOutlets !== false) {
-    matElectrical += mto.stdOutletsUnits * rates.outletPerUnit.material;
-    labElectrical += mto.stdOutletsUnits * rates.outletPerUnit.labor;
+    matElectrical += mto.stdOutletsUnits * rates.outletPerUnit.material * wasteMultiplier;
+    labElectrical += mto.stdOutletsUnits * rates.outletPerUnit.labor * wasteMultiplier;
   }
 
   if (itemInc.gfciOutlets !== false) {
-    matElectrical += mto.gfciOutletsUnits * rates.gfciPerUnit.material;
-    labElectrical += mto.gfciOutletsUnits * rates.gfciPerUnit.labor;
+    matElectrical += mto.gfciOutletsUnits * rates.gfciPerUnit.material * wasteMultiplier;
+    labElectrical += mto.gfciOutletsUnits * rates.gfciPerUnit.labor * wasteMultiplier;
   }
 
   if (itemInc.heavyOutlets24v !== false) {
-    matElectrical += mto.heavyOutlets24vUnits * rates.outletPerUnit.material * 2.5;
-    labElectrical += mto.heavyOutlets24vUnits * rates.outletPerUnit.labor * 1.8;
+    matElectrical += mto.heavyOutlets24vUnits * rates.outletPerUnit.material * 2.5 * wasteMultiplier;
+    labElectrical += mto.heavyOutlets24vUnits * rates.outletPerUnit.labor * 1.8 * wasteMultiplier;
   }
 
   if (itemInc.potlights !== false) {
-    matElectrical += mto.potlightsUnits * rates.potlightPerUnit.material;
-    labElectrical += mto.potlightsUnits * rates.potlightPerUnit.labor;
+    matElectrical += mto.potlightsUnits * rates.potlightPerUnit.material * wasteMultiplier;
+    labElectrical += mto.potlightsUnits * rates.potlightPerUnit.labor * wasteMultiplier;
   }
 
   if (itemInc.fixturesSconces !== false) {
-    matElectrical += mto.fixturesSconcesUnits * rates.potlightPerUnit.material * 1.2;
-    labElectrical += mto.fixturesSconcesUnits * rates.potlightPerUnit.labor * 1.0;
+    matElectrical += mto.fixturesSconcesUnits * rates.potlightPerUnit.material * 1.2 * wasteMultiplier;
+    labElectrical += mto.fixturesSconcesUnits * rates.potlightPerUnit.labor * 1.0 * wasteMultiplier;
   }
 
   if (itemInc.ceilingFans !== false) {
-    matElectrical += mto.ceilingFansUnits * rates.ceilingFanPerUnit.material;
-    labElectrical += mto.ceilingFansUnits * rates.ceilingFanPerUnit.labor;
+    matElectrical += mto.ceilingFansUnits * rates.ceilingFanPerUnit.material * wasteMultiplier;
+    labElectrical += mto.ceilingFansUnits * rates.ceilingFanPerUnit.labor * wasteMultiplier;
   }
 
   if (itemInc.spotExhaustFans !== false) {
-    matElectrical += mto.spotExhaustFansUnits * rates.exhaustFanPerUnit.material;
-    labElectrical += mto.spotExhaustFansUnits * rates.exhaustFanPerUnit.labor;
+    matElectrical += mto.spotExhaustFansUnits * rates.exhaustFanPerUnit.material * wasteMultiplier;
+    labElectrical += mto.spotExhaustFansUnits * rates.exhaustFanPerUnit.labor * wasteMultiplier;
   }
 
   if (itemInc.smokeCoAlarms !== false) {
-    matElectrical += mto.smokeCoAlarmsUnits * rates.smokeAlarmPerUnit.material;
-    labElectrical += mto.smokeCoAlarmsUnits * rates.smokeAlarmPerUnit.labor;
+    matElectrical += mto.smokeCoAlarmsUnits * rates.smokeAlarmPerUnit.material * wasteMultiplier;
+    labElectrical += mto.smokeCoAlarmsUnits * rates.smokeAlarmPerUnit.labor * wasteMultiplier;
   }
 
   // 5. Plumbing & Civil
@@ -649,13 +659,13 @@ export function calculateEstimatedCost(
   let labPlumbing = 0;
 
   if (itemInc.plumbingFixtures !== false) {
-    matPlumbing += mto.plumbingFixturesUnits * rates.plumbingPerFixture.material;
-    labPlumbing += mto.plumbingFixturesUnits * rates.plumbingPerFixture.labor;
+    matPlumbing += mto.plumbingFixturesUnits * rates.plumbingPerFixture.material * wasteMultiplier;
+    labPlumbing += mto.plumbingFixturesUnits * rates.plumbingPerFixture.labor * wasteMultiplier;
   }
 
   if (itemInc.utilityTrenching !== false) {
-    matPlumbing += mto.utilityTrenchingLf * rates.utilityTrenchPerLf.material;
-    labPlumbing += mto.utilityTrenchingLf * rates.utilityTrenchPerLf.labor;
+    matPlumbing += mto.utilityTrenchingLf * rates.utilityTrenchPerLf.material * wasteMultiplier;
+    labPlumbing += mto.utilityTrenchingLf * rates.utilityTrenchPerLf.labor * wasteMultiplier;
   }
 
   // 6. Concrete & Foundations
@@ -663,18 +673,18 @@ export function calculateEstimatedCost(
   let labConcrete = 0;
 
   if (itemInc.pouredConcreteCy !== false) {
-    matConcrete += mto.pouredConcreteCy * rates.concretePerCy.material;
-    labConcrete += mto.pouredConcreteCy * rates.concretePerCy.labor;
+    matConcrete += mto.pouredConcreteCy * rates.concretePerCy.material * wasteMultiplier;
+    labConcrete += mto.pouredConcreteCy * rates.concretePerCy.labor * wasteMultiplier;
   }
 
   if (itemInc.helicalPiersPiles !== false) {
-    matConcrete += mto.helicalPiersPiles * rates.pierPerUnit.material;
-    labConcrete += mto.helicalPiersPiles * rates.pierPerUnit.labor;
+    matConcrete += mto.helicalPiersPiles * rates.pierPerUnit.material * wasteMultiplier;
+    labConcrete += mto.helicalPiersPiles * rates.pierPerUnit.labor * wasteMultiplier;
   }
 
   if (itemInc.foundationSlabInsulation !== false) {
-    matConcrete += mto.foundationSlabInsulationSf * 0.85;
-    labConcrete += mto.foundationSlabInsulationSf * 0.55;
+    matConcrete += mto.foundationSlabInsulationSf * 0.85 * wasteMultiplier;
+    labConcrete += mto.foundationSlabInsulationSf * 0.55 * wasteMultiplier;
   }
 
   // 7. Roofing & Facades
@@ -682,42 +692,42 @@ export function calculateEstimatedCost(
   let labRoofing = 0;
 
   if (itemInc.roofingArea !== false) {
-    matRoofing += mto.roofingAreaSq * rates.roofingPerSq.material;
-    labRoofing += mto.roofingAreaSq * rates.roofingPerSq.labor;
+    matRoofing += mto.roofingAreaSq * rates.roofingPerSq.material * wasteMultiplier;
+    labRoofing += mto.roofingAreaSq * rates.roofingPerSq.labor * wasteMultiplier;
   }
 
   if (itemInc.primarySiding !== false) {
-    matRoofing += mto.primarySidingSf * rates.sidingPerSf.material;
-    labRoofing += mto.primarySidingSf * rates.sidingPerSf.labor;
+    matRoofing += mto.primarySidingSf * rates.sidingPerSf.material * wasteMultiplier;
+    labRoofing += mto.primarySidingSf * rates.sidingPerSf.labor * wasteMultiplier;
   }
 
   if (itemInc.stoneBrickVeneer !== false) {
-    matRoofing += mto.stoneBrickVeneerSf * rates.sidingPerSf.material * 2.2;
-    labRoofing += mto.stoneBrickVeneerSf * rates.sidingPerSf.labor * 2.0;
+    matRoofing += mto.stoneBrickVeneerSf * rates.sidingPerSf.material * 2.2 * wasteMultiplier;
+    labRoofing += mto.stoneBrickVeneerSf * rates.sidingPerSf.labor * 2.0 * wasteMultiplier;
   }
 
   if (itemInc.soffitFasciaEaves !== false) {
-    matRoofing += mto.soffitTotalLf * rates.soffitPerLf.material;
-    labRoofing += mto.soffitTotalLf * rates.soffitPerLf.labor;
-    matRoofing += mto.fasciaTotalLf * rates.fasciaPerLf.material;
-    labRoofing += mto.fasciaTotalLf * rates.fasciaPerLf.labor;
-    matRoofing += mto.eavestroughsLf * rates.eavestroughPerLf.material;
-    labRoofing += mto.eavestroughsLf * rates.eavestroughPerLf.labor;
+    matRoofing += mto.soffitTotalLf * rates.soffitPerLf.material * wasteMultiplier;
+    labRoofing += mto.soffitTotalLf * rates.soffitPerLf.labor * wasteMultiplier;
+    matRoofing += mto.fasciaTotalLf * rates.fasciaPerLf.material * wasteMultiplier;
+    labRoofing += mto.fasciaTotalLf * rates.fasciaPerLf.labor * wasteMultiplier;
+    matRoofing += mto.eavestroughsLf * rates.eavestroughPerLf.material * wasteMultiplier;
+    labRoofing += mto.eavestroughsLf * rates.eavestroughPerLf.labor * wasteMultiplier;
   }
 
   if (itemInc.timberDecking !== false) {
-    matRoofing += mto.timberDeckingSf * rates.deckingPerSf.material;
-    labRoofing += mto.timberDeckingSf * rates.deckingPerSf.labor;
+    matRoofing += mto.timberDeckingSf * rates.deckingPerSf.material * wasteMultiplier;
+    labRoofing += mto.timberDeckingSf * rates.deckingPerSf.labor * wasteMultiplier;
   }
 
   if (itemInc.deckRailing !== false) {
-    matRoofing += mto.deckPerimeterRailingLf * rates.deckRailingPerLf.material;
-    labRoofing += mto.deckPerimeterRailingLf * rates.deckRailingPerLf.labor;
+    matRoofing += mto.deckPerimeterRailingLf * rates.deckRailingPerLf.material * wasteMultiplier;
+    labRoofing += mto.deckPerimeterRailingLf * rates.deckRailingPerLf.labor * wasteMultiplier;
   }
 
   if (itemInc.siteHardscaping !== false) {
-    matRoofing += mto.siteHardscapingSf * rates.hardscapePerSf.material;
-    labRoofing += mto.siteHardscapingSf * rates.hardscapePerSf.labor;
+    matRoofing += mto.siteHardscapingSf * rates.hardscapePerSf.material * wasteMultiplier;
+    labRoofing += mto.siteHardscapingSf * rates.hardscapePerSf.labor * wasteMultiplier;
   }
 
   const catFinishes: CategoryCost = {
@@ -782,12 +792,26 @@ export function calculateEstimatedCost(
     (inc.concreteFoundations ? labConcrete : 0) +
     (inc.roofingEnvelope ? labRoofing : 0);
 
-  const totalCost = materialSubtotal + laborSubtotal;
+  const baseDirectCost = materialSubtotal + laborSubtotal;
+
+  // Indirect Costs & Markups
+  const pmPct = (settings?.projectManagementPercentage || 0) / 100;
+  const contPct = (settings?.projectContingencyPercentage || 0) / 100;
+  const ohPct = (settings?.overheadPercentage || 0) / 100;
+  const profitPct = (settings?.profitPercentage || 0) / 100;
+
+  const indirectProjectManagement = baseDirectCost * pmPct;
+  const indirectContingency = baseDirectCost * contPct;
+  const subtotalBeforeOH = baseDirectCost + indirectProjectManagement + indirectContingency;
+
+  const grossMarginOverhead = subtotalBeforeOH * ohPct;
+  const grossMarginProfit = subtotalBeforeOH * profitPct;
+  const contractorGrandTotal = subtotalBeforeOH + grossMarginOverhead + grossMarginProfit;
 
   return {
     materialSubtotal: Math.round(materialSubtotal),
     laborSubtotal: Math.round(laborSubtotal),
-    totalCost: Math.round(totalCost),
+    totalCost: Math.round(contractorGrandTotal),
     subtotals: {
       finishes: catFinishes.total,
       carpentryFraming: catCarpentry.total,
@@ -806,5 +830,11 @@ export function calculateEstimatedCost(
       concreteFoundations: catConcrete,
       roofingEnvelope: catRoofing,
     },
+    baseDirectCost: Math.round(baseDirectCost),
+    indirectProjectManagement: Math.round(indirectProjectManagement),
+    indirectContingency: Math.round(indirectContingency),
+    grossMarginOverhead: Math.round(grossMarginOverhead),
+    grossMarginProfit: Math.round(grossMarginProfit),
+    contractorGrandTotal: Math.round(contractorGrandTotal),
   };
 }

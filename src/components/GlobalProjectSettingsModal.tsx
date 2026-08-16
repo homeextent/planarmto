@@ -47,7 +47,7 @@ export const GlobalProjectSettingsModal: React.FC<GlobalProjectSettingsModalProp
   onUpdateSettings,
   totalWallsCount,
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'engine' | 'inclusions' | 'branding'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'engine' | 'financial' | 'inclusions' | 'branding'>('general');
   const [formSettings, setFormSettings] = useState<ProjectSettings>({ ...settings });
   const [cascadeToAllWalls, setCascadeToAllWalls] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -254,6 +254,19 @@ export const GlobalProjectSettingsModal: React.FC<GlobalProjectSettingsModalProp
           >
             <Layers className="w-4 h-4" />
             Estimate Inclusions
+          </button>
+
+          <button
+            id="tab-btn-financial"
+            onClick={() => setActiveTab('financial')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 ${
+              activeTab === 'financial'
+                ? 'border-sky-500 text-sky-400 bg-slate-900/80'
+                : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/40'
+            }`}
+          >
+            <Sliders className="w-4 h-4" />
+            Waste & Markups
           </button>
 
           <button
@@ -594,7 +607,127 @@ export const GlobalProjectSettingsModal: React.FC<GlobalProjectSettingsModalProp
             </div>
           )}
 
-          {/* TAB 4: COMPANY BRANDING & LOGO */}
+          {/* TAB 4: FINANCIAL MULTIPLIERS */}
+          {activeTab === 'financial' && (
+            <div className="space-y-6">
+              <div className="bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-4 flex items-start gap-3">
+                <Sliders className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-xs font-bold text-emerald-300">
+                    Waste Factors & Commercial Markups
+                  </h4>
+                  <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                    Adjust material waste factors and corporate financial multipliers. These percentages are applied to the base takeoff to generate the final contractor bid price.
+                  </p>
+                </div>
+              </div>
+
+              {/* Material & Labor Waste */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/60 space-y-4">
+                <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wide flex items-center gap-2">
+                  <Hammer className="w-4 h-4 text-sky-400" />
+                  Jobsite Waste & Scrap
+                </h4>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-sm font-semibold text-slate-100 block">
+                      Material & Labor Waste Factor (%)
+                    </label>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Applied directly to base quantities to account for cutting, damage, and site waste.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      max="50"
+                      value={formSettings.wasteFactorPercentage}
+                      onChange={(e) =>
+                        setFormSettings({
+                          ...formSettings,
+                          wasteFactorPercentage: Math.max(0, Math.min(50, parseFloat(e.target.value) || 0)),
+                        })
+                      }
+                      className="w-24 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-right font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-500"
+                    />
+                    <span className="text-xs text-slate-400 font-mono">%</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Commercial Markups */}
+              <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-4">
+                <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wide flex items-center gap-2">
+                  <Calculator className="w-4 h-4 text-sky-400" />
+                  Commercial Markups & Indirect Costs
+                </h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-300">Company Overhead (%)</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="1"
+                          value={formSettings.overheadPercentage}
+                          onChange={(e) => setFormSettings({...formSettings, overheadPercentage: parseFloat(e.target.value) || 0})}
+                          className="w-20 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-xs text-right font-mono text-sky-400"
+                        />
+                        <span className="text-[10px] text-slate-500 font-mono">%</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-300">Company Profit (%)</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="1"
+                          value={formSettings.profitPercentage}
+                          onChange={(e) => setFormSettings({...formSettings, profitPercentage: parseFloat(e.target.value) || 0})}
+                          className="w-20 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-xs text-right font-mono text-sky-400"
+                        />
+                        <span className="text-[10px] text-slate-500 font-mono">%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-300">Project Contingency (%)</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="1"
+                          value={formSettings.projectContingencyPercentage}
+                          onChange={(e) => setFormSettings({...formSettings, projectContingencyPercentage: parseFloat(e.target.value) || 0})}
+                          className="w-20 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-xs text-right font-mono text-sky-400"
+                        />
+                        <span className="text-[10px] text-slate-500 font-mono">%</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-300">Project Management (%)</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="1"
+                          value={formSettings.projectManagementPercentage}
+                          onChange={(e) => setFormSettings({...formSettings, projectManagementPercentage: parseFloat(e.target.value) || 0})}
+                          className="w-20 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-xs text-right font-mono text-sky-400"
+                        />
+                        <span className="text-[10px] text-slate-500 font-mono">%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: COMPANY BRANDING & LOGO */}
           {activeTab === 'branding' && (
             <div className="space-y-6">
               <div className="bg-sky-950/30 border border-sky-500/20 rounded-xl p-4 flex items-start gap-3">

@@ -18,6 +18,11 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   showDimensions: true,
   showRoomLabels: true,
   showMepIcons: true,
+  wasteFactorPercentage: 10, // 10% default waste
+  overheadPercentage: 10,
+  profitPercentage: 10,
+  projectContingencyPercentage: 5,
+  projectManagementPercentage: 5,
   categoryInclusions: { ...DEFAULT_CATEGORY_INCLUSIONS },
 };
 
