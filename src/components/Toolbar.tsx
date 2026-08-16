@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActiveTool } from '../types';
+import { ActiveTool, WallPreset } from '../types';
 import {
   MousePointer,
   PenTool,
@@ -21,11 +21,16 @@ import {
   Layers,
   ChevronDown,
   ChevronRight,
+  Shield,
+  Home,
+  Layout,
 } from 'lucide-react';
 
 interface ToolbarProps {
   activeTool: ActiveTool;
   onSelectTool: (tool: ActiveTool) => void;
+  activeWallPreset: WallPreset;
+  onSelectWallPreset: (preset: WallPreset) => void;
 }
 
 interface ToolGroup {
@@ -39,7 +44,12 @@ interface ToolGroup {
   }>;
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onSelectTool }) => {
+export const Toolbar: React.FC<ToolbarProps> = ({
+  activeTool,
+  onSelectTool,
+  activeWallPreset,
+  onSelectWallPreset,
+}) => {
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
     structural: false,
     electrical: false,
@@ -141,6 +151,35 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onSelectTool }) =>
 
               {!isCollapsed && (
                 <div className="grid grid-cols-1 gap-1">
+                  {group.id === 'drafting' && (
+                    <div className="px-2 pb-2 mb-2 border-b border-slate-800/50">
+                      <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-tighter block mb-1.5">
+                        Active Wall Preset
+                      </label>
+                      <div className="grid grid-cols-1 gap-1">
+                        {[
+                          { id: 'interior_2x4', label: 'Int Partition (2x4)', icon: <Layout className="w-3.5 h-3.5" /> },
+                          { id: 'exterior_2x6', label: 'Ext Wall (2x6)', icon: <Home className="w-3.5 h-3.5" /> },
+                          { id: 'foundation_10', label: 'Foundation (10")', icon: <Shield className="w-3.5 h-3.5" /> },
+                        ].map((preset) => (
+                          <button
+                            key={preset.id}
+                            onClick={() => onSelectWallPreset(preset.id as WallPreset)}
+                            className={`flex items-center gap-2 px-2 py-1.5 rounded text-[11px] transition-all cursor-pointer ${
+                              activeWallPreset === preset.id
+                                ? 'bg-slate-700 text-sky-400 ring-1 ring-sky-500/50 shadow-inner'
+                                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                            }`}
+                          >
+                            <div className={activeWallPreset === preset.id ? 'text-sky-400' : 'text-slate-500'}>
+                              {preset.icon}
+                            </div>
+                            <span className="truncate font-medium">{preset.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {group.tools.map((tool) => {
                     const isActive = activeTool === tool.id;
                     return (

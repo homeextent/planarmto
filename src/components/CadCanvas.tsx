@@ -11,6 +11,7 @@ import {
   RoomPolygon,
   DeckArea,
   HardscapeArea,
+  WallPreset,
 } from '../types';
 import {
   Point2D,
@@ -48,7 +49,38 @@ interface CadCanvasProps {
   selection: SelectionState;
   onSelect: (selection: SelectionState) => void;
   onDeleteSelected: () => void;
+  activeWallPreset: WallPreset;
 }
+
+// Map Wall Preset to default drafting properties
+const getWallPropertiesFromPreset = (preset: WallPreset) => {
+  switch (preset) {
+    case 'interior_2x4':
+      return {
+        thickness: 3.5 / 12,
+        wallType: 'interior_2x4' as const,
+        finishExterior: 'none' as const,
+      };
+    case 'exterior_2x6':
+      return {
+        thickness: 6.5 / 12,
+        wallType: 'exterior_2x6' as const,
+        finishExterior: 'vinyl_siding' as const,
+      };
+    case 'foundation_10':
+      return {
+        thickness: 10 / 12,
+        wallType: 'foundation_wall' as const,
+        finishExterior: 'none' as const,
+      };
+    default:
+      return {
+        thickness: 4.5 / 12,
+        wallType: 'interior_2x4' as const,
+        finishExterior: 'none' as const,
+      };
+  }
+};
 
 // Helper to split a wall at a given point (for T-junctions and perimeter subdivision)
 function splitWallAtPoint(
@@ -131,6 +163,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   selection,
   onSelect,
   onDeleteSelected,
+  activeWallPreset,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -1574,37 +1607,35 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           const n3: CadNode = { id: `n_${idPrefix}_3`, x: x2, y: y2 };
           const n4: CadNode = { id: `n_${idPrefix}_4`, x: x1, y: y2 };
 
+          const presetProps = getWallPropertiesFromPreset(activeWallPreset);
+
           const w1: CadWall = {
             id: `w_${idPrefix}_1`,
             startNodeId: n1.id,
             endNodeId: n2.id,
-            thickness: state.settings.defaultWallThickness,
+            ...presetProps,
             height: state.settings.defaultWallHeight,
-            wallType: 'exterior_2x6',
           };
           const w2: CadWall = {
             id: `w_${idPrefix}_2`,
             startNodeId: n2.id,
             endNodeId: n3.id,
-            thickness: state.settings.defaultWallThickness,
+            ...presetProps,
             height: state.settings.defaultWallHeight,
-            wallType: 'exterior_2x6',
           };
           const w3: CadWall = {
             id: `w_${idPrefix}_3`,
             startNodeId: n3.id,
             endNodeId: n4.id,
-            thickness: state.settings.defaultWallThickness,
+            ...presetProps,
             height: state.settings.defaultWallHeight,
-            wallType: 'exterior_2x6',
           };
           const w4: CadWall = {
             id: `w_${idPrefix}_4`,
             startNodeId: n4.id,
             endNodeId: n1.id,
-            thickness: state.settings.defaultWallThickness,
+            ...presetProps,
             height: state.settings.defaultWallHeight,
-            wallType: 'exterior_2x6',
           };
 
           const newNodes = [...state.nodes, n1, n2, n3, n4];
@@ -1718,13 +1749,13 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
         // Avoid zero-length walls
         if (endNodeId && endNodeId !== activeWallStartNodeId) {
+          const presetProps = getWallPropertiesFromPreset(activeWallPreset);
           const newWall: CadWall = {
             id: `wall_${Date.now()}`,
             startNodeId: activeWallStartNodeId,
             endNodeId,
-            thickness: state.settings.defaultWallThickness,
+            ...presetProps,
             height: state.settings.defaultWallHeight,
-            wallType: 'exterior_2x6',
           };
 
           const finalWalls = [...updatedWalls, newWall];

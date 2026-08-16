@@ -3,6 +3,8 @@ export type CanvasTheme = 'dark' | 'light' | 'blueprint';
 
 export type WallType = 'exterior_2x6' | 'interior_2x4' | 'partition_2x4' | 'plumbing_2x6' | 'bearing_2x6' | 'foundation_wall';
 
+export type WallPreset = 'interior_2x4' | 'exterior_2x6' | 'foundation_10';
+
 export interface CadNode {
   id: string;
   x: number; // in feet (or meters if metric mode, internally normalized to feet: 1 unit = 1 ft)

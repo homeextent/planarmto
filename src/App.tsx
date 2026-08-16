@@ -3,6 +3,7 @@ import {
   FloorplanState,
   ActiveTool,
   SelectionState,
+  WallPreset,
   UnitCostRates,
   CategoryInclusions,
   DEFAULT_CATEGORY_INCLUSIONS,
@@ -44,6 +45,9 @@ export default function App() {
 
   // Active drafting tool
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
+
+  // Active wall preset for drafting
+  const [activeWallPreset, setActiveWallPreset] = useState<WallPreset>('interior_2x4');
 
   // Currently selected element
   const [selection, setSelection] = useState<SelectionState>({ type: 'none' });
@@ -309,6 +313,8 @@ export default function App() {
               setSelection({ type: 'none' });
             }
           }}
+          activeWallPreset={activeWallPreset}
+          onSelectWallPreset={setActiveWallPreset}
         />
 
         {/* Center Interactive 2D CAD Canvas */}
@@ -320,6 +326,7 @@ export default function App() {
           selection={selection}
           onSelect={setSelection}
           onDeleteSelected={handleDeleteSelected}
+          activeWallPreset={activeWallPreset}
         />
 
         {/* Right Real-time MTO Take-Off Matrix */}

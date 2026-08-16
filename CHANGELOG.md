@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.0] - 2026-08-16
+
+### Added
+- **Pre-Drafting Tool Selectors (Wall Pen & Room Box)**:
+  - New **Active Wall Type Preset Selector** in the CAD tool palette.
+  - Supported Presets: **Interior Partition (2x4)**, **Exterior Wall (2x6)**, and **Foundation Wall (10")**.
+  - Drafting workflow optimization: Newly drawn walls and 4-wall boxes now inherit selected assembly properties (thickness, framing, and cladding) instantly upon creation.
+- **Repository Maintenance Protocol**:
+  - Established a mandatory documentation synchronization rule.
+  - Automated updates for `README.md`, `SYSTEM_BIBLE.md`, and `CHANGELOG.md` following feature completion.
+
+---
+
 ## [1.4.0] - 2026-08-16
 
 ### Added

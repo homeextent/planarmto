@@ -42,3 +42,11 @@
 * Mode Selection: Ensure **Code Mode** is selected for multi-file edits.
 * Model Selection: Use **gemini-2.5-flash** or **gemini-3-flash-preview**.
 * Start New Session: Click the `+` (New Task) icon at top-right before starting a new feature sprint.
+
+---
+
+**Repository Maintenance Protocol**
+Following the completion and user approval of any feature, bug fix, or architectural modification, the codebase build process must systematically update:
+*   `README.md`: If new UI controls, toolbar options, or workflow capabilities are added.
+*   `SYSTEM_BIBLE.md`: If mathematical formulas, topological algorithms, calculation logic, or data structures are altered.
+*   `CHANGELOG.md`: Generate a new semantic version entry ([vX.X.X]) documenting feature releases, refactors, and QA resolutions.

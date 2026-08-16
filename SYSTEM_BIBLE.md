@@ -40,6 +40,12 @@ The local orientation angle $\theta_{\text{aperture}} = \text{atan2}(v_b.y - v_a
 Each aperture has geometric width $W_a$ and height $H_a$. The rough opening area deducted from the wall surface is:
 $$A_{\text{deduct}} = W_a \times H_a$$
 
+### 2.3 Pre-Drafting Wall Presets
+To optimize drafting efficiency, the system supports active wall type selection prior to instantiation.
+- **Interior Partition (2x4)**: $\text{Thickness} = 3.5"$, $\text{Cladding} = \text{None}$.
+- **Exterior Wall (2x6)**: $\text{Thickness} = 6.5"$, $\text{Cladding} = \text{Vinyl Siding / OSB}$.
+- **Foundation Wall (10")**: $\text{Thickness} = 10"$, $\text{Cladding} = \text{Damp-proofing}$.
+
 ---
 
 ## 3. Dual-Cost Estimation & Take-Off Mathematical Formulations
