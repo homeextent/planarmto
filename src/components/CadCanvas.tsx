@@ -24,6 +24,10 @@ import {
   detectRoomFaces,
   calculatePolygonCentroid,
   isPointInPolygon,
+  convertInputToCenterlineNodes,
+  getNetInteriorPolygon,
+  calculateSignedPolygonArea,
+  getWallThickness,
 } from '../engine/cadMath';
 import { getRoomCategory } from '../engine/roomCategories';
 import {
@@ -232,9 +236,14 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         const meters = feet * 0.3048;
         return `${meters.toFixed(2)} m`;
       }
-      const totalInches = Math.round(feet * 12);
+      const totalInches = feet * 12;
       const ft = Math.floor(totalInches / 12);
-      const inches = totalInches % 12;
+      const inches = Math.round(totalInches % 12);
+      
+      // Handle rounding overflow (e.g. 11.6 inches -> 12 inches -> 1'-0")
+      if (inches === 12) {
+        return `${ft + 1}'-0"`;
+      }
       return `${ft}'-${inches}"`;
     },
     [state.settings.unitSystem]
@@ -590,9 +599,16 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         // Area badge & Finish tag
         ctx.font = '600 11px system-ui, sans-serif';
         ctx.fillStyle = isSelected ? '#38bdf8' : roomCat.color;
+        
+        // Fix: Use net interior area instead of centerline area to match MTO Matrix
+        const avgWallThickness = getWallThickness({ thickness: state.settings.defaultWallThickness || 0.375 });
+        const netInteriorPoints = getNetInteriorPolygon(room.points, avgWallThickness);
+        const netArea = Math.abs(calculateSignedPolygonArea(netInteriorPoints));
+        const displayArea = Math.round(netArea * 10) / 10;
+
         const areaStr = state.settings.unitSystem === 'metric'
-          ? `${(room.area * 0.092903).toFixed(1)} m²`
-          : `${room.area} SF`;
+          ? `${(displayArea * 0.092903).toFixed(1)} m²`
+          : `${displayArea.toFixed(1)} SF`;
         const finishLabel = room.floorFinish.replace(/_/g, ' ');
         ctx.fillText(`${areaStr} • ${finishLabel}`, scent.x, scent.y + 8);
         ctx.restore();
@@ -705,7 +721,17 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         ctx.font = '600 11px system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(formatLength(geom.length), 0, 0);
+
+        // Calculate display length based on wall justification
+        let displayLength = geom.length;
+        const fullThickness = getWallThickness(wall);
+        if (state.settings.wallJustification === 'interior_face') {
+          displayLength -= fullThickness;
+        } else if (state.settings.wallJustification === 'exterior_face') {
+          displayLength += fullThickness;
+        }
+
+        ctx.fillText(formatLength(displayLength), 0, 0);
         ctx.restore();
       }
 
@@ -1565,7 +1591,6 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     const clientX = e.clientX - rect.left;
     const clientY = e.clientY - rect.top;
     const rawWorld = screenToWorld(clientX, clientY);
-
     // Pan with Middle Click or Shift/Space drag
     if (e.button === 1 || e.shiftKey || e.altKey) {
       setIsPanning(true);
@@ -1576,7 +1601,19 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     if (e.button !== 0) return; // Only left click for drawing/selecting
 
     const snap = getSmartSnapPoint(rawWorld, activeWallStartNodeId);
-    const worldPoint = snap.point;
+    
+    // For Room Box tool, we want to snap to the grid first before any other logic
+    let worldPoint = (activeTool === 'wall_rect' || activeTool === 'room_box')
+      ? snapPointToGrid(rawWorld, state.settings.gridSnapSize)
+      : snap.point;
+
+    // Fix: Clean world coordinates to nearest integer inch for room box tool
+    if (activeTool === 'wall_rect' || activeTool === 'room_box') {
+      worldPoint = {
+        x: Math.round(worldPoint.x * 12) / 12,
+        y: Math.round(worldPoint.y * 12) / 12
+      };
+    }
 
     // --- TOOL: RULER MEASURE ---
     if (activeTool === 'ruler_measure') {
@@ -1602,12 +1639,27 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
         if (Math.abs(x2 - x1) > 1 && Math.abs(y2 - y1) > 1) {
           const idPrefix = Date.now();
-          const n1: CadNode = { id: `n_${idPrefix}_1`, x: x1, y: y1 };
-          const n2: CadNode = { id: `n_${idPrefix}_2`, x: x2, y: y1 };
-          const n3: CadNode = { id: `n_${idPrefix}_3`, x: x2, y: y2 };
-          const n4: CadNode = { id: `n_${idPrefix}_4`, x: x1, y: y2 };
-
           const presetProps = getWallPropertiesFromPreset(activeWallPreset);
+          
+          // Apply justification logic: Convert face dimensions to centerline nodes
+          const rawPoints = [
+            { x: x1, y: y1 },
+            { x: x2, y: y1 },
+            { x: x2, y: y2 },
+            { x: x1, y: y2 },
+          ];
+          
+          const fullWallThickness = getWallThickness(presetProps);
+          const centerlinePoints = convertInputToCenterlineNodes(
+            rawPoints,
+            fullWallThickness,
+            state.settings.wallJustification
+          );
+
+          const n1: CadNode = { id: `n_${idPrefix}_1`, x: centerlinePoints[0].x, y: centerlinePoints[0].y };
+          const n2: CadNode = { id: `n_${idPrefix}_2`, x: centerlinePoints[1].x, y: centerlinePoints[1].y };
+          const n3: CadNode = { id: `n_${idPrefix}_3`, x: centerlinePoints[2].x, y: centerlinePoints[2].y };
+          const n4: CadNode = { id: `n_${idPrefix}_4`, x: centerlinePoints[3].x, y: centerlinePoints[3].y };
 
           const w1: CadWall = {
             id: `w_${idPrefix}_1`,
@@ -2097,6 +2149,14 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     setSnapCandidate(snap);
 
     let currentPoint = snap.point;
+
+    // Fix: Clean world coordinates to nearest integer inch for room box tool move
+    if (activeTool === 'wall_rect' || activeTool === 'room_box') {
+      currentPoint = {
+        x: Math.round(currentPoint.x * 12) / 12,
+        y: Math.round(currentPoint.y * 12) / 12
+      };
+    }
 
     // Angle snapping for wall pen
     if (activeTool === 'wall_pen' && activeWallStartNodeId) {

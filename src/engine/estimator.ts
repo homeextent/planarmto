@@ -16,6 +16,11 @@ import {
   getWallGeometry,
   getApertureGeometry,
   calculatePolygonPerimeter,
+  getNetInteriorPolygon,
+  calculateSignedPolygonArea,
+  getWallThickness,
+  getVariableOffsetPolygon,
+  getCoreThickness,
 } from './cadMath';
 
 export const DEFAULT_UNIT_COST_RATES: UnitCostRates = {
@@ -149,7 +154,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       drywallFaces = 2;
     }
 
-    const netDrywallForWall = Math.max(0, grossArea * drywallFaces - apertureTotalArea * drywallFaces);
+    const netDrywallForWall = 0; // Moved to room-based calculation for interior precision
     totalDrywallBoardSf += netDrywallForWall;
 
     wallDetails.push({
@@ -172,6 +177,24 @@ export function calculateMTO(state: FloorplanState): MTOReport {
   const roomDetails: MTOReport['roomDetails'] = [];
 
   rooms.forEach((room) => {
+    // PHASE 3: Derived Inset Finishes Geometry
+    // Flooring, Baseboards, Interior Paint MUST calculate strictly using getNetInteriorPolygon()
+    const avgWallThickness = getWallThickness({ thickness: settings.defaultWallThickness || 0.375 });
+    const netInteriorPoints = getNetInteriorPolygon(room.points, avgWallThickness);
+    const netArea = Math.abs(calculateSignedPolygonArea(netInteriorPoints));
+    const netPerimeter = calculatePolygonPerimeter(netInteriorPoints);
+
+    // Wall Drywall calculation (interior faces per room)
+    let roomApertureArea = 0;
+    room.wallIds.forEach((wid) => {
+      const aps = aperturesByWall.get(wid) || [];
+      aps.forEach((ap) => {
+        roomApertureArea += ap.width * ap.height;
+      });
+    });
+    const roomWallDrywallArea = Math.max(0, netPerimeter * (room.ceilingHeight || settings.defaultWallHeight) - roomApertureArea);
+    totalDrywallBoardSf += roomWallDrywallArea;
+
     // Check if it's a foundation room
     let isFoundationRoom = false;
     room.wallIds.forEach((wid) => {
@@ -181,9 +204,9 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       }
     });
 
-    totalFlooringPackageSf += (isFoundationRoom && room.floorFinish === 'polished_concrete') ? 0 : room.area;
+    totalFlooringPackageSf += (isFoundationRoom && room.floorFinish === 'polished_concrete') ? 0 : netArea;
     if (room.hasCeilingDrywall !== false && !isFoundationRoom) {
-      totalCeilingDrywallSf += room.area;
+      totalCeilingDrywallSf += netArea;
     }
 
     // Door width deductions for baseboard
@@ -203,38 +226,50 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       });
     });
 
-    const roomBaseboard = Math.max(0, room.perimeter - doorDeductionLf - foundationWallLengthInRoom);
+    const roomBaseboard = Math.max(0, netPerimeter - doorDeductionLf - foundationWallLengthInRoom);
     totalBaseboardTrimsLf += roomBaseboard;
 
     roomDetails.push({
       roomId: room.id,
       name: room.name,
-      area: room.area,
-      perimeter: room.perimeter,
+      area: Math.round(netArea * 100) / 100,
+      perimeter: Math.round(netPerimeter * 100) / 100,
       floorFinish: room.floorFinish,
       baseboardLf: Math.round(roomBaseboard * 100) / 100,
       hasCeilingDrywall: room.hasCeilingDrywall !== false && !isFoundationRoom,
     });
   });
 
-  // OSB Subfloor Decking extends under exterior framing to the rim board edge in exterior mode.
-  // In interior finish mode, we calculate strictly face-to-face net interior area.
-  // Foundation rooms are excluded as they use concrete slabs.
-  const totalSubfloorAreaSf = rooms.reduce((acc, r) => {
+  // OSB Subfloor Decking logic:
+  // 1. Detached from net interior area; starts at the raw centerline room polygon.
+  // 2. For shared interior walls, we stay at centerline (covering the area under the plates).
+  // 3. For exterior walls, we expand outward by (coreFramingThickness / 2) to reach the rim face.
+  // 4. Foundation rooms (slabs) are excluded.
+  let totalOsbSubfloorDeckingSf = 0;
+  rooms.forEach((room) => {
     let isFoundationRoom = false;
-    r.wallIds.forEach(wid => {
-      if (walls.find(w => w.id === wid)?.wallType === 'foundation_wall') isFoundationRoom = true;
+    room.wallIds.forEach((wid) => {
+      const wall = walls.find((w) => w.id === wid);
+      if (wall?.wallType === 'foundation_wall') isFoundationRoom = true;
     });
-    return isFoundationRoom ? acc : acc + r.area;
-  }, 0);
+    if (isFoundationRoom) return;
 
-  const avgExtWallThickness = settings.defaultWallThickness || 0.5;
-  const framingOffsetSf = (!isInteriorFinishMode && totalExteriorWallLf > 0)
-    ? (totalExteriorWallLf * (avgExtWallThickness / 2)) + (4 * Math.pow(avgExtWallThickness / 2, 2))
-    : 0;
-  const totalOsbSubfloorDeckingSf = totalSubfloorAreaSf > 0
-    ? totalSubfloorAreaSf + framingOffsetSf
-    : 0;
+    const edgeOffsets: number[] = room.wallIds.map((wid) => {
+      const wall = walls.find((w) => w.id === wid);
+      const classification = wallClassification.get(wid)?.classification;
+
+      // Expand outward if wall is exterior OR if we are in global exterior framing mode
+      if (classification === 'exterior' || settings.calculationMode === 'exterior_framing') {
+        const coreT = getCoreThickness({ thickness: wall?.thickness || settings.defaultWallThickness || 0.375 });
+        return -(coreT / 2); // negative = outward expansion from centerline
+      }
+      return 0; // centerline for partition/shared walls
+    });
+
+    const subfloorPolygon = getVariableOffsetPolygon(room.points, edgeOffsets);
+    const subfloorArea = Math.abs(calculateSignedPolygonArea(subfloorPolygon));
+    totalOsbSubfloorDeckingSf += subfloorArea;
+  });
 
   // Add ceiling drywall to total drywall board
   totalDrywallBoardSf += totalCeilingDrywallSf;
@@ -467,22 +502,22 @@ export function calculateMTO(state: FloorplanState): MTOReport {
   });
 
   return {
-    grossFootprintSf: Math.round(grossFootprintSf * 10) / 10,
-    netFloorAreaSf: Math.round(totalFlooringPackageSf * 10) / 10,
+    grossFootprintSf: Math.round(grossFootprintSf * 100) / 100,
+    netFloorAreaSf: Math.round(totalFlooringPackageSf * 100) / 100,
 
-    drywallBoardSf: Math.round(totalDrywallBoardSf * 10) / 10,
-    paintCoverageSf: Math.round(totalPaintCoverageSf * 10) / 10,
-    flooringPackageSf: Math.round(totalFlooringPackageSf * 10) / 10,
-    extWallInsulationSf: Math.round(totalExtWallInsulationSf * 10) / 10,
+    drywallBoardSf: Math.round(totalDrywallBoardSf * 100) / 100,
+    paintCoverageSf: Math.round(totalPaintCoverageSf * 100) / 100,
+    flooringPackageSf: Math.round(totalFlooringPackageSf * 100) / 100,
+    extWallInsulationSf: Math.round(totalExtWallInsulationSf * 100) / 100,
 
-    wallStudFramingLf: Math.round(totalWallStudFramingLf * 10) / 10,
+    wallStudFramingLf: Math.round(totalWallStudFramingLf * 100) / 100,
     wallStudCount: totalStudCount,
-    osbSubfloorDeckingSf: Math.round(totalOsbSubfloorDeckingSf * 10) / 10,
-    structuralBeamsLf: Math.round(structuralBeamsLf * 10) / 10,
+    osbSubfloorDeckingSf: Math.round(totalOsbSubfloorDeckingSf * 100) / 100,
+    structuralBeamsLf: Math.round(structuralBeamsLf * 100) / 100,
     supportColumnsPosts,
-    baseboardTrimsLf: Math.round(totalBaseboardTrimsLf * 10) / 10,
-    apertureCasingLf: Math.round(totalApertureCasingLf * 10) / 10,
-    stairHandGuardrailLf: Math.round(stairHandGuardrailLf * 10) / 10,
+    baseboardTrimsLf: Math.round(totalBaseboardTrimsLf * 100) / 100,
+    apertureCasingLf: Math.round(totalApertureCasingLf * 100) / 100,
+    stairHandGuardrailLf: Math.round(stairHandGuardrailLf * 100) / 100,
     calculatedStairRisers,
 
     totalWindowsUnits,
@@ -508,22 +543,22 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     smokeCoAlarmsUnits,
 
     plumbingFixturesUnits,
-    utilityTrenchingLf: Math.round(utilityTrenchingLf * 10) / 10,
+    utilityTrenchingLf: Math.round(utilityTrenchingLf * 100) / 100,
 
     pouredConcreteCy,
     helicalPiersPiles,
     foundationSlabInsulationSf,
 
     roofingAreaSq,
-    roofingAreaSf: Math.round(grossRoofingAreaSf * 10) / 10,
-    primarySidingSf: Math.round(totalPrimarySidingSf * 10) / 10,
-    stoneBrickVeneerSf: Math.round(totalStoneBrickVeneerSf * 10) / 10,
-    soffitTotalLf,
-    fasciaTotalLf,
-    eavestroughsLf,
-    timberDeckingSf: Math.round(timberDeckingSf * 10) / 10,
-    deckPerimeterRailingLf: Math.round(deckPerimeterRailingLf * 10) / 10,
-    siteHardscapingSf: Math.round(siteHardscapingSf * 10) / 10,
+    roofingAreaSf: Math.round(grossRoofingAreaSf * 100) / 100,
+    primarySidingSf: Math.round(totalPrimarySidingSf * 100) / 100,
+    stoneBrickVeneerSf: Math.round(totalStoneBrickVeneerSf * 100) / 100,
+    soffitTotalLf: Math.round(soffitTotalLf * 100) / 100,
+    fasciaTotalLf: Math.round(fasciaTotalLf * 100) / 100,
+    eavestroughsLf: Math.round(eavestroughsLf * 100) / 100,
+    timberDeckingSf: Math.round(timberDeckingSf * 100) / 100,
+    deckPerimeterRailingLf: Math.round(deckPerimeterRailingLf * 100) / 100,
+    siteHardscapingSf: Math.round(siteHardscapingSf * 100) / 100,
 
     wallDetails,
     roomDetails,

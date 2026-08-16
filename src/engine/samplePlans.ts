@@ -5,6 +5,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   unitSystem: 'imperial',
   theme: 'blueprint',
   calculationMode: 'exterior_framing',
+  wallJustification: 'interior_face',
   defaultWallHeight: 9.0, // 9ft standard
   defaultCeilingHeight: 9.0,
   defaultWallThickness: 0.375, // 4.5"

@@ -362,6 +362,28 @@ export const GlobalProjectSettingsModal: React.FC<GlobalProjectSettingsModalProp
                   </select>
                 </div>
 
+                {/* Wall Justification */}
+                <div className="p-3.5 rounded-xl bg-slate-800/30 border border-slate-700/50 space-y-2">
+                  <label className="text-xs font-semibold text-slate-300 block">
+                    Wall Justification (Drafting Mode)
+                  </label>
+                  <select
+                    id="select-wall-justification"
+                    value={formSettings.wallJustification}
+                    onChange={(e) =>
+                      setFormSettings({
+                        ...formSettings,
+                        wallJustification: e.target.value as any,
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs font-medium text-slate-200 focus:outline-none focus:border-sky-500"
+                  >
+                    <option value="interior_face">Interior Face (Net dimensions)</option>
+                    <option value="centerline">Centerline (Structural)</option>
+                    <option value="exterior_face">Exterior Face (Bounding box)</option>
+                  </select>
+                </div>
+
                 {/* Stud Spacing */}
                 <div className="p-3.5 rounded-xl bg-slate-800/30 border border-slate-700/50 space-y-2">
                   <label className="text-xs font-semibold text-slate-300 block">

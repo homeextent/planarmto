@@ -1,12 +1,184 @@
-import { CadNode, CadWall, RoomPolygon, Aperture } from '../types';
+import { CadNode, CadWall, RoomPolygon, Aperture, WallJustification } from '../types';
 
 export interface Point2D {
   x: number;
   y: number;
 }
 
+/**
+ * PHASE 2: Coordinate Translation
+ * Converts user input (intended face/center) to underlying centerline nodes.
+ * If 'interior_face', for a rectangle, we must expand the nodes outward by t/2.
+ */
+export function convertInputToCenterlineNodes(
+  points: Point2D[],
+  wallThickness: number,
+  justification: WallJustification
+): Point2D[] {
+  if (justification === 'centerline') return points;
+
+  // For a closed room box (4 points), we calculate the centroid to determine "outward"
+  const centroid = calculatePolygonCentroid(points);
+  
+  const sign = justification === 'interior_face' ? 1 : -1;
+  const effectiveThickness = getWallThickness({ thickness: wallThickness });
+  const offset = (effectiveThickness / 2) * sign;
+
+  return points.map((p) => {
+    const dx = p.x - centroid.x;
+    const dy = p.y - centroid.y;
+    
+    // Push away from centroid for interior_face (expanding), pull in for exterior_face (shrinking)
+    // We use a small epsilon to handle axis-aligned points correctly
+    const ox = Math.abs(dx) < 0.001 ? 0 : (dx > 0 ? offset : -offset);
+    const oy = Math.abs(dy) < 0.001 ? 0 : (dy > 0 ? offset : -offset);
+
+    // Bypass grid snapping for the expansion by using high precision
+    // Return exact floating point coordinates to maintain precision
+    return {
+      x: p.x + ox,
+      y: p.y + oy,
+    };
+  });
+}
+
+/**
+ * PHASE 2: Inset Interior Polygon Derivation
+ * Generates an inward parallel offset polygon (shrunken by t/2) from centerline cycle.
+ */
+export function getNetInteriorPolygon(
+  cyclePoints: Point2D[],
+  wallThickness: number
+): Point2D[] {
+  if (cyclePoints.length < 3) return cyclePoints;
+
+  const result: Point2D[] = [];
+  const n = cyclePoints.length;
+
+  for (let i = 0; i < n; i++) {
+    const prev = cyclePoints[(i - 1 + n) % n];
+    const curr = cyclePoints[i];
+    const next = cyclePoints[(i + 1) % n];
+
+    // Edge vectors
+    const v1 = { x: curr.x - prev.x, y: curr.y - prev.y };
+    const v2 = { x: next.x - curr.x, y: next.y - curr.y };
+
+    const l1 = Math.hypot(v1.x, v1.y);
+    const l2 = Math.hypot(v2.x, v2.y);
+
+    // Normals (pointing inward for CCW)
+    const n1 = { x: -v1.y / l1, y: v1.x / l1 };
+    const n2 = { x: -v2.y / l2, y: v2.x / l2 };
+
+    // Average normal for miter
+    const bisector = { x: n1.x + n2.x, y: n1.y + n2.y };
+    const bisectorLen = Math.hypot(bisector.x, bisector.y);
+
+    const offset = wallThickness / 2;
+
+    if (bisectorLen < 0.001) {
+      // Parallel edges
+      result.push({ x: curr.x + n1.x * offset, y: curr.y + n1.y * offset });
+    } else {
+      // Miter length: offset / cos(theta) where 2*theta is angle between n1, n2
+      // dot = cos(2*theta)
+      const dot = n1.x * n2.x + n1.y * n2.y;
+      const miterMag = offset / Math.sqrt((1 + dot) / 2);
+
+      result.push({
+        x: curr.x + (bisector.x / bisectorLen) * miterMag,
+        y: curr.y + (bisector.y / bisectorLen) * miterMag,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * PHASE 4: Variable Offset Polygon
+ * Offsets each edge of a polygon by a specific distance.
+ * Positive offset moves inward (for CCW polygon).
+ */
+export function getVariableOffsetPolygon(
+  cyclePoints: Point2D[],
+  edgeOffsets: number[]
+): Point2D[] {
+  if (cyclePoints.length < 3) return cyclePoints;
+
+  const result: Point2D[] = [];
+  const n = cyclePoints.length;
+
+  for (let i = 0; i < n; i++) {
+    const prevIdx = (i - 1 + n) % n;
+    const currIdx = i;
+
+    const prevPt = cyclePoints[prevIdx];
+    const currPt = cyclePoints[currIdx];
+    const nextPt = cyclePoints[(i + 1) % n];
+
+    // Edge vectors
+    const v1 = { x: currPt.x - prevPt.x, y: currPt.y - prevPt.y };
+    const v2 = { x: nextPt.x - currPt.x, y: nextPt.y - currPt.y };
+
+    const l1 = Math.hypot(v1.x, v1.y);
+    const l2 = Math.hypot(v2.x, v2.y);
+
+    // Inward normals
+    const n1 = { x: -v1.y / l1, y: v1.x / l1 };
+    const n2 = { x: -v2.y / l2, y: v2.x / l2 };
+
+    const d1 = edgeOffsets[prevIdx];
+    const d2 = edgeOffsets[currIdx];
+
+    const det = n1.x * n2.y - n1.y * n2.x;
+
+    if (Math.abs(det) < 0.0001) {
+      const d = (d1 + d2) / 2;
+      result.push({ x: currPt.x + n1.x * d, y: currPt.y + n1.y * d });
+    } else {
+      const dx = (d1 * n2.y - d2 * n1.y) / det;
+      const dy = (n1.x * d2 - n2.x * d1) / det;
+      result.push({ x: currPt.x + dx, y: currPt.y + dy });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * PHASE 2: Wall Thickness Helper
+ * Ensures unified thickness derivation for both centerline expansion and interior inset.
+ * Standardizes 3.5" core vs 4.5" total assembly thickness.
+ */
+export function getWallThickness(wall: { thickness: number }): number {
+  // If the thickness is exactly 3.5" (0.29167 ft), we treat it as a standard 2x4 wall 
+  // that needs assembly thickness (4.5" = 0.375 ft) for interior face logic.
+  // Otherwise we use the provided thickness.
+  const CORE_2X4 = 3.5 / 12;
+  const ASSEMBLY_2X4 = 4.5 / 12;
+  
+  if (Math.abs(wall.thickness - CORE_2X4) < 0.001) {
+    return ASSEMBLY_2X4;
+  }
+  return wall.thickness;
+}
+
+export function getCoreThickness(wall: { thickness: number }): number {
+  const CORE_2X4 = 3.5 / 12;
+  const ASSEMBLY_2X4 = 4.5 / 12;
+  const CORE_2X6 = 5.5 / 12;
+  const ASSEMBLY_2X6 = 6.5 / 12;
+
+  const t = wall.thickness;
+  if (Math.abs(t - ASSEMBLY_2X4) < 0.001 || Math.abs(t - CORE_2X4) < 0.001) return CORE_2X4;
+  if (Math.abs(t - ASSEMBLY_2X6) < 0.001 || Math.abs(t - CORE_2X6) < 0.001) return CORE_2X6;
+  return t;
+}
+
 export function distance(p1: Point2D, p2: Point2D): number {
-  return Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  return Math.round(Math.hypot(p2.x - p1.x, p2.y - p1.y) * 10000) / 10000;
 }
 
 export function snapToGrid(val: number, gridSize: number): number {
@@ -93,7 +265,7 @@ export function calculateSignedPolygonArea(pts: Point2D[]): number {
     area += pts[i].x * pts[j].y;
     area -= pts[j].x * pts[i].y;
   }
-  return area / 2;
+  return Math.round((area / 2) * 10000) / 10000;
 }
 
 export function calculatePolygonPerimeter(pts: Point2D[]): number {
@@ -103,7 +275,7 @@ export function calculatePolygonPerimeter(pts: Point2D[]): number {
     const j = (i + 1) % pts.length;
     perim += distance(pts[i], pts[j]);
   }
-  return perim;
+  return Math.round(perim * 10000) / 10000;
 }
 
 export function calculatePolygonCentroid(pts: Point2D[]): Point2D {

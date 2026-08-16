@@ -1,5 +1,6 @@
 export type UnitSystem = 'imperial' | 'metric'; // imperial: feet/inches & SF, metric: meters & m²
 export type CanvasTheme = 'dark' | 'light' | 'blueprint';
+export type WallJustification = 'interior_face' | 'centerline' | 'exterior_face';
 
 export type WallType = 'exterior_2x6' | 'interior_2x4' | 'partition_2x4' | 'plumbing_2x6' | 'bearing_2x6' | 'foundation_wall';
 
@@ -360,6 +361,7 @@ export interface ProjectSettings {
   unitSystem: UnitSystem;
   theme: CanvasTheme;
   calculationMode: CalculationMode;
+  wallJustification: WallJustification;
   defaultWallHeight: number; // e.g. 9.0 ft
   defaultCeilingHeight: number; // e.g. 9.0 ft
   defaultWallThickness: number; // e.g. 0.375 ft (4.5")

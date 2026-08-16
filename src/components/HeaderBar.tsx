@@ -78,6 +78,23 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
         ...w,
         height: newH,
       }));
+      
+      // Update rooms too
+      const updatedRooms = state.rooms.map((r) => ({
+        ...r,
+        ceilingHeight: newH,
+      }));
+
+      onChange({
+        ...state,
+        walls: updatedWalls,
+        rooms: updatedRooms,
+        settings: {
+          ...state.settings,
+          [key]: value,
+        },
+      });
+      return;
     }
 
     onChange({

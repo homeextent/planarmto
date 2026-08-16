@@ -40,32 +40,41 @@ The local orientation angle $\theta_{\text{aperture}} = \text{atan2}(v_b.y - v_a
 Each aperture has geometric width $W_a$ and height $H_a$. The rough opening area deducted from the wall surface is:
 $$A_{\text{deduct}} = W_a \times H_a$$
 
-### 2.3 Pre-Drafting Wall Presets
-To optimize drafting efficiency, the system supports active wall type selection prior to instantiation.
-- **Interior Partition (2x4)**: $\text{Thickness} = 3.5"$, $\text{Cladding} = \text{None}$.
-- **Exterior Wall (2x6)**: $\text{Thickness} = 6.5"$, $\text{Cladding} = \text{Vinyl Siding / OSB}$.
-- **Foundation Wall (10")**: $\text{Thickness} = 10"$, $\text{Cladding} = \text{Damp-proofing}$.
+---
+
+## 3. Dual-Geometry Pipeline & Wall Justification
+
+PlanarMTO employs a **Dual-Geometry Pipeline** to separate structural framing data from architectural finish surfaces, ensuring sub-pixel precision for both trades.
+
+### 3.1 Wall Justification & Coordinate Translation
+The engine maintains a 1D PSLG of `CadNode` and `CadWall` centerlines for structural framing while allowing users to draft using "clear space" dimensions.
+- **`interior_face` (Default)**: User input acts as the clear interior space. The engine automatically executes `convertInputToCenterlineNodes`, pushing nodes outward by $+t/2$ (using full assembly thickness).
+- **`centerline`**: User input matches the underlying PSLG nodes.
+- **`exterior_face`**: User input acts as the outer envelope. Nodes are pulled inward by $-t/2$.
+
+### 3.2 Derived Geometric Polygons
+- **Inset Interior Polygon**: Derived via `getNetInteriorPolygon()`. This generates an inward parallel offset (shrunken by $t/2$) from the centerline cycle for strictly architectural finish calculations.
+- **Variable Offset (Outer Envelope)**: Derived via `getVariableOffsetPolygon()`. Used for structural elements that wrap the framing core (e.g., OSB subfloor reaching the outer rim joist face).
+
+### 3.3 Trade Calculation Matrix
+Quantities are derived from specific geometric layers based on trade requirements:
+
+| Trade / Material | Geometry Layer Used | Calculation Logic |
+| :--- | :--- | :--- |
+| **Finishes (Flooring, Paint, Drywall)** | Inset Clear Face (`getNetInteriorPolygon`) | Strict interior surface area and perimeter minus apertures. |
+| **Carpentry (Studs, Plates, Headers)** | Centerline PSLG | Linear run of framing core regardless of cladding. |
+| **Subfloor (OSB Decking)** | Outer Rim Envelope (`getVariableOffsetPolygon`) | Expanded to outer structural face on exterior walls; centerline on shared walls. |
+| **Siding / Envelope** | Outer Rim Envelope | Wraps the entire exterior structural framing core. |
 
 ---
 
-## 3. Dual-Cost Estimation & Take-Off Mathematical Formulations
+## 4. Take-Off Mathematical Formulations
 
 Every take-off line item computes both **Material Cost** and **Labor Cost** with an adjustable **Waste Factor**:
 $$\text{Cost}_{\text{Line}} = Q \times (1 + \text{Waste}_{\text{site}}) \times (\text{Rate}_{\text{Material}} + \text{Rate}_{\text{Labor}})$$
-where $Q$ is the calculated engineering quantity and $\text{Waste}_{\text{site}}$ is the global project waste percentage (e.g., 0.10 for 10%).
+where $Q$ is the calculated engineering quantity and $\text{Waste}_{\text{site}}$ is the global project waste percentage.
 
-### 3.5 Financial Rollup & Markups
-The system aggregates base direct costs into a hierarchical contractor bid:
-1. **Base Direct Cost**: $\sum \text{Cost}_{\text{Line}}$ (includes material/labor waste).
-2. **Indirect Costs**:
-   - Project Management: $\text{Base Direct Cost} \times \%_{\text{PM}}$
-   - Contingency: $\text{Base Direct Cost} \times \%_{\text{Cont}}$
-3. **Gross Margin**:
-   - Company Overhead: $(\text{Base} + \text{Indirects}) \times \%_{\text{OH}}$
-   - Company Profit: $(\text{Base} + \text{Indirects}) \times \%_{\text{Profit}}$
-4. **Contractor Grand Total**: $\text{Subtotal} + \text{Overhead} + \text{Profit}$
-
-### 3.1 Division 06 — Carpentry & Structural Framing
+### 4.1 Division 06 — Carpentry & Structural Framing
 
 #### A. Wall Stud Quantity
 For a wall of length $L$ (ft) with stud on-center spacing $S_{\text{oc}}$ (inches, default 16"):
@@ -77,102 +86,24 @@ $$N_{\text{studs, apertures}} = 4 \times N_{\text{apertures}}$$
 Total Stud Count:
 $$N_{\text{studs, total}} = N_{\text{studs, linear}} + N_{\text{studs, corners}} + N_{\text{studs, apertures}}$$
 
-#### B. Wall Top & Bottom Plates
-For 1 bottom sole plate and 2 top double plates (3 linear runs per wall):
-$$L_{\text{plates}} = 3 \times \sum_{i} L_i \text{ (LF)}$$
-
-#### C. Structural Headers
-For each aperture of width $W_a$ (ft):
-$$L_{\text{headers}} = \sum_{a} (W_a + 0.5) \times 2 \text{ (LF of 2x10/2x12 lumber)}$$
-
-#### D. OSB Wall Exterior Sheathing
-For exterior walls with height $H$:
-$$A_{\text{sheathing}} = \sum_{\text{exterior}} (L_i \times H_i) - \sum_{\text{exterior apertures}} (W_a \times H_a)$$
-$$\text{Sheets}_{\text{OSB 4x8}} = \left\lceil \frac{A_{\text{sheathing}} \times (1 + \text{Waste}_{\text{OSB}})}{32} \right\rceil$$
+#### B. OSB Subfloor Decking
+Subfloor is detached from net interior area to account for area under wall plates.
+- **Interior/Shared Walls**: Offset = 0 (Centerline).
+- **Exterior Walls**: Offset = $-(\text{CoreThickness} / 2)$ (Outer Rim Face).
+$$A_{\text{subfloor}} = \text{Area}(\text{getVariableOffsetPolygon}(C, \text{offsets}))$$
 
 ---
 
-### 3.2 Division 09 — Architectural Finishes
+## 5. Numerical Stability & Precision
 
-#### A. Drywall Boards (4'x8' = 32 SF or 4'x12' = 48 SF)
-Drywall coverage accounts for interior vs. exterior wall faces:
-- **Interior Walls**: 2 active faces ($2 \times L \times H$).
-- **Exterior Walls**: 1 interior face ($1 \times L \times H$).
-- **Ceilings**: Sum of net room polygon areas $\sum A_{\text{room}}$ (if ceiling drywall enabled).
-
-$$\text{Gross Drywall SF} = 2 \sum_{\text{interior}} (L_i H_i) + \sum_{\text{exterior}} (L_e H_e) + \sum_{\text{rooms}} A_{\text{room}}$$
-$$\text{Net Drywall SF} = \text{Gross Drywall SF} - \sum_{\text{interior apertures}} 2(W_a H_a) - \sum_{\text{exterior apertures}} 1(W_a H_a)$$
-$$\text{Sheets}_{\text{Drywall 4x8}} = \left\lceil \frac{\text{Net Drywall SF} \times (1 + \text{Waste}_{\text{Drywall}})}{32} \right\rceil$$
-
-#### B. Interior Wall Paint
-Two coats over net primed drywall surfaces at standard coverage rate ($350\text{ SF/gal}$):
-$$\text{Gallons}_{\text{Paint}} = \left\lceil \frac{\text{Net Wall Drywall SF} \times 2}{350} \right\rceil$$
-
-#### C. Finish Flooring (Hardwood / Tile / Carpet / LVP)
-For each room $r$ with assigned floor finish and waste factor (default 10%):
-$$A_{\text{floor, } r} = A(C_r) \times (1 + \text{Waste}_{\text{floor}})$$
-
-#### D. Baseboard Moulding
-For each room $r$ with perimeter $P_r$ and intersecting door openings:
-$$L_{\text{baseboard, } r} = P_r - \sum_{d \in r} W_d$$
+To prevent 1-inch estimation gaps and grid-snap drift, the engine enforces:
+- **Inch-Rounding**: Pre-expansion coordinates are rounded to the nearest inch ($1/12\text{ ft}$).
+- **Precision Limits**: Math utilities (`distance`, `area`) are capped at 4 decimal places.
+- **Unified Thickness**: Both node expansion and inset shrinkage utilize `getWallThickness()` to synchronize $t/2$ offsets perfectly.
 
 ---
 
-### 3.3 Division 03 — Concrete & Substructures
-
-#### A. Explicit Foundation Wall & Footing Volume
-Concrete metrics are driven strictly by walls explicitly set to **Foundation Wall**.
-For each foundation wall $i$ with length $L_i$, wall height $H_{f,i}$, wall thickness $T_{f,i}$, footing width $W_{\text{ftg},i}$, and footing thickness $T_{\text{ftg},i}$:
-- **Wall Volume**: $V_{\text{wall}, i} = L_i \times H_{f,i} \times T_{f,i}$
-- **Footing Volume**: $V_{\text{footing}, i} = L_i \times W_{\text{ftg},i} \times T_{\text{ftg},i}$
-
-#### B. Foundation Room Slab Volume
-For each room polygon $r$ where at least one boundary edge is a **Foundation Wall**:
-- **Slab Volume**: $V_{\text{slab}, r} = \frac{A_r \times (T_{\text{slab}, r} / 12)}{27} \text{ (Cubic Yards)}$
-- **Slab Insulation**: $A_{\text{insul}, r} = A_r$
-
-#### C. Concrete Reinforcement (Rebar & Welded Wire Mesh)
-- **Perimeter Footing Rebar (2 continuous #4 runs + 15% overlap)**:
-  $$L_{\text{rebar}} = 2 \times \sum L_{f,i} \times 1.15 \text{ (LF)}$$
-- **Slab Welded Wire Fabric (6x6 W1.4/W1.4)**:
-  $$A_{\text{mesh}} = \sum A_{\text{slab}, r} \times 1.10 \text{ (SF)}$$
-- **Vapor Barrier (10 mil Polyethylene)**:
-  $$A_{\text{vapor}} = \sum A_{\text{slab}, r} \times 1.10 \text{ (SF)}$$
-
----
-
-### 3.4 Division 07 — Roofing & Thermal Envelope
-
-#### A. Pitched Roof Surface Area
-For pitch $P:12$ (rise over run) and eave overhang $d_{\text{overhang}} = 1.5\text{ ft}$:
-$$\text{Slope Multiplier } M = \sqrt{1 + \left(\frac{P}{12}\right)^2}$$
-$$A_{\text{roof, true}} = (A_{\text{superstructure}} + P_{\text{ext}} \cdot d_{\text{overhang}} + 4 \cdot d_{\text{overhang}}^2) \times M$$
-where $A_{\text{superstructure}}$ excludes areas from rooms bounded by **Foundation Walls**.
-
----
-
-### 3.6 Material Exclusion Rules for Foundation Walls
-Setting a wall type to **Foundation Wall** automatically triggers the following exclusions:
-- **Net Drywall & Paint**: $0\text{ sq ft}$ contribution.
-- **Exterior Insulation & Siding**: $0\text{ sq ft}$ contribution.
-- **Baseboard Length**: $0\text{ lin ft}$ contribution (subtracted from room perimeter).
-- **Stud Framing**: $0\text{ lin ft}$ contribution.
-- **Ceiling Finishes**: $0\text{ sq ft}$ for rooms bounded by foundation walls.
-- **Subfloor Decking**: Excluded from OSB rollups for foundation rooms.
-- **Auto-Roofing**: Excluded from auto-derived roofing footprints.
-- **Flooring Package**: Excluded from overall Flooring Package totals for rooms with the "polished_concrete" finish in foundation zones.
-
-#### B. Architectural Asphalt Shingles & Underlayment
-- **Roofing Squares ($1\text{ Square} = 100\text{ SF}$)**:
-  $$\text{Squares} = \frac{A_{\text{roof, true}} \times (1 + \text{Waste}_{\text{roof}})}{100}$$
-- **Bundles ($3\text{ bundles/square}$)**:
-  $$\text{Bundles} = \lceil \text{Squares} \times 3 \rceil$$
-- **Underlayment Felt (Synthetic 10-sq rolls)**:
-  $$\text{Rolls}_{\text{felt}} = \left\lceil \frac{A_{\text{roof, true}}}{1000} \right\rceil$$
-
----
-
-## 4. PDF Generation & Client-Side Export Pipeline
+## 6. PDF Generation & Client-Side Export Pipeline
 
 ```
 [DOM Element / PrintReportModal]
@@ -199,41 +130,18 @@ Setting a wall type to **Foundation Wall** automatically triggers the following 
 
 ---
 
-## 5. Storage Schema & Local State Hydration
+## 7. Storage Schema & Local State Hydration
 
 Persistent records are serialized to JSON in browser `localStorage`:
 
 ```typescript
-// Company Branding Schema (Key: 'planarmto_persisted_branding')
-interface CompanyBranding {
-  companyName: string;
-  address: string;
-  phone: string;
-  email: string;
-  website: string;
-  estimatorName: string;
-  logoUrl?: string; // Base64 Data URL or SVG string
-  projectNumber?: string;
-}
-
-// Project Directory Entry Schema (Key: 'planarmto_saved_projects_directory')
 interface SavedProjectEntry {
   id: string;
   name: string;
   projectNumber?: string;
-  description?: string;
   createdAt: number;
   updatedAt: number;
   grossSf: number;
-  conditionedSf: number;
-  roomCount: number;
-  estimatedTotal: number;
-  state: FloorplanState;
-}
-
-// Auto-Save Draft Schema (Key: 'planarmto_autosave_draft')
-interface AutoSaveDraft {
-  timestamp: number;
   state: FloorplanState;
 }
 ```

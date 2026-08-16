@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.0] - 2026-08-16
+
+### Added
+- **Wall Justification System**: New `interior_face` default mode allows for true interior clear space drafting by pushing nodes outward by $+t/2$ using full assembly thickness.
+
+### Changed
+- **Dual-Geometry Pipeline Transition**: Refactored the MTO estimator to a Dual-Geometry pipeline, decoupling structural framing from architectural finish surfaces.
+- **Precision OSB Subfloor Decking**: Subfloor now accurately calculates to the outer structural rim joist face instead of matching interior flooring.
+
+### Fixed
+- **Assembly Synchronization**: Synchronized wall thickness properties ($t/2$) between node expansion and inset shrinkage to prevent 1-inch estimation gaps.
+- **Numerical Stability Patch**: Resolved IEEE 754 floating-point "dust" and grid-snap drift in 1-inch snap modes by enforcing pre-expansion inch-rounding and 4-decimal math utility limits.
+- **Reactive Global State**: Wall Height global dropdown state is now fully reactive and instantly updates interior drywall matrix calculations.
+- **Canvas Fidelity**: Canvas room text labels and wall dimensions now perfectly reflect net interior clear area and exact face-to-face dimensions.
+
+---
+
 ## [1.6.1] - 2026-08-16
 
 ### Fixed
