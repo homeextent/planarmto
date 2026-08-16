@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.1] - 2026-08-16
+
+### Fixed
+- **Foundation Footprint Leakage Patch**:
+  - Eliminated **Ceiling Drywall & Paint Leak**: Rooms bounded by foundation walls now correctly report $0\text{ sq ft}$ for ceiling finishes.
+  - Eliminated **OSB Subfloor Decking Leak**: Foundation rooms are now excluded from wood subfloor rollups, correctly assuming concrete slab construction.
+  - Eliminated **Auto-Derived Roofing Leak**: Foundation-only footprints no longer contribute to automatic roofing area projections.
+  - Eliminated **Flooring Package Leak**: Foundation rooms with polished concrete finishes are now excluded from interior finish flooring rollups.
+- **Baseboard Deduction Correction**: Ensured foundation wall lengths are strictly subtracted from room perimeters for baseboard take-offs.
+
+### Added
+- **Explicit Foundation Engine (Iteration 12)**:
+  - Shifted to explicit, foundation-driven estimation.
+  - New **Foundation Dimensions** (Wall Height, Footing Width/Thickness, Slab Thickness) in Inspector Panel.
+  - Foundation walls now automatically stripped from: Net Drywall, Insulation, Siding, Baseboard, and Stud Framing.
+  - Concrete volume (CY) is now calculated strictly from explicit foundation wall and room parameters.
+- **Automatic Foundation Room Detection**: New rooms formed by foundation walls automatically preset to "Basement / Foundation Space" with uncoated polished concrete and no ceiling drywall.
+
+### Updated
+- **Documentation**: Synchronized `README.md` and `SYSTEM_BIBLE.md` with explicit foundation logic and material exclusion rules.
+
+---
+
 ## [1.5.0] - 2026-08-16
 
 ### Added

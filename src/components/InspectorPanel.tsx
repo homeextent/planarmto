@@ -206,7 +206,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             <select
               value={wall.finishExterior || 'vinyl_siding'}
               onChange={(e) => handleFinishChange(e.target.value as any)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500 [&>option]:bg-slate-900 [&>option]:text-slate-100"
+              disabled={wall.wallType === 'foundation_wall'}
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500 [&>option]:bg-slate-900 [&>option]:text-slate-100 disabled:opacity-50"
             >
               <option value="vinyl_siding">Standard Vinyl / Lap Siding</option>
               <option value="brick_veneer">Architectural Brick / Stone Veneer</option>
@@ -214,6 +215,82 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               <option value="none">None (Interior wall)</option>
             </select>
           </div>
+
+          {wall.wallType === 'foundation_wall' && (
+            <div className="p-3 bg-sky-950/30 border border-sky-500/30 rounded-xl space-y-3">
+              <div className="text-[10px] uppercase font-bold text-sky-400">Foundation Dimensions</div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Wall Height (ft)</label>
+                  <input
+                    type="number"
+                    value={wall.foundationDetails?.wallHeight ?? 8}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 8;
+                      const updatedWalls = state.walls.map(w => w.id === wall.id ? {
+                        ...w,
+                        foundationDetails: { ...w.foundationDetails, wallHeight: val }
+                      } : w);
+                      onChange({ ...state, walls: updatedWalls });
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-200 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Slab Thick (in)</label>
+                  <input
+                    type="number"
+                    value={wall.foundationDetails?.slabThickness ?? 4}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 4;
+                      const updatedWalls = state.walls.map(w => w.id === wall.id ? {
+                        ...w,
+                        foundationDetails: { ...w.foundationDetails, slabThickness: val }
+                      } : w);
+                      onChange({ ...state, walls: updatedWalls });
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-200 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Footing Width (in)</label>
+                  <input
+                    type="number"
+                    value={wall.foundationDetails?.footingWidth ?? 20}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 20;
+                      const updatedWalls = state.walls.map(w => w.id === wall.id ? {
+                        ...w,
+                        foundationDetails: { ...w.foundationDetails, footingWidth: val }
+                      } : w);
+                      onChange({ ...state, walls: updatedWalls });
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-200 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Footing Thick (in)</label>
+                  <input
+                    type="number"
+                    value={wall.foundationDetails?.footingThickness ?? 10}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 10;
+                      const updatedWalls = state.walls.map(w => w.id === wall.id ? {
+                        ...w,
+                        foundationDetails: { ...w.foundationDetails, footingThickness: val }
+                      } : w);
+                      onChange({ ...state, walls: updatedWalls });
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-200 font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
             <label className="flex items-center gap-2 cursor-pointer text-slate-300 text-xs">

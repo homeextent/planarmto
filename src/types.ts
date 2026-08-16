@@ -114,6 +114,12 @@ export interface CadWall {
   customStudSpacing?: 16 | 24; // inches on center (default 16)
   finishExterior?: 'vinyl_siding' | 'brick_veneer' | 'stucco' | 'none';
   soundInsulated?: boolean;
+  foundationDetails?: {
+    wallHeight?: number; // ft
+    footingWidth?: number; // inches
+    footingThickness?: number; // inches
+    slabThickness?: number; // inches
+  };
 }
 
 export type FloorFinish =

@@ -26,9 +26,9 @@
 - **Precise Deduction Formulas**:
   - Net Wall Drywall & Paint: Subtracts door/window rough openings and deductions based on interior/exterior wall configurations.
   - Stud & Plate Framing: Bottom sole plates, top double plates, corner studs, partition junctions, and jack/king/header timber framing for all openings.
-  - Concrete & Substructure: Slab volume ($V = A \times T$), continuous perimeter grade beams/footings, rebar linear feet, vapor barrier, and wire mesh.
-  - Roofing Envelope: Pitch multiplier calculation ($\sqrt{1 + (P/12)^2}$), architectural shingles (bundles/squares), underlayment felt, drip edges, and ridge vents.
-  - Finishes & Insulation: Batt insulation with opening deductions, finish flooring with configurable waste factors (default 10%), interior wall paint (2 coats @ 350 SF/gal), and ceiling drywall.
+  - Concrete & Substructure: Explicit foundation-driven volume calculations. Concrete is calculated strictly from walls set to **Foundation Wall** (including footing width/thickness and wall height). Standalone foundation polygons are excluded from interior finishes (drywall, paint, baseboard), wood subflooring, and auto-derived roofing.
+  - Roofing Envelope: Pitch multiplier calculation ($\sqrt{1 + (P/12)^2}$), architectural shingles (bundles/squares), underlayment felt, drip edges, and ridge vents. Auto-roofing projects over non-foundation footprints only.
+  - Finishes & Insulation: Batt insulation with opening deductions, finish flooring with configurable waste factors (default 10%), interior wall paint (2 coats @ 350 SF/gal), and ceiling drywall. Foundation walls and rooms are automatically stripped of interior finishes.
   - Electrical & Plumbing: Automated take-offs for fixtures, wiring homerun lengths, piping runs, and life safety devices.
 
 ### 4. Professional Export & Reporting Suite

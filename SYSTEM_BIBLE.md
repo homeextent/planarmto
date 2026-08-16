@@ -120,21 +120,24 @@ $$L_{\text{baseboard, } r} = P_r - \sum_{d \in r} W_d$$
 
 ### 3.3 Division 03 — Concrete & Substructures
 
-#### A. Monolithic Slab-on-Grade Volume
-For gross building footprint area $A_{\text{gross}}$ (sq ft) and thickness $T_{\text{slab}}$ (inches):
-$$V_{\text{slab}} = \frac{A_{\text{gross}} \times (T_{\text{slab}} / 12)}{27} \text{ (Cubic Yards)}$$
+#### A. Explicit Foundation Wall & Footing Volume
+Concrete metrics are driven strictly by walls explicitly set to **Foundation Wall**.
+For each foundation wall $i$ with length $L_i$, wall height $H_{f,i}$, wall thickness $T_{f,i}$, footing width $W_{\text{ftg},i}$, and footing thickness $T_{\text{ftg},i}$:
+- **Wall Volume**: $V_{\text{wall}, i} = L_i \times H_{f,i} \times T_{f,i}$
+- **Footing Volume**: $V_{\text{footing}, i} = L_i \times W_{\text{ftg},i} \times T_{\text{ftg},i}$
 
-#### B. Continuous Perimeter Grade Beam / Footing
-For exterior perimeter $P_{\text{ext}}$ (ft), footing width $W_{\text{ftg}} = 1.0\text{ ft}$, and depth $D_{\text{ftg}} = 1.5\text{ ft}$:
-$$V_{\text{footing}} = \frac{P_{\text{ext}} \times 1.0 \times 1.5}{27} \text{ (Cubic Yards)}$$
+#### B. Foundation Room Slab Volume
+For each room polygon $r$ where at least one boundary edge is a **Foundation Wall**:
+- **Slab Volume**: $V_{\text{slab}, r} = \frac{A_r \times (T_{\text{slab}, r} / 12)}{27} \text{ (Cubic Yards)}$
+- **Slab Insulation**: $A_{\text{insul}, r} = A_r$
 
 #### C. Concrete Reinforcement (Rebar & Welded Wire Mesh)
 - **Perimeter Footing Rebar (2 continuous #4 runs + 15% overlap)**:
-  $$L_{\text{rebar}} = 2 \times P_{\text{ext}} \times 1.15 \text{ (LF)}$$
+  $$L_{\text{rebar}} = 2 \times \sum L_{f,i} \times 1.15 \text{ (LF)}$$
 - **Slab Welded Wire Fabric (6x6 W1.4/W1.4)**:
-  $$A_{\text{mesh}} = A_{\text{gross}} \times 1.10 \text{ (SF)}$$
+  $$A_{\text{mesh}} = \sum A_{\text{slab}, r} \times 1.10 \text{ (SF)}$$
 - **Vapor Barrier (10 mil Polyethylene)**:
-  $$A_{\text{vapor}} = A_{\text{gross}} \times 1.10 \text{ (SF)}$$
+  $$A_{\text{vapor}} = \sum A_{\text{slab}, r} \times 1.10 \text{ (SF)}$$
 
 ---
 
@@ -143,7 +146,21 @@ $$V_{\text{footing}} = \frac{P_{\text{ext}} \times 1.0 \times 1.5}{27} \text{ (C
 #### A. Pitched Roof Surface Area
 For pitch $P:12$ (rise over run) and eave overhang $d_{\text{overhang}} = 1.5\text{ ft}$:
 $$\text{Slope Multiplier } M = \sqrt{1 + \left(\frac{P}{12}\right)^2}$$
-$$A_{\text{roof, true}} = (A_{\text{gross}} + P_{\text{ext}} \cdot d_{\text{overhang}} + 4 \cdot d_{\text{overhang}}^2) \times M$$
+$$A_{\text{roof, true}} = (A_{\text{superstructure}} + P_{\text{ext}} \cdot d_{\text{overhang}} + 4 \cdot d_{\text{overhang}}^2) \times M$$
+where $A_{\text{superstructure}}$ excludes areas from rooms bounded by **Foundation Walls**.
+
+---
+
+### 3.6 Material Exclusion Rules for Foundation Walls
+Setting a wall type to **Foundation Wall** automatically triggers the following exclusions:
+- **Net Drywall & Paint**: $0\text{ sq ft}$ contribution.
+- **Exterior Insulation & Siding**: $0\text{ sq ft}$ contribution.
+- **Baseboard Length**: $0\text{ lin ft}$ contribution (subtracted from room perimeter).
+- **Stud Framing**: $0\text{ lin ft}$ contribution.
+- **Ceiling Finishes**: $0\text{ sq ft}$ for rooms bounded by foundation walls.
+- **Subfloor Decking**: Excluded from OSB rollups for foundation rooms.
+- **Auto-Roofing**: Excluded from auto-derived roofing footprints.
+- **Flooring Package**: Excluded from overall Flooring Package totals for rooms with the "polished_concrete" finish in foundation zones.
 
 #### B. Architectural Asphalt Shingles & Underlayment
 - **Roofing Squares ($1\text{ Square} = 100\text{ SF}$)**:

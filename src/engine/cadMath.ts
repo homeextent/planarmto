@@ -345,22 +345,39 @@ export function detectRoomFaces(
       (r) => distance(r.centroid, centroid) < 3.0
     );
 
-    const name = existing?.name || defaultRoomNames[idx % defaultRoomNames.length];
-    const floorFinish = existing?.floorFinish || (idx === 1 ? 'porcelain_tile' : idx === 4 ? 'porcelain_tile' : 'hardwood');
+    // Check if it's a foundation room (bounded by foundation walls)
+    let isFoundationRoom = false;
+    cycle.wallIds.forEach(wid => {
+      if (walls.find(w => w.id === wid)?.wallType === 'foundation_wall') isFoundationRoom = true;
+    });
+
+    let name = existing?.name;
+    let floorFinish = existing?.floorFinish;
+
+    if (!existing) {
+      if (isFoundationRoom) {
+        name = 'Basement / Foundation Space';
+        floorFinish = 'polished_concrete';
+      } else {
+        name = defaultRoomNames[idx % defaultRoomNames.length];
+        floorFinish = (idx === 1 ? 'porcelain_tile' : idx === 4 ? 'porcelain_tile' : 'hardwood');
+      }
+    }
+
     const ceilingHeight = existing?.ceilingHeight || 9.0;
 
     return {
       id: existing?.id || `room_${idx + 1}_${Date.now() % 10000}`,
-      name,
+      name: name!,
       nodeIds: cycle.nodeIds,
       points: cycle.points,
       wallIds: cycle.wallIds,
       area: Math.round(area * 100) / 100,
       perimeter: Math.round(perimeter * 100) / 100,
       centroid,
-      floorFinish,
+      floorFinish: floorFinish!,
       ceilingHeight,
-      hasCeilingDrywall: existing?.hasCeilingDrywall ?? true,
+      hasCeilingDrywall: existing?.hasCeilingDrywall ?? !isFoundationRoom,
     };
   });
 

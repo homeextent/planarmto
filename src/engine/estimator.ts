@@ -110,16 +110,20 @@ export function calculateMTO(state: FloorplanState): MTOReport {
 
     // Studs calculation
     const studSpacingFt = (wall.customStudSpacing || settings.studSpacingInches) / 12;
-    const studsInWall = Math.ceil(wallLength / studSpacingFt) + 2 + wallAps.length * 2;
+    const studsInWall = wall.wallType === 'foundation_wall' ? 0 : (Math.ceil(wallLength / studSpacingFt) + 2 + wallAps.length * 2);
     totalStudCount += studsInWall;
-    totalWallStudFramingLf += wallLength;
+    if (wall.wallType !== 'foundation_wall') {
+      totalWallStudFramingLf += wallLength;
+    }
 
     // Drywall & Siding faces:
     // Exterior: 1 interior face drywall, 1 exterior siding/insulation wrapping outer envelope
     // Shared interior: 2 interior faces drywall
     // Partition: 2 faces drywall
     let drywallFaces = 2;
-    if (classification === 'exterior') {
+    if (wall.wallType === 'foundation_wall') {
+      drywallFaces = 0;
+    } else if (classification === 'exterior') {
       drywallFaces = 1;
       totalExteriorWallLf += wallLength;
 
@@ -168,14 +172,29 @@ export function calculateMTO(state: FloorplanState): MTOReport {
   const roomDetails: MTOReport['roomDetails'] = [];
 
   rooms.forEach((room) => {
-    totalFlooringPackageSf += room.area;
-    if (room.hasCeilingDrywall !== false) {
+    // Check if it's a foundation room
+    let isFoundationRoom = false;
+    room.wallIds.forEach((wid) => {
+      const wall = walls.find((w) => w.id === wid);
+      if (wall?.wallType === 'foundation_wall') {
+        isFoundationRoom = true;
+      }
+    });
+
+    totalFlooringPackageSf += (isFoundationRoom && room.floorFinish === 'polished_concrete') ? 0 : room.area;
+    if (room.hasCeilingDrywall !== false && !isFoundationRoom) {
       totalCeilingDrywallSf += room.area;
     }
 
     // Door width deductions for baseboard
     let doorDeductionLf = 0;
+    let foundationWallLengthInRoom = 0;
     room.wallIds.forEach((wid) => {
+      const wall = walls.find(w => w.id === wid);
+      if (wall?.wallType === 'foundation_wall') {
+        const geom = getWallGeometry(wall, nodeMap);
+        if (geom) foundationWallLengthInRoom += geom.length;
+      }
       const aps = aperturesByWall.get(wid) || [];
       aps.forEach((ap) => {
         if (ap.type.includes('door')) {
@@ -184,7 +203,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       });
     });
 
-    const roomBaseboard = Math.max(0, room.perimeter - doorDeductionLf);
+    const roomBaseboard = Math.max(0, room.perimeter - doorDeductionLf - foundationWallLengthInRoom);
     totalBaseboardTrimsLf += roomBaseboard;
 
     roomDetails.push({
@@ -194,18 +213,27 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       perimeter: room.perimeter,
       floorFinish: room.floorFinish,
       baseboardLf: Math.round(roomBaseboard * 100) / 100,
-      hasCeilingDrywall: room.hasCeilingDrywall !== false,
+      hasCeilingDrywall: room.hasCeilingDrywall !== false && !isFoundationRoom,
     });
   });
 
   // OSB Subfloor Decking extends under exterior framing to the rim board edge in exterior mode.
   // In interior finish mode, we calculate strictly face-to-face net interior area.
+  // Foundation rooms are excluded as they use concrete slabs.
+  const totalSubfloorAreaSf = rooms.reduce((acc, r) => {
+    let isFoundationRoom = false;
+    r.wallIds.forEach(wid => {
+      if (walls.find(w => w.id === wid)?.wallType === 'foundation_wall') isFoundationRoom = true;
+    });
+    return isFoundationRoom ? acc : acc + r.area;
+  }, 0);
+
   const avgExtWallThickness = settings.defaultWallThickness || 0.5;
   const framingOffsetSf = (!isInteriorFinishMode && totalExteriorWallLf > 0)
     ? (totalExteriorWallLf * (avgExtWallThickness / 2)) + (4 * Math.pow(avgExtWallThickness / 2, 2))
     : 0;
-  const totalOsbSubfloorDeckingSf = totalFlooringPackageSf > 0
-    ? totalFlooringPackageSf + framingOffsetSf
+  const totalOsbSubfloorDeckingSf = totalSubfloorAreaSf > 0
+    ? totalSubfloorAreaSf + framingOffsetSf
     : 0;
 
   // Add ceiling drywall to total drywall board
@@ -350,26 +378,76 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     }
   });
 
-  // Concrete & Foundations (CY)
-  // Slab CY = (Gross Footprint Area * (slabThickness / 12)) / 27
-  // Thickened perimeter footing CY = (Exterior Wall LF * 1ft * 1ft) / 27
   const grossFootprintSf = totalOsbSubfloorDeckingSf > 0 ? totalOsbSubfloorDeckingSf : totalFlooringPackageSf;
-  const slabThicknessFt = settings.slabThicknessInches / 12;
-  const slabVolumeCf = grossFootprintSf * slabThicknessFt;
-  const footingVolumeCf = (!isInteriorFinishMode && totalExteriorWallLf > 0)
-    ? totalExteriorWallLf * 1.0 * 1.0
-    : 0;
-  const pouredConcreteCy = Math.round(((slabVolumeCf + footingVolumeCf) / 27) * 10) / 10;
-  const foundationSlabInsulationSf = Math.round(grossFootprintSf + (isInteriorFinishMode ? 0 : totalExteriorWallLf * slabThicknessFt));
+
+  // Concrete & Foundations (CY)
+  let totalFoundationWallVolumeCf = 0;
+  let totalFootingVolumeCf = 0;
+  let totalExplicitSlabVolumeCf = 0;
+  let totalExplicitSlabInsulationSf = 0;
+
+  walls.forEach((wall) => {
+    if (wall.wallType === 'foundation_wall') {
+      const geom = getWallGeometry(wall, nodeMap);
+      if (!geom) return;
+
+      const wallLength = geom.length;
+      const f = wall.foundationDetails || {};
+      
+      const fWallHeight = f.wallHeight ?? 8; // ft
+      const fWallThickness = wall.thickness || (10 / 12); // ft
+      const fFootingWidth = (f.footingWidth ?? 20) / 12; // ft
+      const fFootingThickness = (f.footingThickness ?? 10) / 12; // ft
+
+      // Wall Volume
+      totalFoundationWallVolumeCf += wallLength * fWallHeight * fWallThickness;
+      // Footing Volume
+      totalFootingVolumeCf += wallLength * fFootingWidth * fFootingThickness;
+    }
+  });
+
+  // Let's refine: Slabs and Slab insulation should probably still be area-based but only for rooms bounded by foundation walls.
+  rooms.forEach(room => {
+    let isFoundationRoom = false;
+    let roomSlabThickness = settings.slabThicknessInches; // default
+
+    room.wallIds.forEach(wid => {
+      const wall = walls.find(w => w.id === wid);
+      if (wall?.wallType === 'foundation_wall') {
+        isFoundationRoom = true;
+        if (wall.foundationDetails?.slabThickness) {
+          roomSlabThickness = wall.foundationDetails.slabThickness;
+        }
+      }
+    });
+
+    if (isFoundationRoom) {
+      totalExplicitSlabVolumeCf += room.area * (roomSlabThickness / 12);
+      totalExplicitSlabInsulationSf += room.area;
+    }
+  });
+
+  const pouredConcreteCy = Math.round(((totalFoundationWallVolumeCf + totalFootingVolumeCf + totalExplicitSlabVolumeCf) / 27) * 10) / 10;
+  const foundationSlabInsulationSf = Math.round(totalExplicitSlabInsulationSf);
+
 
   // Roofing, Facades & Site Envelope
   // Pitch multiplier: sqrt(1 + (pitch / 12)^2)
+  // Foundation rooms are excluded from auto-derived roofing.
+  const roofingFootprintSf = rooms.reduce((acc, r) => {
+    let isFoundationRoom = false;
+    r.wallIds.forEach(wid => {
+      if (walls.find(w => w.id === wid)?.wallType === 'foundation_wall') isFoundationRoom = true;
+    });
+    return isFoundationRoom ? acc : acc + r.area;
+  }, 0);
+
   const pitchMultiplier = Math.sqrt(1 + Math.pow(settings.roofPitchScale / 12, 2));
   const overhangFt = settings.roofOverhangInches / 12;
   const roofOverhangAreaSf = (!isInteriorFinishMode && totalExteriorWallLf > 0)
     ? (totalExteriorWallLf * overhangFt + 4 * Math.pow(overhangFt, 2))
     : 0;
-  const grossRoofingAreaSf = (grossFootprintSf + roofOverhangAreaSf) * pitchMultiplier;
+  const grossRoofingAreaSf = (roofingFootprintSf + roofOverhangAreaSf) * pitchMultiplier;
   const roofingAreaSq = Math.round((grossRoofingAreaSf / 100) * 10) / 10;
   const soffitTotalLf = Math.round(totalExteriorWallLf * 10) / 10;
   const fasciaTotalLf = Math.round(totalExteriorWallLf * (1 + (settings.roofPitchScale / 12) * 0.15) * 10) / 10;
