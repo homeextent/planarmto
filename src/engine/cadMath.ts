@@ -48,7 +48,7 @@ export function convertInputToCenterlineNodes(
  */
 export function getNetInteriorPolygon(
   cyclePoints: Point2D[],
-  wallThickness: number
+  wallThicknesses: number | number[]
 ): Point2D[] {
   if (cyclePoints.length < 3) return cyclePoints;
 
@@ -56,13 +56,16 @@ export function getNetInteriorPolygon(
   const n = cyclePoints.length;
 
   for (let i = 0; i < n; i++) {
-    const prev = cyclePoints[(i - 1 + n) % n];
-    const curr = cyclePoints[i];
-    const next = cyclePoints[(i + 1) % n];
+    const prevIdx = (i - 1 + n) % n;
+    const currIdx = i;
+
+    const prevPt = cyclePoints[prevIdx];
+    const currPt = cyclePoints[currIdx];
+    const nextPt = cyclePoints[(i + 1) % n];
 
     // Edge vectors
-    const v1 = { x: curr.x - prev.x, y: curr.y - prev.y };
-    const v2 = { x: next.x - curr.x, y: next.y - curr.y };
+    const v1 = { x: currPt.x - prevPt.x, y: currPt.y - prevPt.y };
+    const v2 = { x: nextPt.x - currPt.x, y: nextPt.y - currPt.y };
 
     const l1 = Math.hypot(v1.x, v1.y);
     const l2 = Math.hypot(v2.x, v2.y);
@@ -71,25 +74,24 @@ export function getNetInteriorPolygon(
     const n1 = { x: -v1.y / l1, y: v1.x / l1 };
     const n2 = { x: -v2.y / l2, y: v2.x / l2 };
 
-    // Average normal for miter
-    const bisector = { x: n1.x + n2.x, y: n1.y + n2.y };
-    const bisectorLen = Math.hypot(bisector.x, bisector.y);
+    const t1 = Array.isArray(wallThicknesses) ? wallThicknesses[prevIdx] : wallThicknesses;
+    const t2 = Array.isArray(wallThicknesses) ? wallThicknesses[currIdx] : wallThicknesses;
 
-    const offset = wallThickness / 2;
+    const offset1 = t1 / 2;
+    const offset2 = t2 / 2;
 
-    if (bisectorLen < 0.001) {
+    const det = n1.x * n2.y - n1.y * n2.x;
+
+    if (Math.abs(det) < 0.0001) {
       // Parallel edges
-      result.push({ x: curr.x + n1.x * offset, y: curr.y + n1.y * offset });
+      const d = (offset1 + offset2) / 2;
+      result.push({ x: currPt.x + n1.x * d, y: currPt.y + n1.y * d });
     } else {
-      // Miter length: offset / cos(theta) where 2*theta is angle between n1, n2
-      // dot = cos(2*theta)
-      const dot = n1.x * n2.x + n1.y * n2.y;
-      const miterMag = offset / Math.sqrt((1 + dot) / 2);
-
-      result.push({
-        x: curr.x + (bisector.x / bisectorLen) * miterMag,
-        y: curr.y + (bisector.y / bisectorLen) * miterMag,
-      });
+      // Intersection of two offset lines
+      const dx = (offset1 * n2.y - offset2 * n1.y) / det;
+      const dy = (n1.x * offset2 - n2.x * offset1) / det;
+      
+      result.push({ x: currPt.x + dx, y: currPt.y + dy });
     }
   }
 

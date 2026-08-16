@@ -601,8 +601,11 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         ctx.fillStyle = isSelected ? '#38bdf8' : roomCat.color;
         
         // Fix: Use net interior area instead of centerline area to match MTO Matrix
-        const avgWallThickness = getWallThickness({ thickness: state.settings.defaultWallThickness || 0.375 });
-        const netInteriorPoints = getNetInteriorPolygon(room.points, avgWallThickness);
+        const wallThicknesses = room.wallIds.map(wid => {
+          const wall = state.walls.find(w => w.id === wid);
+          return wall ? getWallThickness(wall) : (state.settings.defaultWallThickness || 0.375);
+        });
+        const netInteriorPoints = getNetInteriorPolygon(room.points, wallThicknesses);
         const netArea = Math.abs(calculateSignedPolygonArea(netInteriorPoints));
         const displayArea = Math.round(netArea * 10) / 10;
 

@@ -179,8 +179,11 @@ export function calculateMTO(state: FloorplanState): MTOReport {
   rooms.forEach((room) => {
     // PHASE 3: Derived Inset Finishes Geometry
     // Flooring, Baseboards, Interior Paint MUST calculate strictly using getNetInteriorPolygon()
-    const avgWallThickness = getWallThickness({ thickness: settings.defaultWallThickness || 0.375 });
-    const netInteriorPoints = getNetInteriorPolygon(room.points, avgWallThickness);
+    const wallThicknesses = room.wallIds.map(wid => {
+      const wall = walls.find(w => w.id === wid);
+      return wall ? getWallThickness(wall) : (settings.defaultWallThickness || 0.375);
+    });
+    const netInteriorPoints = getNetInteriorPolygon(room.points, wallThicknesses);
     const netArea = Math.abs(calculateSignedPolygonArea(netInteriorPoints));
     const netPerimeter = calculatePolygonPerimeter(netInteriorPoints);
 
