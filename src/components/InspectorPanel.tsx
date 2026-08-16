@@ -6,7 +6,14 @@ import {
   FloorFinish,
   ApertureType,
 } from '../types';
-import { detectRoomFaces, getWallGeometry } from '../engine/cadMath';
+import {
+  detectRoomFaces,
+  getWallGeometry,
+  getWallThickness,
+  getNetInteriorPolygon,
+  calculateSignedPolygonArea,
+  calculatePolygonPerimeter,
+} from '../engine/cadMath';
 import { Settings2, Trash2, X, Sliders, Box, Layers, RotateCw, Type } from 'lucide-react';
 
 interface InspectorPanelProps {
@@ -148,8 +155,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                 Assembly Thickness
               </label>
               <span className="text-xs font-mono font-bold text-sky-400">
-                {((wall.thickness || 0.375) * 12).toFixed(1)}" (
-                {((wall.thickness || 0.375)).toFixed(2)} ft)
+                {(getWallThickness(wall) * 12).toFixed(1)}" (
+                {getWallThickness(wall).toFixed(2)} ft)
               </span>
             </div>
             <input
@@ -326,25 +333,57 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
     const room = state.rooms.find((r) => r.id === selection.id);
     if (!room) return null;
 
+    // Derived net metrics
+    const wallThicknesses = (room.wallIds || []).map((wid) => {
+      const w = state.walls.find((wall) => wall.id === wid);
+      return w ? getWallThickness(w) : (state.settings.defaultWallThickness || 0.375);
+    });
+    const netPolygon = getNetInteriorPolygon(room.points, wallThicknesses);
+    const netArea = calculateSignedPolygonArea(netPolygon);
+    const netPerimeter = calculatePolygonPerimeter(netPolygon);
+
+    const isFoundationRoom = room.roomType === 'Basement / Foundation Space' || room.wallIds.some(wid => {
+      const w = state.walls.find(wall => wall.id === wid);
+      return w?.wallType === 'foundation_wall';
+    });
+
     const handleRoomNameChange = (name: string) => {
+      const isBasement = name === 'Basement / Foundation Space';
       const updatedRooms = state.rooms.map((r) =>
-        r.id === room.id ? { ...r, name } : r
+        r.id === room.id ? { ...r, name, roomType: isBasement ? name : r.roomType } : r
       );
       onChange({ ...state, rooms: updatedRooms });
     };
 
-    const handleFinishChange = (floorFinish: FloorFinish) => {
+    const handleRoomTypeChange = (roomType: string) => {
       const updatedRooms = state.rooms.map((r) =>
-        r.id === room.id ? { ...r, floorFinish } : r
+        r.id === room.id ? { ...r, roomType } : r
       );
       onChange({ ...state, rooms: updatedRooms });
     };
 
-    const handleCeilingDrywallToggle = (hasCeilingDrywall: boolean) => {
+    const handleSlabThicknessChange = (slabThickness: number) => {
       const updatedRooms = state.rooms.map((r) =>
-        r.id === room.id ? { ...r, hasCeilingDrywall } : r
+        r.id === room.id ? { ...r, slabThickness } : r
       );
       onChange({ ...state, rooms: updatedRooms });
+    };
+
+    const handleFoundationWallUpdate = (key: string, value: number) => {
+      const updatedWalls = state.walls.map((w) => {
+        if (room.wallIds.includes(w.id) && w.wallType === 'foundation_wall') {
+          if (key === 'thickness') return { ...w, thickness: value / 12 };
+          return {
+            ...w,
+            foundationDetails: {
+              ...w.foundationDetails,
+              [key]: value,
+            },
+          };
+        }
+        return w;
+      });
+      onChange({ ...state, walls: updatedWalls });
     };
 
     const roomPresets = [
@@ -365,10 +404,18 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
       'Walk-In Closet',
       'Mechanical Room',
       'Garage (Attached)',
+      'Basement / Foundation Space',
       'Deck',
       'Patio / Hardscape',
       'Covered Patio / Porch',
     ];
+
+    // Get current values from first foundation wall found
+    const firstFdnWall = state.walls.find(w => room.wallIds.includes(w.id) && w.wallType === 'foundation_wall');
+    const fdnWallThickness = firstFdnWall ? Math.round((firstFdnWall.thickness || 0.833) * 12) : 10;
+    const fdnWallHeight = firstFdnWall?.foundationDetails?.wallHeight ?? 8;
+    const fdnFootingWidth = firstFdnWall?.foundationDetails?.footingWidth ?? 16;
+    const fdnFootingThickness = firstFdnWall?.foundationDetails?.footingThickness ?? 8;
 
     return (
       <div className="absolute top-16 right-88 w-72 bg-slate-900/95 border border-slate-700/80 backdrop-blur-md rounded-2xl shadow-2xl p-4 text-slate-200 z-20 text-xs">
@@ -436,11 +483,11 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
           <div className="grid grid-cols-2 gap-2 bg-slate-950/70 p-2 rounded-xl border border-slate-800">
             <div>
               <div className="text-[10px] text-slate-400 uppercase font-medium">Net Floor Area</div>
-              <div className="text-sm font-bold text-emerald-400 font-mono">{room.area} SF</div>
+              <div className="text-sm font-bold text-emerald-400 font-mono">{netArea.toFixed(1)} SF</div>
             </div>
             <div>
               <div className="text-[10px] text-slate-400 uppercase font-medium">Perimeter</div>
-              <div className="text-sm font-bold text-sky-400 font-mono">{room.perimeter} LF</div>
+              <div className="text-sm font-bold text-sky-400 font-mono">{netPerimeter.toFixed(1)} LF</div>
             </div>
           </div>
 
@@ -453,6 +500,82 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             />
             <span>Include Ceiling Drywall & Paint</span>
           </label>
+
+          {isFoundationRoom && (
+            <div className="p-3 bg-sky-950/30 border border-sky-500/30 rounded-xl space-y-3">
+              <div className="text-[10px] uppercase font-bold text-sky-400">Foundation & Slab Settings</div>
+              
+              <div>
+                <label className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Slab Thickness</label>
+                <div className="flex items-center gap-1">
+                  {[4, 5, 6].map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => handleSlabThicknessChange(v)}
+                      className={`flex-1 py-1 rounded text-[10px] font-mono border transition-colors ${
+                        (room.slabThickness || state.settings.slabThicknessInches || 4) === v
+                          ? 'bg-sky-600/30 border-sky-500 text-sky-300'
+                          : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {v}"
+                    </button>
+                  ))}
+                  <input
+                    type="number"
+                    value={room.slabThickness || state.settings.slabThicknessInches || 4}
+                    onChange={(e) => handleSlabThicknessChange(parseFloat(e.target.value) || 4)}
+                    className="w-12 bg-slate-950 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Wall Thick (in)</label>
+                  <select
+                    value={fdnWallThickness}
+                    onChange={(e) => handleFoundationWallUpdate('thickness', parseInt(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-1 text-[10px] text-slate-200"
+                  >
+                    <option value={8}>8"</option>
+                    <option value={10}>10"</option>
+                    <option value={12}>12"</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Wall Height (ft)</label>
+                  <input
+                    type="number"
+                    value={fdnWallHeight}
+                    onChange={(e) => handleFoundationWallUpdate('wallHeight', parseFloat(e.target.value) || 8)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-1 text-[10px] text-slate-200 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Footing Width (in)</label>
+                  <input
+                    type="number"
+                    value={fdnFootingWidth}
+                    onChange={(e) => handleFoundationWallUpdate('footingWidth', parseFloat(e.target.value) || 16)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-1 text-[10px] text-slate-200 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Footing Thick (in)</label>
+                  <input
+                    type="number"
+                    value={fdnFootingThickness}
+                    onChange={(e) => handleFoundationWallUpdate('footingThickness', parseFloat(e.target.value) || 8)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-1 text-[10px] text-slate-200 font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="pt-2 border-t border-slate-800 flex justify-end">
             <button

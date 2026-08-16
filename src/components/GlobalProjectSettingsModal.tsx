@@ -456,7 +456,6 @@ export const GlobalProjectSettingsModal: React.FC<GlobalProjectSettingsModalProp
             </div>
           )}
 
-          {/* TAB 2: CALCULATION ENGINE MODE */}
           {activeTab === 'engine' && (
             <div className="space-y-4">
               <div className="text-xs text-slate-300 leading-relaxed bg-sky-950/30 border border-sky-800/40 p-3.5 rounded-xl">
@@ -471,7 +470,7 @@ export const GlobalProjectSettingsModal: React.FC<GlobalProjectSettingsModalProp
                 id="mode-card-interior-finish"
                 onClick={() => handleModeSelect('interior_finish')}
                 className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                  formSettings.calculationMode === 'interior_finish'
+                  (formSettings?.calculationMode || 'interior_finish') === 'interior_finish'
                     ? 'bg-sky-950/40 border-sky-500 shadow-md ring-1 ring-sky-500'
                     : 'bg-slate-800/30 border-slate-700/60 hover:bg-slate-800/60'
                 }`}
@@ -480,7 +479,7 @@ export const GlobalProjectSettingsModal: React.FC<GlobalProjectSettingsModalProp
                   <div className="flex items-start gap-3">
                     <div
                       className={`w-6 h-6 rounded-full flex items-center justify-center text-xs mt-0.5 ${
-                        formSettings.calculationMode === 'interior_finish'
+                        (formSettings?.calculationMode || 'interior_finish') === 'interior_finish'
                           ? 'bg-sky-500 text-slate-950 font-bold'
                           : 'border border-slate-600 text-slate-400'
                       }`}
@@ -495,11 +494,11 @@ export const GlobalProjectSettingsModal: React.FC<GlobalProjectSettingsModalProp
                         </span>
                       </h4>
                       <p className="text-xs text-slate-400 mt-1">
-                        Measures strictly face-to-face interior room dimensions. Ideal for drywall contractors, paint crews, flooring installers, and interior fit-out estimators.
+                        Focuses on net interior room boundaries (100.0 SF clear space for 10&apos; x 10&apos; rooms). Ideal for drywall contractors, paint crews, flooring installers, and interior fit-out estimators.
                       </p>
                       <ul className="text-[11px] text-slate-400 mt-2 space-y-1 list-disc list-inside">
-                        <li>Subfloor decking equals net interior room floor area</li>
-                        <li>Wall net drywall calculated strictly from inner face geometry</li>
+                        <li>Measures interior drywall, interior paint, trim, and flooring packages strictly from net clear face geometry</li>
+                        <li>Scopes subflooring to interior patch/remodel areas or baseline room bounds</li>
                         <li>Foundation volume ignores exterior thickened perimeter offsets</li>
                       </ul>
                     </div>
@@ -512,7 +511,7 @@ export const GlobalProjectSettingsModal: React.FC<GlobalProjectSettingsModalProp
                 id="mode-card-exterior-framing"
                 onClick={() => handleModeSelect('exterior_framing')}
                 className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                  formSettings.calculationMode === 'exterior_framing'
+                  formSettings?.calculationMode === 'exterior_framing'
                     ? 'bg-sky-950/40 border-sky-500 shadow-md ring-1 ring-sky-500'
                     : 'bg-slate-800/30 border-slate-700/60 hover:bg-slate-800/60'
                 }`}
@@ -521,7 +520,7 @@ export const GlobalProjectSettingsModal: React.FC<GlobalProjectSettingsModalProp
                   <div className="flex items-start gap-3">
                     <div
                       className={`w-6 h-6 rounded-full flex items-center justify-center text-xs mt-0.5 ${
-                        formSettings.calculationMode === 'exterior_framing'
+                        formSettings?.calculationMode === 'exterior_framing'
                           ? 'bg-sky-500 text-slate-950 font-bold'
                           : 'border border-slate-600 text-slate-400'
                       }`}
@@ -536,12 +535,12 @@ export const GlobalProjectSettingsModal: React.FC<GlobalProjectSettingsModalProp
                         </span>
                       </h4>
                       <p className="text-xs text-slate-400 mt-1">
-                        Accounts for structural framing offsets, rim joist extensions, exterior wall thickness wraps, and outer foundation footing pads.
+                        Measures full structural envelopes, adding +t corner wraps for exterior sheathing, siding, and house wrap.
                       </p>
                       <ul className="text-[11px] text-slate-400 mt-2 space-y-1 list-disc list-inside">
-                        <li>Subfloor decking extends to outer rim boards (+framing offset)</li>
-                        <li>Exterior siding & insulation envelopes outer corner depths</li>
-                        <li>Foundation concrete includes perimeter footing frost-wall mass</li>
+                        <li>Calculates full rim-to-rim structural subfloor decking (113.78 SF for 10&apos; x 10&apos; 2x4 box)</li>
+                        <li>Exterior siding & insulation envelopes outer corner depths (+t per exterior corner)</li>
+                        <li>Includes outer footing projections, frost-wall masses, eave overhangs, soffits, and fascia boards</li>
                       </ul>
                     </div>
                   </div>

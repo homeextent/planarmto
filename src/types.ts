@@ -144,6 +144,8 @@ export interface RoomPolygon {
   floorFinish: FloorFinish;
   ceilingHeight: number; // in feet (defaults to project default)
   hasCeilingDrywall?: boolean;
+  roomType?: string;
+  slabThickness?: number;
 }
 
 export interface DeckArea {

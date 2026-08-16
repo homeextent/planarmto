@@ -134,6 +134,9 @@ export function calculateMTO(state: FloorplanState): MTOReport {
 
       // In Exterior Framing mode, account for structural framing thickness & corner wraps
       const wallThickness = wall.thickness || settings.defaultWallThickness || 0.537;
+      // +t per exterior corner means for a simple box we add 2 * thickness to each wall's calculated exterior length
+      // more precisely, it's about the outer envelope. The current implementation uses wallLength + wallThickness * 2
+      // for all exterior walls if not in interior_finish mode.
       const extFaceLength = isInteriorFinishMode ? wallLength : wallLength + wallThickness * 2;
       const extGrossArea = extFaceLength * wallHeight;
       const extNetArea = Math.max(0, extGrossArea - apertureTotalArea);
@@ -189,13 +192,27 @@ export function calculateMTO(state: FloorplanState): MTOReport {
 
     // Wall Drywall calculation (interior faces per room)
     let roomApertureArea = 0;
-    room.wallIds.forEach((wid) => {
-      const aps = aperturesByWall.get(wid) || [];
-      aps.forEach((ap) => {
-        roomApertureArea += ap.width * ap.height;
-      });
+    let roomWallPerimeterExcludingFoundation = 0;
+
+    room.wallIds.forEach((wid, idx) => {
+      const wall = walls.find(w => w.id === wid);
+      const isFoundation = wall?.wallType === 'foundation_wall';
+
+      // Get the length of this specific segment of the net interior polygon
+      const p1 = netInteriorPoints[idx];
+      const p2 = netInteriorPoints[(idx + 1) % netInteriorPoints.length];
+      const segmentLength = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+
+      if (!isFoundation) {
+        roomWallPerimeterExcludingFoundation += segmentLength;
+        const aps = aperturesByWall.get(wid) || [];
+        aps.forEach((ap) => {
+          roomApertureArea += ap.width * ap.height;
+        });
+      }
     });
-    const roomWallDrywallArea = Math.max(0, netPerimeter * (room.ceilingHeight || settings.defaultWallHeight) - roomApertureArea);
+
+    const roomWallDrywallArea = Math.max(0, roomWallPerimeterExcludingFoundation * (room.ceilingHeight || settings.defaultWallHeight) - roomApertureArea);
     totalDrywallBoardSf += roomWallDrywallArea;
 
     // Check if it's a foundation room
@@ -260,6 +277,12 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     const edgeOffsets: number[] = room.wallIds.map((wid) => {
       const wall = walls.find((w) => w.id === wid);
       const classification = wallClassification.get(wid)?.classification;
+
+      // In interior_finish mode, evaluate subflooring using net interior clear space
+      if (isInteriorFinishMode) {
+        const t = wall ? getWallThickness(wall) : (settings.defaultWallThickness || 0.375);
+        return t / 2; // Inward offset from centerline
+      }
 
       // Expand outward if wall is exterior OR if we are in global exterior framing mode
       if (classification === 'exterior' || settings.calculationMode === 'exterior_framing') {
@@ -434,33 +457,41 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       
       const fWallHeight = f.wallHeight ?? 8; // ft
       const fWallThickness = wall.thickness || (10 / 12); // ft
-      const fFootingWidth = (f.footingWidth ?? 20) / 12; // ft
-      const fFootingThickness = (f.footingThickness ?? 10) / 12; // ft
+      const fFootingWidth = (f.footingWidth ?? 16) / 12; // ft (Default 16" wide)
+      const fFootingThickness = (f.footingThickness ?? 8) / 12; // ft (Default 8" thick)
+
+      // In exterior_framing mode, include footing projection overhangs and thickened-edge slab beams
+      // Current logic uses wallLength which is centerline.
+      // For exterior framing we should ideally use the exterior perimeter of the foundation.
+      const foundationLength = isInteriorFinishMode ? wallLength : (wallLength + fWallThickness);
 
       // Wall Volume
-      totalFoundationWallVolumeCf += wallLength * fWallHeight * fWallThickness;
+      totalFoundationWallVolumeCf += foundationLength * fWallHeight * fWallThickness;
       // Footing Volume
-      totalFootingVolumeCf += wallLength * fFootingWidth * fFootingThickness;
+      totalFootingVolumeCf += foundationLength * fFootingWidth * fFootingThickness;
     }
   });
 
   // Let's refine: Slabs and Slab insulation should probably still be area-based but only for rooms bounded by foundation walls.
   rooms.forEach(room => {
-    let isFoundationRoom = false;
-    let roomSlabThickness = settings.slabThicknessInches; // default
+    let isFoundationRoom = room.roomType === 'Basement / Foundation Space';
+    let roomSlabThickness = room.slabThickness ?? settings.slabThicknessInches; // use room override or global default
 
-    room.wallIds.forEach(wid => {
-      const wall = walls.find(w => w.id === wid);
-      if (wall?.wallType === 'foundation_wall') {
-        isFoundationRoom = true;
-        if (wall.foundationDetails?.slabThickness) {
-          roomSlabThickness = wall.foundationDetails.slabThickness;
+    if (!isFoundationRoom) {
+      room.wallIds.forEach(wid => {
+        const wall = walls.find(w => w.id === wid);
+        if (wall?.wallType === 'foundation_wall') {
+          isFoundationRoom = true;
+          if (wall.foundationDetails?.slabThickness && !room.slabThickness) {
+            roomSlabThickness = wall.foundationDetails.slabThickness;
+          }
         }
-      }
-    });
+      });
+    }
 
     if (isFoundationRoom) {
-      totalExplicitSlabVolumeCf += room.area * (roomSlabThickness / 12);
+      const slabT = roomSlabThickness || 4; // fallback to 4"
+      totalExplicitSlabVolumeCf += room.area * (slabT / 12);
       totalExplicitSlabInsulationSf += room.area;
     }
   });
@@ -482,14 +513,18 @@ export function calculateMTO(state: FloorplanState): MTOReport {
 
   const pitchMultiplier = Math.sqrt(1 + Math.pow(settings.roofPitchScale / 12, 2));
   const overhangFt = settings.roofOverhangInches / 12;
-  const roofOverhangAreaSf = (!isInteriorFinishMode && totalExteriorWallLf > 0)
-    ? (totalExteriorWallLf * overhangFt + 4 * Math.pow(overhangFt, 2))
-    : 0;
+  // In interior_finish mode, suppress roof/eave projections
+  const roofOverhangAreaSf = (isInteriorFinishMode || totalExteriorWallLf === 0)
+    ? 0
+    : (totalExteriorWallLf * overhangFt + 4 * Math.pow(overhangFt, 2));
+  
   const grossRoofingAreaSf = (roofingFootprintSf + roofOverhangAreaSf) * pitchMultiplier;
   const roofingAreaSq = Math.round((grossRoofingAreaSf / 100) * 10) / 10;
-  const soffitTotalLf = Math.round(totalExteriorWallLf * 10) / 10;
-  const fasciaTotalLf = Math.round(totalExteriorWallLf * (1 + (settings.roofPitchScale / 12) * 0.15) * 10) / 10;
-  const eavestroughsLf = Math.round(totalExteriorWallLf * 0.9 * 10) / 10;
+  
+  // Calculate fascia LF, soffit area (represented here as LF for now), and eave overhangs based on the exterior wall perimeter
+  const soffitTotalLf = isInteriorFinishMode ? 0 : Math.round(totalExteriorWallLf * 10) / 10;
+  const fasciaTotalLf = isInteriorFinishMode ? 0 : Math.round(totalExteriorWallLf * (1 + (settings.roofPitchScale / 12) * 0.15) * 10) / 10;
+  const eavestroughsLf = isInteriorFinishMode ? 0 : Math.round(totalExteriorWallLf * 0.9 * 10) / 10;
 
   // Deck & Hardscape
   let timberDeckingSf = 0;
