@@ -671,3 +671,52 @@ export function getApertureGeometry(
     width: aperture.width,
   };
 }
+
+/**
+ * Calculates the shortest translation delta to snap any moving node onto a stationary node or wall.
+ */
+export function calculateMultiCornerSnap(
+  movingNodes: Point2D[],
+  stationaryNodes: CadNode[],
+  stationaryWalls: CadWall[],
+  allNodesMap: Map<string, CadNode>,
+  snapRadius: number
+): { delta: Point2D; snappedNodeIndex: number; snapTarget: Point2D; snapType: 'node' | 'wall' | 'none' } {
+  let minDistance = snapRadius;
+  let bestDelta = { x: 0, y: 0 };
+  let snappedNodeIndex = -1;
+  let snapTarget = { x: 0, y: 0 };
+  let snapType: 'node' | 'wall' | 'none' = 'none';
+
+  movingNodes.forEach((movingPt, idx) => {
+    // 1. Check node-to-node snapping
+    stationaryNodes.forEach((statNode) => {
+      const d = distance(movingPt, statNode);
+      if (d < minDistance) {
+        minDistance = d;
+        bestDelta = { x: statNode.x - movingPt.x, y: statNode.y - movingPt.y };
+        snappedNodeIndex = idx;
+        snapTarget = { x: statNode.x, y: statNode.y };
+        snapType = 'node';
+      }
+    });
+
+    // 2. Check node-to-wall snapping
+    stationaryWalls.forEach((wall) => {
+      const n1 = allNodesMap.get(wall.startNodeId);
+      const n2 = allNodesMap.get(wall.endNodeId);
+      if (!n1 || !n2) return;
+
+      const proj = projectPointOntoSegment(movingPt, n1, n2);
+      if (proj.distance < minDistance) {
+        minDistance = proj.distance;
+        bestDelta = { x: proj.point.x - movingPt.x, y: proj.point.y - movingPt.y };
+        snappedNodeIndex = idx;
+        snapTarget = proj.point;
+        snapType = 'wall';
+      }
+    });
+  });
+
+  return { delta: bestDelta, snappedNodeIndex, snapTarget, snapType };
+}

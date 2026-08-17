@@ -28,6 +28,7 @@ import {
   getNetInteriorPolygon,
   calculateSignedPolygonArea,
   getWallThickness,
+  calculateMultiCornerSnap,
 } from '../engine/cadMath';
 import { getRoomCategory } from '../engine/roomCategories';
 import {
@@ -199,6 +200,12 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   // Dragging selected elements
   const [isDraggingElement, setIsDraggingElement] = useState(false);
   const [dragStartPoint, setDragStartPoint] = useState<Point2D>({ x: 0, y: 0 });
+  const [activeDragAnchorNodeId, setActiveDragAnchorNodeId] = useState<string | null>(null);
+  const [roomSnapFeedback, setRoomSnapFeedback] = useState<{
+    movingNode: Point2D;
+    targetNode: Point2D;
+    type: 'node' | 'wall';
+  } | null>(null);
 
   // Rectangle room drafting
   const [roomBoxStart, setRoomBoxStart] = useState<Point2D | null>(null);
@@ -278,7 +285,8 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       state.nodes.forEach((n) => nodeMap.set(n.id, n));
 
       let nearestWallProj: { point: Point2D; wallId: string } | null = null;
-      let minWallDist = 0.5; // 6 inches
+      const snapInc = state.settings.gridSnapSize || 0.5;
+      let minWallDist = Math.max(0.2, snapInc / 2);
 
       state.walls.forEach((w) => {
         const n1 = nodeMap.get(w.startNodeId);
@@ -1550,6 +1558,38 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       }
     }
 
+    // E. Room Magnetic Snap Target Indicator
+    if (roomSnapFeedback) {
+      const sMoving = worldToScreen(roomSnapFeedback.movingNode.x, roomSnapFeedback.movingNode.y);
+      const sTarget = worldToScreen(roomSnapFeedback.targetNode.x, roomSnapFeedback.targetNode.y);
+
+      ctx.save();
+      // Draw glowing target ring at the stationary target
+      ctx.strokeStyle = '#22d3ee'; // Cyan-400
+      ctx.lineWidth = 3;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.arc(sTarget.x, sTarget.y, 10, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Draw solid ring at the moving corner
+      ctx.setLineDash([]);
+      ctx.strokeStyle = '#10b981'; // Green-500
+      ctx.beginPath();
+      ctx.arc(sMoving.x, sMoving.y, 7, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Connection line
+      ctx.strokeStyle = 'rgba(34, 211, 238, 0.4)';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(sMoving.x, sMoving.y);
+      ctx.lineTo(sTarget.x, sTarget.y);
+      ctx.stroke();
+      
+      ctx.restore();
+    }
+
     // E. Active Tool Cursor Ghost Preview
     if (draftMousePos && (activeTool.startsWith('stamp_') || activeTool.startsWith('aperture_') || activeTool === 'alarm_smoke_co')) {
       const gp = worldToScreen(draftMousePos.x, draftMousePos.y);
@@ -1605,18 +1645,20 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     const snap = getSmartSnapPoint(rawWorld, activeWallStartNodeId);
     
-    // For Room Box tool, we want to snap to the grid first before any other logic
-    let worldPoint = (activeTool === 'wall_rect' || activeTool === 'room_box')
-      ? snapPointToGrid(rawWorld, state.settings.gridSnapSize)
-      : snap.point;
+      const snapInc = state.settings.gridSnapSize || 0.5;
 
-    // Fix: Clean world coordinates to nearest integer inch for room box tool
-    if (activeTool === 'wall_rect' || activeTool === 'room_box') {
-      worldPoint = {
-        x: Math.round(worldPoint.x * 12) / 12,
-        y: Math.round(worldPoint.y * 12) / 12
-      };
-    }
+      // For Room Box tool, we want to snap to the grid first before any other logic
+      let worldPoint = (activeTool === 'wall_rect' || activeTool === 'room_box')
+        ? snapPointToGrid(rawWorld, snapInc)
+        : snap.point;
+
+      // Fix: Clean world coordinates to nearest snap increment for room box tool
+      if (activeTool === 'wall_rect' || activeTool === 'room_box') {
+        worldPoint = {
+          x: Math.round(worldPoint.x / snapInc) * snapInc,
+          y: Math.round(worldPoint.y / snapInc) * snapInc
+        };
+      }
 
     // --- TOOL: RULER MEASURE ---
     if (activeTool === 'ruler_measure') {
@@ -2102,6 +2144,16 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         onSelect({ type: 'room', id: hitRoom.id });
         setIsDraggingElement(true);
         setDragStartPoint(worldPoint);
+
+        // Corner Anchor Detection: If clicking near a corner node of the room, set it as anchor
+        const cornerNode = state.nodes.find(n => 
+          hitRoom.nodeIds.includes(n.id) && distance(rawWorld, n) < 0.8
+        );
+        if (cornerNode) {
+          setActiveDragAnchorNodeId(cornerNode.id);
+        } else {
+          setActiveDragAnchorNodeId(null);
+        }
         return;
       }
 
@@ -2185,18 +2237,62 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     setDraftMousePos(currentPoint);
 
     // Element Dragging & Push/Pull logic
-    if (isDraggingElement && selection.type !== 'none' && selection.id) {
-      const dx = currentPoint.x - dragStartPoint.x;
-      const dy = currentPoint.y - dragStartPoint.y;
+      if (isDraggingElement && selection.type !== 'none' && selection.id) {
+        const snapInc = state.settings.gridSnapSize || 0.5;
+        const currentPointSnapped = {
+          x: Math.round(currentPoint.x / snapInc) * snapInc,
+          y: Math.round(currentPoint.y / snapInc) * snapInc
+        };
 
-      if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001) {
-        if (selection.type === 'node') {
-          const updatedNodes = state.nodes.map((n) =>
-            n.id === selection.id ? { ...n, x: currentPoint.x, y: currentPoint.y } : n
-          );
-          const updatedRooms = detectRoomFaces(updatedNodes, state.walls, state.rooms);
-          onChange({ ...state, nodes: updatedNodes, rooms: updatedRooms });
-        } else if (selection.type === 'wall') {
+        const dx = currentPointSnapped.x - dragStartPoint.x;
+        const dy = currentPointSnapped.y - dragStartPoint.y;
+
+        if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001) {
+          if (selection.type === 'node') {
+            const snappedPoint = currentPointSnapped;
+
+            // Orthogonal Corner Resizing Logic
+            // Find if this node belongs to exactly one rectangular room
+            const parentRooms = state.rooms.filter(r => r.nodeIds.includes(selection.id!));
+            const isOrthogonalRoom = parentRooms.length === 1 && parentRooms[0].nodeIds.length === 4;
+
+            let updatedNodes = state.nodes.map((n) =>
+              n.id === selection.id ? { ...n, x: snappedPoint.x, y: snappedPoint.y } : n
+            );
+
+            if (isOrthogonalRoom) {
+              const room = parentRooms[0];
+              const nodeIdx = room.nodeIds.indexOf(selection.id!);
+              const prevIdx = (nodeIdx - 1 + 4) % 4;
+              const nextIdx = (nodeIdx + 1) % 4;
+              const prevNodeId = room.nodeIds[prevIdx];
+              const nextNodeId = room.nodeIds[nextIdx];
+
+              const nodeMap = new Map<string, CadNode>();
+              state.nodes.forEach(n => nodeMap.set(n.id, n));
+              const currNode = nodeMap.get(selection.id!);
+              const prevNode = nodeMap.get(prevNodeId);
+              const nextNode = nodeMap.get(nextNodeId);
+
+              if (currNode && prevNode && nextNode) {
+                const isPrevHorizontal = Math.abs(currNode.y - prevNode.y) < 0.01;
+                const isNextVertical = Math.abs(currNode.x - nextNode.x) < 0.01;
+
+                updatedNodes = updatedNodes.map(n => {
+                  if (n.id === prevNodeId) {
+                    return isPrevHorizontal ? { ...n, y: snappedPoint.y } : { ...n, x: snappedPoint.x };
+                  }
+                  if (n.id === nextNodeId) {
+                    return isNextVertical ? { ...n, x: snappedPoint.x } : { ...n, y: snappedPoint.y };
+                  }
+                  return n;
+                });
+              }
+            }
+
+            const updatedRooms = detectRoomFaces(updatedNodes, state.walls, state.rooms);
+            onChange({ ...state, nodes: updatedNodes, rooms: updatedRooms });
+          } else if (selection.type === 'wall') {
           const wall = state.walls.find((w) => w.id === selection.id);
           if (wall) {
             const startNode = state.nodes.find((n) => n.id === wall.startNodeId);
@@ -2212,10 +2308,10 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
               // Orthogonal Wall Drag Locking:
               // Lock translation perpendicular to the wall's orientation.
               // Attached perpendicular walls naturally stretch/shrink while preserving 90-degree corners.
-              if (wallLen > 0.001) {
-                const isHorizontal = Math.abs(wallDy) < 0.05;
-                const isVertical = Math.abs(wallDx) < 0.05;
+              const isHorizontal = Math.abs(wallDy) < 0.05;
+              const isVertical = Math.abs(wallDx) < 0.05;
 
+              if (wallLen > 0.001) {
                 if (isHorizontal) {
                   // Horizontal wall moves strictly along Y axis (perpendicular to wall)
                   effectiveDx = 0;
@@ -2235,12 +2331,67 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
               }
 
               if (Math.abs(effectiveDx) > 0.0001 || Math.abs(effectiveDy) > 0.0001) {
+                // Magnetic Wall Alignment & Node Snapping for Single Wall Drags
+                let snapDelta = { x: 0, y: 0 };
+                const projectedStart = { x: startNode.x + effectiveDx, y: startNode.y + effectiveDy };
+                const projectedEnd = { x: endNode.x + effectiveDx, y: endNode.y + effectiveDy };
+
+                const snapRadius = state.settings.gridSnapSize || 0.5;
+                let minSnapDist = snapRadius;
+
+                // 1. Snap wall to stationary nodes (alignment)
+                state.nodes.forEach(n => {
+                  if (n.id === wall.startNodeId || n.id === wall.endNodeId) return;
+                  
+                  if (isHorizontal) {
+                    const distY = Math.abs(projectedStart.y - n.y);
+                    if (distY < minSnapDist) {
+                      minSnapDist = distY;
+                      snapDelta = { x: 0, y: n.y - projectedStart.y };
+                    }
+                  } else if (isVertical) {
+                    const distX = Math.abs(projectedStart.x - n.x);
+                    if (distX < minSnapDist) {
+                      minSnapDist = distX;
+                      snapDelta = { x: n.x - projectedStart.x, y: 0 };
+                    }
+                  }
+                });
+
+                // 2. Snap wall to parallel stationary walls (collinear alignment)
+                state.walls.forEach(sw => {
+                  if (sw.id === wall.id) return;
+                  const sn1 = state.nodes.find(n => n.id === sw.startNodeId);
+                  const sn2 = state.nodes.find(n => n.id === sw.endNodeId);
+                  if (!sn1 || !sn2) return;
+
+                  const swIsHorizontal = Math.abs(sn1.y - sn2.y) < 0.01;
+                  const swIsVertical = Math.abs(sn1.x - sn2.x) < 0.01;
+
+                  if (isHorizontal && swIsHorizontal) {
+                    const distY = Math.abs(projectedStart.y - sn1.y);
+                    if (distY < minSnapDist) {
+                      minSnapDist = distY;
+                      snapDelta = { x: 0, y: sn1.y - projectedStart.y };
+                    }
+                  } else if (isVertical && swIsVertical) {
+                    const distX = Math.abs(projectedStart.x - sn1.x);
+                    if (distX < minSnapDist) {
+                      minSnapDist = distX;
+                      snapDelta = { x: sn1.x - projectedStart.x, y: 0 };
+                    }
+                  }
+                });
+
+                const finalDx = effectiveDx + snapDelta.x;
+                const finalDy = effectiveDy + snapDelta.y;
+
                 const updatedNodes = state.nodes.map((n) => {
                   if (n.id === wall.startNodeId || n.id === wall.endNodeId) {
                     return {
                       ...n,
-                      x: Math.round((n.x + effectiveDx) * 100) / 100,
-                      y: Math.round((n.y + effectiveDy) * 100) / 100,
+                      x: Math.round((n.x + finalDx) * 100) / 100,
+                      y: Math.round((n.y + finalDy) * 100) / 100,
                     };
                   }
                   return n;
@@ -2275,18 +2426,82 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           const room = state.rooms.find((r) => r.id === selection.id);
           if (room) {
             const roomNodeSet = new Set(room.nodeIds);
+            const nodeMap = new Map<string, CadNode>();
+            state.nodes.forEach((n) => nodeMap.set(n.id, n));
+
+            // Multi-Corner Magnetic Snapping
+            const movingNodesActual = room.nodeIds
+              .map((nid) => nodeMap.get(nid))
+              .filter((n): n is CadNode => !!n)
+              .map((n) => ({ x: n.x + dx, y: n.y + dy }));
+
+            const stationaryNodes = state.nodes.filter((n) => !roomNodeSet.has(n.id));
+            const stationaryWalls = state.walls.filter(
+              (w) => !roomNodeSet.has(w.startNodeId) || !roomNodeSet.has(w.endNodeId)
+            );
+
+            // Prioritize the active drag anchor if it exists
+            const anchorIdx = activeDragAnchorNodeId ? room.nodeIds.indexOf(activeDragAnchorNodeId) : -1;
+            const nodesToCheck = anchorIdx !== -1 
+              ? [movingNodesActual[anchorIdx], ...movingNodesActual.filter((_, i) => i !== anchorIdx)]
+              : movingNodesActual;
+
+            const snapRadius = 0.75; // Active SNAP_GRID radius (9 inches)
+            const snapResult = calculateMultiCornerSnap(
+              nodesToCheck,
+              stationaryNodes,
+              stationaryWalls,
+              nodeMap,
+              snapRadius
+            );
+
+            let finalDx = dx;
+            let finalDy = dy;
+
+            if (snapResult.snapType !== 'none') {
+              finalDx += snapResult.delta.x;
+              finalDy += snapResult.delta.y;
+
+              // Find the actual moving node that snapped (it might not be the anchor)
+              const originalIdx = anchorIdx !== -1 && snapResult.snappedNodeIndex === 0 
+                ? anchorIdx 
+                : (anchorIdx !== -1 && snapResult.snappedNodeIndex > 0 
+                    ? (snapResult.snappedNodeIndex <= anchorIdx ? snapResult.snappedNodeIndex - 1 : snapResult.snappedNodeIndex)
+                    : snapResult.snappedNodeIndex);
+              
+              const snappedNode = movingNodesActual[originalIdx];
+
+              setRoomSnapFeedback({
+                movingNode: { x: snappedNode.x + snapResult.delta.x, y: snappedNode.y + snapResult.delta.y },
+                targetNode: snapResult.snapTarget,
+                type: snapResult.snapType,
+              });
+            } else {
+              setRoomSnapFeedback(null);
+            }
+
             const updatedNodes = state.nodes.map((n) => {
               if (roomNodeSet.has(n.id)) {
-                return { ...n, x: Math.round((n.x + dx) * 100) / 100, y: Math.round((n.y + dy) * 100) / 100 };
+                return {
+                  ...n,
+                  x: Math.round((n.x + finalDx) * 1000) / 1000,
+                  y: Math.round((n.y + finalDy) * 1000) / 1000,
+                };
               }
               return n;
             });
+
             const updatedStamps = state.stamps.map((st) => {
               if (isPointInPolygon({ x: st.x, y: st.y }, room.points)) {
-                return { ...st, x: Math.round((st.x + dx) * 100) / 100, y: Math.round((st.y + dy) * 100) / 100 };
+                return {
+                  ...st,
+                  x: Math.round((st.x + finalDx) * 1000) / 1000,
+                  y: Math.round((st.y + finalDy) * 1000) / 1000,
+                };
               }
               return st;
             });
+
             const updatedRooms = detectRoomFaces(updatedNodes, state.walls, state.rooms);
             onChange({ ...state, nodes: updatedNodes, stamps: updatedStamps, rooms: updatedRooms });
           }
@@ -2341,6 +2556,8 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   const handleMouseUp = () => {
     setIsPanning(false);
     setIsDraggingElement(false);
+    setActiveDragAnchorNodeId(null);
+    setRoomSnapFeedback(null);
   };
 
   // Handle Double Click to finish wall drawing chain
