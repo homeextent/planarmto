@@ -48,16 +48,21 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
           let thickness = w.thickness;
           let finishExterior = w.finishExterior;
 
-          if (type === 'partition_2x4') {
+          if (type === 'partition_2x4' || type === 'interior_2x4') {
+            thickness = 4.5 / 12; // 0.375 ft
             finishExterior = 'none';
           } else if (type === 'exterior_2x6') {
             thickness = 6.5 / 12; // 0.5417 ft
+            finishExterior = 'vinyl_siding';
           } else if (type === 'foundation_wall') {
             thickness = 10 / 12; // 0.8333 ft
             finishExterior = 'none'; // Damp-proofing logic
+          } else if (type === 'plumbing_2x6' || type === 'bearing_2x6') {
+            thickness = 6.5 / 12;
+            finishExterior = 'none';
           } else {
             // Default thickness logic for other types
-            thickness = type.includes('2x6') ? 0.5 : 0.375;
+            thickness = type.includes('2x6') ? 0.5417 : 0.375;
           }
 
           return {
@@ -369,6 +374,30 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
       onChange({ ...state, rooms: updatedRooms });
     };
 
+    const handleCeilingHeightChange = (ceilingHeight: number) => {
+      const updatedRooms = state.rooms.map((r) =>
+        r.id === room.id ? { ...r, ceilingHeight } : r
+      );
+      const updatedWalls = state.walls.map((w) =>
+        room.wallIds.includes(w.id) ? { ...w, height: ceilingHeight } : w
+      );
+      onChange({ ...state, rooms: updatedRooms, walls: updatedWalls });
+    };
+
+    const handleCeilingDrywallToggle = (hasCeilingDrywall: boolean) => {
+      const updatedRooms = state.rooms.map((r) =>
+        r.id === room.id ? { ...r, hasCeilingDrywall } : r
+      );
+      onChange({ ...state, rooms: updatedRooms });
+    };
+
+    const handleFinishChange = (floorFinish: FloorFinish) => {
+      const updatedRooms = state.rooms.map((r) =>
+        r.id === room.id ? { ...r, floorFinish } : r
+      );
+      onChange({ ...state, rooms: updatedRooms });
+    };
+
     const handleFoundationWallUpdate = (key: string, value: number) => {
       const updatedWalls = state.walls.map((w) => {
         if (room.wallIds.includes(w.id) && w.wallType === 'foundation_wall') {
@@ -486,8 +515,19 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               <div className="text-sm font-bold text-emerald-400 font-mono">{netArea.toFixed(1)} SF</div>
             </div>
             <div>
-              <div className="text-[10px] text-slate-400 uppercase font-medium">Perimeter</div>
-              <div className="text-sm font-bold text-sky-400 font-mono">{netPerimeter.toFixed(1)} LF</div>
+              <div className="text-[10px] text-slate-400 uppercase font-medium">Ceiling Height</div>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  step="0.5"
+                  min="6"
+                  max="24"
+                  value={room.ceilingHeight || 8}
+                  onChange={(e) => handleCeilingHeightChange(parseFloat(e.target.value) || 8)}
+                  className="w-full bg-transparent text-sm font-bold text-sky-400 font-mono focus:outline-none"
+                />
+                <span className="text-[10px] text-slate-500 font-bold">FT</span>
+              </div>
             </div>
           </div>
 

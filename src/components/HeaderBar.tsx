@@ -70,25 +70,39 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     key: K,
     value: ProjectSettings[K]
   ) => {
-    let updatedWalls = state.walls;
-    // When Wall Height default is adjusted in top bar, bulk-update project walls
+    // When Wall Height default is adjusted in top bar, update project settings
+    // so ALL newly drawn rooms/walls use this value.
     if (key === 'defaultWallHeight') {
-      const newH = value as number;
-      updatedWalls = state.walls.map((w) => ({
-        ...w,
-        height: newH,
-      }));
+      const newHeight = value as number;
       
-      // Update rooms too
-      const updatedRooms = state.rooms.map((r) => ({
-        ...r,
-        ceilingHeight: newH,
-      }));
+      // If a room is selected, update its ceiling height and all its wall heights
+      if (state.selectedRoomId) {
+        const updatedRooms = state.rooms.map(r => 
+          r.id === state.selectedRoomId ? { ...r, ceilingHeight: newHeight } : r
+        );
+        
+        const selectedRoom = state.rooms.find(r => r.id === state.selectedRoomId);
+        let updatedWalls = state.walls;
+        if (selectedRoom) {
+          updatedWalls = state.walls.map(w => 
+            selectedRoom.wallIds.includes(w.id) ? { ...w, height: newHeight } : w
+          );
+        }
+
+        onChange({
+          ...state,
+          settings: {
+            ...state.settings,
+            [key]: value,
+          },
+          rooms: updatedRooms,
+          walls: updatedWalls,
+        });
+        return;
+      }
 
       onChange({
         ...state,
-        walls: updatedWalls,
-        rooms: updatedRooms,
         settings: {
           ...state.settings,
           [key]: value,
@@ -99,7 +113,6 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
     onChange({
       ...state,
-      walls: updatedWalls,
       settings: {
         ...state.settings,
         [key]: value,

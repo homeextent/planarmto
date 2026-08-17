@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.0] - 2026-08-16
+
+### Added
+- **Dynamic Foundation & Footing MTO Controls**: Integrated interactive room-level slab thickness, foundation wall height/thickness, and footing dimensions in `InspectorPanel.tsx`. Updated `estimator.ts` to dynamically evaluate Poured Concrete CY and Slab Insulation SF.
+- **Contextual Header Bar Height Sync**: Bounded header wall height dropdown to be selection-aware—updates selected room `ceilingHeight` when a room is selected, or sets default height for new rooms when unselected. Added ceiling height input to `InspectorPanel.tsx`.
+- **Max-Height Merge Inheritance**: Merging rooms via wall deletion now automatically inherits the maximum ceiling height (`Math.max(...parentHeights)`) across parent room polygons.
+- **Multi-Corner Drag Anchoring & Magnetic Snapping**: Enabled room dragging via specific corner anchor nodes with multi-corner magnetic snapping (`calculateMultiCornerSnap()`) and visual snap ring indicators.
+- **Orthogonal Rectangular Corner Resizing**: Constrained corner dragging on 4-node rectangular rooms to automatically adjust adjacent perpendicular nodes, preserving 90° wall joins without polygon skewing.
+- **Automatic Wall Preset Thickness Sync**: Selecting wall presets (2x4 Partition, 2x6 Exterior, 10" Foundation) now instantly updates assembly thickness and exterior finish settings.
+
+### Changed
+- **Two-Phase Graph Topology Cleanup**: Implemented `mergeCoincidentNodes` (unifying node IDs within spatial threshold) followed by `deduplicateWalls` (merging shared wall segments and remapping room `wallIds` references). Joined $10'\times10'$ rooms now correctly collapse 8 walls to 7, reducing framing from $84.33\text{ LF}$ to $73.79\text{ LF}$.
+- **Mode-Specific Trade Scoping**: Calibrated `estimator.ts` trade rules for *Interior Finish Mode* vs *Exterior Framing Mode* (handling $+t$ corner wraps for siding/sheathing, rim-to-rim subfloor decking, and eave/soffit projections).
+- **Header Bar Snap Increment Integration**: Bounded all drawing, wall offset, node movement, and room resizing logic to strictly respect `state.settings.gridSnapSize` ($1'$, $6"$, $1"$).
+- **Interior Face Hover Dimensioning**: Projected hover dimension overlays onto net interior face boundaries to measure clear distances from interior corners rather than centerline endpoints.
+
+### Fixed
+- **Orphan Node Cleanup**: Automatically purge degree-0 nodes from `state.nodes` when attached walls or rooms are deleted.
+- **JSX Escape Render Crash**: Fixed React runtime render crash on the "Calculation Engine Mode" settings tab by removing raw LaTeX escape backslashes from JSX text nodes.
+
+---
+
 ## [1.7.0] - 2026-08-16
 
 ### Added

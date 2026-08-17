@@ -29,6 +29,8 @@ import {
   calculateSignedPolygonArea,
   getWallThickness,
   calculateMultiCornerSnap,
+  mergeCoincidentNodes,
+  deduplicateWalls,
 } from '../engine/cadMath';
 import { getRoomCategory } from '../engine/roomCategories';
 import {
@@ -211,8 +213,18 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   const [roomBoxStart, setRoomBoxStart] = useState<Point2D | null>(null);
 
   // Measurement ruler drafting
+  const [rulerPoints, setRulerPoints] = useState<Point2D[]>([]);
   const [rulerStart, setRulerStart] = useState<Point2D | null>(null);
   const [rulerEnd, setRulerEnd] = useState<Point2D | null>(null);
+  
+  // Expose ruler reset via state
+  useEffect(() => {
+    if (state.nodes.length === 0 && state.walls.length === 0 && state.stamps.length === 0 && (state.annotations || []).length === 0) {
+      setRulerPoints([]);
+      setRulerStart(null);
+      setRulerEnd(null);
+    }
+  }, [state]);
 
   // Screen to World coordinates (world is in feet)
   const screenToWorld = useCallback(
@@ -562,7 +574,18 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     });
 
     // 2. Draw Detected Room Polygons (Faces)
-    state.rooms.forEach((room) => {
+    const roomFaces = state.rooms.map(room => {
+      const wallThicknesses = room.wallIds.map(wid => {
+        const wall = state.walls.find(w => w.id === wid);
+        return wall ? getWallThickness(wall) : (state.settings.defaultWallThickness || 0.375);
+      });
+      return {
+        ...room,
+        netInteriorPoints: getNetInteriorPolygon(room.points, wallThicknesses)
+      };
+    });
+
+    roomFaces.forEach((room) => {
       if (room.points.length < 3) return;
       const isSelected = selection.type === 'room' && selection.id === room.id;
 
@@ -1366,16 +1389,35 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         ctx.font = '600 10px system-ui, sans-serif';
         ctx.fillText('SNAP NODE', sp.x + 10, sp.y - 6);
       } else if (snapCandidate.type === 'wall' && snapCandidate.wallId) {
-        // Dynamic linear offset dimension callouts from wall nodes
+        // Dynamic linear offset dimension callouts from wall nodes/interior corners
         const hostWall = state.walls.find((w) => w.id === snapCandidate.wallId);
         if (hostWall) {
           const n1 = nodeMap.get(hostWall.startNodeId);
           const n2 = nodeMap.get(hostWall.endNodeId);
           if (n1 && n2) {
-            const sn1 = worldToScreen(n1.x, n1.y);
-            const sn2 = worldToScreen(n2.x, n2.y);
-            const d1 = distance(n1, snapCandidate.point);
-            const d2 = distance(snapCandidate.point, n2);
+            let p1 = { x: n1.x, y: n1.y };
+            let p2 = { x: n2.x, y: n2.y };
+            let snapPoint = snapCandidate.point;
+
+            // Project onto interior face if in a room
+            const hostRoom = roomFaces.find(r => r.wallIds.includes(hostWall.id));
+            if (hostRoom) {
+              const wallIdx = hostRoom.wallIds.indexOf(hostWall.id);
+              const ip1 = hostRoom.netInteriorPoints[wallIdx];
+              const ip2 = hostRoom.netInteriorPoints[(wallIdx + 1) % hostRoom.netInteriorPoints.length];
+              
+              const proj = projectPointOntoSegment(snapCandidate.point, ip1, ip2);
+              p1 = ip1;
+              p2 = ip2;
+              snapPoint = proj.point;
+            }
+
+            const sn1 = worldToScreen(p1.x, p1.y);
+            const sn2 = worldToScreen(p2.x, p2.y);
+            const sSnap = worldToScreen(snapPoint.x, snapPoint.y);
+
+            const d1 = distance(p1, snapPoint);
+            const d2 = distance(snapPoint, p2);
 
             const dx = sn2.x - sn1.x;
             const dy = sn2.y - sn1.y;
@@ -1386,7 +1428,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
               const offsetPx = 22;
 
               const offStart1 = { x: sn1.x + nx * offsetPx, y: sn1.y + ny * offsetPx };
-              const offSnap = { x: sp.x + nx * offsetPx, y: sp.y + ny * offsetPx };
+              const offSnap = { x: sSnap.x + nx * offsetPx, y: sSnap.y + ny * offsetPx };
               const offEnd2 = { x: sn2.x + nx * offsetPx, y: sn2.y + ny * offsetPx };
 
               ctx.strokeStyle = '#f59e0b';
@@ -1396,7 +1438,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
               ctx.beginPath();
               ctx.moveTo(sn1.x, sn1.y);
               ctx.lineTo(offStart1.x, offStart1.y);
-              ctx.moveTo(sp.x, sp.y);
+              ctx.moveTo(sSnap.x, sSnap.y);
               ctx.lineTo(offSnap.x, offSnap.y);
               ctx.moveTo(sn2.x, sn2.y);
               ctx.lineTo(offEnd2.x, offEnd2.y);
@@ -1662,11 +1704,13 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     // --- TOOL: RULER MEASURE ---
     if (activeTool === 'ruler_measure') {
+      const rulerSnap = getSmartSnapPoint(rawWorld);
+      const snapPoint = rulerSnap.point;
       if (!rulerStart) {
-        setRulerStart(worldPoint);
-        setRulerEnd(worldPoint);
+        setRulerStart(snapPoint);
+        setRulerEnd(snapPoint);
       } else {
-        setRulerEnd(worldPoint);
+        setRulerEnd(snapPoint);
       }
       return;
     }
@@ -1737,7 +1781,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
           const newNodes = [...state.nodes, n1, n2, n3, n4];
           const newWalls = [...state.walls, w1, w2, w3, w4];
-          const detectedRooms = detectRoomFaces(newNodes, newWalls, state.rooms);
+          const detectedRooms = detectRoomFaces(newNodes, newWalls, state.rooms, state.settings.defaultWallHeight);
 
           onChange({
             ...state,
@@ -1769,7 +1813,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           nextWalls = splitRes.walls;
           nextApertures = splitRes.apertures;
           startNodeId = splitRes.splitNodeId;
-          const detectedRooms = detectRoomFaces(nextNodes, nextWalls, state.rooms);
+          const detectedRooms = detectRoomFaces(nextNodes, nextWalls, state.rooms, state.settings.defaultWallHeight);
           onChange({
             ...state,
             nodes: nextNodes,
@@ -1856,7 +1900,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           };
 
           const finalWalls = [...updatedWalls, newWall];
-          const detectedRooms = detectRoomFaces(updatedNodes, finalWalls, state.rooms);
+          const detectedRooms = detectRoomFaces(updatedNodes, finalWalls, state.rooms, state.settings.defaultWallHeight);
 
           onChange({
             ...state,
@@ -2290,7 +2334,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
               }
             }
 
-            const updatedRooms = detectRoomFaces(updatedNodes, state.walls, state.rooms);
+            const updatedRooms = detectRoomFaces(updatedNodes, state.walls, state.rooms, state.settings.defaultWallHeight);
             onChange({ ...state, nodes: updatedNodes, rooms: updatedRooms });
           } else if (selection.type === 'wall') {
           const wall = state.walls.find((w) => w.id === selection.id);
@@ -2396,7 +2440,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
                   }
                   return n;
                 });
-                const updatedRooms = detectRoomFaces(updatedNodes, state.walls, state.rooms);
+                const updatedRooms = detectRoomFaces(updatedNodes, state.walls, state.rooms, state.settings.defaultWallHeight);
                 onChange({ ...state, nodes: updatedNodes, rooms: updatedRooms });
               }
             }
@@ -2502,7 +2546,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
               return st;
             });
 
-            const updatedRooms = detectRoomFaces(updatedNodes, state.walls, state.rooms);
+            const updatedRooms = detectRoomFaces(updatedNodes, state.walls, state.rooms, state.settings.defaultWallHeight);
             onChange({ ...state, nodes: updatedNodes, stamps: updatedStamps, rooms: updatedRooms });
           }
         } else if (selection.type === 'stamp') {
@@ -2558,6 +2602,39 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     setIsDraggingElement(false);
     setActiveDragAnchorNodeId(null);
     setRoomSnapFeedback(null);
+
+    // Two-Phase Graph Cleanup
+    // Phase 1: Coincident Node Merging
+    const { nodes: mergedNodes, walls: mergedWalls, rooms: mergedRooms } = mergeCoincidentNodes(
+      state.nodes,
+      state.walls,
+      state.rooms
+    );
+
+    // Phase 2: Wall Deduplication
+    const { walls: finalWalls, rooms: finalRooms, apertures: finalApertures } = deduplicateWalls(
+      mergedWalls,
+      mergedRooms,
+      state.apertures,
+      mergedNodes
+    );
+
+    const reDetectedRooms = detectRoomFaces(mergedNodes, finalWalls, finalRooms, state.settings.defaultWallHeight);
+
+    if (
+      finalWalls.length !== state.walls.length || 
+      mergedNodes.length !== state.nodes.length ||
+      finalApertures.length !== state.apertures.length ||
+      reDetectedRooms.length !== state.rooms.length
+    ) {
+      onChange({
+        ...state,
+        nodes: mergedNodes,
+        walls: finalWalls,
+        rooms: reDetectedRooms,
+        apertures: finalApertures,
+      });
+    }
   };
 
   // Handle Double Click to finish wall drawing chain

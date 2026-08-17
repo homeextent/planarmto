@@ -380,7 +380,8 @@ interface DirectedHalfEdge {
 export function detectRoomFaces(
   nodes: CadNode[],
   walls: CadWall[],
-  existingRooms: RoomPolygon[] = []
+  existingRooms: RoomPolygon[] = [],
+  defaultWallHeight = 9.0
 ): RoomPolygon[] {
   if (walls.length < 3 || nodes.length < 3) {
     return [];
@@ -519,6 +520,22 @@ export function detectRoomFaces(
       (r) => distance(r.centroid, centroid) < 3.0
     );
 
+    // If no existing room found via centroid (maybe a merge), look for overlapping parents
+    let inheritedCeilingHeight = defaultWallHeight;
+    if (existing) {
+      inheritedCeilingHeight = existing.ceilingHeight;
+    } else {
+      // Find all parents that overlap with this new room
+      const overlappingParents = existingRooms.filter(parent => 
+        isPointInPolygon(parent.centroid, cycle.points) || 
+        cycle.points.some(pt => isPointInPolygon(pt, parent.points))
+      );
+      
+      if (overlappingParents.length > 0) {
+        inheritedCeilingHeight = Math.max(...overlappingParents.map(p => p.ceilingHeight), defaultWallHeight);
+      }
+    }
+
     // Check if it's a foundation room (bounded by foundation walls)
     let isFoundationRoom = false;
     cycle.wallIds.forEach(wid => {
@@ -538,7 +555,7 @@ export function detectRoomFaces(
       }
     }
 
-    const ceilingHeight = existing?.ceilingHeight || 9.0;
+    const ceilingHeight = inheritedCeilingHeight;
 
     return {
       id: existing?.id || `room_${idx + 1}_${Date.now() % 10000}`,
@@ -553,6 +570,17 @@ export function detectRoomFaces(
       ceilingHeight,
       hasCeilingDrywall: existing?.hasCeilingDrywall ?? !isFoundationRoom,
     };
+  });
+
+  // After detecting rooms and inheriting heights, sync all walls to match room ceiling heights
+  // If a wall is shared between rooms with different heights, it should take the max height
+  resultRooms.forEach(room => {
+    room.wallIds.forEach(wid => {
+      const wall = walls.find(w => w.id === wid);
+      if (wall) {
+        wall.height = Math.max(wall.height || 0, room.ceilingHeight);
+      }
+    });
   });
 
   return resultRooms;
@@ -679,9 +707,13 @@ export function calculateMultiCornerSnap(
   movingNodes: Point2D[],
   stationaryNodes: CadNode[],
   stationaryWalls: CadWall[],
-  allNodesMap: Map<string, CadNode>,
+  allNodesMap: Map<string, CadNode> | CadNode[],
   snapRadius: number
 ): { delta: Point2D; snappedNodeIndex: number; snapTarget: Point2D; snapType: 'node' | 'wall' | 'none' } {
+  const nodeMap = Array.isArray(allNodesMap)
+    ? new Map(allNodesMap.map((n) => [n.id, n]))
+    : allNodesMap;
+
   let minDistance = snapRadius;
   let bestDelta = { x: 0, y: 0 };
   let snappedNodeIndex = -1;
@@ -703,8 +735,8 @@ export function calculateMultiCornerSnap(
 
     // 2. Check node-to-wall snapping
     stationaryWalls.forEach((wall) => {
-      const n1 = allNodesMap.get(wall.startNodeId);
-      const n2 = allNodesMap.get(wall.endNodeId);
+      const n1 = nodeMap.get(wall.startNodeId);
+      const n2 = nodeMap.get(wall.endNodeId);
       if (!n1 || !n2) return;
 
       const proj = projectPointOntoSegment(movingPt, n1, n2);
@@ -719,4 +751,109 @@ export function calculateMultiCornerSnap(
   });
 
   return { delta: bestDelta, snappedNodeIndex, snapTarget, snapType };
+}
+
+/**
+ * PHASE 1: Coincident Node Merging
+ * Scans all nodes and merges those within a small threshold into a master node.
+ * Remaps wall and room references accordingly.
+ */
+export function mergeCoincidentNodes(
+  nodes: CadNode[],
+  walls: CadWall[],
+  rooms: RoomPolygon[],
+  threshold = 0.01 // ~1/8 inch
+): { nodes: CadNode[]; walls: CadWall[]; rooms: RoomPolygon[] } {
+  const nodeMap = new Map<string, string>(); // oldNodeId -> masterNodeId
+  const finalNodes: CadNode[] = [];
+
+  nodes.forEach((node) => {
+    const master = finalNodes.find((fn) => distance(node, fn) < threshold);
+    if (master) {
+      nodeMap.set(node.id, master.id);
+    } else {
+      finalNodes.push(node);
+      nodeMap.set(node.id, node.id);
+    }
+  });
+
+  const updatedWalls = walls.map((wall) => ({
+    ...wall,
+    startNodeId: nodeMap.get(wall.startNodeId) || wall.startNodeId,
+    endNodeId: nodeMap.get(wall.endNodeId) || wall.endNodeId,
+  })).filter(w => w.startNodeId !== w.endNodeId); // Remove any zero-length walls created by merging
+
+  const updatedRooms = rooms.map((room) => ({
+    ...room,
+    nodeIds: room.nodeIds.map((nid) => nodeMap.get(nid) || nid),
+  }));
+
+  return { nodes: finalNodes, walls: updatedWalls, rooms: updatedRooms };
+}
+
+/**
+ * Deduplicates coincident walls by merging them into shared segments.
+ * Coincident walls share the same start and end nodes (order may be reversed).
+ */
+export function deduplicateWalls(
+  walls: CadWall[],
+  rooms: RoomPolygon[],
+  apertures: Aperture[] = [],
+  nodes: CadNode[] = []
+): { walls: CadWall[]; rooms: RoomPolygon[]; apertures: Aperture[] } {
+  const finalWalls: CadWall[] = [];
+  const wallMap = new Map<string, { masterId: string; isFlipped: boolean }>();
+
+  walls.forEach((wall) => {
+    // Check if a wall with same nodes already exists
+    const duplicate = finalWalls.find(
+      (fw) =>
+        (fw.startNodeId === wall.startNodeId && fw.endNodeId === wall.endNodeId) ||
+        (fw.startNodeId === wall.endNodeId && fw.endNodeId === wall.startNodeId)
+    );
+
+    if (duplicate) {
+      const isFlipped = duplicate.startNodeId !== wall.startNodeId;
+      wallMap.set(wall.id, { masterId: duplicate.id, isFlipped });
+    } else {
+      finalWalls.push(wall);
+    }
+  });
+
+  // Update room wall references
+  const finalRooms = rooms.map((room) => ({
+    ...room,
+    wallIds: Array.from(new Set(room.wallIds.map((wid) => wallMap.get(wid)?.masterId || wid))),
+  }));
+
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+
+  // Update aperture wall references and handle coordinate flips for reversed walls
+  const finalApertures = apertures.map((ap) => {
+    const mapping = wallMap.get(ap.wallId);
+    if (!mapping) return ap;
+
+    if (!mapping.isFlipped) {
+      return { ...ap, wallId: mapping.masterId };
+    }
+
+    // Wall is reversed, flip aperture offset
+    const masterWall = finalWalls.find((w) => w.id === mapping.masterId);
+    if (!masterWall) return { ...ap, wallId: mapping.masterId };
+
+    const n1 = nodeMap.get(masterWall.startNodeId);
+    const n2 = nodeMap.get(masterWall.endNodeId);
+    if (n1 && n2) {
+      const wallLen = distance(n1, n2);
+      return {
+        ...ap,
+        wallId: mapping.masterId,
+        offset: Math.round(Math.max(0, wallLen - ap.offset - ap.width) * 100) / 100,
+      };
+    }
+
+    return { ...ap, wallId: mapping.masterId };
+  });
+
+  return { walls: finalWalls, rooms: finalRooms, apertures: finalApertures };
 }

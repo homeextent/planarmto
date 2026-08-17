@@ -220,9 +220,25 @@ export default function App() {
         .map((w) => w.id);
       nextWalls = nextWalls.filter((w) => !removedWallIds.includes(w.id));
       nextApertures = nextApertures.filter((ap) => !removedWallIds.includes(ap.wallId));
+      
+      // Clean up orphaned nodes
+      const remainingWallNodeIds = new Set<string>();
+      nextWalls.forEach((w) => {
+        remainingWallNodeIds.add(w.startNodeId);
+        remainingWallNodeIds.add(w.endNodeId);
+      });
+      nextNodes = nextNodes.filter((n) => remainingWallNodeIds.has(n.id));
     } else if (selection.type === 'wall') {
       nextWalls = nextWalls.filter((w) => w.id !== id);
       nextApertures = nextApertures.filter((ap) => ap.wallId !== id);
+      
+      // Clean up orphaned nodes
+      const remainingWallNodeIds = new Set<string>();
+      nextWalls.forEach((w) => {
+        remainingWallNodeIds.add(w.startNodeId);
+        remainingWallNodeIds.add(w.endNodeId);
+      });
+      nextNodes = nextNodes.filter((n) => remainingWallNodeIds.has(n.id));
     } else if (selection.type === 'aperture') {
       nextApertures = nextApertures.filter((ap) => ap.id !== id);
     } else if (selection.type === 'stamp') {

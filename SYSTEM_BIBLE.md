@@ -13,12 +13,19 @@ When drafting or moving a node $v_{\text{new}}$ within a threshold radius $\epsi
 $$t = \frac{(v_{\text{new}} - v_a) \cdot (v_b - v_a)}{\|v_b - v_a\|^2}, \quad t \in [0, 1]$$
 The original edge $(v_a, v_b)$ is replaced by two sub-edges $(v_a, v_{\text{new}})$ and $(v_{\text{new}}, v_b)$.
 
+#### 1.1.1 Two-Phase Topology Cleanup
+To maintain graph integrity during complex room merges:
+1. **`mergeCoincidentNodes`**: Unifies disparate node IDs within spatial threshold $\epsilon_{\text{snap}}$.
+2. **`deduplicateWalls`**: Merges shared wall segments and remaps room `wallIds` references, ensuring topological consistency (e.g., collapsing 8 walls to 7 when merging $10'\times10'$ rooms).
+3. **Orphan Cleanup**: Automatically purges degree-0 nodes from $V$ when attached walls or rooms are deleted.
+
 ### 1.2 Half-Edge Data Structure & Face Traversal
 Planar rooms (faces) are identified by converting undirected edges $E$ into paired directed half-edges $\vec{e}_{ij}$ and $\vec{e}_{ji}$.
 1. For each node $v_i$, incoming and outgoing half-edges are sorted radially by polar angle:
    $$\theta = \text{atan2}(y_j - y_i, x_j - x_i)$$
 2. The traversal executes the **"Next Counter-Clockwise (CCW) Edge"** rule: upon traversing $\vec{e}_{ij}$, the next edge selected from $v_j$ is the one immediately CCW from $\vec{e}_{ji}$.
 3. Closed cycles $C = (v_1, v_2, \dots, v_k, v_1)$ are extracted.
+4. **Merge Inheritance**: Merging rooms via wall deletion preserves structural metadata by inheriting the maximum ceiling height ($H_{\text{merge}} = \max(H_1, H_2, \dots, H_n)$) across parent polygons.
 
 ### 1.3 Polygon Area & Winding Order
 The signed area $A$ of cycle $C$ is computed via the **Shoelace Formula (Gauss's Area Formula)**:
@@ -61,8 +68,8 @@ Quantities are derived from specific geometric layers based on trade requirement
 
 | Trade / Material | Geometry Layer Used | Calculation Logic |
 | :--- | :--- | :--- |
-| **Finishes (Flooring, Paint, Drywall)** | Inset Clear Face (`getNetInteriorPolygon`) | Strict interior surface area and perimeter minus apertures. |
-| **Carpentry (Studs, Plates, Headers)** | Centerline PSLG | Linear run of framing core regardless of cladding. |
+| **Finishes (Flooring, Paint, Drywall)** | Inset Clear Face (`getNetInteriorPolygon`) | Strict interior surface area and perimeter minus apertures. Hover overlays measure clear face distances. |
+| **Carpentry (Studs, Plates, Headers)** | Centerline PSLG | Linear run of framing core regardless of cladding. Mode-specific rules for Interior vs Exterior (corner $+t$ wraps). |
 | **Subfloor (OSB Decking)** | Outer Rim Envelope (`getVariableOffsetPolygon`) | Expanded to outer structural face on exterior walls; centerline on shared walls. |
 | **Siding / Envelope** | Outer Rim Envelope | Wraps the entire exterior structural framing core. |
 
@@ -91,6 +98,14 @@ Subfloor is detached from net interior area to account for area under wall plate
 - **Interior/Shared Walls**: Offset = 0 (Centerline).
 - **Exterior Walls**: Offset = $-(\text{CoreThickness} / 2)$ (Outer Rim Face).
 $$A_{\text{subfloor}} = \text{Area}(\text{getVariableOffsetPolygon}(C, \text{offsets}))$$
+
+### 4.2 Division 03 — Concrete Foundations
+Foundation estimation relies on explicit volumetric variables assigned per-room or per-wall:
+- **Slab Volume**: $V_{\text{slab}} = A_{\text{room}} \times T_{\text{slab}}$
+- **Foundation Wall Volume**: $V_{\text{fnd}} = \sum (L_i \times T_i \times H_i)$
+- **Footing Volume**: $V_{\text{ftg}} = \sum (L_i \times W_{\text{ftg}} \times T_{\text{ftg}})$
+- **Total Poured Concrete (CY)**: $V_{\text{total, CY}} = \frac{V_{\text{slab}} + V_{\text{fnd}} + V_{\text{ftg}}}{27}$
+- **Slab Insulation**: $A_{\text{insul}} = A_{\text{room}}$ (SF)
 
 ---
 

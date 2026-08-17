@@ -8,6 +8,8 @@
 
 ### 1. Interactive 2D Vector CAD Canvas
 - **Planar Graph Drafting**: Automatic node snapping, collinear vertex intersection, orthogonal locking (90° Ortho), and live dimension overlays.
+- **Multi-Corner Drag Anchoring & Magnetic Snapping**: Enhanced room movement via specific corner nodes with multi-corner magnetic snapping and visual snap indicators.
+- **Orthogonal Rectangular Corner Resizing**: Constrained corner dragging on 4-node rectangular rooms to automatically adjust adjacent nodes, preserving 90° wall joins.
 - **Sub-Pixel Precision**: Enforces true interior clear-space drafting capabilities via a synchronized dual-geometry pipeline.
 - **Active Wall Type Presets**: Pre-selection of wall framing assemblies (Interior 2x4, Exterior 2x6, Foundation 10") prior to drafting, ensuring new segments inherit correct thickness and cladding properties instantly.
 - **Parametric Apertures**: Doors (passage, exterior, pocket, overhead garage) and Windows (standard, picture, slider) hosted parametrically on wall segments.
@@ -28,9 +30,9 @@
 - **Precise Deduction Formulas**:
   - Net Wall Drywall & Paint: Subtracts door/window rough openings and deductions based on interior/exterior wall configurations.
   - Stud & Plate Framing: Bottom sole plates, top double plates, corner studs, partition junctions, and jack/king/header timber framing for all openings.
-  - Concrete & Substructure: Explicit foundation-driven volume calculations. Concrete is calculated strictly from walls set to **Foundation Wall** (including footing width/thickness and wall height). Standalone foundation polygons are excluded from interior finishes (drywall, paint, baseboard), wood subflooring, and auto-derived roofing.
-  - Roofing Envelope: Pitch multiplier calculation ($\sqrt{1 + (P/12)^2}$), architectural shingles (bundles/squares), underlayment felt, drip edges, and ridge vents. Auto-roofing projects over non-foundation footprints only.
-  - Finishes & Insulation: Batt insulation with opening deductions, finish flooring with configurable waste factors (default 10%), interior wall paint (2 coats @ 350 SF/gal), and ceiling drywall. Foundation walls and rooms are automatically stripped of interior finishes.
+  - Concrete & Substructure: Explicit foundation-driven volume calculations. Concrete is calculated strictly from walls set to **Foundation Wall** (including footing width/thickness and wall height). Interactive room-level controls for slab thickness and footing dimensions in the Inspector Panel enable real-time Poured Concrete CY and Slab Insulation SF evaluation. Standalone foundation polygons are excluded from interior finishes (drywall, paint, baseboard), wood subflooring, and auto-derived roofing.
+  - Roofing Envelope: Pitch multiplier calculation ($\sqrt{1 + (P/12)^2}$), architectural shingles (bundles/squares), underlayment felt, drip edges, and ridge vents. Auto-roofing projects over non-foundation footprints only. Merging rooms via wall deletion automatically inherits the maximum ceiling height across parent room polygons for consistent roofing elevations.
+  - Finishes & Insulation: Batt insulation with opening deductions, finish flooring with configurable waste factors (default 10%), interior wall paint (2 coats @ 350 SF/gal), and ceiling drywall. Foundation walls and rooms are automatically stripped of interior finishes. Interior face dimensioning provides clear-distance measurements from interior corners rather than centerline endpoints.
   - Electrical & Plumbing: Automated take-offs for fixtures, wiring homerun lengths, piping runs, and life safety devices.
 
 ### 4. Professional Export & Reporting Suite
