@@ -8,11 +8,15 @@
 
 ### 1. Interactive 2D Vector CAD Canvas
 - **Planar Graph Drafting**: Automatic node snapping, collinear vertex intersection, orthogonal locking (90° Ortho), and live dimension overlays.
+- **2D Blueprint Underlay & Scale Calibration**: Import floor plan images (`.png`, `.jpg`, `.webp`, `.svg`) with 2-point reference calibration for pixel-to-foot mapping. Includes opacity controls and canvas position locking.
 - **Multi-Corner Drag Anchoring & Magnetic Snapping**: Enhanced room movement via specific corner nodes with multi-corner magnetic snapping and visual snap indicators.
 - **Orthogonal Rectangular Corner Resizing**: Constrained corner dragging on 4-node rectangular rooms to automatically adjust adjacent nodes, preserving 90° wall joins.
 - **Sub-Pixel Precision**: Enforces true interior clear-space drafting capabilities via a synchronized dual-geometry pipeline.
 - **Active Wall Type Presets**: Pre-selection of wall framing assemblies (Interior 2x4, Exterior 2x6, Foundation 10") prior to drafting, ensuring new segments inherit correct thickness and cladding properties instantly.
-- **Parametric Apertures**: Doors (passage, exterior, pocket, overhead garage) and Windows (standard, picture, slider) hosted parametrically on wall segments.
+- **Parametric Apertures**:
+  - Doors: Passage, Exterior, Pocket (with slide direction toggle), Bifold Single (30"), Bifold Double (60"), and Overhead Garage.
+  - Windows: Standard, Picture, Slider.
+  - Openings: Cased wall openings / archways that preserve room topology for flooring and ceiling take-offs.
 - **Architectural Stamps**: Placed fixtures with automatic clearance envelope visualization (toilets, sinks, bathtubs, kitchen islands, appliances, LED potlights, GFCI receptacles, 240V EV chargers, subpanels, HVAC condensing units).
 - **Hardscapes & Decks**: Outer structural zones including composite decks with ledger boards, footings, framing, concrete driveways, and paver patios.
 - **Dimensioning & Annotations**: Aligned dimension strings and leader text callouts.
@@ -24,7 +28,7 @@
 
 ### 3. Dual-Cost Estimation & Multi-Trade Quantity Surveying
 - **Split Material & Labor Rates**: Configurable unit rates for all items across 7 construction divisions.
-- **Dual-Geometry Accuracy**: Synchronized calculation of structural framing vs. interior finishes using independent geometric layers for unmatched take-off precision.
+- **Dual-Geometry Accuracy**: Synchronized calculation of structural framing vs. interior finishes using independent geometric layers for unmatched take-off precision. Defaults to **Interior Finish Mode** for trade-focused drywall and finish scheduling.
 - **Commercial Markups & Financial Rollups**: Built-in logic for Company Overhead, Profit, Project Management, and Contingency percentages.
 - **Jobsite Waste Factors**: Adjustable Waste/Scrap multipliers applied directly to base quantities prior to markup.
 - **Precise Deduction Formulas**:
@@ -87,7 +91,9 @@ npm run preview
 | `A` | Activate Text Annotation Tool |
 | `Ctrl+Z` / `Cmd+Z` | Undo last action |
 | `Ctrl+Y` / `Cmd+Y` | Redo last action |
-| `Ctrl+S` / `Cmd+S` | Open Project Directory / Save Dialog |
+| `Ctrl+S` / `Cmd+S` | Quick Save (In-Place Overwrite) |
+| `Ctrl+Shift+S` | Save As (New Project Entry) |
+| `Ctrl+O` / `Cmd+O` | Open Project Directory Manager |
 | `Ctrl+P` / `Cmd+P` | Open Architectural Take-Off & PDF Report Modal |
 | `Delete` / `Backspace` | Delete selected wall, aperture, stamp, deck, or annotation |
 | `Shift` (Hold) | Toggle Orthogonal 90° Constraint while drafting walls |

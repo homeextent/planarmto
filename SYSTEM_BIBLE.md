@@ -47,6 +47,11 @@ The local orientation angle $\theta_{\text{aperture}} = \text{atan2}(v_b.y - v_a
 Each aperture has geometric width $W_a$ and height $H_a$. The rough opening area deducted from the wall surface is:
 $$A_{\text{deduct}} = W_a \times H_a$$
 
+### 2.3 Specialized Aperture Rendering & Logic
+- **Bifold Doors (Single/Double)**: Features parametric chevron vector rendering. Single bifold (30") and Double bifold (60") use a `flipSwing` boolean to control fold direction. Double bifolds enforce leaf symmetry via mirrored normal vector calculations.
+- **Cased Openings**: Non-door passages (`cased_opening`) that deduct framing and drywall but do not break room polygon cycles, ensuring continuous flooring and ceiling take-offs.
+- **Pocket Doors**: Includes a `pocketDirection` toggle to determine which side of the wall segment hosts the sliding pocket frame.
+
 ---
 
 ## 3. Dual-Geometry Pipeline & Wall Justification
@@ -147,7 +152,7 @@ To prevent 1-inch estimation gaps and grid-snap drift, the engine enforces:
 
 ## 7. Storage Schema & Local State Hydration
 
-Persistent records are serialized to JSON in browser `localStorage`:
+Persistent records are serialized to JSON in browser `localStorage`. The system tracks an `activeProjectId` to enable in-place overwrites via "Quick Save" (`Ctrl+S`) while allowing "Save As" (`Ctrl+Shift+S`) to fork new entries.
 
 ```typescript
 interface SavedProjectEntry {
@@ -160,3 +165,17 @@ interface SavedProjectEntry {
   state: FloorplanState;
 }
 ```
+
+---
+
+## 8. 2D Blueprint Underlay & Scale Calibration
+
+PlanarMTO supports raster/vector underlays (`.png`, `.jpg`, `.webp`, `.svg`) for tracing.
+
+### 8.1 2-Point Reference Calibration
+To map image pixels to real-world feet, the user defines two points $P_1, P_2$ on the image and enters the physical distance $D$ between them. The pixel-to-foot scale factor $S$ is:
+$$S = \frac{D}{\sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}}$$
+All canvas interactions with the underlay are subsequently scaled by $S$.
+
+### 8.2 Canvas Persistence
+Underlay state (opacity, visibility, lock status, and transformation matrix) is persisted within the `FloorplanState`, ensuring the tracing context is restored across sessions.

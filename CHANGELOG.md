@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.9.0] - 2026-08-17
+
+### Added
+- **2D Blueprint Underlay & Scale Calibration**: Integrated floor plan image import (`.png`, `.jpg`, `.webp`, `.svg`) with 2-point reference scale calibration (pixel-to-foot mapping), opacity controls, canvas position locking, and a persistent "Blueprint Options" control button in the header bar.
+- **Bifold Closet Doors (Single & Double)**: Added 30" Single and 60" Double Bifold Door aperture presets featuring parametric chevron vector rendering, fold side controls (`flipSwing`), and trim takeoff calculations.
+- **Cased Wall Openings / Archways**: Added `cased_opening` preset to create wall passages that deduct wall drywall and stud framing while preserving complete room polygon topology for flooring, ceiling, and net area calculations.
+- **Pocket Door Slide Direction Toggle**: Added `pocketDirection` state property and UI toggle in `InspectorPanel.tsx` to flip the sliding pocket frame direction along the wall segment.
+- **In-Place Project Overwrite Workflow**: Implemented `activeProjectId` tracking and in-place `localStorage` updates in `storage.ts`. Added keyboard shortcuts (`Ctrl+S` for Quick Save, `Ctrl+Shift+S` for Save As) and a reactive `isDirty` unsaved changes indicator (`*` and pulsing orange dot) in `HeaderBar.tsx`.
+
+### Changed
+- **Default Calculation Mode**: Set default project initialization and sample plan calculation mode to `'interior_finish'` (Drywall & Trade Focus).
+- **Project Manager Persistence**: Saved projects now update their existing records in the project directory instead of creating duplicate timestamped entries.
+
+### Fixed
+- **Double Bifold Chevron Symmetry**: Fixed inverted normal vector calculations for `door_bifold_double`, ensuring both $30"$ leaf pairs fold symmetrically toward the same side of the wall.
+- **Locked Underlay Access**: Ensured blueprint underlay opacity, visibility, and lock settings remain accessible via the header bar even when the image is locked on the canvas.
+
+---
+
 ## [1.8.0] - 2026-08-16
 
 ### Added
