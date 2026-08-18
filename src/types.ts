@@ -429,10 +429,11 @@ export type ActiveTool =
   | 'stamp_utility_trench'
   | 'polygon_deck'
   | 'polygon_hardscape'
-  | 'ruler_measure';
+  | 'ruler_measure'
+  | 'calibrate_scale';
 
 export interface SelectionState {
-  type: 'none' | 'node' | 'wall' | 'aperture' | 'stamp' | 'room' | 'deck' | 'hardscape' | 'annotation';
+  type: 'none' | 'node' | 'wall' | 'aperture' | 'stamp' | 'room' | 'deck' | 'hardscape' | 'annotation' | 'underlay';
   id?: string;
 }
 
@@ -526,6 +527,19 @@ export interface MTOReport {
   }>;
 }
 
+export interface UnderlayImage {
+  id: string;
+  src: string; // Base64 data URL or Object URL
+  width: number; // Native image pixel width
+  height: number; // Native image pixel height
+  x: number; // Canvas origin offset X
+  y: number; // Canvas origin offset Y
+  scale: number; // Pixels per foot scaling factor
+  opacity: number; // 0.1 to 1.0 (default: 0.5)
+  isLocked: boolean; // Prevent dragging when tracing
+  isVisible: boolean; // Show/hide toggle
+}
+
 export interface FloorplanState {
   nodes: CadNode[];
   walls: CadWall[];
@@ -536,4 +550,5 @@ export interface FloorplanState {
   decks: DeckArea[];
   hardscapes: HardscapeArea[];
   settings: ProjectSettings;
+  underlay?: UnderlayImage;
 }

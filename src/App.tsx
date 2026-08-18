@@ -359,13 +359,14 @@ export default function App() {
         />
 
         {/* Floating Context Inspector for selected item */}
-        <InspectorPanel
-          state={state}
-          onChange={handleStateChange}
-          selection={selection}
-          onClose={() => setSelection({ type: 'none' })}
-          onDelete={handleDeleteSelected}
-        />
+          <InspectorPanel
+            state={state}
+            onChange={handleStateChange}
+            selection={selection}
+            onClose={() => setSelection({ type: 'none' })}
+            onDelete={handleDeleteSelected}
+            onToolChange={setActiveTool}
+          />
       </div>
 
       {/* Global Project & Engine Settings Modal */}

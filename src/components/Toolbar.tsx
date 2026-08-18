@@ -24,6 +24,7 @@ import {
   Shield,
   Home,
   Layout,
+  Maximize2,
 } from 'lucide-react';
 
 interface ToolbarProps {
@@ -70,6 +71,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         { id: 'room_box', label: '4-Wall Room Box', icon: <Square className="w-4 h-4 text-sky-400" /> },
         { id: 'text_label', label: 'Text Label / Note', icon: <Type className="w-4 h-4 text-violet-400" /> },
         { id: 'ruler_measure', label: 'Measure Ruler', icon: <Ruler className="w-4 h-4 text-amber-400" /> },
+        { id: 'calibrate_scale', label: 'Calibrate Underlay Scale', icon: <Maximize2 className="w-4 h-4 text-sky-400" /> },
       ],
     },
     {

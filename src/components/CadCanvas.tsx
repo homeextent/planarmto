@@ -212,6 +212,22 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   // Rectangle room drafting
   const [roomBoxStart, setRoomBoxStart] = useState<Point2D | null>(null);
 
+  // Calibration tool state
+  const [calibrationPoints, setCalibrationPoints] = useState<Point2D[]>([]);
+
+  // Underlay image cache
+  const [underlayImage, setUnderlayImage] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    if (state.underlay?.src) {
+      const img = new Image();
+      img.onload = () => setUnderlayImage(img);
+      img.src = state.underlay.src;
+    } else {
+      setUnderlayImage(null);
+    }
+  }, [state.underlay?.src]);
+
   // Measurement ruler drafting
   const [rulerPoints, setRulerPoints] = useState<Point2D[]>([]);
   const [rulerStart, setRulerStart] = useState<Point2D | null>(null);
@@ -462,8 +478,21 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     ctx.fillStyle = bgCol;
     ctx.fillRect(0, 0, width, height);
 
-    // Draw Grid
     const { scale, x: panX, y: panY } = transform;
+
+    // --- DRAW UNDERLAY IMAGE ---
+    if (state.underlay && state.underlay.isVisible && underlayImage) {
+      ctx.save();
+      ctx.globalAlpha = state.underlay.opacity;
+      const drawX = state.underlay.x * scale + panX;
+      const drawY = state.underlay.y * scale + panY;
+      const drawW = (state.underlay.width / state.underlay.scale) * scale;
+      const drawH = (state.underlay.height / state.underlay.scale) * scale;
+      ctx.drawImage(underlayImage, drawX, drawY, drawW, drawH);
+      ctx.restore();
+    }
+
+    // Draw Grid
     const gridFt = state.settings.gridSnapSize || 1.0;
     const gridPixels = gridFt * scale;
 
@@ -1374,6 +1403,34 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       ctx.restore();
     }
 
+    // --- CALIBRATION PREVIEW ---
+    if (activeTool === 'calibrate_scale' && calibrationPoints.length > 0 && draftMousePos) {
+      const sp1 = worldToScreen(calibrationPoints[0].x, calibrationPoints[0].y);
+      const sp2 = worldToScreen(draftMousePos.x, draftMousePos.y);
+      
+      ctx.save();
+      ctx.strokeStyle = '#22d3ee';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(sp1.x, sp1.y);
+      ctx.lineTo(sp2.x, sp2.y);
+      ctx.stroke();
+      
+      // Points
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#22d3ee';
+      ctx.beginPath();
+      ctx.arc(sp1.x, sp1.y, 5, 0, Math.PI * 2);
+      ctx.arc(sp2.x, sp2.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.font = '700 12px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText("Select Second Point for Calibration", (sp1.x + sp2.x) / 2, (sp1.y + sp2.y) / 2 - 15);
+      ctx.restore();
+    }
+
     // D. Magnetic Snap Indicator Ring & Dynamic Wall Offset Dimension Callouts
     if (snapCandidate) {
       const sp = worldToScreen(snapCandidate.point.x, snapCandidate.point.y);
@@ -1687,7 +1744,52 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     const snap = getSmartSnapPoint(rawWorld, activeWallStartNodeId);
     
-      const snapInc = state.settings.gridSnapSize || 0.5;
+    // --- TOOL: CALIBRATE SCALE ---
+    if (activeTool === 'calibrate_scale') {
+      if (calibrationPoints.length === 0) {
+        setCalibrationPoints([rawWorld]);
+      } else {
+        const p1 = calibrationPoints[0];
+        const p2 = rawWorld;
+        const distWorld = distance(p1, p2);
+        
+        const actualDist = prompt("Enter actual distance for this segment (e.g. 12' 6\" or 12.5):", "10");
+        if (actualDist && state.underlay) {
+          // Parse distance (simple for now, just float)
+          let feet = parseFloat(actualDist);
+          // Very basic feet/inches parsing if someone enters 12' 6"
+          if (actualDist.includes("'")) {
+            const parts = actualDist.split("'");
+            feet = parseFloat(parts[0]);
+            if (parts[1] && parts[1].includes('"')) {
+              feet += parseFloat(parts[1].replace('"', '')) / 12;
+            } else if (parts[1] && parts[1].trim()) {
+              feet += parseFloat(parts[1]) / 12;
+            }
+          }
+
+          if (!isNaN(feet) && feet > 0) {
+            // New scale = (current pixel distance) / feet
+            // current pixel distance = distWorld * underlay.scale
+            const currentPixelDist = distWorld * state.underlay.scale;
+            const newScale = currentPixelDist / feet;
+
+            onChange({
+              ...state,
+              underlay: {
+                ...state.underlay,
+                scale: newScale
+              }
+            });
+          }
+        }
+        setCalibrationPoints([]);
+        onToolChange('select');
+      }
+      return;
+    }
+
+    const snapInc = state.settings.gridSnapSize || 0.5;
 
       // For Room Box tool, we want to snap to the grid first before any other logic
       let worldPoint = (activeTool === 'wall_rect' || activeTool === 'room_box')
@@ -2219,6 +2321,23 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         return;
       }
 
+      // 9. Check underlay hit (if not locked)
+      if (state.underlay && state.underlay.isVisible && !state.underlay.isLocked) {
+        const uw = state.underlay.width / state.underlay.scale;
+        const uh = state.underlay.height / state.underlay.scale;
+        if (
+          rawWorld.x >= state.underlay.x &&
+          rawWorld.x <= state.underlay.x + uw &&
+          rawWorld.y >= state.underlay.y &&
+          rawWorld.y <= state.underlay.y + uh
+        ) {
+          onSelect({ type: 'underlay', id: state.underlay.id });
+          setIsDraggingElement(true);
+          setDragStartPoint(rawWorld);
+          return;
+        }
+      }
+
       // Deselect
       onSelect({ type: 'none' });
     }
@@ -2589,6 +2708,15 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
             return h;
           });
           onChange({ ...state, hardscapes: updatedHardscapes });
+        } else if (selection.type === 'underlay' && state.underlay) {
+          onChange({
+            ...state,
+            underlay: {
+              ...state.underlay,
+              x: state.underlay.x + dx,
+              y: state.underlay.y + dy,
+            },
+          });
         }
 
         setDragStartPoint(currentPoint);

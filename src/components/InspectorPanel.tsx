@@ -5,6 +5,7 @@ import {
   WallType,
   FloorFinish,
   ApertureType,
+  ActiveTool,
 } from '../types';
 import {
   detectRoomFaces,
@@ -22,6 +23,7 @@ interface InspectorPanelProps {
   selection: SelectionState;
   onClose: () => void;
   onDelete: () => void;
+  onToolChange?: (tool: ActiveTool) => void;
 }
 
 export const InspectorPanel: React.FC<InspectorPanelProps> = ({
@@ -30,6 +32,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   selection,
   onClose,
   onDelete,
+  onToolChange,
 }) => {
   if (selection.type === 'none' || !selection.id) return null;
 
@@ -1199,6 +1202,111 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             >
               <Trash2 className="w-3 h-3" />
               Delete Text
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 8. UNDERLAY INSPECTOR
+  if (selection.type === 'underlay') {
+    const underlay = state.underlay;
+    if (!underlay) return null;
+
+    return (
+      <div className="absolute top-16 right-88 w-72 bg-slate-900/95 border border-slate-700/80 backdrop-blur-md rounded-2xl shadow-2xl p-4 text-slate-200 z-20 text-xs">
+        <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-800">
+          <div className="flex items-center gap-2 font-bold text-sky-400">
+            <Layers className="w-4 h-4" />
+            <span>Blueprint Underlay Settings</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 text-slate-400 hover:text-white rounded-md cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[10px] uppercase font-bold text-slate-400">
+                Opacity
+              </label>
+              <span className="text-xs font-mono font-bold text-sky-400">
+                {Math.round(underlay.opacity * 100)}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0.1"
+              max="1.0"
+              step="0.05"
+              value={underlay.opacity}
+              onChange={(e) => {
+                onChange({
+                  ...state,
+                  underlay: { ...underlay, opacity: parseFloat(e.target.value) }
+                });
+              }}
+              className="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-sky-500"
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 cursor-pointer text-slate-300 text-xs font-semibold">
+              <input
+                type="checkbox"
+                checked={underlay.isLocked}
+                onChange={(e) => {
+                  onChange({
+                    ...state,
+                    underlay: { ...underlay, isLocked: e.target.checked }
+                  });
+                }}
+                className="rounded bg-slate-950 border-slate-700 text-sky-500"
+              />
+              Lock Position
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer text-slate-300 text-xs font-semibold">
+              <input
+                type="checkbox"
+                checked={underlay.isVisible}
+                onChange={(e) => {
+                  onChange({
+                    ...state,
+                    underlay: { ...underlay, isVisible: e.target.checked }
+                  });
+                }}
+                className="rounded bg-slate-950 border-slate-700 text-sky-500"
+              />
+              Visible
+            </label>
+          </div>
+
+          <div className="pt-2 border-t border-slate-800 space-y-2">
+            <button
+              onClick={() => {
+                if (onToolChange) onToolChange('calibrate_scale');
+                onClose();
+              }}
+              className="w-full px-3 py-2 bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold rounded-lg flex items-center justify-center gap-2 border border-slate-700 transition-colors cursor-pointer"
+            >
+              <RotateCw className="w-4 h-4" />
+              Re-Calibrate Scale
+            </button>
+            
+            <button
+              onClick={() => {
+                onChange({ ...state, underlay: undefined });
+                onClose();
+              }}
+              className="w-full px-3 py-2 bg-red-950/40 hover:bg-red-900/60 text-red-300 font-bold rounded-lg flex items-center justify-center gap-2 border border-red-900/30 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+              Remove Image
             </button>
           </div>
         </div>

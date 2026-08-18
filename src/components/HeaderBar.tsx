@@ -25,6 +25,7 @@ import {
   Palette,
   SlidersHorizontal,
   HardDrive,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 interface HeaderBarProps {
@@ -174,6 +175,36 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     reader.readAsText(file);
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const src = event.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        onChange({
+          ...state,
+          underlay: {
+            id: `underlay-${Date.now()}`,
+            src,
+            width: img.width,
+            height: img.height,
+            x: - (img.width / 2) / 24, // Center roughly assuming default 24px/ft scale
+            y: - (img.height / 2) / 24,
+            scale: 24, // Initial scale: 24 pixels per foot
+            opacity: 0.5,
+            isLocked: false,
+            isVisible: true,
+          },
+        });
+      };
+      img.src = src;
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <header className="h-14 bg-slate-900/95 border-b border-slate-800 px-4 flex items-center justify-between select-none shrink-0 z-30">
       {/* App Branding */}
@@ -253,6 +284,21 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             </div>
           )}
         </div>
+
+        {/* Blueprint Underlay Import */}
+        <label
+          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-colors border border-slate-700/60"
+          title="Import Blueprint / Floor Plan Image"
+        >
+          <ImageIcon className="w-3.5 h-3.5 text-sky-400" />
+          <span>Import Blueprint</span>
+          <input
+            type="file"
+            accept=".png, .jpg, .jpeg, .webp, .svg"
+            onChange={handleImageUpload}
+            className="hidden"
+          />
+        </label>
 
         {/* Unit Selector */}
         <div className="bg-slate-950 p-0.5 rounded-lg border border-slate-800 flex items-center">
