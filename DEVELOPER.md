@@ -19,7 +19,7 @@
 ---
 
 **Git Advanced & Project Backups**
-* Create clean `.zip` archive of committed code outside root: `git archive -o ../project-backup.zip HEAD`
+* Create clean `.zip` archive of committed code outside root: `git archive -o ../planarMTO.zip HEAD`
 * Create `.zip` archive including uncommitted edits: `zip -r ../project-backup.zip . -x "*.git*" "node_modules/*"`
 * Create and switch to new branch: `git checkout -b branch-name`
 * Switch back to main branch: `git checkout main`
