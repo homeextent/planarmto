@@ -331,7 +331,13 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       overheadGarageBays++;
       // Garage exterior jamb casing = W + 2*H
       totalApertureCasingLf += ap.width + 2 * ap.height;
-    } else if (ap.type === 'door_sliding_patio' || ap.type === 'door_bifold') {
+    } else if (ap.type === 'door_bifold_single' || ap.type === 'door_bifold_double') {
+      passageDoorsUnits++;
+      totalApertureCasingLf += 2 * (ap.width + 2 * ap.height);
+    } else if (ap.type === 'cased_opening') {
+      // Cased opening has casing on both sides, but no door unit
+      totalApertureCasingLf += 2 * (ap.width + 2 * ap.height);
+    } else if (ap.type === 'door_sliding_patio') {
       passageDoorsUnits++;
       totalApertureCasingLf += 2 * (ap.width + 2 * ap.height);
     }

@@ -120,9 +120,11 @@ export function saveProjectToDirectory(
     state.settings.itemInclusions
   );
 
-  const existingIndex = options?.id ? projects.findIndex((p) => p.id === options.id) : -1;
+  // Search by ID first for robust overwriting
+  const targetId = options?.id || state.activeProjectId;
+  const existingIndex = targetId ? projects.findIndex((p) => p.id === targetId) : -1;
 
-  const entryId = options?.id || `proj_${now}_${Math.random().toString(36).substr(2, 6)}`;
+  const entryId = targetId || `proj_${now}_${Math.random().toString(36).substr(2, 6)}`;
   const entryCreatedAt = existingIndex >= 0 ? projects[existingIndex].createdAt : now;
 
   const newEntry: SavedProjectEntry = {

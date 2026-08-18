@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FloorplanState, ProjectSettings, UnitSystem } from '../types';
+import { FloorplanState, ProjectSettings, UnitSystem, SelectionState } from '../types';
 import {
   createBlankProject,
   createModernTwoBedroomRancher,
@@ -26,6 +26,7 @@ import {
   SlidersHorizontal,
   HardDrive,
   Image as ImageIcon,
+  FileCode,
 } from 'lucide-react';
 
 interface HeaderBarProps {
@@ -33,13 +34,18 @@ interface HeaderBarProps {
   onChange: (newState: FloorplanState) => void;
   canUndo: boolean;
   canRedo: boolean;
+  isDirty?: boolean;
   onUndo: () => void;
   onRedo: () => void;
+  onSave?: () => void;
+  onSaveAs?: () => void;
   onOpenSettingsModal: () => void;
   onOpenRateModal?: () => void;
   onOpenHelpModal: () => void;
   onOpenPrintModal?: () => void;
   onOpenProjectDirectoryModal?: () => void;
+  onSelectUnderlay?: () => void;
+  selection: SelectionState;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -47,13 +53,18 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onChange,
   canUndo,
   canRedo,
+  isDirty,
   onUndo,
   onRedo,
+  onSave,
+  onSaveAs,
   onOpenSettingsModal,
   onOpenRateModal,
   onOpenHelpModal,
   onOpenPrintModal,
   onOpenProjectDirectoryModal,
+  onSelectUnderlay,
+  selection,
 }) => {
   const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
 
@@ -71,47 +82,6 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     key: K,
     value: ProjectSettings[K]
   ) => {
-    // When Wall Height default is adjusted in top bar, update project settings
-    // so ALL newly drawn rooms/walls use this value.
-    if (key === 'defaultWallHeight') {
-      const newHeight = value as number;
-      
-      // If a room is selected, update its ceiling height and all its wall heights
-      if (state.selectedRoomId) {
-        const updatedRooms = state.rooms.map(r => 
-          r.id === state.selectedRoomId ? { ...r, ceilingHeight: newHeight } : r
-        );
-        
-        const selectedRoom = state.rooms.find(r => r.id === state.selectedRoomId);
-        let updatedWalls = state.walls;
-        if (selectedRoom) {
-          updatedWalls = state.walls.map(w => 
-            selectedRoom.wallIds.includes(w.id) ? { ...w, height: newHeight } : w
-          );
-        }
-
-        onChange({
-          ...state,
-          settings: {
-            ...state.settings,
-            [key]: value,
-          },
-          rooms: updatedRooms,
-          walls: updatedWalls,
-        });
-        return;
-      }
-
-      onChange({
-        ...state,
-        settings: {
-          ...state.settings,
-          [key]: value,
-        },
-      });
-      return;
-    }
-
     onChange({
       ...state,
       settings: {
@@ -134,7 +104,6 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       baseState = createBlankProject();
     }
 
-    // Hydrate loaded template with persisted company branding while generating fresh job code
     const hydratedSettings = hydrateSettingsWithBranding(
       baseState.settings,
       templateName === 'blank'
@@ -152,7 +121,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(state, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `PlanarMTO_Project_${Date.now()}.json`);
+    downloadAnchor.setAttribute('download', `${state.activeProjectName || 'Project'}_${Date.now()}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -191,9 +160,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             src,
             width: img.width,
             height: img.height,
-            x: - (img.width / 2) / 24, // Center roughly assuming default 24px/ft scale
+            x: - (img.width / 2) / 24,
             y: - (img.height / 2) / 24,
-            scale: 24, // Initial scale: 24 pixels per foot
+            scale: 24,
             opacity: 0.5,
             isLocked: false,
             isVisible: true,
@@ -207,38 +176,72 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
   return (
     <header className="h-14 bg-slate-900/95 border-b border-slate-800 px-4 flex items-center justify-between select-none shrink-0 z-30">
-      {/* App Branding */}
-      <div className="flex items-center gap-3">
-        {state.settings.companyBranding?.logoUrl ? (
-          <div className="h-9 max-w-[120px] flex items-center justify-center rounded-lg bg-slate-950 p-1 border border-slate-800 shadow-md">
-            <img
-              src={state.settings.companyBranding.logoUrl}
-              alt="Company Logo"
-              className="max-h-full max-w-full object-contain rounded"
-            />
+      {/* App Branding & Project Info */}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {state.settings.companyBranding?.logoUrl ? (
+            <div className="h-9 max-w-[120px] flex items-center justify-center rounded-lg bg-slate-950 p-1 border border-slate-800 shadow-md">
+              <img
+                src={state.settings.companyBranding.logoUrl}
+                alt="Company Logo"
+                className="max-h-full max-w-full object-contain rounded"
+              />
+            </div>
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-700 flex items-center justify-center shadow-md shadow-sky-950">
+              <DraftingCompass className="w-5 h-5 text-white" />
+            </div>
+          )}
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-sm tracking-tight text-white font-sans truncate max-w-[180px]">
+                {state.settings.companyBranding?.companyName || 'PlanarMTO'}
+              </span>
+              <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 bg-sky-950 border border-sky-600/40 text-sky-400 rounded">
+                CAD Engine
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-400 -mt-0.5">
+              2D Material Take-Off & Estimator
+            </p>
           </div>
-        ) : (
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-700 flex items-center justify-center shadow-md shadow-sky-950">
-            <DraftingCompass className="w-5 h-5 text-white" />
-          </div>
-        )}
-        <div>
+        </div>
+
+        <div className="h-8 w-[1px] bg-slate-800 mx-2" />
+
+        <div className="flex flex-col">
           <div className="flex items-center gap-2">
-            <span className="font-extrabold text-sm tracking-tight text-white font-sans truncate max-w-[180px]">
-              {state.settings.companyBranding?.companyName || 'PlanarMTO'}
-            </span>
-            <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 bg-sky-950 border border-sky-600/40 text-sky-400 rounded">
-              CAD Engine
-            </span>
+            <span className="text-xs font-bold text-sky-400 uppercase tracking-wider">Active Project</span>
+            {isDirty && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Unsaved Changes"></span>}
           </div>
-          <p className="text-[10px] text-slate-400 -mt-0.5">
-            2D Material Take-Off & Estimator
-          </p>
+          <span className="text-sm font-semibold text-slate-100 truncate max-w-[200px]">
+            {state.activeProjectName || 'Untitled Project'}{isDirty ? '*' : ''}
+          </span>
         </div>
       </div>
 
       {/* Center Drafting Settings & Toggles */}
       <div className="flex items-center gap-2 text-xs">
+        {/* Save Controls */}
+        <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 mr-2">
+          <button
+            onClick={onSave}
+            className="px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded-md flex items-center gap-1.5 text-[11px] font-bold transition-colors cursor-pointer shadow-sm shadow-sky-950"
+            title="Quick Save (Ctrl+S)"
+          >
+            <Save className="w-3 h-3" />
+            <span>Save</span>
+          </button>
+          <button
+            onClick={onSaveAs}
+            className="px-3 py-1 text-slate-400 hover:text-white rounded-md flex items-center gap-1.5 text-[11px] font-bold transition-colors cursor-pointer"
+            title="Save As (Ctrl+Shift+S)"
+          >
+            <FileCode className="w-3 h-3" />
+            <span>Save As</span>
+          </button>
+        </div>
+
         {/* Templates Selector */}
         <div className="relative">
           <button
@@ -299,6 +302,21 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             className="hidden"
           />
         </label>
+        
+        {state.underlay && (
+          <button
+            onClick={onSelectUnderlay}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-colors border ${
+              selection.type === 'underlay'
+                ? 'bg-sky-950/80 border-sky-500 text-sky-300'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700/60'
+            }`}
+            title="Open Blueprint Underlay Settings"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-sky-400" />
+            <span>Blueprint Options</span>
+          </button>
+        )}
 
         {/* Unit Selector */}
         <div className="bg-slate-950 p-0.5 rounded-lg border border-slate-800 flex items-center">
@@ -337,63 +355,6 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           <Compass className="w-3.5 h-3.5" />
           <span>Ortho 90°</span>
         </button>
-
-        {/* Wall Height Selector */}
-        <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1">
-          <span className="text-[10px] font-bold text-slate-400 uppercase">Wall H:</span>
-          <select
-            value={state.settings.defaultWallHeight}
-            onChange={(e) => handleSettingChange('defaultWallHeight', parseFloat(e.target.value))}
-            className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer [&>option]:bg-slate-900 [&>option]:text-slate-100"
-          >
-            <option value="8" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>8 ft</option>
-            <option value="9" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>9 ft</option>
-            <option value="10" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>10 ft</option>
-            <option value="11" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>11 ft</option>
-            <option value="12" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>12 ft</option>
-            <option value="13" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>13 ft</option>
-            <option value="14" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>14 ft</option>
-            <option value="15" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>15 ft</option>
-            <option value="16" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>16 ft</option>
-            <option value="18" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>18 ft</option>
-            <option value="20" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>20 ft</option>
-            {![8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20].includes(state.settings.defaultWallHeight) && (
-              <option value={state.settings.defaultWallHeight} style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>
-                {state.settings.defaultWallHeight} ft (Custom)
-              </option>
-            )}
-          </select>
-        </div>
-
-        {/* Slab Thickness */}
-        <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1">
-          <span className="text-[10px] font-bold text-slate-400 uppercase">Slab:</span>
-          <select
-            value={state.settings.slabThicknessInches}
-            onChange={(e) => handleSettingChange('slabThicknessInches', parseFloat(e.target.value))}
-            className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer [&>option]:bg-slate-900 [&>option]:text-slate-100"
-          >
-            <option value="4" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>4" (Slab)</option>
-            <option value="6" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>6" (Heavy)</option>
-            <option value="8" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>8" (Industrial)</option>
-          </select>
-        </div>
-
-        {/* Roof Pitch */}
-        <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1">
-          <span className="text-[10px] font-bold text-slate-400 uppercase">Pitch:</span>
-          <select
-            value={state.settings.roofPitchScale}
-            onChange={(e) => handleSettingChange('roofPitchScale', parseFloat(e.target.value))}
-            className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer [&>option]:bg-slate-900 [&>option]:text-slate-100"
-          >
-            <option value="3" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>3:12 (Low)</option>
-            <option value="4" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>4:12 (Std)</option>
-            <option value="6" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>6:12 (Mid)</option>
-            <option value="8" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>8:12 (Steep)</option>
-            <option value="12" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>12:12 (45°)</option>
-          </select>
-        </div>
 
         {/* Theme Selector */}
         <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1">

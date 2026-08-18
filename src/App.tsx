@@ -14,7 +14,7 @@ import {
 import { createModernTwoBedroomRancher, createBlankProject } from './engine/samplePlans';
 import { calculateMTO, calculateEstimatedCost, DEFAULT_UNIT_COST_RATES } from './engine/estimator';
 import { detectRoomFaces, isPointInPolygon } from './engine/cadMath';
-import { hydrateSettingsWithBranding, saveAutoSaveState } from './utils/storage';
+import { hydrateSettingsWithBranding, saveAutoSaveState, saveProjectToDirectory } from './utils/storage';
 import { HeaderBar } from './components/HeaderBar';
 import { Toolbar } from './components/Toolbar';
 import { CadCanvas } from './components/CadCanvas';
@@ -52,6 +52,9 @@ export default function App() {
   // Currently selected element
   const [selection, setSelection] = useState<SelectionState>({ type: 'none' });
 
+  // Tracking unsaved changes
+  const [isDirty, setIsDirty] = useState(false);
+
   // Modal visibility states
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -67,23 +70,12 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [state]);
 
-  // Global Keyboard Shortcuts (Ctrl+S / Cmd+S for Project Directory, Ctrl+Z / Ctrl+Y)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        setIsProjectDirectoryOpen(true);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   // Update State with Undo history tracking
   const handleStateChange = useCallback((newState: FloorplanState, pushHistory = true) => {
     if (pushHistory) {
       setHistory((prev) => [...prev.slice(-30), state]);
       setRedoStack([]);
+      setIsDirty(true);
     }
     setState(newState);
   }, [state]);
@@ -95,6 +87,7 @@ export default function App() {
     setHistory((prev) => prev.slice(0, prev.length - 1));
     setState(previous);
     setSelection({ type: 'none' });
+    setIsDirty(true);
   }, [history, state]);
 
   const handleRedo = useCallback(() => {
@@ -104,6 +97,7 @@ export default function App() {
     setRedoStack((prev) => prev.slice(1));
     setState(next);
     setSelection({ type: 'none' });
+    setIsDirty(true);
   }, [redoStack, state]);
 
   // Load project from directory
@@ -115,7 +109,53 @@ export default function App() {
       ...loadedState,
       settings: hydrateSettingsWithBranding(loadedState.settings),
     });
+    setIsDirty(false);
   }, []);
+
+  // Save/Overwrite active project
+  const handleSaveProject = useCallback(() => {
+    const { activeProjectId, activeProjectName } = state;
+    if (activeProjectId) {
+      saveProjectToDirectory(activeProjectName, state, { id: activeProjectId });
+      setIsDirty(false);
+    } else {
+      handleSaveProjectAs();
+    }
+  }, [state]);
+
+  const handleSaveProjectAs = useCallback(() => {
+    const newName = prompt('Enter project name:', state.activeProjectName || 'New Project');
+    if (newName) {
+      const newId = `proj_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const newState = {
+        ...state,
+        activeProjectId: newId,
+        activeProjectName: newName,
+      };
+      saveProjectToDirectory(newName, newState, { id: newId });
+      setState(newState);
+      setIsDirty(false);
+    }
+  }, [state]);
+
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleSaveProjectAs();
+        } else {
+          handleSaveProject();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') {
+        e.preventDefault();
+        setIsProjectDirectoryOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSaveProject, handleSaveProjectAs]);
 
   // New Blank Project with persisted branding
   const handleNewBlankProject = useCallback(() => {
@@ -169,7 +209,7 @@ export default function App() {
   // Toggle calculation engine mode (Interior Finish Mode vs Exterior Framing Mode)
   const handleToggleCalculationMode = useCallback(() => {
     setState((prev) => {
-      const currentMode = prev.settings.calculationMode || 'exterior_framing';
+      const currentMode = prev.settings.calculationMode || 'interior_finish';
       const nextMode = currentMode === 'interior_finish' ? 'exterior_framing' : 'interior_finish';
       return {
         ...prev,
@@ -309,13 +349,18 @@ export default function App() {
         onChange={handleStateChange}
         canUndo={history.length > 0}
         canRedo={redoStack.length > 0}
+        isDirty={isDirty}
         onUndo={handleUndo}
         onRedo={handleRedo}
+        onSave={handleSaveProject}
+        onSaveAs={handleSaveProjectAs}
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
         onOpenRateModal={() => setIsRateModalOpen(true)}
         onOpenHelpModal={() => setIsHelpOpen(true)}
         onOpenPrintModal={() => setIsPrintModalOpen(true)}
         onOpenProjectDirectoryModal={() => setIsProjectDirectoryOpen(true)}
+        onSelectUnderlay={() => setSelection({ type: 'underlay', id: state.underlay?.id })}
+        selection={selection}
       />
 
       {/* 2. MAIN 3-PANEL WORKSPACE */}

@@ -21,7 +21,9 @@ export type ApertureType =
   | 'door_exterior'
   | 'door_garage'
   | 'door_sliding_patio'
-  | 'door_bifold';
+  | 'door_bifold_single'
+  | 'door_bifold_double'
+  | 'cased_opening';
 
 export interface Aperture {
   id: string;
@@ -34,6 +36,7 @@ export interface Aperture {
   label?: string;
   swingSide?: 'left' | 'right' | 'inward' | 'outward';
   hingeSide?: 'left' | 'right';
+  pocketDirection?: 'left' | 'right';
   casingSides?: 1 | 2; // 2 for interior passage doors, 1 for exterior doors
   rotation?: number;
 }
@@ -400,6 +403,9 @@ export type ActiveTool =
   | 'aperture_exterior_door'
   | 'aperture_garage'
   | 'aperture_patio_slider'
+  | 'aperture_bifold_single'
+  | 'aperture_bifold_double'
+  | 'aperture_cased_opening'
   | 'stamp_column'
   | 'stamp_pier'
   | 'stamp_beam'
@@ -541,6 +547,8 @@ export interface UnderlayImage {
 }
 
 export interface FloorplanState {
+  activeProjectId: string | null;
+  activeProjectName: string;
   nodes: CadNode[];
   walls: CadWall[];
   apertures: Aperture[];

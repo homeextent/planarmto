@@ -484,11 +484,20 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     if (state.underlay && state.underlay.isVisible && underlayImage) {
       ctx.save();
       ctx.globalAlpha = state.underlay.opacity;
+      const isSelected = selection.type === 'underlay';
       const drawX = state.underlay.x * scale + panX;
       const drawY = state.underlay.y * scale + panY;
       const drawW = (state.underlay.width / state.underlay.scale) * scale;
       const drawH = (state.underlay.height / state.underlay.scale) * scale;
       ctx.drawImage(underlayImage, drawX, drawY, drawW, drawH);
+      
+      if (isSelected) {
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([10, 5]);
+        ctx.strokeRect(drawX, drawY, drawW, drawH);
+        ctx.setLineDash([]);
+      }
       ctx.restore();
     }
 
@@ -887,14 +896,37 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         ctx.setLineDash([3, 3]);
         ctx.strokeStyle = '#c084fc';
         ctx.beginPath();
+        const isReversed = ap.pocketDirection === 'right';
+        const pocketDir = isReversed ? { x: -geom.dir.x, y: -geom.dir.y } : geom.dir;
+        const pocketStart = isReversed ? sStart : sEnd;
         const pocketEnd = {
-          x: sEnd.x + geom.dir.x * apWidthPx,
-          y: sEnd.y + geom.dir.y * apWidthPx,
+          x: pocketStart.x + pocketDir.x * apWidthPx,
+          y: pocketStart.y + pocketDir.y * apWidthPx,
         };
-        ctx.moveTo(sEnd.x, sEnd.y);
+        ctx.moveTo(pocketStart.x, pocketStart.y);
         ctx.lineTo(pocketEnd.x, pocketEnd.y);
         ctx.stroke();
         ctx.setLineDash([]);
+
+        // Direction arrow
+        const arrowSize = 6;
+        const arrowTip = {
+          x: pocketStart.x + pocketDir.x * (apWidthPx * 0.8),
+          y: pocketStart.y + pocketDir.y * (apWidthPx * 0.8),
+        };
+        const arrowAngle = Math.atan2(pocketDir.y, pocketDir.x);
+        ctx.beginPath();
+        ctx.moveTo(arrowTip.x, arrowTip.y);
+        ctx.lineTo(
+          arrowTip.x - arrowSize * Math.cos(arrowAngle - Math.PI / 6),
+          arrowTip.y - arrowSize * Math.sin(arrowAngle - Math.PI / 6)
+        );
+        ctx.moveTo(arrowTip.x, arrowTip.y);
+        ctx.lineTo(
+          arrowTip.x - arrowSize * Math.cos(arrowAngle + Math.PI / 6),
+          arrowTip.y - arrowSize * Math.sin(arrowAngle + Math.PI / 6)
+        );
+        ctx.stroke();
       } else if (ap.type === 'door_sliding_patio') {
         // Sliding patio door: two overlapping panels
         ctx.strokeStyle = isSelected ? '#38bdf8' : '#10b981';
@@ -908,6 +940,111 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         ctx.moveTo(sCenter.x - nx, sCenter.y - ny);
         ctx.lineTo(sEnd.x - nx, sEnd.y - ny);
         ctx.stroke();
+      } else if (ap.type === 'door_bifold_single' || ap.type === 'door_bifold_double') {
+        // Bifold door: chevron/accordion panels
+        const isDouble = ap.type === 'door_bifold_double';
+        const swingNormal = ap.swingSide === 'inward' ? -1 : 1;
+        const panelColor = isSelected ? '#38bdf8' : '#34d399';
+        ctx.strokeStyle = panelColor;
+        ctx.lineWidth = 2.5;
+
+        const drawBifoldPair = (start: Point2D, end: Point2D) => {
+          const dx = end.x - start.x;
+          const dy = end.y - start.y;
+          const spanLen = Math.hypot(dx, dy);
+          if (spanLen < 0.01) return;
+
+          const ux = dx / spanLen;
+          const uy = dy / spanLen;
+
+          // Single, unified normal vector perpendicular to the segment
+          const nx = -uy * swingNormal;
+          const ny = ux * swingNormal;
+
+          // Apex is at 1/4 of the span, projected out using the same normal
+          const apexOffset = spanLen / 4;
+          const apex = {
+            x: start.x + (ux * spanLen) / 4 + nx * apexOffset,
+            y: start.y + (uy * spanLen) / 4 + ny * apexOffset,
+          };
+
+          const mid = {
+            x: start.x + (ux * spanLen) / 2,
+            y: start.y + (uy * spanLen) / 2,
+          };
+
+          ctx.beginPath();
+          ctx.moveTo(start.x, start.y);
+          ctx.lineTo(apex.x, apex.y);
+          ctx.lineTo(mid.x, mid.y);
+          ctx.stroke();
+        };
+
+        if (isDouble) {
+          // Left pair: from sStart to sCenter
+          drawBifoldPair(sStart, sCenter);
+          // Right pair: from sEnd to sCenter. 
+          // Note: sEnd to sCenter ensures normal is consistent with sStart to sCenter 
+          // because it's the same line direction vector if we swapped start/end.
+          // Wait, sEnd to sCenter has dx, dy inverted.
+          // To ensure uniform normal, we should use the same base normal from geom.
+          
+          const drawBifoldPairFixed = (p0: Point2D, p1: Point2D) => {
+            const dx_ap = sEnd.x - sStart.x;
+            const dy_ap = sEnd.y - sStart.y;
+            const fullLen = Math.hypot(dx_ap, dy_ap);
+            const ux = dx_ap / fullLen;
+            const uy = dy_ap / fullLen;
+            const nx = -uy * swingNormal;
+            const ny = ux * swingNormal;
+
+            const spanDx = p1.x - p0.x;
+            const spanDy = p1.y - p0.y;
+            const spanLen = Math.hypot(spanDx, spanDy);
+            const spanUx = spanDx / spanLen;
+            const spanUy = spanDy / spanLen;
+
+            const apexOffset = fullLen / 8; // 1/4 of half span
+            const apex = {
+              x: p0.x + (spanUx * spanLen) / 2 + nx * apexOffset,
+              y: p0.y + (spanUy * spanLen) / 2 + ny * apexOffset,
+            };
+
+            ctx.beginPath();
+            ctx.moveTo(p0.x, p0.y);
+            ctx.lineTo(apex.x, apex.y);
+            ctx.lineTo(p1.x, p1.y);
+            ctx.stroke();
+          };
+
+          drawBifoldPairFixed(sStart, sCenter);
+          drawBifoldPairFixed(sEnd, sCenter);
+        } else {
+          const hinge = ap.hingeSide === 'right' ? sEnd : sStart;
+          const moving = ap.hingeSide === 'right' ? sStart : sEnd;
+          drawBifoldPair(hinge, moving);
+        }
+
+        ctx.fillStyle = panelColor;
+        ctx.font = '600 10px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`BIFOLD ${ap.width}'`, sCenter.x, sCenter.y + 12 * swingNormal);
+
+      } else if (ap.type === 'cased_opening') {
+        // Cased Opening: Clean opening with dashed header line
+        ctx.strokeStyle = isSelected ? '#38bdf8' : '#94a3b8';
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(sStart.x, sStart.y);
+        ctx.lineTo(sEnd.x, sEnd.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = isSelected ? '#38bdf8' : '#94a3b8';
+        ctx.font = 'italic 600 10px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`OPENING ${ap.width}'`, sCenter.x, sCenter.y);
       } else {
         // Standard Passage / Exterior Door swing arc
         const swingNormal = ap.swingSide === 'inward' ? -1 : 1;
@@ -2085,6 +2222,15 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         } else if (activeTool === 'aperture_patio_slider') {
           apType = 'door_sliding_patio';
           width = 6.0;
+        } else if (activeTool === 'aperture_bifold_single') {
+          apType = 'door_bifold_single';
+          width = 2.5;
+        } else if (activeTool === 'aperture_bifold_double') {
+          apType = 'door_bifold_double';
+          width = 5.0;
+        } else if (activeTool === 'aperture_cased_opening') {
+          apType = 'cased_opening';
+          width = 3.0;
         }
 
         const newAperture: Aperture = {

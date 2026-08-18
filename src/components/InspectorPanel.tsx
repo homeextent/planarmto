@@ -703,6 +703,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             >
               <option value="door_passage">Passage Interior Door</option>
               <option value="door_pocket">Pocket Door (In-Wall)</option>
+              <option value="door_bifold_single">Bifold Closet Door (Single)</option>
+              <option value="door_bifold_double">Bifold Closet Door (Double)</option>
+              <option value="cased_opening">Cased Wall Opening</option>
               <option value="door_exterior">Exterior Entry Door</option>
               <option value="door_garage">Overhead Garage Bay</option>
               <option value="door_sliding_patio">Sliding Patio Door</option>
@@ -815,6 +818,30 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                 <RotateCw className="w-3.5 h-3.5 text-emerald-400" />
                 Hinge: {ap.hingeSide === 'right' ? 'Right' : 'Left'}
               </button>
+
+              {ap.type === 'door_pocket' && (
+                <button
+                  onClick={() => {
+                    const updated = state.apertures.map((a) =>
+                      a.id === ap.id
+                        ? {
+                            ...a,
+                            pocketDirection:
+                              a.pocketDirection === 'right'
+                                ? ('left' as const)
+                                : ('right' as const),
+                          }
+                        : a
+                    );
+                    onChange({ ...state, apertures: updated });
+                  }}
+                  className="col-span-2 px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                  title="Flip pocket sliding direction"
+                >
+                  <RotateCw className="w-3.5 h-3.5 text-purple-400" />
+                  Flip Pocket ({ap.pocketDirection || 'left'})
+                </button>
+              )}
             </div>
           </div>
 
@@ -1214,6 +1241,27 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
     const underlay = state.underlay;
     if (!underlay) return null;
 
+    const handleOpacityChange = (opacity: number) => {
+      onChange({
+        ...state,
+        underlay: { ...underlay, opacity }
+      });
+    };
+
+    const handleLockedChange = (isLocked: boolean) => {
+      onChange({
+        ...state,
+        underlay: { ...underlay, isLocked }
+      });
+    };
+
+    const handleVisibleChange = (isVisible: boolean) => {
+      onChange({
+        ...state,
+        underlay: { ...underlay, isVisible }
+      });
+    };
+
     return (
       <div className="absolute top-16 right-88 w-72 bg-slate-900/95 border border-slate-700/80 backdrop-blur-md rounded-2xl shadow-2xl p-4 text-slate-200 z-20 text-xs">
         <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-800">
@@ -1245,12 +1293,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               max="1.0"
               step="0.05"
               value={underlay.opacity}
-              onChange={(e) => {
-                onChange({
-                  ...state,
-                  underlay: { ...underlay, opacity: parseFloat(e.target.value) }
-                });
-              }}
+              onChange={(e) => handleOpacityChange(parseFloat(e.target.value))}
               className="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-sky-500"
             />
           </div>
@@ -1260,12 +1303,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               <input
                 type="checkbox"
                 checked={underlay.isLocked}
-                onChange={(e) => {
-                  onChange({
-                    ...state,
-                    underlay: { ...underlay, isLocked: e.target.checked }
-                  });
-                }}
+                onChange={(e) => handleLockedChange(e.target.checked)}
                 className="rounded bg-slate-950 border-slate-700 text-sky-500"
               />
               Lock Position
@@ -1274,12 +1312,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               <input
                 type="checkbox"
                 checked={underlay.isVisible}
-                onChange={(e) => {
-                  onChange({
-                    ...state,
-                    underlay: { ...underlay, isVisible: e.target.checked }
-                  });
-                }}
+                onChange={(e) => handleVisibleChange(e.target.checked)}
                 className="rounded bg-slate-950 border-slate-700 text-sky-500"
               />
               Visible

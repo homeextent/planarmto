@@ -4,7 +4,7 @@ import { detectRoomFaces } from './cadMath';
 export const DEFAULT_SETTINGS: ProjectSettings = {
   unitSystem: 'imperial',
   theme: 'blueprint',
-  calculationMode: 'exterior_framing',
+  calculationMode: 'interior_finish',
   wallJustification: 'interior_face',
   defaultWallHeight: 9.0, // 9ft standard
   defaultCeilingHeight: 9.0,
@@ -29,6 +29,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
 
 export function createBlankProject(): FloorplanState {
   return {
+    activeProjectId: null,
+    activeProjectName: 'Untitled Project',
     nodes: [],
     walls: [],
     apertures: [],
@@ -185,6 +187,8 @@ export function createModernTwoBedroomRancher(): FloorplanState {
   });
 
   return {
+    activeProjectId: 'sample_modern_rancher',
+    activeProjectName: 'Modern Two Bedroom Rancher',
     nodes,
     walls,
     apertures,
@@ -250,6 +254,8 @@ export function createStudioSuite(): FloorplanState {
   });
 
   return {
+    activeProjectId: 'sample_studio_suite',
+    activeProjectName: 'Studio Suite',
     nodes,
     walls,
     apertures,
@@ -316,6 +322,8 @@ export function createGarageWorkshop(): FloorplanState {
   });
 
   return {
+    activeProjectId: 'sample_garage_workshop',
+    activeProjectName: 'Garage Workshop',
     nodes,
     walls,
     apertures,
