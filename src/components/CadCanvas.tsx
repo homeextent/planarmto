@@ -981,44 +981,38 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         };
 
         if (isDouble) {
-          // Left pair: from sStart to sCenter
-          drawBifoldPair(sStart, sCenter);
-          // Right pair: from sEnd to sCenter. 
-          // Note: sEnd to sCenter ensures normal is consistent with sStart to sCenter 
-          // because it's the same line direction vector if we swapped start/end.
-          // Wait, sEnd to sCenter has dx, dy inverted.
-          // To ensure uniform normal, we should use the same base normal from geom.
+          // Parametric Vector Formula for Symmetric Double Bifold Doors
+          const dx_ap = sEnd.x - sStart.x;
+          const dy_ap = sEnd.y - sStart.y;
+          const L = Math.hypot(dx_ap, dy_ap);
+          const ux = dx_ap / L;
+          const uy = dy_ap / L;
+          const nx = -uy;
+          const ny = ux;
           
-          const drawBifoldPairFixed = (p0: Point2D, p1: Point2D) => {
-            const dx_ap = sEnd.x - sStart.x;
-            const dy_ap = sEnd.y - sStart.y;
-            const fullLen = Math.hypot(dx_ap, dy_ap);
-            const ux = dx_ap / fullLen;
-            const uy = dy_ap / fullLen;
-            const nx = -uy * swingNormal;
-            const ny = ux * swingNormal;
+          const d = ap.swingSide === 'inward' ? -0.2 * L : 0.2 * L;
 
-            const spanDx = p1.x - p0.x;
-            const spanDy = p1.y - p0.y;
-            const spanLen = Math.hypot(spanDx, spanDy);
-            const spanUx = spanDx / spanLen;
-            const spanUy = spanDy / spanLen;
-
-            const apexOffset = fullLen / 8; // 1/4 of half span
-            const apex = {
-              x: p0.x + (spanUx * spanLen) / 2 + nx * apexOffset,
-              y: p0.y + (spanUy * spanLen) / 2 + ny * apexOffset,
-            };
-
-            ctx.beginPath();
-            ctx.moveTo(p0.x, p0.y);
-            ctx.lineTo(apex.x, apex.y);
-            ctx.lineTo(p1.x, p1.y);
-            ctx.stroke();
+          // 1. Left/Top Pair (Jamb sStart to Midpoint sCenter)
+          const p1 = {
+            x: sStart.x + 0.25 * dx_ap + d * nx,
+            y: sStart.y + 0.25 * dy_ap + d * ny,
           };
+          ctx.beginPath();
+          ctx.moveTo(sStart.x, sStart.y);
+          ctx.lineTo(p1.x, p1.y);
+          ctx.lineTo(sCenter.x, sCenter.y);
+          ctx.stroke();
 
-          drawBifoldPairFixed(sStart, sCenter);
-          drawBifoldPairFixed(sEnd, sCenter);
+          // 2. Right/Bottom Pair (Jamb sEnd to Midpoint sCenter)
+          const p2 = {
+            x: sEnd.x - 0.25 * dx_ap + d * nx,
+            y: sEnd.y - 0.25 * dy_ap + d * ny,
+          };
+          ctx.beginPath();
+          ctx.moveTo(sEnd.x, sEnd.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.lineTo(sCenter.x, sCenter.y);
+          ctx.stroke();
         } else {
           const hinge = ap.hingeSide === 'right' ? sEnd : sStart;
           const moving = ap.hingeSide === 'right' ? sStart : sEnd;
