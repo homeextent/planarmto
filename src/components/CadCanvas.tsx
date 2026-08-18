@@ -215,6 +215,10 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   // Calibration tool state
   const [calibrationPoints, setCalibrationPoints] = useState<Point2D[]>([]);
 
+  // Track last project and underlay to detect "Load" or "Import" events
+  const lastProjectId = useRef<string | undefined>(undefined);
+  const lastUnderlayId = useRef<string | undefined>(state.underlay?.id);
+
   // Underlay image cache
   const [underlayImage, setUnderlayImage] = useState<HTMLImageElement | null>(null);
 
@@ -363,22 +367,38 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
   const handleZoomFit = () => {
     const canvas = canvasRef.current;
-    if (!canvas || state.nodes.length === 0) {
-      setTransform({ scale: 24, x: 200, y: 150 });
-      return;
-    }
+    if (!canvas) return;
 
     let minX = Infinity;
     let maxX = -Infinity;
     let minY = Infinity;
     let maxY = -Infinity;
 
-    state.nodes.forEach((n) => {
-      minX = Math.min(minX, n.x);
-      maxX = Math.max(maxX, n.x);
-      minY = Math.min(minY, n.y);
-      maxY = Math.max(maxY, n.y);
-    });
+    // Include nodes in bounding box
+    if (state.nodes.length > 0) {
+      state.nodes.forEach((n) => {
+        minX = Math.min(minX, n.x);
+        maxX = Math.max(maxX, n.x);
+        minY = Math.min(minY, n.y);
+        maxY = Math.max(maxY, n.y);
+      });
+    }
+
+    // Include underlay in bounding box if it exists and is visible
+    if (state.underlay && state.underlay.isVisible) {
+      const uw = state.underlay.width / state.underlay.scale;
+      const uh = state.underlay.height / state.underlay.scale;
+      minX = Math.min(minX, state.underlay.x);
+      maxX = Math.max(maxX, state.underlay.x + uw);
+      minY = Math.min(minY, state.underlay.y);
+      maxY = Math.max(maxY, state.underlay.y + uh);
+    }
+
+    // If still nothing found, use default view
+    if (minX === Infinity) {
+      setTransform({ scale: 24, x: 200, y: 150 });
+      return;
+    }
 
     const pad = 6; // 6ft padding
     minX -= pad;
@@ -401,6 +421,53 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     setTransform({ scale: newScale, x: newX, y: newY });
   };
+
+  // 1. Auto-Fit Viewport on Project Load or Switch
+  useEffect(() => {
+    if (state.activeProjectId !== lastProjectId.current) {
+      lastProjectId.current = state.activeProjectId;
+      // Delay slightly to ensure geometry is ready for bounding box calculation
+      const timer = setTimeout(() => {
+        handleZoomFit();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [state.activeProjectId]);
+
+  // 2. Auto-Center & Fit on Blueprint Import
+  useEffect(() => {
+    if (state.underlay?.id && state.underlay.id !== lastUnderlayId.current) {
+      lastUnderlayId.current = state.underlay.id;
+      
+      const canvas = canvasRef.current;
+      if (canvas) {
+        // Calculate viewport center in world coordinates
+        const centerWorld = screenToWorld(canvas.clientWidth / 2, canvas.clientHeight / 2);
+        
+        // Calculate centered x, y for the underlay
+        const uw = state.underlay.width / state.underlay.scale;
+        const uh = state.underlay.height / state.underlay.scale;
+        
+        const newX = centerWorld.x - uw / 2;
+        const newY = centerWorld.y - uh / 2;
+        
+        // Update state with centered coordinates
+        onChange({
+          ...state,
+          underlay: {
+            ...state.underlay,
+            x: newX,
+            y: newY,
+          }
+        });
+        
+        // Trigger zoom fit after state propagates
+        setTimeout(handleZoomFit, 100);
+      }
+    } else if (!state.underlay?.id) {
+      lastUnderlayId.current = undefined;
+    }
+  }, [state.underlay?.id, state, onChange, screenToWorld]);
 
   // Keyboard shortcut listener (Delete, Escape, Space)
   useEffect(() => {
