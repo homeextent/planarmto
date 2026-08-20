@@ -28,6 +28,19 @@
 * View commit log history: `git log --oneline`
 
 ---
+**To completely discard all local modifications, delete any newly created untracked files (like new folders or build files), and reset your local directory to match your GitHub repository, run these three commands in your terminal:**
+
+
+* git fetch origin
+* git reset --hard origin/main
+* git clean -fd
+
+**What these commands do:**
+
+* git fetch origin: Downloads the latest state and commit history from your remote GitHub repository without touching your local working files.
+* git reset --hard origin/main: Forces your local tracked files to match the main branch on GitHub, permanently discarding all uncommitted local modifications.
+* git clean -fd: Removes all untracked files and directories created during your plugin build attempt (such as planar-mto.php, build output folders, or temporary .zip files).
+---
 
 **System & VS Code Troubleshooting**
 * Reload VS Code extension host: `Ctrl + Shift + P` -> `Developer: Reload Window`
