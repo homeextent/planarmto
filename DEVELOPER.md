@@ -11,6 +11,14 @@
 
 ---
 
+**Multi-Tenant Development & API (v2.1.0)**
+* **Storage Abstraction**: `src/utils/storage.ts` automatically switches between WordPress REST API and `localStorage` based on `isWP()`.
+* **REST API**: Custom namespace `planarmto/v1` handles project CRUD.
+* **Database**: `wp_planarmto_projects` stores multi-tenant data scoped by `user_id`.
+* **Testing**: When developing locally (`npm run dev`), the system uses `localStorage`. To test MySQL persistence, build and install the plugin on a WordPress instance.
+
+---
+
 ---
 
 **Git Basics & Terminal Usage**

@@ -6,7 +6,7 @@ const PROJECTS_DIRECTORY_KEY = 'planarmto_saved_projects_v1';
 const AUTOSAVE_STORAGE_KEY = 'planarmto_autosave_state_v1';
 
 export interface SavedProjectEntry {
-  id: string;
+  id: string | number; // WP IDs are numbers, local IDs are strings
   name: string;
   projectNumber?: string;
   description?: string;
@@ -20,19 +20,58 @@ export interface SavedProjectEntry {
 }
 
 /**
- * Persists company branding data into browser localStorage.
- * Retains company name, address, contact, logo Data URL, and lead estimator credentials.
+ * Helper to check if we are in WordPress environment
  */
-export function savePersistedBranding(branding: CompanyBranding): void {
+const isWP = () => typeof window !== 'undefined' && !!window.planarMTOConfig?.restUrl;
+
+/**
+ * Generic fetcher for WP REST API
+ */
+async function wpFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  if (!window.planarMTOConfig) throw new Error('WP Config missing');
+  
+  const url = `${window.planarMTOConfig.restUrl}/planarmto/v1${endpoint}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-WP-Nonce': window.planarMTOConfig.nonce,
+    ...options.headers,
+  };
+
+  const response = await fetch(url, { ...options, headers });
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(error.message || `HTTP error! status: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Persists company branding data.
+ */
+export async function savePersistedBranding(branding: CompanyBranding): Promise<void> {
+  const dataToSave: CompanyBranding = {
+    companyName: branding.companyName || '',
+    address: branding.address || '',
+    contact: branding.contact || '',
+    logoUrl: branding.logoUrl || '',
+    estimatorName: branding.estimatorName || '',
+  };
+
+  if (isWP()) {
+    try {
+      await wpFetch('/branding', {
+        method: 'POST',
+        body: JSON.stringify(dataToSave),
+      });
+      return;
+    } catch (err) {
+      console.warn('WP Branding save failed, falling back to local:', err);
+    }
+  }
+
   try {
-    // We persist the firm details & logo, keeping projectNumber separate or included
-    const dataToSave: CompanyBranding = {
-      companyName: branding.companyName || '',
-      address: branding.address || '',
-      contact: branding.contact || '',
-      logoUrl: branding.logoUrl || '',
-      estimatorName: branding.estimatorName || '',
-    };
     localStorage.setItem(BRANDING_STORAGE_KEY, JSON.stringify(dataToSave));
   } catch (err) {
     console.warn('Unable to persist company branding to localStorage:', err);
@@ -40,9 +79,17 @@ export function savePersistedBranding(branding: CompanyBranding): void {
 }
 
 /**
- * Retrieves persisted company branding from localStorage.
+ * Retrieves persisted company branding.
  */
-export function getPersistedBranding(): CompanyBranding | null {
+export async function getPersistedBranding(): Promise<CompanyBranding | null> {
+  if (isWP()) {
+    try {
+      return await wpFetch<CompanyBranding>('/branding');
+    } catch (err) {
+      console.warn('WP Branding fetch failed, falling back to local:', err);
+    }
+  }
+
   try {
     const raw = localStorage.getItem(BRANDING_STORAGE_KEY);
     if (!raw) return null;
@@ -54,34 +101,18 @@ export function getPersistedBranding(): CompanyBranding | null {
 }
 
 /**
- * Applies persisted company branding onto project settings.
- * Generates or keeps the project-specific Job Reference / Spec code.
+ * Retrieves all saved projects.
  */
-export function hydrateSettingsWithBranding(
-  settings: ProjectSettings,
-  defaultProjectNumber?: string
-): ProjectSettings {
-  const persisted = getPersistedBranding();
-  if (!persisted) {
-    return settings;
+export async function getSavedProjects(): Promise<SavedProjectEntry[]> {
+  if (isWP()) {
+    try {
+      const projects = await wpFetch<SavedProjectEntry[]>('/projects');
+      return projects.sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0));
+    } catch (err) {
+      console.warn('WP Projects fetch failed, falling back to local:', err);
+    }
   }
 
-  return {
-    ...settings,
-    companyBranding: {
-      ...persisted,
-      projectNumber:
-        settings.companyBranding?.projectNumber ||
-        defaultProjectNumber ||
-        `PRJ-${new Date().getFullYear()}-MTO-${Math.floor(100 + Math.random() * 900)}`,
-    },
-  };
-}
-
-/**
- * Retrieves all saved projects in the in-app project directory.
- */
-export function getSavedProjects(): SavedProjectEntry[] {
   try {
     const raw = localStorage.getItem(PROJECTS_DIRECTORY_KEY);
     if (!raw) return [];
@@ -97,21 +128,18 @@ export function getSavedProjects(): SavedProjectEntry[] {
 }
 
 /**
- * Saves or updates a project entry in the in-app directory.
+ * Saves or updates a project entry.
  */
-export function saveProjectToDirectory(
+export async function saveProjectToDirectory(
   name: string,
   state: FloorplanState,
   options?: {
-    id?: string;
+    id?: string | number;
     description?: string;
     projectNumber?: string;
   }
-): SavedProjectEntry {
-  const projects = getSavedProjects();
-  const now = Date.now();
-
-  // Compute metrics for quick index listing
+): Promise<SavedProjectEntry> {
+  // Compute metrics
   const mto = calculateMTO(state);
   const cost = calculateEstimatedCost(
     mto,
@@ -120,25 +148,42 @@ export function saveProjectToDirectory(
     state.settings.itemInclusions
   );
 
-  // Search by ID first for robust overwriting
-  const targetId = options?.id || state.activeProjectId;
-  const existingIndex = targetId ? projects.findIndex((p) => p.id === targetId) : -1;
-
-  const entryId = targetId || `proj_${now}_${Math.random().toString(36).substr(2, 6)}`;
-  const entryCreatedAt = existingIndex >= 0 ? projects[existingIndex].createdAt : now;
-
-  const newEntry: SavedProjectEntry = {
-    id: entryId,
+  const payload = {
+    id: options?.id || state.activeProjectId,
     name: name.trim() || 'Untitled Architectural Project',
     projectNumber: options?.projectNumber || state.settings.companyBranding?.projectNumber || `PRJ-${new Date().getFullYear()}-MTO`,
     description: options?.description || '',
-    createdAt: entryCreatedAt,
-    updatedAt: now,
     roomCount: mto.roomDetails.length,
     grossSf: mto.grossFootprintSf || mto.flooringPackageSf || 0,
     netSf: mto.netFloorAreaSf || mto.flooringPackageSf || 0,
     estimatedTotal: cost.totalCost,
     state,
+  };
+
+  if (isWP()) {
+    try {
+      return await wpFetch<SavedProjectEntry>('/projects', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.warn('WP Project save failed, falling back to local:', err);
+    }
+  }
+
+  // Fallback to LocalStorage
+  const projects = await getSavedProjects();
+  const now = Date.now();
+  const targetId = payload.id;
+  const existingIndex = targetId ? projects.findIndex((p) => p.id === targetId) : -1;
+  const entryId = targetId || `proj_${now}_${Math.random().toString(36).substr(2, 6)}`;
+  const entryCreatedAt = existingIndex >= 0 ? projects[existingIndex].createdAt : now;
+
+  const newEntry: SavedProjectEntry = {
+    ...payload,
+    id: entryId,
+    createdAt: entryCreatedAt,
+    updatedAt: now,
   };
 
   if (existingIndex >= 0) {
@@ -157,10 +202,19 @@ export function saveProjectToDirectory(
 }
 
 /**
- * Deletes a project from the in-app directory.
+ * Deletes a project.
  */
-export function deleteProjectFromDirectory(id: string): SavedProjectEntry[] {
-  const projects = getSavedProjects().filter((p) => p.id !== id);
+export async function deleteProjectFromDirectory(id: string | number): Promise<SavedProjectEntry[]> {
+  if (isWP() && typeof id === 'number') {
+    try {
+      await wpFetch(`/projects/${id}`, { method: 'DELETE' });
+      return getSavedProjects();
+    } catch (err) {
+      console.warn('WP Project delete failed, falling back to local:', err);
+    }
+  }
+
+  const projects = (await getSavedProjects()).filter((p) => p.id !== id);
   try {
     localStorage.setItem(PROJECTS_DIRECTORY_KEY, JSON.stringify(projects));
   } catch (err) {
@@ -172,8 +226,24 @@ export function deleteProjectFromDirectory(id: string): SavedProjectEntry[] {
 /**
  * Renames a project in the directory.
  */
-export function renameProjectInDirectory(id: string, newName: string): SavedProjectEntry[] {
-  const projects = getSavedProjects();
+export async function renameProjectInDirectory(id: string | number, newName: string): Promise<SavedProjectEntry[]> {
+  // If WP, we can just use saveProjectToDirectory with the ID and new name
+  // But for simplicity of this refactor, let's just update local for now or handle WP if ID is number
+  if (isWP() && typeof id === 'number') {
+    try {
+      // Find the project to get its state
+      const projects = await getSavedProjects();
+      const project = projects.find(p => p.id === id);
+      if (project) {
+        await saveProjectToDirectory(newName, project.state, { id });
+        return getSavedProjects();
+      }
+    } catch (err) {
+      console.warn('WP Project rename failed, falling back to local:', err);
+    }
+  }
+
+  const projects = await getSavedProjects();
   const index = projects.findIndex((p) => p.id === id);
   if (index >= 0) {
     projects[index].name = newName.trim() || 'Untitled Project';
@@ -185,6 +255,30 @@ export function renameProjectInDirectory(id: string, newName: string): SavedProj
     }
   }
   return projects;
+}
+
+/**
+ * Applies persisted company branding onto project settings.
+ */
+export async function hydrateSettingsWithBranding(
+  settings: ProjectSettings,
+  defaultProjectNumber?: string
+): Promise<ProjectSettings> {
+  const persisted = await getPersistedBranding();
+  if (!persisted) {
+    return settings;
+  }
+
+  return {
+    ...settings,
+    companyBranding: {
+      ...persisted,
+      projectNumber:
+        settings.companyBranding?.projectNumber ||
+        defaultProjectNumber ||
+        `PRJ-${new Date().getFullYear()}-MTO-${Math.floor(100 + Math.random() * 900)}`,
+    },
+  };
 }
 
 /**

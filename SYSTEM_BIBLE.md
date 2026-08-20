@@ -168,24 +168,33 @@ interface SavedProjectEntry {
 
 ---
 
-## 9. WordPress Integration & Deployment Layer
+## 10. Multi-Tenant Data Architecture & REST API Pipeline
 
-### 9.1 WordPress Rewrite Endpoint Pipeline
-PlanarMTO utilizes a custom WordPress rewrite rule to serve the React application on a dedicated endpoint (`/planarmto`), bypassing the standard WordPress theme and page-builder injection (e.g., Elementor, headers/footers).
+To support professional enterprise usage, PlanarMTO implements a multi-tenant storage architecture that transitions from client-side `localStorage` to a centralized WordPress MySQL backend.
 
-1. **Endpoint Registration**: The `init` hook registers a custom rewrite rule:
-   - `add_rewrite_rule('^planarmto/?$', 'index.php?planarmto=1', 'top')`
-2. **Template Redirection & Theme Isolation**: The `template_redirect` hook intercepts the `planarmto` query variable. If present, it loads the compiled `index.html` from the plugin's `dist` directory and exits, preventing the WordPress theme from rendering.
-3. **Dynamic Asset Resolution**: Since Vite generates relative asset paths (`./assets/`), the WordPress engine performs an in-memory string replacement on the `index.html` content:
-   - Replaces `./assets/` with the absolute `plugin_dir_url(__FILE__) . 'dist/assets/'`.
-   - This ensures scripts and styles load correctly regardless of the WordPress site's URL structure.
+### 10.1 MySQL Schema: `wp_planarmto_projects`
+Projects are stored in a dedicated table created via `dbDelta()` to ensure schema stability:
+- **`id`**: Primary Key (UUID/String).
+- **`tenant_id`**: Maps to the WordPress `user_id`. All queries are strictly filtered by this ID.
+- **`name`**: Project title.
+- **`project_data`**: `LONGTEXT` blob containing the serialized `FloorplanState` (nodes, walls, rooms, apertures, stamps, etc.).
+- **`metrics`**: `JSON` or `TEXT` summary of Gross SF and project totals for directory performance.
+- **`updated_at`**: Timestamp for versioning and sorting.
 
-### 9.2 Automated Packaging Pipeline
-The project includes a Node.js-based packaging pipeline (`scripts/zip-plugin.js`) to streamline WordPress plugin distribution.
+### 10.2 REST API Endpoint Specification
+The system exposes a custom namespace `planarmto/v1` for authenticated communication:
+- **`GET /projects`**: Retrieves all projects belonging to the current `tenant_id`.
+- **`POST /projects`**: Upserts a project entry (creates new or updates existing based on ID).
+- **`DELETE /projects/{id}`**: Permanently removes a project record if it belongs to the requester.
 
-- **`npm run build:zip`**: This command executes the production Vite build and then triggers the zip script.
-- **Packaging Logic**:
-  - Automatically cleans up previous build artifacts.
-  - Bundles `planar-mto.php`, `metadata.json`, and the `dist/` directory into a standardized WordPress plugin structure.
-  - Generates `planar-mto.zip` in the project's parent directory for easy distribution.
-  - Maintains version synchronization across `package.json` and WordPress plugin headers.
+### 10.3 Authorization & X-WP-Nonce
+To prevent Cross-Site Request Forgery (CSRF) and ensure tenant isolation:
+1. **Nonce Verification**: Every request must include an `X-WP-Nonce` header generated via `wp_create_nonce('wp_rest')`.
+2. **REST Authentication**: The API utilizes the built-in WordPress cookie authentication (`is_user_logged_in()`).
+3. **Tenant Enforcement**: The backend controller explicitly retrieves the current user's ID via `get_current_user_id()` and injects it into all SQL `WHERE` clauses, preventing users from accessing projects belonging to other IDs even if the project UUID is known.
+
+### 10.4 Async Storage Abstraction Layer
+The frontend `storage.ts` utility implements an isomorphic interface:
+- **`isWP()` Check**: Detects if the app is running within the WordPress environment (checks for `wpApiSettings`).
+- **`wpFetch` Wrapper**: Standardizes error handling and nonce injection for all REST calls.
+- **Fallback Logic**: If `isWP()` is false, the system transparently falls back to `localStorage` for zero-configuration local development.

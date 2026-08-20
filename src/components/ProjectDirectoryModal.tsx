@@ -47,8 +47,9 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
   onNewBlankProject,
 }) => {
   const [projects, setProjects] = useState<SavedProjectEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | number | null>(null);
   const [editingName, setEditingName] = useState('');
   const [saveAsModalOpen, setSaveAsModalOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -57,16 +58,25 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
 
   // Reload projects list on open
   useEffect(() => {
-    if (isOpen) {
-      setProjects(getSavedProjects());
-      setAutoSaveItem(getAutoSaveState());
-      setNewProjectName(
-        currentState.settings.companyBranding?.projectNumber
-          ? `Project ${currentState.settings.companyBranding.projectNumber}`
-          : 'Custom Architectural Project'
-      );
-      setNewProjectRef(currentState.settings.companyBranding?.projectNumber || `PRJ-${new Date().getFullYear()}-MTO`);
+    async function loadData() {
+      if (isOpen) {
+        setIsLoading(true);
+        try {
+          const loadedProjects = await getSavedProjects();
+          setProjects(loadedProjects);
+          setAutoSaveItem(getAutoSaveState());
+          setNewProjectName(
+            currentState.settings.companyBranding?.projectNumber
+              ? `Project ${currentState.settings.companyBranding.projectNumber}`
+              : 'Custom Architectural Project'
+          );
+          setNewProjectRef(currentState.settings.companyBranding?.projectNumber || `PRJ-${new Date().getFullYear()}-MTO`);
+        } finally {
+          setIsLoading(false);
+        }
+      }
     }
+    loadData();
   }, [isOpen, currentState]);
 
   if (!isOpen) return null;
@@ -76,45 +86,68 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
     (p.projectNumber && p.projectNumber.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const handleSaveCurrent = () => {
-    const defaultName = currentState.settings.companyBranding?.projectNumber
-      ? `Project ${currentState.settings.companyBranding.projectNumber}`
-      : 'Architectural Model';
-    const entry = saveProjectToDirectory(defaultName, currentState);
-    setProjects(getSavedProjects());
+  const handleSaveCurrent = async () => {
+    setIsLoading(true);
+    try {
+      const defaultName = currentState.settings.companyBranding?.projectNumber
+        ? `Project ${currentState.settings.companyBranding.projectNumber}`
+        : 'Architectural Model';
+      await saveProjectToDirectory(defaultName, currentState);
+      const updated = await getSavedProjects();
+      setProjects(updated);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSaveAsSubmit = (e: React.FormEvent) => {
+  const handleSaveAsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProjectName.trim()) return;
 
-    const updatedState: FloorplanState = {
-      ...currentState,
-      settings: {
-        ...currentState.settings,
-        companyBranding: {
-          ...currentState.settings.companyBranding,
-          projectNumber: newProjectRef.trim() || currentState.settings.companyBranding?.projectNumber,
+    setIsLoading(true);
+    try {
+      const updatedState: FloorplanState = {
+        ...currentState,
+        settings: {
+          ...currentState.settings,
+          companyBranding: {
+            ...currentState.settings.companyBranding,
+            projectNumber: newProjectRef.trim() || currentState.settings.companyBranding?.projectNumber,
+          },
         },
-      },
-    };
+      };
 
-    saveProjectToDirectory(newProjectName.trim(), updatedState, {
-      projectNumber: newProjectRef.trim(),
-    });
+      await saveProjectToDirectory(newProjectName.trim(), updatedState, {
+        projectNumber: newProjectRef.trim(),
+      });
 
-    setProjects(getSavedProjects());
-    setSaveAsModalOpen(false);
+      const updated = await getSavedProjects();
+      setProjects(updated);
+      setSaveAsModalOpen(false);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    const updated = deleteProjectFromDirectory(id);
-    setProjects(updated);
+  const handleDelete = async (id: string | number) => {
+    setIsLoading(true);
+    try {
+      const updated = await deleteProjectFromDirectory(id);
+      setProjects(updated);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDuplicate = (project: SavedProjectEntry) => {
-    saveProjectToDirectory(`${project.name} (Copy)`, project.state);
-    setProjects(getSavedProjects());
+  const handleDuplicate = async (project: SavedProjectEntry) => {
+    setIsLoading(true);
+    try {
+      await saveProjectToDirectory(`${project.name} (Copy)`, project.state);
+      const updated = await getSavedProjects();
+      setProjects(updated);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleStartRename = (project: SavedProjectEntry) => {
@@ -122,10 +155,15 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
     setEditingName(project.name);
   };
 
-  const handleSaveRename = (id: string) => {
+  const handleSaveRename = async (id: string | number) => {
     if (editingName.trim()) {
-      const updated = renameProjectInDirectory(id, editingName.trim());
-      setProjects(updated);
+      setIsLoading(true);
+      try {
+        const updated = await renameProjectInDirectory(id, editingName.trim());
+        setProjects(updated);
+      } finally {
+        setIsLoading(false);
+      }
     }
     setEditingId(null);
   };
@@ -155,27 +193,32 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
+      setIsLoading(true);
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (Array.isArray(parsed)) {
-          parsed.forEach((item) => {
+          for (const item of parsed) {
             if (item.name && item.state) {
-              saveProjectToDirectory(item.name, item.state, {
+              await saveProjectToDirectory(item.name, item.state, {
                 id: item.id,
                 projectNumber: item.projectNumber,
                 description: item.description,
               });
             }
-          });
-          setProjects(getSavedProjects());
+          }
+          const updated = await getSavedProjects();
+          setProjects(updated);
         } else if (parsed.nodes && parsed.walls) {
           // Single project file
-          saveProjectToDirectory('Imported Project', parsed);
-          setProjects(getSavedProjects());
+          await saveProjectToDirectory('Imported Project', parsed);
+          const updated = await getSavedProjects();
+          setProjects(updated);
         }
       } catch (err) {
         console.error('Failed to import projects archive:', err);
+      } finally {
+        setIsLoading(false);
       }
     };
     reader.readAsText(file);
@@ -229,6 +272,16 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Loading Indicator */}
+        {isLoading && (
+          <div className="absolute inset-0 z-[60] bg-slate-950/40 backdrop-blur-[1px] flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3 p-4 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl">
+              <RefreshCw className="w-8 h-8 text-sky-400 animate-spin" />
+              <span className="text-xs font-bold text-slate-200 uppercase tracking-widest">Processing...</span>
+            </div>
+          </div>
+        )}
 
         {/* Toolbar & Search */}
         <div className="p-3 bg-slate-900/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">

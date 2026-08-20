@@ -28,13 +28,19 @@ import { ProjectDirectoryModal } from './components/ProjectDirectoryModal';
 
 export default function App() {
   // Project State initialized with realistic Modern 2-Bedroom Rancher template and persisted branding
-  const [state, setState] = useState<FloorplanState>(() => {
-    const base = createModernTwoBedroomRancher();
-    return {
-      ...base,
-      settings: hydrateSettingsWithBranding(base.settings),
-    };
-  });
+  const [state, setState] = useState<FloorplanState>(createModernTwoBedroomRancher());
+
+  // Hydrate branding on mount
+  useEffect(() => {
+    async function initBranding() {
+      const hydratedSettings = await hydrateSettingsWithBranding(state.settings);
+      setState(prev => ({
+        ...prev,
+        settings: hydratedSettings
+      }));
+    }
+    initBranding();
+  }, []);
 
   // Unit Cost Rates for dual material/labor estimating
   const [costRates, setCostRates] = useState<UnitCostRates>(DEFAULT_UNIT_COST_RATES);
@@ -101,29 +107,32 @@ export default function App() {
   }, [redoStack, state]);
 
   // Load project from directory
-  const handleLoadProjectFromDirectory = useCallback((loadedState: FloorplanState) => {
+  const handleLoadProjectFromDirectory = useCallback(async (loadedState: FloorplanState) => {
     setHistory([]);
     setRedoStack([]);
     setSelection({ type: 'none' });
+    
+    const hydratedSettings = await hydrateSettingsWithBranding(loadedState.settings);
+    
     setState({
       ...loadedState,
-      settings: hydrateSettingsWithBranding(loadedState.settings),
+      settings: hydratedSettings,
     });
     setIsDirty(false);
   }, []);
 
   // Save/Overwrite active project
-  const handleSaveProject = useCallback(() => {
+  const handleSaveProject = useCallback(async () => {
     const { activeProjectId, activeProjectName } = state;
     if (activeProjectId) {
-      saveProjectToDirectory(activeProjectName, state, { id: activeProjectId });
+      await saveProjectToDirectory(activeProjectName, state, { id: activeProjectId });
       setIsDirty(false);
     } else {
       handleSaveProjectAs();
     }
   }, [state]);
 
-  const handleSaveProjectAs = useCallback(() => {
+  const handleSaveProjectAs = useCallback(async () => {
     const newName = prompt('Enter project name:', state.activeProjectName || 'New Project');
     if (newName) {
       const newId = `proj_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
@@ -132,7 +141,7 @@ export default function App() {
         activeProjectId: newId,
         activeProjectName: newName,
       };
-      saveProjectToDirectory(newName, newState, { id: newId });
+      await saveProjectToDirectory(newName, newState, { id: newId });
       setState(newState);
       setIsDirty(false);
     }
@@ -158,17 +167,20 @@ export default function App() {
   }, [handleSaveProject, handleSaveProjectAs]);
 
   // New Blank Project with persisted branding
-  const handleNewBlankProject = useCallback(() => {
+  const handleNewBlankProject = useCallback(async () => {
     const blank = createBlankProject();
     setHistory([]);
     setRedoStack([]);
     setSelection({ type: 'none' });
+
+    const hydratedSettings = await hydrateSettingsWithBranding(
+      blank.settings,
+      `PRJ-${new Date().getFullYear()}-MTO-${Math.floor(100 + Math.random() * 900)}`
+    );
+
     setState({
       ...blank,
-      settings: hydrateSettingsWithBranding(
-        blank.settings,
-        `PRJ-${new Date().getFullYear()}-MTO-${Math.floor(100 + Math.random() * 900)}`
-      ),
+      settings: hydratedSettings,
     });
   }, []);
 

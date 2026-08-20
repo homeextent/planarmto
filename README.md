@@ -42,8 +42,13 @@
 ### 4. Professional Export & Reporting Suite
 - **Direct Client-Side PDF Generation**: High-resolution rasterization to multi-page vector-styled PDF via `jsPDF` and `html2canvas`—no physical printer connection required.
 - **Executive HTML Take-Off & Specification Export**: Standalone formatted HTML document complete with company branding, CSI trade breakdowns, unit costs, and room finish schedules.
-- **In-App Project Directory Manager**: Browser `localStorage` storage to save, duplicate, rename, auto-recover drafts, and export/import `.json` project bundles.
-- **Persistent Company Branding**: Preserves firm name, logo (Base64 data URL), address, contact info, and lead estimator credentials across all sessions.
+- **In-App Project Directory Manager**: Multi-tenant persistence layer using WordPress MySQL database (via `wp_planarmto_projects`) with browser `localStorage` fallbacks for local development. Supports project duplication, renaming, auto-recovery, and JSON exports.
+- **Persistent Company Branding**: Multi-tenant company profile storage mapped to WordPress user metadata, ensuring branding and custom rates follow the user across devices.
+
+### 5. Multi-Tenant WordPress Persistence
+- **Secure Data Isolation**: Project data is strictly scoped by WordPress `user_id` (`tenant_id`), ensuring estimators only see and manage their own floor plans and project metrics.
+- **MySQL Storage Engine**: Replaces fragile local storage with a robust `wp_planarmto_projects` table for long-term project persistence and cross-device accessibility.
+- **REST API Pipeline**: Leverages the `planarmto/v1` namespace for authenticated CRUD operations, secured via `X-WP-Nonce` to prevent unauthorized cross-tenant data access.
 
 ---
 

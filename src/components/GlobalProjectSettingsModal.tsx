@@ -113,9 +113,9 @@ export const GlobalProjectSettingsModal: React.FC<GlobalProjectSettingsModalProp
     reader.readAsDataURL(file);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (formSettings.companyBranding) {
-      savePersistedBranding(formSettings.companyBranding);
+      await savePersistedBranding(formSettings.companyBranding);
     }
     onUpdateSettings(formSettings, cascadeToAllWalls);
     onClose();

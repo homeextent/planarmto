@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] - 2026-08-20
+
+### Added
+- **Multi-Tenant MySQL Database Storage**: Integrated custom `wp_planarmto_projects` database table using `dbDelta()` to persist CAD floor plans, project metrics, and user logs scoped strictly by WordPress `tenant_id` (`user_id`).
+- **REST API Endpoint Engine**: Implemented `planarmto/v1` namespace with authenticated `GET`, `POST`, and `DELETE` endpoints for projects and user-specific company branding.
+- **Async Storage Abstraction Layer**: Refactored `src/utils/storage.ts` with `wpFetch` and `isWP()` helpers, enabling seamless auto-switching between WordPress REST API persistence and browser `localStorage` fallbacks for local dev.
+- **Directory Loading UI State**: Added asynchronous loading spinners in `ProjectDirectoryModal.tsx` for real-time visual feedback during database queries.
+
+### Changed
+- **Branding & Settings Hydration**: Updated `App.tsx`, `HeaderBar.tsx`, and `GlobalProjectSettingsModal.tsx` to handle async promise resolutions when loading company branding and custom rate profiles.
+
+---
+
 ## [2.0.0] - 2026-08-20
 
 ### Added

@@ -1,3 +1,13 @@
+declare global {
+  interface Window {
+    planarMTOConfig?: {
+      restUrl: string;
+      nonce: string;
+      currentUserId: number;
+    };
+  }
+}
+
 export type UnitSystem = 'imperial' | 'metric'; // imperial: feet/inches & SF, metric: meters & m²
 export type CanvasTheme = 'dark' | 'light' | 'blueprint';
 export type WallJustification = 'interior_face' | 'centerline' | 'exterior_face';

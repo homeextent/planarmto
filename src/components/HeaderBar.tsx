@@ -91,7 +91,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     });
   };
 
-  const handleLoadTemplate = (templateName: string) => {
+  const handleLoadTemplate = async (templateName: string) => {
     setTemplateMenuOpen(false);
     let baseState: FloorplanState;
     if (templateName === 'rancher') {
@@ -104,7 +104,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       baseState = createBlankProject();
     }
 
-    const hydratedSettings = hydrateSettingsWithBranding(
+    const hydratedSettings = await hydrateSettingsWithBranding(
       baseState.settings,
       templateName === 'blank'
         ? `PRJ-${new Date().getFullYear()}-MTO-${Math.floor(100 + Math.random() * 900)}`
