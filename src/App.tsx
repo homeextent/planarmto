@@ -342,7 +342,8 @@ export default function App() {
   }, [mtoReport, costRates, state.settings]);
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans select-none">
+    <div className="h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans select-none">
+      <div className="flex flex-col h-full w-full">
       {/* 1. TOP HEADER BAR */}
       <HeaderBar
         state={state}
@@ -454,6 +455,7 @@ export default function App() {
         onLoadProject={handleLoadProjectFromDirectory}
         onNewBlankProject={handleNewBlankProject}
       />
+      </div>
     </div>
   );
 }

@@ -5,6 +5,11 @@
 * Open local preview in browser: `http://localhost:3000/`
 * Install new package: `npm install <package-name>`
 * Run build check: `npm run build`
+* **Build WP Plugin Package:** `npm run build:zip` *(Compiles React assets and exports `planar-mto.zip` to parent directory `../`)*
+* **Deploy WP Plugin:** Upload `planar-mto.zip` via **WP Admin > Plugins > Add New > Upload Plugin**
+* **Flush WP Permalinks:** Go to **Settings > Permalinks** and click **Save Changes** *(required if `/planarmto` endpoint returns 404)*
+
+---
 
 ---
 

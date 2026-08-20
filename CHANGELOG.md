@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] - 2026-08-20
+
+### Added
+- **WordPress Full-Page Endpoint Architecture**: Registered a custom rewrite rule (`/planarmto`) in `planar-mto.php` to serve the React CAD application on a clean, dedicated domain endpoint that bypasses WordPress themes, page builders (Elementor), and headers/footers.
+- **WordPress Admin Dashboard Integration**: Added a dedicated WP Admin sidebar menu item ("PlanarMTO") rendering a management card with a single-click "Launch PlanarMTO" action button.
+- **Automated Plugin Packaging Pipeline**: Added `scripts/zip-plugin.js` and the terminal command `npm run build:zip` to compile production assets and automatically bundle `planar-mto.zip` directly into the parent directory (`../planar-mto.zip`).
+- **Dynamic Asset Resolution Engine**: Implemented direct HTML string replacement inside the `template_redirect` hook to map relative Vite asset paths (`./assets/`) to absolute WordPress plugin directory URLs (`plugin_dir_url`).
+
+### Changed
+- **Vite Build Base Path**: Updated `vite.config.ts` configuration to use relative asset pathing (`base: './'`).
+- **Plugin Version**: Bumped version metadata to `2.0.0` across plugin headers and system files.
+
+---
+
 ## [1.9.0] - 2026-08-17
 
 ### Added

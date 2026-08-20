@@ -47,32 +47,49 @@
 
 ---
 
-## Getting Started
+## Installation & Deployment
 
-### Prerequisites
-- Node.js (v18 or higher)
-- npm or yarn
+### WordPress Plugin Deployment (Recommended)
+PlanarMTO is optimized to run as a dedicated WordPress plugin, providing a full-page application experience independent of your WordPress theme.
 
-### Installation
-```bash
-# Clone the repository and install dependencies
-npm install
-```
+1. **Build & Package**:
+   ```bash
+   # Compile production assets and bundle the plugin zip
+   npm run build:zip
+   ```
+   This generates `planar-mto.zip` in the parent directory.
 
-### Development
-```bash
-# Start local development server on port 3000
-npm run dev
-```
+2. **Install**:
+   - Upload `planar-mto.zip` via **WP Admin > Plugins > Add New**.
+   - Activate the plugin.
 
-### Production Build
-```bash
-# Compile and build production bundle into dist/
-npm run build
+3. **Configure Permalinks**:
+   - Go to **WP Admin > Settings > Permalinks**.
+   - Click **Save Changes** once to flush the rewrite rules.
 
-# Preview production build
-npm run preview
-```
+4. **Launch**:
+   - Click the **PlanarMTO** menu item in the WordPress sidebar and click "Launch PlanarMTO".
+   - Alternatively, navigate directly to `yourdomain.com/planarmto`.
+
+### Manual / Standard Deployment
+For standalone web hosting or local development:
+
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Development**:
+   ```bash
+   # Start local development server on port 3000
+   npm run dev
+   ```
+
+3. **Production Build**:
+   ```bash
+   # Compile and build production bundle into dist/
+   npm run build
+   ```
 
 ---
 

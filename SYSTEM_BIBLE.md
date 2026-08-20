@@ -168,14 +168,24 @@ interface SavedProjectEntry {
 
 ---
 
-## 8. 2D Blueprint Underlay & Scale Calibration
+## 9. WordPress Integration & Deployment Layer
 
-PlanarMTO supports raster/vector underlays (`.png`, `.jpg`, `.webp`, `.svg`) for tracing.
+### 9.1 WordPress Rewrite Endpoint Pipeline
+PlanarMTO utilizes a custom WordPress rewrite rule to serve the React application on a dedicated endpoint (`/planarmto`), bypassing the standard WordPress theme and page-builder injection (e.g., Elementor, headers/footers).
 
-### 8.1 2-Point Reference Calibration
-To map image pixels to real-world feet, the user defines two points $P_1, P_2$ on the image and enters the physical distance $D$ between them. The pixel-to-foot scale factor $S$ is:
-$$S = \frac{D}{\sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}}$$
-All canvas interactions with the underlay are subsequently scaled by $S$.
+1. **Endpoint Registration**: The `init` hook registers a custom rewrite rule:
+   - `add_rewrite_rule('^planarmto/?$', 'index.php?planarmto=1', 'top')`
+2. **Template Redirection & Theme Isolation**: The `template_redirect` hook intercepts the `planarmto` query variable. If present, it loads the compiled `index.html` from the plugin's `dist` directory and exits, preventing the WordPress theme from rendering.
+3. **Dynamic Asset Resolution**: Since Vite generates relative asset paths (`./assets/`), the WordPress engine performs an in-memory string replacement on the `index.html` content:
+   - Replaces `./assets/` with the absolute `plugin_dir_url(__FILE__) . 'dist/assets/'`.
+   - This ensures scripts and styles load correctly regardless of the WordPress site's URL structure.
 
-### 8.2 Canvas Persistence
-Underlay state (opacity, visibility, lock status, and transformation matrix) is persisted within the `FloorplanState`, ensuring the tracing context is restored across sessions.
+### 9.2 Automated Packaging Pipeline
+The project includes a Node.js-based packaging pipeline (`scripts/zip-plugin.js`) to streamline WordPress plugin distribution.
+
+- **`npm run build:zip`**: This command executes the production Vite build and then triggers the zip script.
+- **Packaging Logic**:
+  - Automatically cleans up previous build artifacts.
+  - Bundles `planar-mto.php`, `metadata.json`, and the `dist/` directory into a standardized WordPress plugin structure.
+  - Generates `planar-mto.zip` in the project's parent directory for easy distribution.
+  - Maintains version synchronization across `package.json` and WordPress plugin headers.
