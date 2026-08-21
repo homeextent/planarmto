@@ -82,8 +82,9 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
   if (!isOpen) return null;
 
   const filteredProjects = projects.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.projectNumber && p.projectNumber.toLowerCase().includes(searchQuery.toLowerCase()))
+    (p.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (p.projectNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (p.description || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleSaveCurrent = async () => {

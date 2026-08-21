@@ -30,7 +30,10 @@ const isWP = () => typeof window !== 'undefined' && !!window.planarMTOConfig?.re
 async function wpFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   if (!window.planarMTOConfig) throw new Error('WP Config missing');
   
-  const url = `${window.planarMTOConfig.restUrl}/planarmto/v1${endpoint}`;
+  const cleanEndpoint = endpoint.replace(/^\/?(planarmto\/v1\/)?/, '');
+  const baseUrl = window.planarMTOConfig.restUrl.replace(/\/$/, '');
+  const url = `${baseUrl}/${cleanEndpoint}`;
+
   const headers = {
     'Content-Type': 'application/json',
     'X-WP-Nonce': window.planarMTOConfig.nonce,
@@ -61,7 +64,7 @@ export async function savePersistedBranding(branding: CompanyBranding): Promise<
 
   if (isWP()) {
     try {
-      await wpFetch('/branding', {
+      await wpFetch('branding', {
         method: 'POST',
         body: JSON.stringify(dataToSave),
       });
@@ -84,7 +87,7 @@ export async function savePersistedBranding(branding: CompanyBranding): Promise<
 export async function getPersistedBranding(): Promise<CompanyBranding | null> {
   if (isWP()) {
     try {
-      return await wpFetch<CompanyBranding>('/branding');
+      return await wpFetch<CompanyBranding>('branding');
     } catch (err) {
       console.warn('WP Branding fetch failed, falling back to local:', err);
     }
@@ -106,8 +109,23 @@ export async function getPersistedBranding(): Promise<CompanyBranding | null> {
 export async function getSavedProjects(): Promise<SavedProjectEntry[]> {
   if (isWP()) {
     try {
-      const projects = await wpFetch<SavedProjectEntry[]>('/projects');
-      return projects.sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0));
+      const projects = await wpFetch<any[]>('projects');
+      return projects
+        .map((p) => ({
+          ...p,
+          id: p.id || p.project_uuid,
+          name: p.name || p.project_name || 'Untitled Project',
+          projectNumber: p.projectNumber || p.project_number || '',
+          description: p.description || '',
+          roomCount: Number(p.roomCount || p.room_count || 0),
+          grossSf: Number(p.grossSf || p.gross_sf || 0),
+          netSf: Number(p.netSf || p.net_sf || 0),
+          estimatedTotal: Number(p.estimatedTotal || p.estimated_total || 0),
+          createdAt: Number(p.createdAt || (p.created_at ? new Date(p.created_at).getTime() : Date.now())),
+          updatedAt: Number(p.updatedAt || (p.updated_at ? new Date(p.updated_at).getTime() : Date.now())),
+          state: typeof p.state === 'string' ? JSON.parse(p.state) : p.state || (p.project_state ? (typeof p.project_state === 'string' ? JSON.parse(p.project_state) : p.project_state) : {}),
+        }))
+        .sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0));
     } catch (err) {
       console.warn('WP Projects fetch failed, falling back to local:', err);
     }
@@ -162,9 +180,13 @@ export async function saveProjectToDirectory(
 
   if (isWP()) {
     try {
-      return await wpFetch<SavedProjectEntry>('/projects', {
+      return await wpFetch<SavedProjectEntry>('projects', {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          uuid: payload.id,
+          project_uuid: payload.id,
+        }),
       });
     } catch (err) {
       console.warn('WP Project save failed, falling back to local:', err);
@@ -207,7 +229,7 @@ export async function saveProjectToDirectory(
 export async function deleteProjectFromDirectory(id: string | number): Promise<SavedProjectEntry[]> {
   if (isWP() && typeof id === 'number') {
     try {
-      await wpFetch(`/projects/${id}`, { method: 'DELETE' });
+      await wpFetch(`projects/${id}`, { method: 'DELETE' });
       return getSavedProjects();
     } catch (err) {
       console.warn('WP Project delete failed, falling back to local:', err);
