@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.1] - 2026-08-20
+
+### Added
+- **Beta Passcode Protection Gate**: Implemented an access gate (`PLANARMTO_BETA_PASSCODE`) restricting unauthenticated visitors to a guest sandbox environment behind a passcode.
+- **Interactive Password Visibility Toggle**: Integrated an inline eye/eye-off SVG toggle button in `planarmto_serve_passcode_form()` to switch input types between hidden password and visible text.
+- **Cache-Bypass Directives**: Added `nocache_headers()` and `define('DONOTCACHEPAGE', true)` in `planar-mto.php` to prevent SiteGround Optimizer and Nginx servers from caching guest access screens and redirect loops.
+
+### Changed
+- **Instant Guest Authentication**: Updated passcode validation in `planar-mto.php` to instantly hydrate `$has_access = true` and set the root cookie (`planarmto_guest_access`), rendering the React CAD app without relying on cached HTTP redirects.
+
+---
+
 ## [2.1.0] - 2026-08-20
 
 ### Added

@@ -198,3 +198,26 @@ The frontend `storage.ts` utility implements an isomorphic interface:
 - **`isWP()` Check**: Detects if the app is running within the WordPress environment (checks for `wpApiSettings`).
 - **`wpFetch` Wrapper**: Standardizes error handling and nonce injection for all REST calls.
 - **Fallback Logic**: If `isWP()` is false, the system transparently falls back to `localStorage` for zero-configuration local development.
+
+---
+
+## 11. WordPress Deployment Layer & Guest Passcode Gate
+
+To protect beta deployments from unauthorized public access while allowing a sandbox "Guest" experience, PlanarMTO implements a server-side passcode gate.
+
+### 11.1 Passcode Verification Pipeline
+The gate is enforced within the `template_redirect` hook in `planar-mto.php` before any React assets are served:
+1. **Unauthenticated Check**: If a visitor is not a logged-in WordPress user, the system checks for a valid `planarmto_guest_access` cookie.
+2. **Passcode Challenge**: If no cookie is present, the visitor is served the `planarmto_serve_passcode_form()` instead of the CAD application.
+3. **Instant Hydration**: Upon submitting the correct passcode (matching `PLANARMTO_BETA_PASSCODE`), the server instantly sets the root cookie and hydrates `$has_access = true`, allowing the app to render in the same request lifecycle.
+
+### 11.2 Cookie Persistence & Security
+- **Cookie Name**: `planarmto_guest_access`
+- **Scope**: Root path (`/`) to ensure access persists across all potential project endpoints.
+- **Duration**: 7 days (default).
+- **Verification**: The server verifies the presence of this cookie on every non-authenticated request to determine whether to serve the App or the Gate.
+
+### 11.3 Cache-Bypass Architecture
+Aggressive caching layers (SiteGround Optimizer, Nginx, Varnish) can often cache the passcode gate or redirect loops. To ensure the gate functions reliably:
+- **`DONOTCACHEPAGE`**: The constant `define('DONOTCACHEPAGE', true)` is set globally within the plugin to signal to most WordPress caching plugins to skip the PlanarMTO endpoint.
+- **`nocache_headers()`**: WordPress native `nocache_headers()` are issued to send standard HTTP headers (`Cache-Control: no-cache, must-revalidate, max-age=0`) to the browser and edge CDN layers.
