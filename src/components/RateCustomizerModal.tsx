@@ -18,6 +18,8 @@ import {
   HelpCircle,
   RefreshCw,
   Star,
+  Download,
+  Printer,
 } from 'lucide-react';
 
 import { getPersistedRateProfile, savePersistedRateProfile } from '../utils/storage';
@@ -189,6 +191,100 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
     onClose();
   };
 
+  const handleExportCSV = () => {
+    const headers = ['Category', 'Item', 'Unit', 'Material Rate', 'Labor Rate', 'Total Rate'];
+    const rows = filteredFields.map((field) => {
+      const rateItem = localRates[field.key] || DEFAULT_UNIT_COST_RATES[field.key] || { material: 0, labor: 0 };
+      const total = (rateItem.material || 0) + (rateItem.labor || 0);
+      return [
+        field.category,
+        field.label,
+        field.unit,
+        `$${rateItem.material.toFixed(2)}`,
+        `$${rateItem.labor.toFixed(2)}`,
+        `$${total.toFixed(2)}`,
+      ];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) => row.map((val) => `"${val}"`).join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const date = new Date().toISOString().split('T')[0];
+    const categoryName = selectedCategory.toLowerCase().replace(/\s+/g, '_');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `rates_${categoryName}_${date}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '', 'width=800,height=600');
+    if (!printWindow) return;
+
+    const date = new Date().toISOString().split('T')[0];
+    const rows = filteredFields
+      .map((field) => {
+        const rateItem = localRates[field.key] || DEFAULT_UNIT_COST_RATES[field.key] || { material: 0, labor: 0 };
+        const total = (rateItem.material || 0) + (rateItem.labor || 0);
+        return `
+        <tr>
+          <td>${field.label}</td>
+          <td>${field.unit}</td>
+          <td>$${rateItem.material.toFixed(2)}</td>
+          <td>$${rateItem.labor.toFixed(2)}</td>
+          <td><strong>$${total.toFixed(2)}</strong></td>
+        </tr>
+      `;
+      })
+      .join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Pricing Rate Sheet: ${selectedCategory}</title>
+          <style>
+            body { font-family: sans-serif; padding: 40px; color: #333; }
+            h1 { color: #1e293b; margin-bottom: 5px; }
+            p { color: #64748b; margin-bottom: 30px; font-size: 14px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { background-color: #f8fafc; text-align: left; padding: 12px; border-bottom: 2px solid #e2e8f0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+            td { padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+            tr:nth-child(even) { background-color: #f1f5f9; }
+            .total { font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <h1>Pricing Rate Sheet: ${selectedCategory}</h1>
+          <p>Generated on ${date}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Unit</th>
+                <th>Material</th>
+                <th>Labor</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+    printWindow.close();
+  };
+
   const filteredFields =
     selectedCategory === 'All Categories'
       ? RATE_FIELDS
@@ -247,6 +343,23 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
                 {cat}
               </button>
             ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportCSV}
+              className="px-2.5 py-1.5 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-700 cursor-pointer transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export CSV</span>
+            </button>
+            <button
+              onClick={handlePrint}
+              className="px-2.5 py-1.5 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-700 cursor-pointer transition-colors"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print</span>
+            </button>
           </div>
 
           {/* Bulk Percentage Adjuster */}
