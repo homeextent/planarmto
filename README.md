@@ -11,6 +11,8 @@
 - **2D Blueprint Underlay & Scale Calibration**: Import floor plan images (`.png`, `.jpg`, `.webp`, `.svg`) with 2-point reference calibration for pixel-to-foot mapping. Includes opacity controls and canvas position locking.
 - **Multi-Corner Drag Anchoring & Magnetic Snapping**: Enhanced room movement via specific corner nodes with multi-corner magnetic snapping and visual snap indicators.
 - **Orthogonal Rectangular Corner Resizing**: Constrained corner dragging on 4-node rectangular rooms to automatically adjust adjacent nodes, preserving 90° wall joins.
+- **Marquee Box Selection**: Click-and-drag box selection across canvas entities (walls, vertices, rooms, apertures, stamps, annotations) with support for multi-item group dragging.
+- **Custom Canvas Context Menu**: A dark-themed, floating right-click context menu on the CAD canvas for rapid clipboard and item management.
 - **Sub-Pixel Precision**: Enforces true interior clear-space drafting capabilities via a synchronized dual-geometry pipeline.
 - **Active Wall Type Presets**: Pre-selection of wall framing assemblies (Interior 2x4, Exterior 2x6, Foundation 10") prior to drafting, ensuring new segments inherit correct thickness and cladding properties instantly.
 - **Parametric Apertures**:
@@ -32,6 +34,7 @@
 - **Dual-Geometry Accuracy**: Synchronized calculation of structural framing vs. interior finishes using independent geometric layers for unmatched take-off precision. Defaults to **Interior Finish Mode** for trade-focused drywall and finish scheduling.
 - **Enhanced Rate Customizer**: Integrated "Sync Master", "Save as Master Template", and "Apply to Project" actions for rapid pricing synchronization across multiple projects.
 - **Commercial Markups & Financial Rollups**: Built-in logic for Company Overhead, Profit, Project Management, and Contingency percentages.
+- **Ceiling Profiles & Area Multipliers**: Support for Flat (1.00x), Vaulted (1.18x), Tray (1.25x), Coffered (1.45x), and Custom ceiling profiles in the Room Face Properties inspector. Automatically scales ceiling drywall and paint quantities based on the selected profile multiplier.
 - **Jobsite Waste Factors**: Adjustable Waste/Scrap multipliers applied directly to base quantities prior to markup.
 - **Precise Deduction Formulas**:
   - Net Wall Drywall & Paint: Subtracts door/window rough openings and deductions based on interior/exterior wall configurations.
@@ -114,14 +117,14 @@ For standalone web hosting or local development:
 | `H` | Activate Hardscape Drawing Tool |
 | `M` | Activate Dimension Tool |
 | `A` | Activate Text Annotation Tool |
-| `Ctrl+Z` / `Cmd+Z` | Undo last action |
-| `Ctrl+Y` / `Cmd+Y` | Redo last action |
-| `Ctrl+S` / `Cmd+S` | Quick Save (In-Place Overwrite) |
-| `Ctrl+Shift+S` | Save As (New Project Entry) |
-| `Ctrl+O` / `Cmd+O` | Open Project Directory Manager |
-| `Ctrl+P` / `Cmd+P` | Open Architectural Take-Off & PDF Report Modal |
-| `Delete` / `Backspace` | Delete selected wall, aperture, stamp, deck, or annotation |
-| `Shift` (Hold) | Toggle Orthogonal 90° Constraint while drafting walls |
+| `Ctrl+X` / `Cmd+X` | Cut selected entities to clipboard |
+| `Ctrl+C` / `Cmd+C` | Copy selected entities to clipboard |
+| `Ctrl+V` / `Cmd+V` | Paste entities from clipboard (with offset and new UUIDs) |
+| `Ctrl+D` / `Cmd+D` | Duplicate selection instantly |
+| `Delete` / `Backspace` | Delete selection |
+| `Shift` (Hold) | Toggle Selection / Ortho Lock (Drafting) |
+| `Ctrl` / `Cmd` (Hold) | Add to Selection |
+| `Ctrl+Shift` / `Cmd+Shift` | Subtract from Selection |
 
 ---
 

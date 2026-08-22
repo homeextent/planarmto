@@ -225,8 +225,12 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     });
 
     totalFlooringPackageSf += (isFoundationRoom && room.floorFinish === 'polished_concrete') ? 0 : netArea;
+    
+    const ceilingMultiplier = room.ceilingMultiplier || 1.0;
+    const effectiveCeilingArea = netArea * ceilingMultiplier;
+
     if (room.hasCeilingDrywall !== false && !isFoundationRoom) {
-      totalCeilingDrywallSf += netArea;
+      totalCeilingDrywallSf += effectiveCeilingArea;
     }
 
     // Door width deductions for baseboard

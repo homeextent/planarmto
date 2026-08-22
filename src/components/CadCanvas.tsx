@@ -57,6 +57,7 @@ interface CadCanvasProps {
   onSelect: (selection: SelectionState) => void;
   onDeleteSelected: () => void;
   activeWallPreset: WallPreset;
+  onContextMenu?: (e: React.MouseEvent, worldPos: Point2D) => void;
 }
 
 // Map Wall Preset to default drafting properties
@@ -171,6 +172,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   onSelect,
   onDeleteSelected,
   activeWallPreset,
+  onContextMenu,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -188,6 +190,8 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   // Interaction tracking state
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState<Point2D>({ x: 0, y: 0 });
+  const [hasMovedDuringDrag, setHasMovedDuringDrag] = useState(false);
+  const [pendingSelectionOnMouseUp, setPendingSelectionOnMouseUp] = useState<SelectionState | null>(null);
 
   // Drafting wall sequence
   const [activeWallStartNodeId, setActiveWallStartNodeId] = useState<string | null>(null);
@@ -211,6 +215,10 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
   // Rectangle room drafting
   const [roomBoxStart, setRoomBoxStart] = useState<Point2D | null>(null);
+
+  // Marquee selection state
+  const [marqueeStart, setMarqueeStart] = useState<Point2D | null>(null);
+  const [marqueeEnd, setMarqueeEnd] = useState<Point2D | null>(null);
 
   // Calibration tool state
   const [calibrationPoints, setCalibrationPoints] = useState<Point2D[]>([]);
@@ -547,11 +555,17 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     const { scale, x: panX, y: panY } = transform;
 
+    const isEntitySelected = (type: string, id: string) => {
+      if (selection.type === type && selection.id === id) return true;
+      if (selection.type === 'multiple' && selection.ids?.includes(id)) return true;
+      return false;
+    };
+
     // --- DRAW UNDERLAY IMAGE ---
     if (state.underlay && state.underlay.isVisible && underlayImage) {
       ctx.save();
       ctx.globalAlpha = state.underlay.opacity;
-      const isSelected = selection.type === 'underlay';
+      const isSelected = isEntitySelected('underlay', state.underlay.id);
       const drawX = state.underlay.x * scale + panX;
       const drawY = state.underlay.y * scale + panY;
       const drawW = (state.underlay.width / state.underlay.scale) * scale;
@@ -628,7 +642,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     // 1. Draw Decks & Hardscapes
     state.decks.forEach((deck) => {
       if (deck.points.length < 3) return;
-      const isSelected = selection.type === 'deck' && selection.id === deck.id;
+      const isSelected = isEntitySelected('deck', deck.id);
       ctx.beginPath();
       deck.points.forEach((p, idx) => {
         const sp = worldToScreen(p.x, p.y);
@@ -656,7 +670,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     state.hardscapes.forEach((h) => {
       if (h.points.length < 3) return;
-      const isSelected = selection.type === 'hardscape' && selection.id === h.id;
+      const isSelected = isEntitySelected('hardscape', h.id);
       ctx.beginPath();
       h.points.forEach((p, idx) => {
         const sp = worldToScreen(p.x, p.y);
@@ -692,7 +706,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     roomFaces.forEach((room) => {
       if (room.points.length < 3) return;
-      const isSelected = selection.type === 'room' && selection.id === room.id;
+      const isSelected = isEntitySelected('room', room.id);
 
       ctx.beginPath();
       room.points.forEach((pt, idx) => {
@@ -796,7 +810,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       const geom = getWallGeometry(wall, nodeMap);
       if (!geom) return;
 
-      const isSelected = selection.type === 'wall' && selection.id === wall.id;
+      const isSelected = isEntitySelected('wall', wall.id);
       const s1 = worldToScreen(geom.start.x, geom.start.y);
       const s2 = worldToScreen(geom.end.x, geom.end.y);
 
@@ -885,7 +899,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       const geom = getApertureGeometry(ap, parentWall, nodeMap);
       if (!geom) return;
 
-      const isSelected = selection.type === 'aperture' && selection.id === ap.id;
+      const isSelected = isEntitySelected('aperture', ap.id);
       const sStart = worldToScreen(geom.start.x, geom.start.y);
       const sEnd = worldToScreen(geom.end.x, geom.end.y);
       const sCenter = worldToScreen(geom.center.x, geom.center.y);
@@ -1152,7 +1166,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     if (state.settings.showMepIcons) {
       state.stamps.forEach((st) => {
         const sp = worldToScreen(st.x, st.y);
-        const isSelected = selection.type === 'stamp' && selection.id === st.id;
+        const isSelected = isEntitySelected('stamp', st.id);
 
         ctx.save();
         ctx.translate(sp.x, sp.y);
@@ -1452,7 +1466,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     // 6.5 Draw Text Annotations / Notes
     (state.annotations || []).forEach((ann) => {
-      const isSelected = selection.type === 'annotation' && selection.id === ann.id;
+      const isSelected = isEntitySelected('annotation', ann.id);
       const sp = worldToScreen(ann.x, ann.y);
       const rad = ((ann.rotation || 0) * Math.PI) / 180;
 
@@ -1489,7 +1503,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     // 7. Draw Nodes (Junction Handles)
     state.nodes.forEach((n) => {
-      const isSelected = selection.type === 'node' && selection.id === n.id;
+      const isSelected = isEntitySelected('node', n.id);
       const sp = worldToScreen(n.x, n.y);
 
       ctx.save();
@@ -1906,6 +1920,25 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       ctx.restore();
     }
 
+    // --- DRAW MARQUEE SELECTION BOX ---
+    if (marqueeStart && marqueeEnd) {
+      const sp1 = worldToScreen(marqueeStart.x, marqueeStart.y);
+      const sp2 = worldToScreen(marqueeEnd.x, marqueeEnd.y);
+      const mx = Math.min(sp1.x, sp2.x);
+      const my = Math.min(sp1.y, sp2.y);
+      const mw = Math.abs(sp2.x - sp1.x);
+      const mh = Math.abs(sp2.y - sp1.y);
+
+      ctx.save();
+      ctx.setLineDash([5, 5]);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+      ctx.strokeRect(mx, my, mw, mh);
+      ctx.fillRect(mx, my, mw, mh);
+      ctx.restore();
+    }
+
     ctx.restore();
   }, [
     state,
@@ -1931,8 +1964,17 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     const clientX = e.clientX - rect.left;
     const clientY = e.clientY - rect.top;
     const rawWorld = screenToWorld(clientX, clientY);
+
+    if (e.button === 2) {
+      // Right Click Context Menu
+      if (onContextMenu) {
+        onContextMenu(e, rawWorld);
+      }
+      return;
+    }
+
     // Pan with Middle Click or Shift/Space drag
-    if (e.button === 1 || e.shiftKey || e.altKey) {
+    if (e.button === 1 || (e.button === 0 && e.altKey)) {
       setIsPanning(true);
       setPanStart({ x: clientX, y: clientY });
       return;
@@ -1941,6 +1983,46 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     if (e.button !== 0) return; // Only left click for drawing/selecting
 
     const snap = getSmartSnapPoint(rawWorld, activeWallStartNodeId);
+
+    const toggleSelection = (type: SelectionState['type'], id: string, event: React.MouseEvent) => {
+      const isShift = event.shiftKey;
+      const isCtrl = event.ctrlKey || event.metaKey;
+      
+      let currentIds = selection.ids ? [...selection.ids] : (selection.id ? [selection.id] : []);
+      let newIds = [...currentIds];
+
+      if (isCtrl && isShift) {
+        // Subtract Mode: Strictly remove
+        newIds = newIds.filter(i => i !== id);
+      } else if (isCtrl) {
+        // Add Mode: Strictly add
+        if (!newIds.includes(id)) newIds.push(id);
+      } else if (isShift) {
+        // Toggle Mode: Invert
+        if (newIds.includes(id)) {
+          newIds = newIds.filter(i => i !== id);
+        } else {
+          newIds.push(id);
+        }
+      } else {
+        // No Modifier: Replace
+        // If already part of a multi-selection, defer replacement to handle group drag
+        if (currentIds.includes(id) && currentIds.length > 1) {
+          setPendingSelectionOnMouseUp({ type, id, ids: [id] });
+          return; 
+        }
+        newIds = [id];
+      }
+
+      if (newIds.length === 0) {
+        onSelect({ type: 'none' });
+      } else if (newIds.length === 1) {
+        // If it's a single item, use its specific type to open the Inspector
+        onSelect({ type, id: newIds[0], ids: newIds });
+      } else {
+        onSelect({ type: 'multiple', ids: newIds });
+      }
+    };
     
     // --- TOOL: CALIBRATE SCALE ---
     if (activeTool === 'calibrate_scale') {
@@ -1953,9 +2035,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         
         const actualDist = prompt("Enter actual distance for this segment (e.g. 12' 6\" or 12.5):", "10");
         if (actualDist && state.underlay) {
-          // Parse distance (simple for now, just float)
           let feet = parseFloat(actualDist);
-          // Very basic feet/inches parsing if someone enters 12' 6"
           if (actualDist.includes("'")) {
             const parts = actualDist.split("'");
             feet = parseFloat(parts[0]);
@@ -1967,18 +2047,9 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           }
 
           if (!isNaN(feet) && feet > 0) {
-            // New scale = (current pixel distance) / feet
-            // current pixel distance = distWorld * underlay.scale
             const currentPixelDist = distWorld * state.underlay.scale;
             const newScale = currentPixelDist / feet;
-
-            onChange({
-              ...state,
-              underlay: {
-                ...state.underlay,
-                scale: newScale
-              }
-            });
+            onChange({ ...state, underlay: { ...state.underlay, scale: newScale } });
           }
         }
         setCalibrationPoints([]);
@@ -1988,784 +2059,311 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     }
 
     const snapInc = state.settings.gridSnapSize || 0.5;
+    let worldPoint = (activeTool === 'wall_rect' || activeTool === 'room_box')
+      ? snapPointToGrid(rawWorld, snapInc)
+      : snap.point;
 
-      // For Room Box tool, we want to snap to the grid first before any other logic
-      let worldPoint = (activeTool === 'wall_rect' || activeTool === 'room_box')
-        ? snapPointToGrid(rawWorld, snapInc)
-        : snap.point;
+    if (activeTool === 'wall_rect' || activeTool === 'room_box') {
+      worldPoint = {
+        x: Math.round(worldPoint.x / snapInc) * snapInc,
+        y: Math.round(worldPoint.y / snapInc) * snapInc
+      };
+    }
 
-      // Fix: Clean world coordinates to nearest snap increment for room box tool
-      if (activeTool === 'wall_rect' || activeTool === 'room_box') {
-        worldPoint = {
-          x: Math.round(worldPoint.x / snapInc) * snapInc,
-          y: Math.round(worldPoint.y / snapInc) * snapInc
-        };
-      }
-
-    // --- TOOL: RULER MEASURE ---
     if (activeTool === 'ruler_measure') {
       const rulerSnap = getSmartSnapPoint(rawWorld);
-      const snapPoint = rulerSnap.point;
-      if (!rulerStart) {
-        setRulerStart(snapPoint);
-        setRulerEnd(snapPoint);
-      } else {
-        setRulerEnd(snapPoint);
-      }
+      if (!rulerStart) { setRulerStart(rulerSnap.point); setRulerEnd(rulerSnap.point); }
+      else { setRulerEnd(rulerSnap.point); }
       return;
     }
 
-    // --- TOOL: ROOM BOX (4-wall rectangle) ---
     if (activeTool === 'wall_rect' || activeTool === 'room_box') {
-      if (!roomBoxStart) {
-        setRoomBoxStart(worldPoint);
-      } else {
-        // Complete box
-        const x1 = roomBoxStart.x;
-        const y1 = roomBoxStart.y;
-        const x2 = worldPoint.x;
-        const y2 = worldPoint.y;
-
+      if (!roomBoxStart) { setRoomBoxStart(worldPoint); }
+      else {
+        const x1 = roomBoxStart.x, y1 = roomBoxStart.y, x2 = worldPoint.x, y2 = worldPoint.y;
         if (Math.abs(x2 - x1) > 1 && Math.abs(y2 - y1) > 1) {
           const idPrefix = Date.now();
           const presetProps = getWallPropertiesFromPreset(activeWallPreset);
-          
-          // Apply justification logic: Convert face dimensions to centerline nodes
-          const rawPoints = [
-            { x: x1, y: y1 },
-            { x: x2, y: y1 },
-            { x: x2, y: y2 },
-            { x: x1, y: y2 },
-          ];
-          
+          const rawPoints = [{ x: x1, y: y1 }, { x: x2, y: y1 }, { x: x2, y: y2 }, { x: x1, y: y2 }];
           const fullWallThickness = getWallThickness(presetProps);
-          const centerlinePoints = convertInputToCenterlineNodes(
-            rawPoints,
-            fullWallThickness,
-            state.settings.wallJustification
-          );
-
+          const centerlinePoints = convertInputToCenterlineNodes(rawPoints, fullWallThickness, state.settings.wallJustification);
           const n1: CadNode = { id: `n_${idPrefix}_1`, x: centerlinePoints[0].x, y: centerlinePoints[0].y };
           const n2: CadNode = { id: `n_${idPrefix}_2`, x: centerlinePoints[1].x, y: centerlinePoints[1].y };
           const n3: CadNode = { id: `n_${idPrefix}_3`, x: centerlinePoints[2].x, y: centerlinePoints[2].y };
           const n4: CadNode = { id: `n_${idPrefix}_4`, x: centerlinePoints[3].x, y: centerlinePoints[3].y };
-
-          const w1: CadWall = {
-            id: `w_${idPrefix}_1`,
-            startNodeId: n1.id,
-            endNodeId: n2.id,
-            ...presetProps,
-            height: state.settings.defaultWallHeight,
-          };
-          const w2: CadWall = {
-            id: `w_${idPrefix}_2`,
-            startNodeId: n2.id,
-            endNodeId: n3.id,
-            ...presetProps,
-            height: state.settings.defaultWallHeight,
-          };
-          const w3: CadWall = {
-            id: `w_${idPrefix}_3`,
-            startNodeId: n3.id,
-            endNodeId: n4.id,
-            ...presetProps,
-            height: state.settings.defaultWallHeight,
-          };
-          const w4: CadWall = {
-            id: `w_${idPrefix}_4`,
-            startNodeId: n4.id,
-            endNodeId: n1.id,
-            ...presetProps,
-            height: state.settings.defaultWallHeight,
-          };
-
-          const newNodes = [...state.nodes, n1, n2, n3, n4];
-          const newWalls = [...state.walls, w1, w2, w3, w4];
-          const detectedRooms = detectRoomFaces(newNodes, newWalls, state.rooms, state.settings.defaultWallHeight);
-
-          onChange({
-            ...state,
-            nodes: newNodes,
-            walls: newWalls,
-            rooms: detectedRooms,
-          });
+          const w1: CadWall = { id: `w_${idPrefix}_1`, startNodeId: n1.id, endNodeId: n2.id, ...presetProps, height: state.settings.defaultWallHeight };
+          const w2: CadWall = { id: `w_${idPrefix}_2`, startNodeId: n2.id, endNodeId: n3.id, ...presetProps, height: state.settings.defaultWallHeight };
+          const w3: CadWall = { id: `w_${idPrefix}_3`, startNodeId: n3.id, endNodeId: n4.id, ...presetProps, height: state.settings.defaultWallHeight };
+          const w4: CadWall = { id: `w_${idPrefix}_4`, startNodeId: n4.id, endNodeId: n1.id, ...presetProps, height: state.settings.defaultWallHeight };
+          const newNodes = [n1, n2, n3, n4];
+          const newWalls = [w1, w2, w3, w4];
+          const finalNodes = [...state.nodes, ...newNodes], finalWalls = [...state.walls, ...newWalls];
+          const detectedRooms = detectRoomFaces(finalNodes, finalWalls, state.rooms, state.settings.defaultWallHeight);
+          onChange({ ...state, nodes: finalNodes, walls: finalWalls, rooms: detectedRooms });
         }
-
-        setRoomBoxStart(null);
-        onToolChange('select');
+        setRoomBoxStart(null); onToolChange('select');
       }
       return;
     }
 
-    // --- TOOL: WALL PEN ---
     if (activeTool === 'wall_pen') {
       if (!activeWallStartNodeId) {
-        // First node of the wall
         let startNodeId = snap.nodeId;
-        let nextNodes = [...state.nodes];
-        let nextWalls = [...state.walls];
-        let nextApertures = [...state.apertures];
-
+        let nextNodes = [...state.nodes], nextWalls = [...state.walls], nextApertures = [...state.apertures];
         if (snap.type === 'wall' && snap.wallId) {
-          // Snap onto existing wall segment: split it to create a T-junction node
           const splitRes = splitWallAtPoint(snap.wallId, snap.point, nextNodes, nextWalls, nextApertures);
-          nextNodes = splitRes.nodes;
-          nextWalls = splitRes.walls;
-          nextApertures = splitRes.apertures;
-          startNodeId = splitRes.splitNodeId;
+          nextNodes = splitRes.nodes; nextWalls = splitRes.walls; nextApertures = splitRes.apertures; startNodeId = splitRes.splitNodeId;
           const detectedRooms = detectRoomFaces(nextNodes, nextWalls, state.rooms, state.settings.defaultWallHeight);
-          onChange({
-            ...state,
-            nodes: nextNodes,
-            walls: nextWalls,
-            apertures: nextApertures,
-            rooms: detectedRooms,
-          });
+          onChange({ ...state, nodes: nextNodes, walls: nextWalls, apertures: nextApertures, rooms: detectedRooms });
         } else if (!startNodeId) {
-          const newNode: CadNode = {
-            id: `node_${Date.now()}`,
-            x: worldPoint.x,
-            y: worldPoint.y,
-          };
-          nextNodes.push(newNode);
-          startNodeId = newNode.id;
-          onChange({ ...state, nodes: nextNodes });
+          const newNode: CadNode = { id: `node_${Date.now()}`, x: worldPoint.x, y: worldPoint.y };
+          nextNodes.push(newNode); startNodeId = newNode.id; onChange({ ...state, nodes: nextNodes });
         }
-
         setActiveWallStartNodeId(startNodeId);
       } else {
-        // Second node of the wall segment
         let targetPoint = worldPoint;
         const startNode = state.nodes.find((n) => n.id === activeWallStartNodeId);
-
         if (startNode) {
-          targetPoint = snapAngle(
-            startNode,
-            targetPoint,
-            state.settings.angleSnapIncrement,
-            state.settings.orthoMode
-          );
-
+          targetPoint = snapAngle(startNode, targetPoint, state.settings.angleSnapIncrement, state.settings.orthoMode);
           if (state.settings.orthoMode) {
-            // Re-enforce exact orthogonal axis lock
-            if (Math.abs(targetPoint.x - startNode.x) >= Math.abs(targetPoint.y - startNode.y)) {
-              targetPoint.y = startNode.y;
-            } else {
-              targetPoint.x = startNode.x;
-            }
+            if (Math.abs(targetPoint.x - startNode.x) >= Math.abs(targetPoint.y - startNode.y)) { targetPoint.y = startNode.y; }
+            else { targetPoint.x = startNode.x; }
           }
         }
-
         const angleSnapResult = getSmartSnapPoint(targetPoint, activeWallStartNodeId);
         if (state.settings.orthoMode && startNode && angleSnapResult.nodeId) {
           const candNode = state.nodes.find((n) => n.id === angleSnapResult.nodeId);
-          if (candNode && (Math.abs(candNode.x - startNode.x) < 0.2 || Math.abs(candNode.y - startNode.y) < 0.2)) {
-            targetPoint = angleSnapResult.point;
-          }
-        } else {
-          targetPoint = angleSnapResult.point;
-        }
-
+          if (candNode && (Math.abs(candNode.x - startNode.x) < 0.2 || Math.abs(candNode.y - startNode.y) < 0.2)) { targetPoint = angleSnapResult.point; }
+        } else { targetPoint = angleSnapResult.point; }
         let endNodeId = angleSnapResult.nodeId;
-        let updatedNodes = [...state.nodes];
-        let updatedWalls = [...state.walls];
-        let updatedApertures = [...state.apertures];
-
+        let updatedNodes = [...state.nodes], updatedWalls = [...state.walls], updatedApertures = [...state.apertures];
         if (angleSnapResult.type === 'wall' && angleSnapResult.wallId) {
-          // Snap onto existing wall segment: split it for complete topological PSLG face subdivision!
           const splitRes = splitWallAtPoint(angleSnapResult.wallId, angleSnapResult.point, updatedNodes, updatedWalls, updatedApertures);
-          updatedNodes = splitRes.nodes;
-          updatedWalls = splitRes.walls;
-          updatedApertures = splitRes.apertures;
-          endNodeId = splitRes.splitNodeId;
+          updatedNodes = splitRes.nodes; updatedWalls = splitRes.walls; updatedApertures = splitRes.apertures; endNodeId = splitRes.splitNodeId;
         } else if (!endNodeId) {
-          const newNode: CadNode = {
-            id: `node_${Date.now()}`,
-            x: targetPoint.x,
-            y: targetPoint.y,
-          };
-          updatedNodes.push(newNode);
-          endNodeId = newNode.id;
+          const newNode: CadNode = { id: `node_${Date.now()}`, x: targetPoint.x, y: targetPoint.y };
+          updatedNodes.push(newNode); endNodeId = newNode.id;
         }
-
-        // Avoid zero-length walls
         if (endNodeId && endNodeId !== activeWallStartNodeId) {
           const presetProps = getWallPropertiesFromPreset(activeWallPreset);
-          const newWall: CadWall = {
-            id: `wall_${Date.now()}`,
-            startNodeId: activeWallStartNodeId,
-            endNodeId,
-            ...presetProps,
-            height: state.settings.defaultWallHeight,
-          };
-
+          const newWall: CadWall = { id: `wall_${Date.now()}`, startNodeId: activeWallStartNodeId, endNodeId, ...presetProps, height: state.settings.defaultWallHeight };
           const finalWalls = [...updatedWalls, newWall];
           const detectedRooms = detectRoomFaces(updatedNodes, finalWalls, state.rooms, state.settings.defaultWallHeight);
-
-          onChange({
-            ...state,
-            nodes: updatedNodes,
-            walls: finalWalls,
-            apertures: updatedApertures,
-            rooms: detectedRooms,
-          });
-
-          // Continue continuous wall chain from the new end node
+          onChange({ ...state, nodes: updatedNodes, walls: finalWalls, apertures: updatedApertures, rooms: detectedRooms });
           setActiveWallStartNodeId(endNodeId);
         }
       }
       return;
     }
 
-    // --- TOOL: TEXT ANNOTATION ---
     if (activeTool === 'text_label') {
-      const newAnnotation: CadAnnotation = {
-        id: `ann_${Date.now()}`,
-        x: Math.round(worldPoint.x * 10) / 10,
-        y: Math.round(worldPoint.y * 10) / 10,
-        text: 'Plan Note / Specification',
-        fontSize: 14,
-        color: '#38bdf8',
-        rotation: 0,
-      };
-
-      onChange({
-        ...state,
-        annotations: [...(state.annotations || []), newAnnotation],
-      });
-
+      const newAnnotation: CadAnnotation = { id: `ann_${Date.now()}`, x: Math.round(worldPoint.x * 10) / 10, y: Math.round(worldPoint.y * 10) / 10, text: 'Plan Note / Specification', fontSize: 14, color: '#38bdf8', rotation: 0 };
+      onChange({ ...state, annotations: [...(state.annotations || []), newAnnotation] });
       onSelect({ type: 'annotation', id: newAnnotation.id });
-      if (!isStickyMode) {
-        onToolChange('select');
-      }
+      if (!isStickyMode) { onToolChange('select'); }
       return;
     }
 
-    // --- TOOL: APERTURE PLACEMENT (Door/Window) ---
     if (activeTool.startsWith('aperture_')) {
-      const nodeMap = new Map<string, CadNode>();
-      state.nodes.forEach((n) => nodeMap.set(n.id, n));
-
-      let hitWall: CadWall | null = null;
-      let hitOffset = 0;
-
+      const nodeMap = new Map<string, CadNode>(); state.nodes.forEach((n) => nodeMap.set(n.id, n));
+      let hitWall: CadWall | null = null; let hitOffset = 0;
       state.walls.forEach((w) => {
-        const n1 = nodeMap.get(w.startNodeId);
-        const n2 = nodeMap.get(w.endNodeId);
+        const n1 = nodeMap.get(w.startNodeId), n2 = nodeMap.get(w.endNodeId);
         if (!n1 || !n2) return;
         const proj = projectPointOntoSegment(rawWorld, n1, n2);
-        if (proj.distance < 1.2) {
-          hitWall = w;
-          const wallLen = distance(n1, n2);
-          hitOffset = proj.t * wallLen;
-        }
+        if (proj.distance < 1.2) { hitWall = w; hitOffset = proj.t * distance(n1, n2); }
       });
-
       if (hitWall) {
-        let apType: Aperture['type'] = 'door_passage';
-        let width = 3.0;
-        let height = 6.67;
-
-        if (activeTool === 'aperture_window') {
-          apType = 'window_standard';
-          width = 4.0;
-          height = 4.0;
-        } else if (activeTool === 'aperture_pocket_door') {
-          apType = 'door_pocket';
-          width = 2.67;
-        } else if (activeTool === 'aperture_exterior_door') {
-          apType = 'door_exterior';
-          width = 3.0;
-        } else if (activeTool === 'aperture_garage') {
-          apType = 'door_garage';
-          width = 9.0;
-          height = 8.0;
-        } else if (activeTool === 'aperture_patio_slider') {
-          apType = 'door_sliding_patio';
-          width = 6.0;
-        } else if (activeTool === 'aperture_bifold_single') {
-          apType = 'door_bifold_single';
-          width = 2.5;
-        } else if (activeTool === 'aperture_bifold_double') {
-          apType = 'door_bifold_double';
-          width = 5.0;
-        } else if (activeTool === 'aperture_cased_opening') {
-          apType = 'cased_opening';
-          width = 3.0;
-        }
-
-        const newAperture: Aperture = {
-          id: `ap_${Date.now()}`,
-          wallId: (hitWall as CadWall).id,
-          offset: Math.round(hitOffset * 10) / 10,
-          width,
-          height,
-          type: apType,
-          swingSide: 'inward',
-        };
-
-        onChange({
-          ...state,
-          apertures: [...state.apertures, newAperture],
-        });
-
+        let apType: Aperture['type'] = 'door_passage', width = 3.0, height = 6.67;
+        if (activeTool === 'aperture_window') { apType = 'window_standard'; width = 4.0; height = 4.0; }
+        else if (activeTool === 'aperture_pocket_door') { apType = 'door_pocket'; width = 2.67; }
+        else if (activeTool === 'aperture_exterior_door') { apType = 'door_exterior'; width = 3.0; }
+        else if (activeTool === 'aperture_garage') { apType = 'door_garage'; width = 9.0; height = 8.0; }
+        else if (activeTool === 'aperture_patio_slider') { apType = 'door_sliding_patio'; width = 6.0; }
+        else if (activeTool === 'aperture_bifold_single') { apType = 'door_bifold_single'; width = 2.5; }
+        else if (activeTool === 'aperture_bifold_double') { apType = 'door_bifold_double'; width = 5.0; }
+        else if (activeTool === 'aperture_cased_opening') { apType = 'cased_opening'; width = 3.0; }
+        const newAperture: Aperture = { id: `ap_${Date.now()}`, wallId: hitWall.id, offset: Math.round(hitOffset * 10) / 10, width, height, type: apType, swingSide: 'inward' };
+        onChange({ ...state, apertures: [...state.apertures, newAperture] });
         onSelect({ type: 'aperture', id: newAperture.id });
-        if (!isStickyMode) {
-          onToolChange('select');
-        }
+        if (!isStickyMode) { onToolChange('select'); }
       }
       return;
     }
 
-    // --- TOOL: MEP STAMPING ---
     const stampTypeMap: Record<string, CadStamp['type']> = {
-      stamp_column: 'column_post',
-      stamp_pier: 'helical_pier',
-      stamp_beam: 'beam_segment',
-      stamp_stair: 'stair_run',
-      stamp_switch: 'switch_std',
-      stamp_dimmer: 'switch_dimmer',
-      stamp_3way: 'switch_3way',
-      stamp_outlet: 'outlet_std',
-      stamp_gfci: 'outlet_gfci',
-      stamp_240v: 'outlet_240v',
-      stamp_ev: 'outlet_ev',
-      stamp_potlight: 'light_potlight',
-      stamp_light_fixture: 'light_fixture',
-      stamp_coach_light: 'light_coach',
-      stamp_soffit_light: 'light_soffit',
-      stamp_fan_ceiling: 'fan_ceiling',
-      stamp_fan_exhaust: 'fan_exhaust',
-      stamp_rangehood: 'fan_rangehood',
-      alarm_smoke_co: 'alarm_smoke_co',
-      stamp_plumbing_toilet: 'plumbing_toilet',
-      stamp_plumbing_sink: 'plumbing_sink',
-      stamp_plumbing_shower: 'plumbing_shower',
-      stamp_plumbing_tub: 'plumbing_tub',
-      stamp_plumbing_hose_bib: 'plumbing_hose_bib',
-      stamp_plumbing_water_heater: 'plumbing_water_heater',
-      stamp_plumbing_fixture: 'plumbing_fixture',
-      stamp_utility_trench: 'utility_trench',
+      stamp_column: 'column_post', stamp_pier: 'helical_pier', stamp_beam: 'beam_segment', stamp_stair: 'stair_run',
+      stamp_switch: 'switch_std', stamp_dimmer: 'switch_dimmer', stamp_3way: 'switch_3way', stamp_outlet: 'outlet_std',
+      stamp_gfci: 'outlet_gfci', stamp_240v: 'outlet_240v', stamp_ev: 'outlet_ev', stamp_potlight: 'light_potlight',
+      stamp_light_fixture: 'light_fixture', stamp_coach_light: 'light_coach', stamp_soffit_light: 'light_soffit',
+      stamp_fan_ceiling: 'fan_ceiling', stamp_fan_exhaust: 'fan_exhaust', stamp_rangehood: 'fan_rangehood',
+      alarm_smoke_co: 'alarm_smoke_co', stamp_plumbing_toilet: 'plumbing_toilet', stamp_plumbing_sink: 'plumbing_sink',
+      stamp_plumbing_shower: 'plumbing_shower', stamp_plumbing_tub: 'plumbing_tub', stamp_plumbing_hose_bib: 'plumbing_hose_bib',
+      stamp_plumbing_water_heater: 'plumbing_water_heater', stamp_plumbing_fixture: 'plumbing_fixture', stamp_utility_trench: 'utility_trench',
     };
 
     if (activeTool in stampTypeMap || activeTool.startsWith('stamp_') || activeTool === 'alarm_smoke_co') {
       const stampType = stampTypeMap[activeTool] || (activeTool.replace('stamp_', '') as CadStamp['type']);
-      const newStamp: CadStamp = {
-        id: `st_${Date.now()}`,
-        type: stampType,
-        x: Math.round(worldPoint.x * 10) / 10,
-        y: Math.round(worldPoint.y * 10) / 10,
-        parentType: 'canvas',
-        rotation: 0,
-        length: stampType === 'beam_segment' ? 12.0 : stampType === 'utility_trench' ? 25.0 : undefined,
-      };
-
-      onChange({
-        ...state,
-        stamps: [...state.stamps, newStamp],
-      });
-
+      const newStamp: CadStamp = { id: `st_${Date.now()}`, type: stampType, x: Math.round(worldPoint.x * 10) / 10, y: Math.round(worldPoint.y * 10) / 10, parentType: 'canvas', rotation: 0, length: stampType === 'beam_segment' ? 12.0 : stampType === 'utility_trench' ? 25.0 : undefined };
+      onChange({ ...state, stamps: [...state.stamps, newStamp] });
       onSelect({ type: 'stamp', id: newStamp.id });
-      if (!isStickyMode) {
-        onToolChange('select');
-      }
+      if (!isStickyMode) { onToolChange('select'); }
       return;
     }
 
-    // --- TOOL: SELECT ---
     if (activeTool === 'select') {
-      // 1. Check node hit
       const hitNode = state.nodes.find((n) => distance(rawWorld, n) < 0.8);
-      if (hitNode) {
-        onSelect({ type: 'node', id: hitNode.id });
-        setIsDraggingElement(true);
-        setDragStartPoint(worldPoint);
-        return;
-      }
-
-      // 2. Check annotation hit
-      const hitAnnotation = (state.annotations || []).find((ann) => {
-        return distance(rawWorld, { x: ann.x, y: ann.y }) < 2.5;
-      });
-      if (hitAnnotation) {
-        onSelect({ type: 'annotation', id: hitAnnotation.id });
-        setIsDraggingElement(true);
-        setDragStartPoint(worldPoint);
-        return;
-      }
-
-      // 3. Check aperture hit
-      const nodeMap = new Map<string, CadNode>();
-      state.nodes.forEach((n) => nodeMap.set(n.id, n));
-
+      if (hitNode) { toggleSelection('node', hitNode.id, e); setIsDraggingElement(true); setDragStartPoint(worldPoint); setHasMovedDuringDrag(false); return; }
+      const hitAnnotation = (state.annotations || []).find((ann) => distance(rawWorld, { x: ann.x, y: ann.y }) < 2.5);
+      if (hitAnnotation) { toggleSelection('annotation', hitAnnotation.id, e); setIsDraggingElement(true); setDragStartPoint(worldPoint); setHasMovedDuringDrag(false); return; }
+      const nodeMap = new Map<string, CadNode>(); state.nodes.forEach((n) => nodeMap.set(n.id, n));
       const hitAperture = state.apertures.find((ap) => {
-        const wall = state.walls.find((w) => w.id === ap.wallId);
-        if (!wall) return false;
-        const geom = getApertureGeometry(ap, wall, nodeMap);
-        if (!geom) return false;
+        const wall = state.walls.find((w) => w.id === ap.wallId); if (!wall) return false;
+        const geom = getApertureGeometry(ap, wall, nodeMap); if (!geom) return false;
         return distance(rawWorld, geom.center) < geom.width / 2 + 0.5;
       });
-
-      if (hitAperture) {
-        onSelect({ type: 'aperture', id: hitAperture.id });
-        setIsDraggingElement(true);
-        setDragStartPoint(worldPoint);
-        return;
-      }
-
-      // 4. Check stamp hit
+      if (hitAperture) { toggleSelection('aperture', hitAperture.id, e); setIsDraggingElement(true); setDragStartPoint(worldPoint); setHasMovedDuringDrag(false); return; }
       const hitStamp = state.stamps.find((st) => {
-        // Linear elements (beam, utility trench)
         if (st.type === 'beam_segment' || st.type === 'utility_trench') {
-          const len = st.length || (st.type === 'beam_segment' ? 12 : 25);
-          const rad = ((st.rotation || 0) * Math.PI) / 180;
-          const halfDx = (len / 2) * Math.cos(rad);
-          const halfDy = (len / 2) * Math.sin(rad);
-          const p1 = { x: st.x - halfDx, y: st.y - halfDy };
-          const p2 = { x: st.x + halfDx, y: st.y + halfDy };
-          const proj = projectPointOntoSegment(rawWorld, p1, p2);
-          return proj.distance < 1.4;
+          const len = st.length || 12, rad = ((st.rotation || 0) * Math.PI) / 180;
+          const p1 = { x: st.x - (len / 2) * Math.cos(rad), y: st.y - (len / 2) * Math.sin(rad) }, p2 = { x: st.x + (len / 2) * Math.cos(rad), y: st.y + (len / 2) * Math.sin(rad) };
+          return projectPointOntoSegment(rawWorld, p1, p2).distance < 1.4;
         }
-
-        // Rotated 2D bounding boxes for all architectural/MEP stamps
-        const rad = -((st.rotation || 0) * Math.PI) / 180;
-        const dx = rawWorld.x - st.x;
-        const dy = rawWorld.y - st.y;
-        const localX = Math.abs(dx * Math.cos(rad) - dy * Math.sin(rad));
-        const localY = Math.abs(dx * Math.sin(rad) + dy * Math.cos(rad));
-
-        let halfW = 1.0;
-        let halfH = 1.0;
-
-        if (st.type === 'plumbing_tub') {
-          halfW = 2.7; // 5.4 ft length
-          halfH = 1.6; // 3.2 ft width
-        } else if (st.type === 'plumbing_shower') {
-          halfW = 1.8;
-          halfH = 1.8;
-        } else if (st.type === 'stair_run') {
-          halfW = 2.2;
-          halfH = 3.5;
-        } else if (st.type === 'plumbing_toilet') {
-          halfW = 1.2;
-          halfH = 1.6;
-        } else if (st.type === 'plumbing_sink' || st.type === 'plumbing_water_heater') {
-          halfW = 1.4;
-          halfH = 1.4;
-        } else if (st.type === 'fan_exhaust' || st.type === 'fan_rangehood') {
-          halfW = 1.6;
-          halfH = 1.4;
-        } else if (st.type === 'column_post' || st.type === 'helical_pier') {
-          halfW = 1.2;
-          halfH = 1.2;
-        } else if (st.type === 'fan_ceiling') {
-          halfW = 1.8;
-          halfH = 1.8;
-        }
-
+        const rad = -((st.rotation || 0) * Math.PI) / 180, dx = rawWorld.x - st.x, dy = rawWorld.y - st.y;
+        const localX = Math.abs(dx * Math.cos(rad) - dy * Math.sin(rad)), localY = Math.abs(dx * Math.sin(rad) + dy * Math.cos(rad));
+        let halfW = 1.0, halfH = 1.0;
+        if (st.type === 'plumbing_tub') { halfW = 2.7; halfH = 1.6; } else if (st.type === 'plumbing_shower') { halfW = 1.8; halfH = 1.8; } else if (st.type === 'stair_run') { halfW = 2.2; halfH = 3.5; } else if (st.type === 'plumbing_toilet') { halfW = 1.2; halfH = 1.6; } else if (st.type === 'plumbing_sink' || st.type === 'plumbing_water_heater') { halfW = 1.4; halfH = 1.4; } else if (st.type === 'fan_exhaust' || st.type === 'fan_rangehood') { halfW = 1.6; halfH = 1.4; } else if (st.type === 'column_post' || st.type === 'helical_pier') { halfW = 1.2; halfH = 1.2; } else if (st.type === 'fan_ceiling') { halfW = 1.8; halfH = 1.8; }
         return localX <= halfW + 0.4 && localY <= halfH + 0.4;
       });
-      if (hitStamp) {
-        onSelect({ type: 'stamp', id: hitStamp.id });
-        setIsDraggingElement(true);
-        setDragStartPoint(worldPoint);
-        return;
-      }
-
-      // 5. Check wall hit
+      if (hitStamp) { toggleSelection('stamp', hitStamp.id, e); setIsDraggingElement(true); setDragStartPoint(worldPoint); setHasMovedDuringDrag(false); return; }
       const hitWall = state.walls.find((w) => {
-        const n1 = nodeMap.get(w.startNodeId);
-        const n2 = nodeMap.get(w.endNodeId);
-        if (!n1 || !n2) return false;
-        const proj = projectPointOntoSegment(rawWorld, n1, n2);
-        return proj.distance < (w.thickness / 2) + 0.5;
+        const n1 = nodeMap.get(w.startNodeId), n2 = nodeMap.get(w.endNodeId); if (!n1 || !n2) return false;
+        return projectPointOntoSegment(rawWorld, n1, n2).distance < (w.thickness / 2) + 0.5;
       });
-
-      if (hitWall) {
-        onSelect({ type: 'wall', id: hitWall.id });
-        setIsDraggingElement(true);
-        setDragStartPoint(worldPoint);
-        return;
-      }
-
-      // 6. Check room hit
-      const hitRoom = state.rooms.find((room) => {
-        return isPointInPolygon(rawWorld, room.points) || distance(rawWorld, room.centroid) < 4.0;
-      });
-
+      if (hitWall) { toggleSelection('wall', hitWall.id, e); setIsDraggingElement(true); setDragStartPoint(worldPoint); setHasMovedDuringDrag(false); return; }
+      const hitRoom = state.rooms.find((room) => isPointInPolygon(rawWorld, room.points) || distance(rawWorld, room.centroid) < 4.0);
       if (hitRoom) {
-        onSelect({ type: 'room', id: hitRoom.id });
-        setIsDraggingElement(true);
-        setDragStartPoint(worldPoint);
-
-        // Corner Anchor Detection: If clicking near a corner node of the room, set it as anchor
-        const cornerNode = state.nodes.find(n => 
-          hitRoom.nodeIds.includes(n.id) && distance(rawWorld, n) < 0.8
-        );
-        if (cornerNode) {
-          setActiveDragAnchorNodeId(cornerNode.id);
-        } else {
-          setActiveDragAnchorNodeId(null);
-        }
+        toggleSelection('room', hitRoom.id, e); setIsDraggingElement(true); setDragStartPoint(worldPoint); setHasMovedDuringDrag(false);
+        const cornerNode = state.nodes.find(n => hitRoom.nodeIds.includes(n.id) && distance(rawWorld, n) < 0.8);
+        if (cornerNode) setActiveDragAnchorNodeId(cornerNode.id); else setActiveDragAnchorNodeId(null);
         return;
       }
-
-      // 7. Check deck hit
       const hitDeck = state.decks.find((d) => isPointInPolygon(rawWorld, d.points));
-      if (hitDeck) {
-        onSelect({ type: 'deck', id: hitDeck.id });
-        setIsDraggingElement(true);
-        setDragStartPoint(worldPoint);
-        return;
-      }
-
-      // 8. Check hardscape hit
+      if (hitDeck) { toggleSelection('deck', hitDeck.id, e); setIsDraggingElement(true); setDragStartPoint(worldPoint); setHasMovedDuringDrag(false); return; }
       const hitHardscape = state.hardscapes.find((h) => isPointInPolygon(rawWorld, h.points));
-      if (hitHardscape) {
-        onSelect({ type: 'hardscape', id: hitHardscape.id });
-        setIsDraggingElement(true);
-        setDragStartPoint(worldPoint);
-        return;
-      }
-
-      // 9. Check underlay hit (if not locked)
+      if (hitHardscape) { toggleSelection('hardscape', hitHardscape.id, e); setIsDraggingElement(true); setDragStartPoint(worldPoint); setHasMovedDuringDrag(false); return; }
       if (state.underlay && state.underlay.isVisible && !state.underlay.isLocked) {
-        const uw = state.underlay.width / state.underlay.scale;
-        const uh = state.underlay.height / state.underlay.scale;
-        if (
-          rawWorld.x >= state.underlay.x &&
-          rawWorld.x <= state.underlay.x + uw &&
-          rawWorld.y >= state.underlay.y &&
-          rawWorld.y <= state.underlay.y + uh
-        ) {
-          onSelect({ type: 'underlay', id: state.underlay.id });
-          setIsDraggingElement(true);
-          setDragStartPoint(rawWorld);
-          return;
+        const uw = state.underlay.width / state.underlay.scale, uh = state.underlay.height / state.underlay.scale;
+        if (rawWorld.x >= state.underlay.x && rawWorld.x <= state.underlay.x + uw && rawWorld.y >= state.underlay.y && rawWorld.y <= state.underlay.y + uh) {
+          toggleSelection('underlay', state.underlay.id, e); setIsDraggingElement(true); setDragStartPoint(rawWorld); setHasMovedDuringDrag(false); return;
         }
       }
-
-      // Deselect
-      onSelect({ type: 'none' });
+      if (!e.shiftKey && !(e.ctrlKey || e.metaKey)) onSelect({ type: 'none' });
+      setMarqueeStart(rawWorld); setMarqueeEnd(rawWorld); setHasMovedDuringDrag(false);
     }
   };
 
   // Handle Mouse Move
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
+    const canvas = canvasRef.current; if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const clientX = e.clientX - rect.left;
-    const clientY = e.clientY - rect.top;
-
+    const clientX = e.clientX - rect.left, clientY = e.clientY - rect.top;
     if (isPanning) {
-      setTransform((prev) => ({
-        ...prev,
-        x: prev.x + (clientX - panStart.x),
-        y: prev.y + (clientY - panStart.y),
-      }));
-      setPanStart({ x: clientX, y: clientY });
-      return;
+      setTransform((prev) => ({ ...prev, x: prev.x + (clientX - panStart.x), y: prev.y + (clientY - panStart.y) }));
+      setPanStart({ x: clientX, y: clientY }); return;
     }
-
     const rawWorld = screenToWorld(clientX, clientY);
     const snap = getSmartSnapPoint(rawWorld, activeWallStartNodeId);
     setSnapCandidate(snap);
-
     let currentPoint = snap.point;
-
-    // Fix: Clean world coordinates to nearest integer inch for room box tool move
-    if (activeTool === 'wall_rect' || activeTool === 'room_box') {
-      currentPoint = {
-        x: Math.round(currentPoint.x * 12) / 12,
-        y: Math.round(currentPoint.y * 12) / 12
-      };
-    }
-
-    // Angle snapping for wall pen
+    if (activeTool === 'wall_rect' || activeTool === 'room_box') { currentPoint = { x: Math.round(currentPoint.x * 12) / 12, y: Math.round(currentPoint.y * 12) / 12 }; }
     if (activeTool === 'wall_pen' && activeWallStartNodeId) {
       const startNode = state.nodes.find((n) => n.id === activeWallStartNodeId);
       if (startNode) {
-        currentPoint = snapAngle(
-          startNode,
-          currentPoint,
-          state.settings.angleSnapIncrement,
-          state.settings.orthoMode
-        );
-
-        if (state.settings.orthoMode) {
-          if (Math.abs(currentPoint.x - startNode.x) >= Math.abs(currentPoint.y - startNode.y)) {
-            currentPoint.y = startNode.y;
-          } else {
-            currentPoint.x = startNode.x;
-          }
-        }
+        currentPoint = snapAngle(startNode, currentPoint, state.settings.angleSnapIncrement, state.settings.orthoMode);
+        if (state.settings.orthoMode) { if (Math.abs(currentPoint.x - startNode.x) >= Math.abs(currentPoint.y - startNode.y)) currentPoint.y = startNode.y; else currentPoint.x = startNode.x; }
       }
     }
-
     setDraftMousePos(currentPoint);
-
-    // Element Dragging & Push/Pull logic
-      if (isDraggingElement && selection.type !== 'none' && selection.id) {
-        const snapInc = state.settings.gridSnapSize || 0.5;
-        const currentPointSnapped = {
-          x: Math.round(currentPoint.x / snapInc) * snapInc,
-          y: Math.round(currentPoint.y / snapInc) * snapInc
-        };
-
-        const dx = currentPointSnapped.x - dragStartPoint.x;
-        const dy = currentPointSnapped.y - dragStartPoint.y;
-
-        if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001) {
-          if (selection.type === 'node') {
+    if (marqueeStart && !isDraggingElement) { setMarqueeEnd(rawWorld); return; }
+    if (isDraggingElement && selection.type !== 'none') {
+      const snapInc = state.settings.gridSnapSize || 0.5;
+      const currentPointSnapped = { x: Math.round(currentPoint.x / snapInc) * snapInc, y: Math.round(currentPoint.y / snapInc) * snapInc };
+      const dx = currentPointSnapped.x - dragStartPoint.x, dy = currentPointSnapped.y - dragStartPoint.y;
+      if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001) {
+        setHasMovedDuringDrag(true);
+        const selectionIds = selection.ids || (selection.id ? [selection.id] : []);
+        if (selectionIds.length > 1 || (selectionIds.length === 1 && !['node', 'wall', 'room', 'aperture'].includes(selection.type))) {
+          const allSelectedNodeIds = new Set<string>();
+          state.walls.forEach(w => { if (selectionIds.includes(w.id)) { allSelectedNodeIds.add(w.startNodeId); allSelectedNodeIds.add(w.endNodeId); } });
+          state.rooms.forEach(r => { if (selectionIds.includes(r.id)) r.nodeIds.forEach(nid => allSelectedNodeIds.add(nid)); });
+          state.nodes.forEach(n => { if (selectionIds.includes(n.id)) allSelectedNodeIds.add(n.id); });
+          const nextNodes = state.nodes.map(n => allSelectedNodeIds.has(n.id) ? { ...n, x: Math.round((n.x + dx) * 100) / 100, y: Math.round((n.y + dy) * 100) / 100 } : n);
+          const nextStamps = state.stamps.map(st => {
+            if (selectionIds.includes(st.id)) return { ...st, x: Math.round((st.x + dx) * 100) / 100, y: Math.round((st.y + dy) * 100) / 100 };
+            const roomHit = state.rooms.find(r => selectionIds.includes(r.id) && isPointInPolygon({ x: st.x, y: st.y }, r.points));
+            if (roomHit) return { ...st, x: Math.round((st.x + dx) * 100) / 100, y: Math.round((st.y + dy) * 100) / 100 };
+            return st;
+          });
+          const nextAnnotations = (state.annotations || []).map(ann => selectionIds.includes(ann.id) ? { ...ann, x: Math.round((ann.x + dx) * 100) / 100, y: Math.round((ann.y + dy) * 100) / 100 } : ann);
+          const nextDecks = state.decks.map(d => selectionIds.includes(d.id) ? { ...d, points: d.points.map(pt => ({ x: Math.round((pt.x + dx) * 100) / 100, y: Math.round((pt.y + dy) * 100) / 100 })) } : d);
+          const nextHardscapes = state.hardscapes.map(h => selectionIds.includes(h.id) ? { ...h, points: h.points.map(pt => ({ x: Math.round((pt.x + dx) * 100) / 100, y: Math.round((pt.y + dy) * 100) / 100 })) } : h);
+          let nextUnderlay = state.underlay; if (state.underlay && selectionIds.includes(state.underlay.id)) nextUnderlay = { ...state.underlay, x: state.underlay.x + dx, y: state.underlay.y + dy };
+          const nextRooms = detectRoomFaces(nextNodes, state.walls, state.rooms, state.settings.defaultWallHeight);
+          onChange({ ...state, nodes: nextNodes, stamps: nextStamps, annotations: nextAnnotations, rooms: nextRooms, decks: nextDecks, hardscapes: nextHardscapes, underlay: nextUnderlay });
+          setDragStartPoint(currentPointSnapped); return;
+        }
+        if (selection.type === 'node' && selection.id) {
             const snappedPoint = currentPointSnapped;
-
-            // Orthogonal Corner Resizing Logic
-            // Find if this node belongs to exactly one rectangular room
             const parentRooms = state.rooms.filter(r => r.nodeIds.includes(selection.id!));
             const isOrthogonalRoom = parentRooms.length === 1 && parentRooms[0].nodeIds.length === 4;
-
-            let updatedNodes = state.nodes.map((n) =>
-              n.id === selection.id ? { ...n, x: snappedPoint.x, y: snappedPoint.y } : n
-            );
-
+            let updatedNodes = state.nodes.map((n) => n.id === selection.id ? { ...n, x: snappedPoint.x, y: snappedPoint.y } : n);
             if (isOrthogonalRoom) {
-              const room = parentRooms[0];
-              const nodeIdx = room.nodeIds.indexOf(selection.id!);
-              const prevIdx = (nodeIdx - 1 + 4) % 4;
-              const nextIdx = (nodeIdx + 1) % 4;
-              const prevNodeId = room.nodeIds[prevIdx];
-              const nextNodeId = room.nodeIds[nextIdx];
-
-              const nodeMap = new Map<string, CadNode>();
-              state.nodes.forEach(n => nodeMap.set(n.id, n));
-              const currNode = nodeMap.get(selection.id!);
-              const prevNode = nodeMap.get(prevNodeId);
-              const nextNode = nodeMap.get(nextNodeId);
-
+              const room = parentRooms[0], nodeIdx = room.nodeIds.indexOf(selection.id!), prevNodeId = room.nodeIds[(nodeIdx - 1 + 4) % 4], nextNodeId = room.nodeIds[(nodeIdx + 1) % 4];
+              const nodeMap = new Map<string, CadNode>(); state.nodes.forEach(n => nodeMap.set(n.id, n));
+              const currNode = nodeMap.get(selection.id!), prevNode = nodeMap.get(prevNodeId), nextNode = nodeMap.get(nextNodeId);
               if (currNode && prevNode && nextNode) {
-                const isPrevHorizontal = Math.abs(currNode.y - prevNode.y) < 0.01;
-                const isNextVertical = Math.abs(currNode.x - nextNode.x) < 0.01;
-
+                const isPrevHorizontal = Math.abs(currNode.y - prevNode.y) < 0.01, isNextVertical = Math.abs(currNode.x - nextNode.x) < 0.01;
                 updatedNodes = updatedNodes.map(n => {
-                  if (n.id === prevNodeId) {
-                    return isPrevHorizontal ? { ...n, y: snappedPoint.y } : { ...n, x: snappedPoint.x };
-                  }
-                  if (n.id === nextNodeId) {
-                    return isNextVertical ? { ...n, x: snappedPoint.x } : { ...n, y: snappedPoint.y };
-                  }
+                  if (n.id === prevNodeId) return isPrevHorizontal ? { ...n, y: snappedPoint.y } : { ...n, x: snappedPoint.x };
+                  if (n.id === nextNodeId) return isNextVertical ? { ...n, x: snappedPoint.x } : { ...n, y: snappedPoint.y };
                   return n;
                 });
               }
             }
-
             const updatedRooms = detectRoomFaces(updatedNodes, state.walls, state.rooms, state.settings.defaultWallHeight);
             onChange({ ...state, nodes: updatedNodes, rooms: updatedRooms });
           } else if (selection.type === 'wall') {
           const wall = state.walls.find((w) => w.id === selection.id);
           if (wall) {
-            const startNode = state.nodes.find((n) => n.id === wall.startNodeId);
-            const endNode = state.nodes.find((n) => n.id === wall.endNodeId);
+            const startNode = state.nodes.find((n) => n.id === wall.startNodeId), endNode = state.nodes.find((n) => n.id === wall.endNodeId);
             if (startNode && endNode) {
-              const wallDx = endNode.x - startNode.x;
-              const wallDy = endNode.y - startNode.y;
-              const wallLen = Math.hypot(wallDx, wallDy);
-
-              let effectiveDx = dx;
-              let effectiveDy = dy;
-
-              // Orthogonal Wall Drag Locking:
-              // Lock translation perpendicular to the wall's orientation.
-              // Attached perpendicular walls naturally stretch/shrink while preserving 90-degree corners.
-              const isHorizontal = Math.abs(wallDy) < 0.05;
-              const isVertical = Math.abs(wallDx) < 0.05;
-
+              const wallDx = endNode.x - startNode.x, wallDy = endNode.y - startNode.y, wallLen = Math.hypot(wallDx, wallDy);
+              let effectiveDx = dx, effectiveDy = dy;
+              const isHorizontal = Math.abs(wallDy) < 0.05, isVertical = Math.abs(wallDx) < 0.05;
               if (wallLen > 0.001) {
-                if (isHorizontal) {
-                  // Horizontal wall moves strictly along Y axis (perpendicular to wall)
-                  effectiveDx = 0;
-                  effectiveDy = dy;
-                } else if (isVertical) {
-                  // Vertical wall moves strictly along X axis (perpendicular to wall)
-                  effectiveDx = dx;
-                  effectiveDy = 0;
-                } else {
-                  // Angled wall: project displacement (dx, dy) onto wall normal vector
-                  const nx = -wallDy / wallLen;
-                  const ny = wallDx / wallLen;
-                  const proj = dx * nx + dy * ny;
-                  effectiveDx = proj * nx;
-                  effectiveDy = proj * ny;
+                if (isHorizontal) { effectiveDx = 0; effectiveDy = dy; } else if (isVertical) { effectiveDx = dx; effectiveDy = 0; } else {
+                  const nx = -wallDy / wallLen, ny = wallDx / wallLen, proj = dx * nx + dy * ny;
+                  effectiveDx = proj * nx; effectiveDy = proj * ny;
                 }
               }
-
               if (Math.abs(effectiveDx) > 0.0001 || Math.abs(effectiveDy) > 0.0001) {
-                // Magnetic Wall Alignment & Node Snapping for Single Wall Drags
-                let snapDelta = { x: 0, y: 0 };
-                const projectedStart = { x: startNode.x + effectiveDx, y: startNode.y + effectiveDy };
-                const projectedEnd = { x: endNode.x + effectiveDx, y: endNode.y + effectiveDy };
-
-                const snapRadius = state.settings.gridSnapSize || 0.5;
+                let snapDelta = { x: 0, y: 0 }; const projectedStart = { x: startNode.x + effectiveDx, y: startNode.y + effectiveDy }, snapRadius = state.settings.gridSnapSize || 0.5;
                 let minSnapDist = snapRadius;
-
-                // 1. Snap wall to stationary nodes (alignment)
                 state.nodes.forEach(n => {
                   if (n.id === wall.startNodeId || n.id === wall.endNodeId) return;
-                  
-                  if (isHorizontal) {
-                    const distY = Math.abs(projectedStart.y - n.y);
-                    if (distY < minSnapDist) {
-                      minSnapDist = distY;
-                      snapDelta = { x: 0, y: n.y - projectedStart.y };
-                    }
-                  } else if (isVertical) {
-                    const distX = Math.abs(projectedStart.x - n.x);
-                    if (distX < minSnapDist) {
-                      minSnapDist = distX;
-                      snapDelta = { x: n.x - projectedStart.x, y: 0 };
-                    }
-                  }
+                  if (isHorizontal) { const distY = Math.abs(projectedStart.y - n.y); if (distY < minSnapDist) { minSnapDist = distY; snapDelta = { x: 0, y: n.y - projectedStart.y }; } }
+                  else if (isVertical) { const distX = Math.abs(projectedStart.x - n.x); if (distX < minSnapDist) { minSnapDist = distX; snapDelta = { x: n.x - projectedStart.x, y: 0 }; } }
                 });
-
-                // 2. Snap wall to parallel stationary walls (collinear alignment)
                 state.walls.forEach(sw => {
                   if (sw.id === wall.id) return;
-                  const sn1 = state.nodes.find(n => n.id === sw.startNodeId);
-                  const sn2 = state.nodes.find(n => n.id === sw.endNodeId);
-                  if (!sn1 || !sn2) return;
-
-                  const swIsHorizontal = Math.abs(sn1.y - sn2.y) < 0.01;
-                  const swIsVertical = Math.abs(sn1.x - sn2.x) < 0.01;
-
-                  if (isHorizontal && swIsHorizontal) {
-                    const distY = Math.abs(projectedStart.y - sn1.y);
-                    if (distY < minSnapDist) {
-                      minSnapDist = distY;
-                      snapDelta = { x: 0, y: sn1.y - projectedStart.y };
-                    }
-                  } else if (isVertical && swIsVertical) {
-                    const distX = Math.abs(projectedStart.x - sn1.x);
-                    if (distX < minSnapDist) {
-                      minSnapDist = distX;
-                      snapDelta = { x: sn1.x - projectedStart.x, y: 0 };
-                    }
-                  }
+                  const sn1 = state.nodes.find(n => n.id === sw.startNodeId), sn2 = state.nodes.find(n => n.id === sw.endNodeId); if (!sn1 || !sn2) return;
+                  const swIsHorizontal = Math.abs(sn1.y - sn2.y) < 0.01, swIsVertical = Math.abs(sn1.x - sn2.x) < 0.01;
+                  if (isHorizontal && swIsHorizontal) { const distY = Math.abs(projectedStart.y - sn1.y); if (distY < minSnapDist) { minSnapDist = distY; snapDelta = { x: 0, y: sn1.y - projectedStart.y }; } }
+                  else if (isVertical && swIsVertical) { const distX = Math.abs(projectedStart.x - sn1.x); if (distX < minSnapDist) { minSnapDist = distX; snapDelta = { x: sn1.x - projectedStart.x, y: 0 }; } }
                 });
-
-                const finalDx = effectiveDx + snapDelta.x;
-                const finalDy = effectiveDy + snapDelta.y;
-
-                const updatedNodes = state.nodes.map((n) => {
-                  if (n.id === wall.startNodeId || n.id === wall.endNodeId) {
-                    return {
-                      ...n,
-                      x: Math.round((n.x + finalDx) * 100) / 100,
-                      y: Math.round((n.y + finalDy) * 100) / 100,
-                    };
-                  }
-                  return n;
-                });
+                const finalDx = effectiveDx + snapDelta.x, finalDy = effectiveDy + snapDelta.y;
+                const updatedNodes = state.nodes.map((n) => (n.id === wall.startNodeId || n.id === wall.endNodeId) ? { ...n, x: Math.round((n.x + finalDx) * 100) / 100, y: Math.round((n.y + finalDy) * 100) / 100 } : n);
                 const updatedRooms = detectRoomFaces(updatedNodes, state.walls, state.rooms, state.settings.defaultWallHeight);
                 onChange({ ...state, nodes: updatedNodes, rooms: updatedRooms });
               }
@@ -2776,199 +2374,93 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           if (ap) {
             const wall = state.walls.find((w) => w.id === ap.wallId);
             if (wall) {
-              const n1 = state.nodes.find((n) => n.id === wall.startNodeId);
-              const n2 = state.nodes.find((n) => n.id === wall.endNodeId);
+              const n1 = state.nodes.find((n) => n.id === wall.startNodeId), n2 = state.nodes.find((n) => n.id === wall.endNodeId);
               if (n1 && n2) {
-                const wallLen = distance(n1, n2);
-                const proj = projectPointOntoSegment(rawWorld, n1, n2);
-                const snapInc = state.settings.gridSnapSize || 0.5;
-                let newOffset = proj.t * wallLen - ap.width / 2;
-                newOffset = Math.round(newOffset / snapInc) * snapInc;
+                const wallLen = distance(n1, n2), proj = projectPointOntoSegment(rawWorld, n1, n2), snapInc = state.settings.gridSnapSize || 0.5;
+                let newOffset = Math.round((proj.t * wallLen - ap.width / 2) / snapInc) * snapInc;
                 newOffset = Math.max(0, Math.min(Math.max(0, wallLen - ap.width), newOffset));
-                const updatedApertures = state.apertures.map((a) =>
-                  a.id === ap.id ? { ...a, offset: Math.round(newOffset * 100) / 100 } : a
-                );
-                onChange({ ...state, apertures: updatedApertures });
+                onChange({ ...state, apertures: state.apertures.map((a) => a.id === ap.id ? { ...a, offset: Math.round(newOffset * 100) / 100 } : a) });
               }
             }
           }
         } else if (selection.type === 'room') {
           const room = state.rooms.find((r) => r.id === selection.id);
           if (room) {
-            const roomNodeSet = new Set(room.nodeIds);
-            const nodeMap = new Map<string, CadNode>();
-            state.nodes.forEach((n) => nodeMap.set(n.id, n));
-
-            // Multi-Corner Magnetic Snapping
-            const movingNodesActual = room.nodeIds
-              .map((nid) => nodeMap.get(nid))
-              .filter((n): n is CadNode => !!n)
-              .map((n) => ({ x: n.x + dx, y: n.y + dy }));
-
-            const stationaryNodes = state.nodes.filter((n) => !roomNodeSet.has(n.id));
-            const stationaryWalls = state.walls.filter(
-              (w) => !roomNodeSet.has(w.startNodeId) || !roomNodeSet.has(w.endNodeId)
-            );
-
-            // Prioritize the active drag anchor if it exists
+            const roomNodeSet = new Set(room.nodeIds), nodeMap = new Map<string, CadNode>(); state.nodes.forEach((n) => nodeMap.set(n.id, n));
+            const movingNodesActual = room.nodeIds.map((nid) => nodeMap.get(nid)).filter((n): n is CadNode => !!n).map((n) => ({ x: n.x + dx, y: n.y + dy }));
+            const stationaryNodes = state.nodes.filter((n) => !roomNodeSet.has(n.id)), stationaryWalls = state.walls.filter((w) => !roomNodeSet.has(w.startNodeId) || !roomNodeSet.has(w.endNodeId));
             const anchorIdx = activeDragAnchorNodeId ? room.nodeIds.indexOf(activeDragAnchorNodeId) : -1;
-            const nodesToCheck = anchorIdx !== -1 
-              ? [movingNodesActual[anchorIdx], ...movingNodesActual.filter((_, i) => i !== anchorIdx)]
-              : movingNodesActual;
-
-            const snapRadius = 0.75; // Active SNAP_GRID radius (9 inches)
-            const snapResult = calculateMultiCornerSnap(
-              nodesToCheck,
-              stationaryNodes,
-              stationaryWalls,
-              nodeMap,
-              snapRadius
-            );
-
-            let finalDx = dx;
-            let finalDy = dy;
-
+            const nodesToCheck = anchorIdx !== -1 ? [movingNodesActual[anchorIdx], ...movingNodesActual.filter((_, i) => i !== anchorIdx)] : movingNodesActual;
+            const snapResult = calculateMultiCornerSnap(nodesToCheck, stationaryNodes, stationaryWalls, nodeMap, 0.75);
+            let finalDx = dx, finalDy = dy;
             if (snapResult.snapType !== 'none') {
-              finalDx += snapResult.delta.x;
-              finalDy += snapResult.delta.y;
-
-              // Find the actual moving node that snapped (it might not be the anchor)
-              const originalIdx = anchorIdx !== -1 && snapResult.snappedNodeIndex === 0 
-                ? anchorIdx 
-                : (anchorIdx !== -1 && snapResult.snappedNodeIndex > 0 
-                    ? (snapResult.snappedNodeIndex <= anchorIdx ? snapResult.snappedNodeIndex - 1 : snapResult.snappedNodeIndex)
-                    : snapResult.snappedNodeIndex);
-              
-              const snappedNode = movingNodesActual[originalIdx];
-
-              setRoomSnapFeedback({
-                movingNode: { x: snappedNode.x + snapResult.delta.x, y: snappedNode.y + snapResult.delta.y },
-                targetNode: snapResult.snapTarget,
-                type: snapResult.snapType,
-              });
-            } else {
-              setRoomSnapFeedback(null);
-            }
-
-            const updatedNodes = state.nodes.map((n) => {
-              if (roomNodeSet.has(n.id)) {
-                return {
-                  ...n,
-                  x: Math.round((n.x + finalDx) * 1000) / 1000,
-                  y: Math.round((n.y + finalDy) * 1000) / 1000,
-                };
-              }
-              return n;
-            });
-
-            const updatedStamps = state.stamps.map((st) => {
-              if (isPointInPolygon({ x: st.x, y: st.y }, room.points)) {
-                return {
-                  ...st,
-                  x: Math.round((st.x + finalDx) * 1000) / 1000,
-                  y: Math.round((st.y + finalDy) * 1000) / 1000,
-                };
-              }
-              return st;
-            });
-
+              finalDx += snapResult.delta.x; finalDy += snapResult.delta.y;
+              const originalIdx = anchorIdx !== -1 && snapResult.snappedNodeIndex === 0 ? anchorIdx : (anchorIdx !== -1 && snapResult.snappedNodeIndex > 0 ? (snapResult.snappedNodeIndex <= anchorIdx ? snapResult.snappedNodeIndex - 1 : snapResult.snappedNodeIndex) : snapResult.snappedNodeIndex);
+              setRoomSnapFeedback({ movingNode: { x: movingNodesActual[originalIdx].x + snapResult.delta.x, y: movingNodesActual[originalIdx].y + snapResult.delta.y }, targetNode: snapResult.snapTarget, type: snapResult.snapType });
+            } else setRoomSnapFeedback(null);
+            const updatedNodes = state.nodes.map((n) => roomNodeSet.has(n.id) ? { ...n, x: Math.round((n.x + finalDx) * 1000) / 1000, y: Math.round((n.y + finalDy) * 1000) / 1000 } : n);
+            const updatedStamps = state.stamps.map((st) => isPointInPolygon({ x: st.x, y: st.y }, room.points) ? { ...st, x: Math.round((st.x + finalDx) * 1000) / 1000, y: Math.round((st.y + finalDy) * 1000) / 1000 } : st);
             const updatedRooms = detectRoomFaces(updatedNodes, state.walls, state.rooms, state.settings.defaultWallHeight);
             onChange({ ...state, nodes: updatedNodes, stamps: updatedStamps, rooms: updatedRooms });
           }
-        } else if (selection.type === 'stamp') {
-          const updatedStamps = state.stamps.map((st) =>
-            st.id === selection.id ? { ...st, x: currentPoint.x, y: currentPoint.y } : st
-          );
-          onChange({ ...state, stamps: updatedStamps });
-        } else if (selection.type === 'annotation') {
-          const updatedAnnotations = (state.annotations || []).map((ann) =>
-            ann.id === selection.id
-              ? { ...ann, x: Math.round(currentPoint.x * 10) / 10, y: Math.round(currentPoint.y * 10) / 10 }
-              : ann
-          );
-          onChange({ ...state, annotations: updatedAnnotations });
-        } else if (selection.type === 'deck') {
-          const updatedDecks = state.decks.map((d) => {
-            if (d.id === selection.id) {
-              return {
-                ...d,
-                points: d.points.map((pt) => ({
-                  x: Math.round((pt.x + dx) * 100) / 100,
-                  y: Math.round((pt.y + dy) * 100) / 100,
-                })),
-              };
-            }
-            return d;
-          });
-          onChange({ ...state, decks: updatedDecks });
-        } else if (selection.type === 'hardscape') {
-          const updatedHardscapes = state.hardscapes.map((h) => {
-            if (h.id === selection.id) {
-              return {
-                ...h,
-                points: h.points.map((pt) => ({
-                  x: Math.round((pt.x + dx) * 100) / 100,
-                  y: Math.round((pt.y + dy) * 100) / 100,
-                })),
-              };
-            }
-            return h;
-          });
-          onChange({ ...state, hardscapes: updatedHardscapes });
-        } else if (selection.type === 'underlay' && state.underlay) {
-          onChange({
-            ...state,
-            underlay: {
-              ...state.underlay,
-              x: state.underlay.x + dx,
-              y: state.underlay.y + dy,
-            },
-          });
         }
-
-        setDragStartPoint(currentPoint);
+        setDragStartPoint(currentPointSnapped);
       }
     }
   };
 
   // Handle Mouse Up
-  const handleMouseUp = () => {
-    setIsPanning(false);
-    setIsDraggingElement(false);
-    setActiveDragAnchorNodeId(null);
-    setRoomSnapFeedback(null);
+  const handleMouseUp = (e: React.MouseEvent) => {
+    setIsPanning(false); setIsDraggingElement(false); setActiveDragAnchorNodeId(null); setRoomSnapFeedback(null);
+    if (!hasMovedDuringDrag && pendingSelectionOnMouseUp) onSelect(pendingSelectionOnMouseUp);
+    setPendingSelectionOnMouseUp(null); setHasMovedDuringDrag(false);
 
-    // Two-Phase Graph Cleanup
-    // Phase 1: Coincident Node Merging
-    const { nodes: mergedNodes, walls: mergedWalls, rooms: mergedRooms } = mergeCoincidentNodes(
-      state.nodes,
-      state.walls,
-      state.rooms
-    );
-
-    // Phase 2: Wall Deduplication
-    const { walls: finalWalls, rooms: finalRooms, apertures: finalApertures } = deduplicateWalls(
-      mergedWalls,
-      mergedRooms,
-      state.apertures,
-      mergedNodes
-    );
-
-    const reDetectedRooms = detectRoomFaces(mergedNodes, finalWalls, finalRooms, state.settings.defaultWallHeight);
-
-    if (
-      finalWalls.length !== state.walls.length || 
-      mergedNodes.length !== state.nodes.length ||
-      finalApertures.length !== state.apertures.length ||
-      reDetectedRooms.length !== state.rooms.length
-    ) {
-      onChange({
-        ...state,
-        nodes: mergedNodes,
-        walls: finalWalls,
-        rooms: reDetectedRooms,
-        apertures: finalApertures,
+    if (marqueeStart && marqueeEnd && distance(marqueeStart, marqueeEnd) > 0.1) {
+      const x1 = Math.min(marqueeStart.x, marqueeEnd.x), y1 = Math.min(marqueeStart.y, marqueeEnd.y), x2 = Math.max(marqueeStart.x, marqueeEnd.x), y2 = Math.max(marqueeStart.y, marqueeEnd.y);
+      const isInside = (p: Point2D) => p.x >= x1 && p.x <= x2 && p.y >= y1 && p.y <= y2;
+      const itemsInBox: string[] = [];
+      state.nodes.forEach(n => { if (isInside(n)) itemsInBox.push(n.id); });
+      state.walls.forEach(w => {
+        const n1 = state.nodes.find(n => n.id === w.startNodeId), n2 = state.nodes.find(n => n.id === w.endNodeId);
+        if (n1 && n2 && (isInside(n1) || isInside(n2) || isInside({ x: (n1.x + n2.x) / 2, y: (n1.y + n2.y) / 2 }))) itemsInBox.push(w.id);
       });
+      state.apertures.forEach(ap => {
+        const wall = state.walls.find(w => w.id === ap.wallId);
+        if (wall) {
+          const n1 = state.nodes.find(n => n.id === wall.startNodeId), n2 = state.nodes.find(n => n.id === wall.endNodeId);
+          if (n1 && n2) {
+            const wallLen = distance(n1, n2);
+            const centerOffset = ap.offset + ap.width / 2;
+            const t = centerOffset / wallLen;
+            if (isInside({ x: n1.x + (n2.x - n1.x) * t, y: n1.y + (n2.y - n1.y) * t })) itemsInBox.push(ap.id);
+          }
+        }
+      });
+      state.stamps.forEach(st => { if (isInside({ x: st.x, y: st.y })) itemsInBox.push(st.id); });
+      (state.annotations || []).forEach(ann => { if (isInside({ x: ann.x, y: ann.y })) itemsInBox.push(ann.id); });
+      state.rooms.forEach(r => { if (isInside(r.centroid)) itemsInBox.push(r.id); });
+      state.decks.forEach(d => { if (d.points.some(p => isInside(p))) itemsInBox.push(d.id); });
+      state.hardscapes.forEach(h => { if (h.points.some(p => isInside(p))) itemsInBox.push(h.id); });
+
+      const isShift = e.shiftKey, isCtrl = e.ctrlKey || e.metaKey;
+      let currentIds = selection.ids ? [...selection.ids] : (selection.id ? [selection.id] : []);
+      let newIds = [...currentIds];
+      if (isCtrl && isShift) newIds = newIds.filter(id => !itemsInBox.includes(id));
+      else if (isCtrl) itemsInBox.forEach(id => { if (!newIds.includes(id)) newIds.push(id); });
+      else if (isShift) itemsInBox.forEach(id => { if (newIds.includes(id)) newIds = newIds.filter(i => i !== id); else newIds.push(id); });
+      else newIds = itemsInBox;
+
+      if (newIds.length === 0) onSelect({ type: 'none' });
+      else if (newIds.length === 1) onSelect({ type: 'multiple', ids: newIds, id: newIds[0] });
+      else onSelect({ type: 'multiple', ids: newIds });
+      setMarqueeStart(null); setMarqueeEnd(null); return;
+    }
+    setMarqueeStart(null); setMarqueeEnd(null);
+    const { nodes: mergedNodes, walls: mergedWalls, rooms: mergedRooms } = mergeCoincidentNodes(state.nodes, state.walls, state.rooms);
+    const { walls: finalWalls, rooms: finalRooms, apertures: finalApertures } = deduplicateWalls(mergedWalls, mergedRooms, state.apertures, mergedNodes);
+    const reDetectedRooms = detectRoomFaces(mergedNodes, finalWalls, finalRooms, state.settings.defaultWallHeight);
+    if (finalWalls.length !== state.walls.length || mergedNodes.length !== state.nodes.length || finalApertures.length !== state.apertures.length || reDetectedRooms.length !== state.rooms.length) {
+      onChange({ ...state, nodes: mergedNodes, walls: finalWalls, rooms: reDetectedRooms, apertures: finalApertures });
     }
   };
 
@@ -3006,7 +2498,18 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         onMouseUp={handleMouseUp}
         onDoubleClick={handleDoubleClick}
         onWheel={handleWheel}
-        onContextMenu={(e) => e.preventDefault()}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          const rect = canvasRef.current?.getBoundingClientRect();
+          if (rect) {
+            const clientX = e.clientX - rect.left;
+            const clientY = e.clientY - rect.top;
+            const rawWorld = screenToWorld(clientX, clientY);
+            if (onContextMenu) {
+              onContextMenu(e as any, rawWorld);
+            }
+          }
+        }}
       />
 
       {/* Floating Canvas Overlays & Controls */}
@@ -3142,10 +2645,12 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       </div>
 
       {/* Floating Selected Element Quick Toolbar */}
-      {selection.type !== 'none' && selection.id && (
+      {selection.type !== 'none' && (selection.id || (selection.ids && selection.ids.length > 0)) && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/95 border border-sky-500/30 backdrop-blur-md px-4 py-2 rounded-xl shadow-2xl flex items-center gap-3">
           <span className="text-xs font-semibold text-sky-400 uppercase tracking-wider">
-            Selected: {selection.type} ({selection.id.slice(0, 8)})
+            {selection.type === 'multiple' 
+              ? `Selected: ${selection.ids?.length || 0} Items` 
+              : `Selected: ${selection.type} (${selection.id?.slice(0, 8)})`}
           </span>
 
           {selection.type === 'aperture' && (

@@ -145,6 +145,16 @@ export type FloorFinish =
   | 'polished_concrete'
   | 'osb_subfloor_only';
 
+export type CeilingType = 'flat' | 'vaulted' | 'tray' | 'coffered' | 'custom';
+
+export const CEILING_MULTIPLIERS: Record<CeilingType, number> = {
+  flat: 1.00,
+  vaulted: 1.18,
+  tray: 1.25,
+  coffered: 1.45,
+  custom: 1.00,
+};
+
 export interface RoomPolygon {
   id: string;
   name: string;
@@ -157,6 +167,8 @@ export interface RoomPolygon {
   floorFinish: FloorFinish;
   ceilingHeight: number; // in feet (defaults to project default)
   hasCeilingDrywall?: boolean;
+  ceilingType?: CeilingType;
+  ceilingMultiplier?: number;
   roomType?: string;
   slabThickness?: number;
 }
@@ -449,8 +461,9 @@ export type ActiveTool =
   | 'calibrate_scale';
 
 export interface SelectionState {
-  type: 'none' | 'node' | 'wall' | 'aperture' | 'stamp' | 'room' | 'deck' | 'hardscape' | 'annotation' | 'underlay';
+  type: 'none' | 'node' | 'wall' | 'aperture' | 'stamp' | 'room' | 'deck' | 'hardscape' | 'annotation' | 'underlay' | 'multiple';
   id?: string;
+  ids?: string[];
 }
 
 export interface MTOReport {
@@ -554,6 +567,15 @@ export interface UnderlayImage {
   opacity: number; // 0.1 to 1.0 (default: 0.5)
   isLocked: boolean; // Prevent dragging when tracing
   isVisible: boolean; // Show/hide toggle
+}
+
+export interface ClipboardState {
+  nodes: CadNode[];
+  walls: CadWall[];
+  apertures: Aperture[];
+  stamps: CadStamp[];
+  annotations: CadAnnotation[];
+  rooms: RoomPolygon[];
 }
 
 export interface FloorplanState {

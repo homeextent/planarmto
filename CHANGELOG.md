@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.0] - 2026-08-22
+
+### Added
+- **Ceiling Profiles & Area Multipliers**: Added support for Flat (1.00x), Vaulted (1.18x), Tray (1.25x), Coffered (1.45x), and Custom ceiling profiles in the Room Face Properties inspector, automatically scaling ceiling drywall sheet and paint gallon takeoffs.
+- **Marquee Box Selection**: Enabled click-and-drag box selection across canvas entities (walls, vertices, rooms, apertures, stamps, annotations) with multi-item group dragging.
+- **SketchUp-Style Modifier Keys**: Integrated Shift (Toggle/Invert), Ctrl/Cmd (Add), and Ctrl+Shift/Cmd+Shift (Subtract) selection modifier behaviors.
+- **CAD Clipboard Engine**: Added global keyboard shortcuts for Cut (`Ctrl+X`), Copy (`Ctrl+C`), Paste (`Ctrl+V`), Duplicate (`Ctrl+D`), and Delete (`Delete`/`Backspace`) with automatic UUID regeneration and spatial offsets.
+- **Custom Canvas Context Menu**: Implemented a dark-themed, floating right-click context menu on the CAD canvas for rapid clipboard and item management.
+
+### Fixed
+- **Single-Click Room Inspector**: Preserved explicit single-room entity selection (`type: 'room'`) on single clicks without modifiers to immediately open the Room Face Properties card.
+- **Initialization Order**: Reordered helper callbacks in `App.tsx` to resolve hoisting runtime exceptions during keyboard shortcut mounting.
+
+---
+
 ## [2.3.0] - 2026-08-21
 
 ### Added

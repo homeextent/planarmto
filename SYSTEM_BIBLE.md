@@ -34,6 +34,22 @@ $$A(C) = \frac{1}{2} \sum_{i=1}^{k} (x_i y_{i+1} - x_{i+1} y_i), \quad \text{whe
 - **Negative Signed Area ($A < 0$)**: Clockwise exterior boundless perimeter (discarded or used for exterior building envelope bounds).
 - **Minimum Enclosed Threshold**: Cycles with $|A| < 4\text{ sq ft}$ are discarded as topological artifacts.
 
+### 1.4 Selection & Multi-Item Interaction
+PlanarMTO supports complex entity selection and group manipulation:
+- **Marquee Box Selection**: Implemented via `calculateBoxSelection(startPoint, endPoint)`, which performs AABB (Axis-Aligned Bounding Box) intersection checks against all canvas entities.
+- **Selection Modifiers**:
+  - **`Shift`**: Toggles/inverts selection state of clicked or marquee-contained items.
+  - **`Ctrl` / `Cmd`**: Additive selection mode.
+  - **`Ctrl+Shift` / `Cmd+Shift`**: Subtractive selection mode.
+- **Group Dragging**: Selected entities maintain relative spatial offsets during movement, with magnetic snapping applied to the primary anchor node of the selection group.
+
+### 1.5 Clipboard Engine & UUID Regeneration
+The CAD Clipboard Engine (`copyToClipboard`, `pasteFromClipboard`) manages entity serialization:
+- **Deep Cloning**: All copied entities are deep-cloned into a memory buffer.
+- **UUID Regeneration**: To prevent ID collisions, new UUIDs are generated for all pasted entities.
+- **Spatial Offset**: Pasted items are offset by a fixed distance (e.g., $10', 10'$) from their original position to provide visual separation.
+- **Relationship Mapping**: Parent-child relationships (e.g., apertures hosted on walls) are remapped to the newly generated UUIDs during the paste operation to maintain assembly integrity.
+
 ---
 
 ## 2. Parametric Aperture & Stamp Hosting
@@ -103,6 +119,17 @@ Subfloor is detached from net interior area to account for area under wall plate
 - **Interior/Shared Walls**: Offset = 0 (Centerline).
 - **Exterior Walls**: Offset = $-(\text{CoreThickness} / 2)$ (Outer Rim Face).
 $$A_{\text{subfloor}} = \text{Area}(\text{getVariableOffsetPolygon}(C, \text{offsets}))$$
+
+#### C. Ceiling Surface Area (Profiles & Multipliers)
+Ceiling take-offs support non-flat profiles using an area multiplier $M_{\text{ceil}}$:
+- **Flat**: $M = 1.00$
+- **Vaulted**: $M = 1.18$
+- **Tray**: $M = 1.25$
+- **Coffered**: $M = 1.45$
+- **Custom**: User-defined scalar.
+
+The net ceiling drywall and paint quantities are calculated as:
+$$A_{\text{ceil, modified}} = A_{\text{net\_interior}} \times M_{\text{ceil}}$$
 
 ### 4.2 Division 03 — Concrete Foundations
 Foundation estimation relies on explicit volumetric variables assigned per-room or per-wall:
@@ -238,7 +265,9 @@ To streamline the user experience, all document-level controls are consolidated 
 - **Consolidated Control**: Global Settings, Master Rates, Printing, and Saving are managed exclusively from the header, removing duplicate action buttons from the MTO Matrix Panel.
 - **Canvas Lifecycle Management**: Includes a dedicated **"+ New Project"** button that triggers a hard canvas reset and hydrates the new project with active **Master Rates**.
 
-### 12.2 Two-Step Project Deletion Flow
-To prevent accidental data loss in the Project Directory, deletion follows a two-step verification pattern:
-1. **Selection**: User clicks the delete icon in the project card.
-2. **Confirmation**: A modal overlay (`ProjectDirectoryModal`) requires explicit user confirmation before the asynchronous `DELETE` request is dispatched to the REST API and `storage.ts` logic.
+### 12.3 Canvas Context Menu & Clipboard UI
+A dedicated context menu provides rapid access to clipboard operations:
+- **Floating Menu**: Dark-themed overlay triggered on `contextmenu` events within the `CadCanvas` viewport.
+- **Selection Awareness**: Menu options (Cut, Copy, Duplicate, Delete) are dynamically enabled/disabled based on the current selection state.
+- **Global Shortcut Sync**: Context menu actions dispatch the same internal commands as keyboard shortcuts (`Ctrl+X/C/V/D/Delete`), ensuring consistent application state logic.
+- **Initialization Order**: Helper callbacks in `App.tsx` are ordered to prevent hoisting exceptions during keyboard and context menu event listener mounting.

@@ -4,6 +4,8 @@ import {
   SelectionState,
   WallType,
   FloorFinish,
+  CeilingType,
+  CEILING_MULTIPLIERS,
   ApertureType,
   ActiveTool,
 } from '../types';
@@ -394,6 +396,21 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
       onChange({ ...state, rooms: updatedRooms });
     };
 
+    const handleCeilingTypeChange = (ceilingType: CeilingType) => {
+      const ceilingMultiplier = CEILING_MULTIPLIERS[ceilingType];
+      const updatedRooms = state.rooms.map((r) =>
+        r.id === room.id ? { ...r, ceilingType, ceilingMultiplier } : r
+      );
+      onChange({ ...state, rooms: updatedRooms });
+    };
+
+    const handleCeilingMultiplierChange = (ceilingMultiplier: number) => {
+      const updatedRooms = state.rooms.map((r) =>
+        r.id === room.id ? { ...r, ceilingMultiplier } : r
+      );
+      onChange({ ...state, rooms: updatedRooms });
+    };
+
     const handleFinishChange = (floorFinish: FloorFinish) => {
       const updatedRooms = state.rooms.map((r) =>
         r.id === room.id ? { ...r, floorFinish } : r
@@ -534,15 +551,51 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             </div>
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer text-slate-300 text-xs">
-            <input
-              type="checkbox"
-              checked={room.hasCeilingDrywall ?? true}
-              onChange={(e) => handleCeilingDrywallToggle(e.target.checked)}
-              className="rounded bg-slate-950 border-slate-700 text-sky-500"
-            />
-            <span>Include Ceiling Drywall & Paint</span>
-          </label>
+          <div className="space-y-2 pt-1 border-t border-slate-800">
+            <label className="flex items-center gap-2 cursor-pointer text-slate-300 text-xs">
+              <input
+                type="checkbox"
+                checked={room.hasCeilingDrywall ?? true}
+                onChange={(e) => handleCeilingDrywallToggle(e.target.checked)}
+                className="rounded bg-slate-950 border-slate-700 text-sky-500"
+              />
+              <span>Include Ceiling Drywall & Paint</span>
+            </label>
+
+            {room.hasCeilingDrywall !== false && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                    Ceiling Profile
+                  </label>
+                  <select
+                    value={room.ceilingType || 'flat'}
+                    onChange={(e) => handleCeilingTypeChange(e.target.value as CeilingType)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-sky-500"
+                  >
+                    <option value="flat">Flat (1.00x)</option>
+                    <option value="vaulted">Vaulted (1.18x)</option>
+                    <option value="tray">Tray (1.25x)</option>
+                    <option value="coffered">Coffered (1.45x)</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                    Area Multiplier
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1.0"
+                    value={room.ceilingMultiplier || 1.0}
+                    onChange={(e) => handleCeilingMultiplierChange(parseFloat(e.target.value) || 1.0)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-200 font-mono focus:border-sky-500"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
 
           {isFoundationRoom && (
             <div className="p-3 bg-sky-950/30 border border-sky-500/30 rounded-xl space-y-3">
