@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.3.0] - 2026-08-21
+
+### Added
+- **Global Master Rate Persistence**: Added `GET` and `POST` REST API routes (`planarmto/v1/rates`) to store tenant master unit pricing in `wp_usermeta` (`planarmto_global_rates`) with local fallback.
+- **Enhanced Rate Customizer Modal**: Integrated "Sync Master", "Save as Master Template", and "Apply to Project" actions directly into `RateCustomizerModal`.
+- **Top Header "+ New Project" Button**: Added a direct action button in the main header bar for instant canvas resets.
+- **Two-Step Project Deletion**: Added a confirmation dialog overlay in `ProjectDirectoryModal` before deleting saved plans.
+
+### Changed
+- **Toolbar Streamlining**: Removed duplicate Settings, Rates, and Print buttons from `MtoMatrixPanel`, consolidating document controls exclusively into the Top Header Bar.
+- **Default Startup View**: Set default app mounting state to open directly to a clean, interactive blank canvas.
+- **Rate State Isolation**: Separated frozen project rate snapshots (`wp_planarmto_projects.project_state`) from active master rate templates (`wp_usermeta`).
+
+### Fixed
+- **Rate Hydration on Canvas Reset**: Fixed new project creation and canvas clearing so new drawings inherit active `masterRates` instead of static hardcoded defaults.
+- **Project Deletion API Sync**: Fixed asynchronous deletion handling in `storage.ts` and `ProjectDirectoryModal` to ensure database records are removed upon confirmation.
+
+---
+
 ## [2.1.1] - 2026-08-20
 
 ### Added

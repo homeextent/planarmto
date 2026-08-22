@@ -51,6 +51,7 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | number | null>(null);
   const [saveAsModalOpen, setSaveAsModalOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectRef, setNewProjectRef] = useState('');
@@ -135,6 +136,7 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
     try {
       const updated = await deleteProjectFromDirectory(id);
       setProjects(updated);
+      setDeleteConfirmId(null);
     } finally {
       setIsLoading(false);
     }
@@ -452,7 +454,7 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
                             <Copy className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => handleDelete(project.id)}
+                            onClick={() => setDeleteConfirmId(project.id)}
                             className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors"
                             title="Delete project"
                           >
@@ -460,6 +462,31 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
                           </button>
                         </div>
                       </div>
+
+                      {/* Deletion Confirmation Overlay */}
+                      {deleteConfirmId === project.id && (
+                        <div className="absolute inset-0 z-20 bg-slate-900/95 flex flex-col items-center justify-center p-4 rounded-xl border border-red-500/50 text-center">
+                          <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
+                          <h4 className="text-xs font-bold text-white mb-1">Confirm Deletion</h4>
+                          <p className="text-[10px] text-slate-400 mb-3">
+                            Are you sure you want to delete "{project.name}"? This action cannot be undone.
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setDeleteConfirmId(null)}
+                              className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleDelete(project.id)}
+                              className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-[10px] font-bold"
+                            >
+                              Delete Project
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Project Metrics Summary Grid */}
                       <div className="grid grid-cols-3 gap-2 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80 my-3 text-xs">

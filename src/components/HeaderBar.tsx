@@ -27,6 +27,7 @@ import {
   HardDrive,
   Image as ImageIcon,
   FileCode,
+  Plus,
 } from 'lucide-react';
 
 interface HeaderBarProps {
@@ -44,6 +45,7 @@ interface HeaderBarProps {
   onOpenHelpModal: () => void;
   onOpenPrintModal?: () => void;
   onOpenProjectDirectoryModal?: () => void;
+  onNewProject?: () => void;
   onSelectUnderlay?: () => void;
   selection: SelectionState;
 }
@@ -63,6 +65,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onOpenHelpModal,
   onOpenPrintModal,
   onOpenProjectDirectoryModal,
+  onNewProject,
   onSelectUnderlay,
   selection,
 }) => {
@@ -224,6 +227,16 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       <div className="flex items-center gap-2 text-xs">
         {/* Save Controls */}
         <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 mr-2">
+          {onNewProject && (
+            <button
+              onClick={onNewProject}
+              className="px-3 py-1 text-emerald-400 hover:text-emerald-300 rounded-md flex items-center gap-1.5 text-[11px] font-bold transition-colors cursor-pointer"
+              title="Start New Project"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>New Project</span>
+            </button>
+          )}
           <button
             onClick={onSave}
             className="px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded-md flex items-center gap-1.5 text-[11px] font-bold transition-colors cursor-pointer shadow-sm shadow-sky-950"

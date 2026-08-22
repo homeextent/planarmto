@@ -33,8 +33,8 @@ import { GlobalProjectSettingsModal } from './components/GlobalProjectSettingsMo
 import { ProjectDirectoryModal } from './components/ProjectDirectoryModal';
 
 export default function App() {
-  // Project State initialized with realistic Modern 2-Bedroom Rancher template and persisted branding
-  const [state, setState] = useState<FloorplanState>(createModernTwoBedroomRancher());
+  // Project State initialized with a clean blank canvas
+  const [state, setState] = useState<FloorplanState>(createBlankProject());
 
   // Hydrate branding and master rates on mount
   useEffect(() => {
@@ -148,6 +148,7 @@ export default function App() {
       settings: hydratedSettings,
     });
     setIsDirty(false);
+    setIsProjectDirectoryOpen(false);
   }, []);
 
   // Save/Overwrite active project
@@ -220,6 +221,7 @@ export default function App() {
       ...blank,
       settings: finalSettings,
     });
+    setIsProjectDirectoryOpen(false);
   }, []);
 
   // Toggle single trade category inclusion in real-time
@@ -411,6 +413,7 @@ export default function App() {
         onOpenHelpModal={() => setIsHelpOpen(true)}
         onOpenPrintModal={() => setIsPrintModalOpen(true)}
         onOpenProjectDirectoryModal={() => setIsProjectDirectoryOpen(true)}
+        onNewProject={handleNewBlankProject}
         onSelectUnderlay={() => setSelection({ type: 'underlay', id: state.underlay?.id })}
         selection={selection}
       />

@@ -505,38 +505,12 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
-          {onOpenSettingsModal && (
-            <button
-              onClick={onOpenSettingsModal}
-              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-sky-400 hover:text-sky-300 rounded-md text-xs transition-colors cursor-pointer border border-slate-700"
-              title="Global Project & Engine Settings"
-            >
-              <Settings className="w-3.5 h-3.5" />
-            </button>
-          )}
-          {onOpenRateModal && (
-            <button
-              onClick={onOpenRateModal}
-              className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-sky-400 hover:text-sky-300 rounded-md text-xs font-semibold flex items-center gap-1 border border-slate-700 cursor-pointer transition-colors"
-              title="Project Unit Rates (Cost Model)"
-            >
-              <SlidersHorizontal className="w-3 h-3" />
-              <span>Rates</span>
-            </button>
-          )}
           <button
             onClick={handleExportCSV}
-            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-md text-xs transition-colors cursor-pointer"
+            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-md text-xs transition-colors cursor-pointer border border-slate-700"
             title="Export Detailed CSV"
           >
             <Download className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={handlePrint}
-            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-md text-xs transition-colors cursor-pointer"
-            title="Print Full Take-Off Report"
-          >
-            <Printer className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

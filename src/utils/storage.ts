@@ -276,10 +276,9 @@ export async function saveProjectToDirectory(
  * Deletes a project.
  */
 export async function deleteProjectFromDirectory(id: string | number): Promise<SavedProjectEntry[]> {
-  if (isWP() && typeof id === 'number') {
+  if (isWP()) {
     try {
       await wpFetch(`projects/${id}`, { method: 'DELETE' });
-      return getSavedProjects();
     } catch (err) {
       console.warn('WP Project delete failed, falling back to local:', err);
     }

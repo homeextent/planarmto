@@ -27,8 +27,10 @@
 - **Dynamic Net & Gross Area**: Computes gross building footprint, net interior conditioned area, exterior wall linear footages, and individual room finish schedules.
 
 ### 3. Dual-Cost Estimation & Multi-Trade Quantity Surveying
+- **Dual-Layer Rate Architecture**: Implements a strict separation between **Global Master Rates** (stored in WordPress user metadata for tenant-wide persistence) and **Project Cost Rates** (frozen snapshots stored within the project state). This allows users to update global pricing without unintentionally altering historically saved project estimates.
 - **Split Material & Labor Rates**: Configurable unit rates for all items across 7 construction divisions.
 - **Dual-Geometry Accuracy**: Synchronized calculation of structural framing vs. interior finishes using independent geometric layers for unmatched take-off precision. Defaults to **Interior Finish Mode** for trade-focused drywall and finish scheduling.
+- **Enhanced Rate Customizer**: Integrated "Sync Master", "Save as Master Template", and "Apply to Project" actions for rapid pricing synchronization across multiple projects.
 - **Commercial Markups & Financial Rollups**: Built-in logic for Company Overhead, Profit, Project Management, and Contingency percentages.
 - **Jobsite Waste Factors**: Adjustable Waste/Scrap multipliers applied directly to base quantities prior to markup.
 - **Precise Deduction Formulas**:
@@ -40,9 +42,10 @@
   - Electrical & Plumbing: Automated take-offs for fixtures, wiring homerun lengths, piping runs, and life safety devices.
 
 ### 4. Professional Export & Reporting Suite
+- **Single-Source-of-Truth Top Header Bar**: Consolidated document controls (Settings, Rates, Print, Save) into a unified top-level bar, removing duplicate controls from the MTO matrix for a streamlined interface. Includes an instant "+ New Project" canvas reset button.
 - **Direct Client-Side PDF Generation**: High-resolution rasterization to multi-page vector-styled PDF via `jsPDF` and `html2canvas`—no physical printer connection required.
 - **Executive HTML Take-Off & Specification Export**: Standalone formatted HTML document complete with company branding, CSI trade breakdowns, unit costs, and room finish schedules.
-- **In-App Project Directory Manager**: Multi-tenant persistence layer using WordPress MySQL database (via `wp_planarmto_projects`) with browser `localStorage` fallbacks for local development. Supports project duplication, renaming, auto-recovery, and JSON exports.
+- **In-App Project Directory Manager**: Multi-tenant persistence layer using WordPress MySQL database (via `wp_planarmto_projects`) with browser `localStorage` fallbacks for local development. Supports project duplication, renaming, auto-recovery, two-step deletion confirmation, and JSON exports.
 - **Persistent Company Branding**: Multi-tenant company profile storage mapped to WordPress user metadata, ensuring branding and custom rates follow the user across devices.
 
 ### 5. Multi-Tenant WordPress Persistence

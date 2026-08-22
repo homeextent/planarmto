@@ -172,20 +172,27 @@ interface SavedProjectEntry {
 
 To support professional enterprise usage, PlanarMTO implements a multi-tenant storage architecture that transitions from client-side `localStorage` to a centralized WordPress MySQL backend.
 
-### 10.1 MySQL Schema: `wp_planarmto_projects`
-Projects are stored in a dedicated table created via `dbDelta()` to ensure schema stability:
-- **`id`**: Primary Key (UUID/String).
-- **`tenant_id`**: Maps to the WordPress `user_id`. All queries are strictly filtered by this ID.
-- **`name`**: Project title.
-- **`project_data`**: `LONGTEXT` blob containing the serialized `FloorplanState` (nodes, walls, rooms, apertures, stamps, etc.).
-- **`metrics`**: `JSON` or `TEXT` summary of Gross SF and project totals for directory performance.
-- **`updated_at`**: Timestamp for versioning and sorting.
+### 10.1 Persistence Layers
+PlanarMTO utilizes a multi-layered storage strategy to balance project-level integrity with tenant-wide preferences:
 
-### 10.2 REST API Endpoint Specification
+1. **`wp_planarmto_projects` Table**: Stores serialized project states, metrics, and UUIDs strictly scoped by `tenant_id`.
+2. **`wp_usermeta` (Global Metadata)**: Stores tenant-wide configuration independent of specific projects:
+   - **`planarmto_company_branding`**: Persists company identity (name, logo, contact info) across all projects.
+   - **`planarmto_global_rates` (Master Rates)**: Stores the single-source-of-truth unit price template for materials and labor.
+
+### 10.2 Dual-Layer Rate Architecture
+The system maintains a strict separation between global templates and project-specific costs:
+- **Master Rates (`masterRates`)**: The active template stored in `wp_usermeta`. These are the baseline prices applied to all new projects.
+- **Project Cost Rates (`costRates`)**: A frozen snapshot of rates saved within the `project_state` JSON blob. This ensures that historical project estimates remain accurate even if global market material rates are updated later.
+- **Synchronization Pipeline**: Users can manually "Sync Master" to pull current global pricing into an old project, or "Save as Master" to push a project's custom rates to the global template.
+
+### 10.3 REST API Endpoint Specification
 The system exposes a custom namespace `planarmto/v1` for authenticated communication:
 - **`GET /projects`**: Retrieves all projects belonging to the current `tenant_id`.
 - **`POST /projects`**: Upserts a project entry (creates new or updates existing based on ID).
-- **`DELETE /projects/{id}`**: Permanently removes a project record if it belongs to the requester.
+- **`DELETE /projects/{id}`**: Permanently removes a project record.
+- **`GET /rates`**: Retrieves the global master rate template from user metadata.
+- **`POST /rates`**: Updates the global master rate template.
 
 ### 10.3 Authorization & X-WP-Nonce
 To prevent Cross-Site Request Forgery (CSRF) and ensure tenant isolation:
@@ -221,3 +228,17 @@ The gate is enforced within the `template_redirect` hook in `planar-mto.php` bef
 Aggressive caching layers (SiteGround Optimizer, Nginx, Varnish) can often cache the passcode gate or redirect loops. To ensure the gate functions reliably:
 - **`DONOTCACHEPAGE`**: The constant `define('DONOTCACHEPAGE', true)` is set globally within the plugin to signal to most WordPress caching plugins to skip the PlanarMTO endpoint.
 - **`nocache_headers()`**: WordPress native `nocache_headers()` are issued to send standard HTTP headers (`Cache-Control: no-cache, must-revalidate, max-age=0`) to the browser and edge CDN layers.
+
+---
+
+## 12. UI Architecture & Document Controls
+
+### 12.1 Single-Source-of-Truth Top Header Bar
+To streamline the user experience, all document-level controls are consolidated into the **Top Header Bar**:
+- **Consolidated Control**: Global Settings, Master Rates, Printing, and Saving are managed exclusively from the header, removing duplicate action buttons from the MTO Matrix Panel.
+- **Canvas Lifecycle Management**: Includes a dedicated **"+ New Project"** button that triggers a hard canvas reset and hydrates the new project with active **Master Rates**.
+
+### 12.2 Two-Step Project Deletion Flow
+To prevent accidental data loss in the Project Directory, deletion follows a two-step verification pattern:
+1. **Selection**: User clicks the delete icon in the project card.
+2. **Confirmation**: A modal overlay (`ProjectDirectoryModal`) requires explicit user confirmation before the asynchronous `DELETE` request is dispatched to the REST API and `storage.ts` logic.
