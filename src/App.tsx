@@ -14,7 +14,13 @@ import {
 import { createModernTwoBedroomRancher, createBlankProject } from './engine/samplePlans';
 import { calculateMTO, calculateEstimatedCost, DEFAULT_UNIT_COST_RATES } from './engine/estimator';
 import { detectRoomFaces, isPointInPolygon } from './engine/cadMath';
-import { hydrateSettingsWithBranding, saveAutoSaveState, saveProjectToDirectory } from './utils/storage';
+import {
+  hydrateSettingsWithBranding,
+  saveAutoSaveState,
+  saveProjectToDirectory,
+  getPersistedRateProfile,
+  savePersistedRateProfile,
+} from './utils/storage';
 import { HeaderBar } from './components/HeaderBar';
 import { Toolbar } from './components/Toolbar';
 import { CadCanvas } from './components/CadCanvas';
@@ -30,20 +36,43 @@ export default function App() {
   // Project State initialized with realistic Modern 2-Bedroom Rancher template and persisted branding
   const [state, setState] = useState<FloorplanState>(createModernTwoBedroomRancher());
 
-  // Hydrate branding on mount
+  // Hydrate branding and master rates on mount
   useEffect(() => {
-    async function initBranding() {
-      const hydratedSettings = await hydrateSettingsWithBranding(state.settings);
-      setState(prev => ({
-        ...prev,
-        settings: hydratedSettings
-      }));
+    async function init() {
+      const [hydratedSettings, persistedMasterRates] = await Promise.all([
+        hydrateSettingsWithBranding(state.settings),
+        getPersistedRateProfile()
+      ]);
+      
+      setState(prev => {
+        const nextSettings = { ...hydratedSettings };
+        
+        // If it's a blank project without custom rates, we can apply master rates
+        // Otherwise, we keep what's in the project state
+        if (persistedMasterRates && !prev.settings.costRates) {
+          nextSettings.costRates = persistedMasterRates;
+        }
+
+        return {
+          ...prev,
+          settings: nextSettings
+        };
+      });
+
+      if (persistedMasterRates) {
+        setMasterRates(persistedMasterRates);
+      }
     }
-    initBranding();
+    init();
   }, []);
 
   // Unit Cost Rates for dual material/labor estimating
-  const [costRates, setCostRates] = useState<UnitCostRates>(DEFAULT_UNIT_COST_RATES);
+  const [masterRates, setMasterRates] = useState<UnitCostRates | null>(null);
+
+  // Use the rates from active project state for calculations
+  const costRates = useMemo(() => {
+    return state.settings.costRates || DEFAULT_UNIT_COST_RATES;
+  }, [state.settings.costRates]);
 
   // History stack for Undo / Redo
   const [history, setHistory] = useState<FloorplanState[]>([]);
@@ -173,14 +202,23 @@ export default function App() {
     setRedoStack([]);
     setSelection({ type: 'none' });
 
-    const hydratedSettings = await hydrateSettingsWithBranding(
-      blank.settings,
-      `PRJ-${new Date().getFullYear()}-MTO-${Math.floor(100 + Math.random() * 900)}`
-    );
+    const [hydratedSettings, persistedMasterRates] = await Promise.all([
+      hydrateSettingsWithBranding(
+        blank.settings,
+        `PRJ-${new Date().getFullYear()}-MTO-${Math.floor(100 + Math.random() * 900)}`
+      ),
+      getPersistedRateProfile()
+    ]);
+
+    const finalSettings = { ...hydratedSettings };
+    if (persistedMasterRates) {
+      finalSettings.costRates = persistedMasterRates;
+      setMasterRates(persistedMasterRates);
+    }
 
     setState({
       ...blank,
-      settings: hydratedSettings,
+      settings: finalSettings,
     });
   }, []);
 
@@ -243,6 +281,7 @@ export default function App() {
           height: newSettings.defaultWallHeight,
         }));
       }
+
       return {
         ...prev,
         walls: updatedWalls,
@@ -456,7 +495,18 @@ export default function App() {
         isOpen={isRateModalOpen}
         onClose={() => setIsRateModalOpen(false)}
         rates={costRates}
-        onSaveRates={setCostRates}
+        masterRates={masterRates}
+        onSaveMasterRates={(newMaster) => setMasterRates(newMaster)}
+        onSaveRates={async (newRates) => {
+          // Sync rates into state settings to ensure project consistency
+          setState(prev => ({
+            ...prev,
+            settings: {
+              ...prev.settings,
+              costRates: newRates
+            }
+          }));
+        }}
       />
 
       {/* In-App Project Directory & Local Storage Manager Modal */}

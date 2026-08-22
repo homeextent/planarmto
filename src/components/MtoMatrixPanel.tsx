@@ -518,7 +518,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
             <button
               onClick={onOpenRateModal}
               className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-sky-400 hover:text-sky-300 rounded-md text-xs font-semibold flex items-center gap-1 border border-slate-700 cursor-pointer transition-colors"
-              title="Edit Material & Labor Unit Rates"
+              title="Project Unit Rates (Cost Model)"
             >
               <SlidersHorizontal className="w-3 h-3" />
               <span>Rates</span>

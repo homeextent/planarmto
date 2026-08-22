@@ -1,9 +1,10 @@
-import { CompanyBranding, FloorplanState, ProjectSettings } from '../types';
+import { CompanyBranding, FloorplanState, ProjectSettings, UnitCostRates } from '../types';
 import { calculateMTO, calculateEstimatedCost, DEFAULT_UNIT_COST_RATES } from '../engine/estimator';
 
 const BRANDING_STORAGE_KEY = 'planarmto_company_branding_v1';
 const PROJECTS_DIRECTORY_KEY = 'planarmto_saved_projects_v1';
 const AUTOSAVE_STORAGE_KEY = 'planarmto_autosave_state_v1';
+const GLOBAL_RATES_STORAGE_KEY = 'planarmto_global_rates';
 
 export interface SavedProjectEntry {
   id: string | number; // WP IDs are numbers, local IDs are strings
@@ -99,6 +100,54 @@ export async function getPersistedBranding(): Promise<CompanyBranding | null> {
     return JSON.parse(raw) as CompanyBranding;
   } catch (err) {
     console.warn('Unable to read company branding from localStorage:', err);
+    return null;
+  }
+}
+
+/**
+ * Persists global master rate presets.
+ */
+export async function savePersistedRateProfile(rates: UnitCostRates): Promise<void> {
+  if (isWP()) {
+    try {
+      await wpFetch('rates', {
+        method: 'POST',
+        body: JSON.stringify(rates),
+      });
+      return;
+    } catch (err) {
+      console.warn('WP Rates save failed, falling back to local:', err);
+    }
+  }
+
+  try {
+    localStorage.setItem(GLOBAL_RATES_STORAGE_KEY, JSON.stringify(rates));
+  } catch (err) {
+    console.warn('Unable to persist global rates to localStorage:', err);
+  }
+}
+
+/**
+ * Retrieves persisted global master rate presets.
+ */
+export async function getPersistedRateProfile(): Promise<UnitCostRates | null> {
+  if (isWP()) {
+    try {
+      const rates = await wpFetch<UnitCostRates | any[]>('rates');
+      // If it returns an empty array, it means no meta found
+      if (Array.isArray(rates) && rates.length === 0) return null;
+      return rates as UnitCostRates;
+    } catch (err) {
+      console.warn('WP Rates fetch failed, falling back to local:', err);
+    }
+  }
+
+  try {
+    const raw = localStorage.getItem(GLOBAL_RATES_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as UnitCostRates;
+  } catch (err) {
+    console.warn('Unable to read global rates from localStorage:', err);
     return null;
   }
 }

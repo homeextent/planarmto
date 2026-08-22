@@ -16,13 +16,19 @@ import {
   Home,
   Save,
   HelpCircle,
+  RefreshCw,
+  Star,
 } from 'lucide-react';
+
+import { getPersistedRateProfile, savePersistedRateProfile } from '../utils/storage';
 
 interface RateCustomizerModalProps {
   isOpen: boolean;
   onClose: () => void;
   rates: UnitCostRates;
   onSaveRates: (newRates: UnitCostRates) => void;
+  masterRates: UnitCostRates | null;
+  onSaveMasterRates: (newMaster: UnitCostRates) => void;
 }
 
 interface RateFieldConfig {
@@ -92,14 +98,17 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
   onClose,
   rates,
   onSaveRates,
+  masterRates,
+  onSaveMasterRates,
 }) => {
   const [localRates, setLocalRates] = useState<UnitCostRates>(rates || DEFAULT_UNIT_COST_RATES);
   const [selectedCategory, setSelectedCategory] = useState<string>('All Categories');
   const [globalLaborMultiplier, setGlobalLaborMultiplier] = useState<string>('0');
   const [globalMaterialMultiplier, setGlobalMaterialMultiplier] = useState<string>('0');
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    if (rates) {
+    if (rates && isOpen) {
       setLocalRates(rates);
     }
   }, [rates, isOpen]);
@@ -141,6 +150,38 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
     setLocalRates(updated);
     setGlobalLaborMultiplier('0');
     setGlobalMaterialMultiplier('0');
+  };
+
+  const handleSyncWithMaster = async () => {
+    try {
+      const masterRates = await getPersistedRateProfile();
+      if (masterRates) {
+        setLocalRates(masterRates as UnitCostRates);
+        setSyncStatus('Rates updated to master profile!');
+        setTimeout(() => setSyncStatus(null), 3000);
+      } else {
+        setSyncStatus('No master rates found.');
+        setTimeout(() => setSyncStatus(null), 3000);
+      }
+    } catch (err) {
+      console.error('Sync failed:', err);
+      setSyncStatus('Sync failed.');
+      setTimeout(() => setSyncStatus(null), 3000);
+    }
+  };
+
+  const handleSaveAsMaster = async () => {
+    try {
+      await savePersistedRateProfile(localRates);
+      onSaveMasterRates(localRates); // Update global masterRates in App.tsx
+      onSaveRates(localRates); // ALSO update active project rates in App.tsx
+      setSyncStatus('Saved as Master & Applied to Project!');
+      setTimeout(() => setSyncStatus(null), 3000);
+    } catch (err) {
+      console.error('Save master failed:', err);
+      setSyncStatus('Save failed.');
+      setTimeout(() => setSyncStatus(null), 3000);
+    }
   };
 
   const handleSave = () => {
@@ -326,12 +367,36 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
 
         {/* Modal Footer */}
         <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between shrink-0">
-          <div className="text-xs text-slate-400 flex items-center gap-1.5">
-            <HelpCircle className="w-4 h-4 text-slate-500" />
-            <span>Rates apply live to MTO Matrix subtotals, export spreadsheets, and printable take-offs.</span>
+          <div className="flex items-center gap-4">
+            <div className="text-xs text-slate-400 flex items-center gap-1.5">
+              <HelpCircle className="w-4 h-4 text-slate-500" />
+              <span>Project rates are isolated to this plan.</span>
+            </div>
+            {syncStatus && (
+              <span className="text-[10px] text-emerald-400 font-bold animate-pulse uppercase tracking-wider">
+                {syncStatus}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={handleSyncWithMaster}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-sky-400 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700 cursor-pointer transition-colors"
+              title="Pull master rates from database into this project"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Sync Master</span>
+            </button>
+            <button
+              onClick={handleSaveAsMaster}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700 cursor-pointer transition-colors"
+              title="Save these current rates as the new global master template"
+            >
+              <Star className="w-3.5 h-3.5" />
+              <span>Save as Master</span>
+            </button>
+            <div className="w-px h-6 bg-slate-800 mx-1" />
             <button
               onClick={onClose}
               className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
@@ -343,7 +408,7 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
               className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 cursor-pointer transition-colors"
             >
               <Save className="w-4 h-4" />
-              <span>Save & Recalculate Project</span>
+              <span>Apply to Project</span>
             </button>
           </div>
         </div>

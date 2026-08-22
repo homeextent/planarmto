@@ -302,6 +302,20 @@ add_action('rest_api_init', function () {
         'callback' => 'planarmto_update_branding',
         'permission_callback' => 'planarmto_rest_permission_check',
     ]);
+
+    // GET Rates
+    register_rest_route('planarmto/v1', '/rates', [
+        'methods'  => 'GET',
+        'callback' => 'planarmto_get_rates',
+        'permission_callback' => 'planarmto_rest_permission_check',
+    ]);
+
+    // POST Rates
+    register_rest_route('planarmto/v1', '/rates', [
+        'methods'  => 'POST',
+        'callback' => 'planarmto_update_rates',
+        'permission_callback' => 'planarmto_rest_permission_check',
+    ]);
 });
 
 /**
@@ -411,5 +425,22 @@ function planarmto_update_branding($request) {
     $tenant_id = get_current_user_id();
     $params = $request->get_json_params();
     update_user_meta($tenant_id, 'planarmto_company_branding', $params);
+    return rest_ensure_response(['success' => true]);
+}
+
+/**
+ * Rates Callbacks
+ */
+
+function planarmto_get_rates() {
+    $user_id = get_current_user_id();
+    $rates = get_user_meta($user_id, 'planarmto_global_rates', true);
+    return rest_ensure_response($rates ?: []);
+}
+
+function planarmto_update_rates($request) {
+    $user_id = get_current_user_id();
+    $params = $request->get_json_params();
+    update_user_meta($user_id, 'planarmto_global_rates', $params);
     return rest_ensure_response(['success' => true]);
 }

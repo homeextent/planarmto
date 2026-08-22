@@ -431,7 +431,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           <button
             onClick={onOpenRateModal}
             className="p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-400 hover:text-amber-300 rounded-lg transition-colors cursor-pointer"
-            title="Custom Material & Labor Rates"
+            title="Project Unit Rates (Cost Model)"
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
           </button>

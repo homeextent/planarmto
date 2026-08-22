@@ -30,6 +30,7 @@ import {
   Phone,
   User,
   Hash,
+  RefreshCw,
 } from 'lucide-react';
 
 interface GlobalProjectSettingsModalProps {
@@ -50,6 +51,7 @@ export const GlobalProjectSettingsModal: React.FC<GlobalProjectSettingsModalProp
   const [activeTab, setActiveTab] = useState<'general' | 'engine' | 'financial' | 'inclusions' | 'branding'>('general');
   const [formSettings, setFormSettings] = useState<ProjectSettings>({ ...settings });
   const [cascadeToAllWalls, setCascadeToAllWalls] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
