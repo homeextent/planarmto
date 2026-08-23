@@ -12,6 +12,7 @@ import {
   RoomPolygon,
 } from '../types';
 import { DEFAULT_UNIT_COST_RATES } from '../constants/rates';
+export { DEFAULT_UNIT_COST_RATES };
 import {
   classifyWalls,
   getWallGeometry,
