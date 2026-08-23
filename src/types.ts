@@ -215,6 +215,7 @@ export interface UnitCostRates {
   garageDoorPerBay: CostRateItem;
   doorHardwarePerSet: CostRateItem;
   switchPerUnit: CostRateItem;
+  switchDimmer: CostRateItem;
   switch3Way: CostRateItem;
   electricalPanelMain100A: CostRateItem;
   electricalPanelMain200A: CostRateItem;
@@ -227,6 +228,7 @@ export interface UnitCostRates {
   soffitLight: CostRateItem;
   outletPerUnit: CostRateItem;
   gfciPerUnit: CostRateItem;
+  outlet240v: CostRateItem;
   evChargerPerUnit: CostRateItem;
   potlightPerUnit: CostRateItem;
   plumbingPerFixture: CostRateItem;
@@ -240,6 +242,7 @@ export interface UnitCostRates {
   exhaustFanPerUnit: CostRateItem;
   rangeHoodPerUnit: CostRateItem;
   smokeAlarmPerUnit: CostRateItem;
+  waterHeaterPerUnit: CostRateItem;
   utilityTrenchPerLf: CostRateItem;
   soffitPerLf: CostRateItem;
   fasciaPerLf: CostRateItem;

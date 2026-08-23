@@ -42,6 +42,7 @@ export const DEFAULT_UNIT_COST_RATES: UnitCostRates = {
   garageDoorPerBay: { material: 950.0, labor: 500.0 },
   doorHardwarePerSet: { material: 32.0, labor: 16.0 },
   switchPerUnit: { material: 8.0, labor: 24.0 },
+  switchDimmer: { material: 25.0, labor: 35.0 },
   switch3Way: { material: 18.0, labor: 35.0 },
   electricalPanelMain100A: { material: 900.0, labor: 1200.0 },
   electricalPanelMain200A: { material: 1200.0, labor: 1500.0 },
@@ -54,6 +55,7 @@ export const DEFAULT_UNIT_COST_RATES: UnitCostRates = {
   soffitLight: { material: 30.0, labor: 40.0 },
   outletPerUnit: { material: 6.0, labor: 22.0 },
   gfciPerUnit: { material: 22.0, labor: 30.0 },
+  outlet240v: { material: 65.0, labor: 95.0 },
   evChargerPerUnit: { material: 280.0, labor: 200.0 },
   potlightPerUnit: { material: 25.0, labor: 40.0 },
   plumbingPerFixture: { material: 220.0, labor: 230.0 },
@@ -67,6 +69,7 @@ export const DEFAULT_UNIT_COST_RATES: UnitCostRates = {
   exhaustFanPerUnit: { material: 85.0, labor: 55.0 },
   rangeHoodPerUnit: { material: 220.0, labor: 100.0 },
   smokeAlarmPerUnit: { material: 35.0, labor: 30.0 },
+  waterHeaterPerUnit: { material: 450.0, labor: 350.0 },
   utilityTrenchPerLf: { material: 10.0, labor: 25.0 },
   soffitPerLf: { material: 4.5, labor: 5.0 },
   fasciaPerLf: { material: 3.5, labor: 4.5 },
@@ -830,8 +833,8 @@ export function calculateEstimatedCost(
   }
 
   if (itemInc.dimmers !== false) {
-    matElectrical += mto.dimmersUnits * (rates.switchPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.switchPerUnit.material) * 1.5 * wasteMultiplier;
-    labElectrical += mto.dimmersUnits * (rates.switchPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.switchPerUnit.labor) * 1.2 * wasteMultiplier;
+    matElectrical += mto.dimmersUnits * (rates.switchDimmer?.material ?? DEFAULT_UNIT_COST_RATES.switchDimmer.material) * wasteMultiplier;
+    labElectrical += mto.dimmersUnits * (rates.switchDimmer?.labor ?? DEFAULT_UNIT_COST_RATES.switchDimmer.labor) * wasteMultiplier;
   }
 
   if (itemInc.stdOutlets !== false) {
@@ -845,8 +848,8 @@ export function calculateEstimatedCost(
   }
 
   if (itemInc.heavyOutlets24v !== false) {
-    matElectrical += mto.heavyOutlets24vUnits * (rates.outletPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.outletPerUnit.material) * 2.5 * wasteMultiplier;
-    labElectrical += mto.heavyOutlets24vUnits * (rates.outletPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.outletPerUnit.labor) * 1.8 * wasteMultiplier;
+    matElectrical += mto.heavyOutlets24vUnits * (rates.outlet240v?.material ?? DEFAULT_UNIT_COST_RATES.outlet240v.material) * wasteMultiplier;
+    labElectrical += mto.heavyOutlets24vUnits * (rates.outlet240v?.labor ?? DEFAULT_UNIT_COST_RATES.outlet240v.labor) * wasteMultiplier;
   }
 
   if (itemInc.potlights !== false) {

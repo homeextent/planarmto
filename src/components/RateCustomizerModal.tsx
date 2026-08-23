@@ -68,6 +68,7 @@ const RATE_FIELDS: RateFieldConfig[] = [
 
   // 4. Electrical
   { key: 'switchPerUnit', label: 'Standard Light Switch (Decora)', unit: '$/Unit', category: 'Electrical & Lighting', description: 'Box, romex wire, switch, and coverplate' },
+  { key: 'switchDimmer', label: 'Dimmer Switch ($D)', unit: '$/Unit', category: 'Electrical & Lighting', description: 'Variable voltage dimmer control device and wiring' },
   { key: 'switch3Way', label: '3-Way Switch ($3W)', unit: '$/Unit', category: 'Electrical & Lighting', description: 'Dual switch control wiring and devices' },
   { key: 'electricalPanelMain100A', label: 'Main Panel - 100A', unit: '$/Unit', category: 'Electrical & Lighting', description: '100A Service entrance and breaker panel' },
   { key: 'electricalPanelMain200A', label: 'Main Panel - 200A', unit: '$/Unit', category: 'Electrical & Lighting', description: '200A Service entrance and breaker panel' },
@@ -80,6 +81,7 @@ const RATE_FIELDS: RateFieldConfig[] = [
   { key: 'soffitLight', label: 'Exterior Soffit / Eaves Light', unit: '$/Unit', category: 'Electrical & Lighting', description: 'Recessed soffit potlight' },
   { key: 'outletPerUnit', label: '120V Standard Duplex Outlet', unit: '$/Unit', category: 'Electrical & Lighting', description: '15A/20A tamper-resistant outlet box and wiring' },
   { key: 'gfciPerUnit', label: 'GFCI Wet Location Outlet', unit: '$/Unit', category: 'Electrical & Lighting', description: 'Bath/kitchen GFCI circuit breaker/receptacle' },
+  { key: 'outlet240v', label: '240V Heavy Outlet (Dryer / Range / HVAC)', unit: '$/Unit', category: 'Electrical & Lighting', description: 'High-voltage dedicated circuit for appliances' },
   { key: 'evChargerPerUnit', label: 'EV Level 2 Fast Charger', unit: '$/Unit', category: 'Electrical & Lighting', description: '50A breaker, 6/3 wire run, and Wallbox/NEMA 14-50 outlet' },
   { key: 'potlightPerUnit', label: 'Slim LED Potlight / Sconce', unit: '$/Unit', category: 'Electrical & Lighting', description: 'Recessed canless LED with junction box' },
   { key: 'ceilingFanPerUnit', label: 'Ceiling Fan & Light Combo', unit: '$/Unit', category: 'Electrical & Lighting', description: 'Heavy-duty ceiling box and fan assembly' },
@@ -89,6 +91,7 @@ const RATE_FIELDS: RateFieldConfig[] = [
 
   // 5. Plumbing & Civil
   { key: 'plumbingPerFixture', label: 'Plumbing Fixture Rough-in & Trim', unit: '$/Fixture', category: 'Plumbing & Mechanical', description: 'Toilet, vanity sink, shower valve, or tub waste & vent rough-in' },
+  { key: 'waterHeaterPerUnit', label: 'Water Heater / Boiler System', unit: '$/Unit', category: 'Plumbing & Mechanical', description: 'Tank or tankless heater installation and connections' },
   { key: 'utilityTrenchPerLf', label: 'Civil / Utility Trenching', unit: '$/LF', category: 'Plumbing & Mechanical', description: 'Excavation, sand bed, conduit, and backfill' },
 
   // 6. Concrete

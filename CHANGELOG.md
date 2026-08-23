@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Electrical Panel Placement & Safety**: Resolved canvas placement white screen crash by adding default property initialization (`panelType: 'main'`, `panelAmperage: '200A'`) and fallback rate key lookups.
 - **Sconce & Exterior Light Canvas Placement**: Fixed tool handlers in `CadCanvas.tsx` to enable direct canvas click placement for all light fixture stamps.
 - **Passive Event Listener Fix**: Registered native { passive: false } event listeners on the canvas container for wheel and touchmove events to eliminate browser console preventDefault warnings during pan and zoom interactions.
+- **Missing Rate Fields Sync**: Added missing switchDimmer, outlet240v, and waterHeaterPerUnit field configurations to RateCustomizerModal.tsx and the estimation engine, ensuring 100% field coverage across trade rate cards, print schedules, and CSV exports.
 
 ---
 
