@@ -11,6 +11,7 @@ import {
   Aperture,
   RoomPolygon,
 } from '../types';
+import { DEFAULT_UNIT_COST_RATES } from '../constants/rates';
 import {
   classifyWalls,
   getWallGeometry,
@@ -22,61 +23,6 @@ import {
   getVariableOffsetPolygon,
   getCoreThickness,
 } from './cadMath';
-
-export const DEFAULT_UNIT_COST_RATES: UnitCostRates = {
-  drywallPerSf: { material: 2.25, labor: 1.0 },
-  paintPerSf: { material: 0.5, labor: 0.65 },
-  flooringPerSf: { material: 4.25, labor: 2.25 },
-  extInsulationPerSf: { material: 1.1, labor: 0.75 },
-  studFramingPerLf: { material: 2.6, labor: 2.2 },
-  osbSubfloorPerSf: { material: 1.95, labor: 1.25 },
-  beamPerLf: { material: 16.0, labor: 12.0 },
-  postPerUnit: { material: 85.0, labor: 60.0 },
-  baseboardPerLf: { material: 1.75, labor: 2.0 },
-  casingPerLf: { material: 2.0, labor: 2.2 },
-  stairRiserPerUnit: { material: 35.0, labor: 30.0 },
-  windowPerUnit: { material: 270.0, labor: 110.0 },
-  passageDoorPerUnit: { material: 135.0, labor: 85.0 },
-  pocketDoorPerUnit: { material: 200.0, labor: 140.0 },
-  exteriorDoorPerUnit: { material: 550.0, labor: 300.0 },
-  garageDoorPerBay: { material: 950.0, labor: 500.0 },
-  doorHardwarePerSet: { material: 32.0, labor: 16.0 },
-  switchPerUnit: { material: 8.0, labor: 24.0 },
-  switchDimmer: { material: 25.0, labor: 35.0 },
-  switch3Way: { material: 18.0, labor: 35.0 },
-  electricalPanelMain100A: { material: 900.0, labor: 1200.0 },
-  electricalPanelMain200A: { material: 1200.0, labor: 1500.0 },
-  electricalPanelMain400A: { material: 2800.0, labor: 3200.0 },
-  electricalPanelSub60A: { material: 350.0, labor: 500.0 },
-  electricalPanelSub100A: { material: 450.0, labor: 650.0 },
-  electricalPanelSub125A: { material: 550.0, labor: 750.0 },
-  fixtureSconce: { material: 35.0, labor: 45.0 },
-  exteriorCoachLight: { material: 45.0, labor: 55.0 },
-  soffitLight: { material: 30.0, labor: 40.0 },
-  outletPerUnit: { material: 6.0, labor: 22.0 },
-  gfciPerUnit: { material: 22.0, labor: 30.0 },
-  outlet240v: { material: 65.0, labor: 95.0 },
-  evChargerPerUnit: { material: 280.0, labor: 200.0 },
-  potlightPerUnit: { material: 25.0, labor: 40.0 },
-  plumbingPerFixture: { material: 220.0, labor: 230.0 },
-  concretePerCy: { material: 115.0, labor: 60.0 },
-  pierPerUnit: { material: 180.0, labor: 140.0 },
-  roofingPerSq: { material: 180.0, labor: 160.0 },
-  sidingPerSf: { material: 3.75, labor: 3.5 },
-  deckingPerSf: { material: 10.5, labor: 8.0 },
-  // Extra MEP & Envelope
-  ceilingFanPerUnit: { material: 125.0, labor: 60.0 },
-  exhaustFanPerUnit: { material: 85.0, labor: 55.0 },
-  rangeHoodPerUnit: { material: 220.0, labor: 100.0 },
-  smokeAlarmPerUnit: { material: 35.0, labor: 30.0 },
-  waterHeaterPerUnit: { material: 450.0, labor: 350.0 },
-  utilityTrenchPerLf: { material: 10.0, labor: 25.0 },
-  soffitPerLf: { material: 4.5, labor: 5.0 },
-  fasciaPerLf: { material: 3.5, labor: 4.5 },
-  eavestroughPerLf: { material: 5.5, labor: 6.5 },
-  deckRailingPerLf: { material: 22.0, labor: 20.0 },
-  hardscapePerSf: { material: 6.5, labor: 7.5 },
-};
 
 /**
  * Deep merges loaded rates over default rates to ensure no missing properties
@@ -123,8 +69,11 @@ export function calculateMTO(state: FloorplanState): MTOReport {
 
   let totalWallStudFramingLf = 0;
   let totalStudCount = 0;
-  let totalDrywallBoardSf = 0;
+  let totalDrywall12Sf = 0;
+  let totalDrywall58Sf = 0;
+  let totalDrywallGreenboard12Sf = 0;
   let totalExtWallInsulationSf = 0;
+  let totalResilientChannelLf = 0;
   let totalPrimarySidingSf = 0;
   let totalStoneBrickVeneerSf = 0;
   let totalExteriorWallLf = 0;
@@ -193,16 +142,13 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       drywallFaces = 2;
     }
 
-    const netDrywallForWall = 0; // Moved to room-based calculation for interior precision
-    totalDrywallBoardSf += netDrywallForWall;
-
     wallDetails.push({
       wallId: wall.id,
       length: Math.round(wallLength * 100) / 100,
       height: wallHeight,
       grossArea: Math.round(grossArea * 100) / 100,
       apertureDeduction: Math.round(apertureTotalArea * 100) / 100,
-      netDrywallArea: Math.round(netDrywallForWall * 100) / 100,
+      netDrywallArea: 0, // No longer tracked per wall, calculated per room face
       classification,
       adjacentRoomsCount,
       studsCalculated: studsInWall,
@@ -249,7 +195,15 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     });
 
     const roomWallDrywallArea = Math.max(0, roomWallPerimeterExcludingFoundation * (room.ceilingHeight || settings.defaultWallHeight) - roomApertureArea);
-    totalDrywallBoardSf += roomWallDrywallArea;
+    
+    const wallDrywallType = room.wallDrywallType || 'drywall_12';
+    if (wallDrywallType === 'drywall_58') {
+      totalDrywall58Sf += roomWallDrywallArea;
+    } else if (wallDrywallType === 'drywall_greenboard_12') {
+      totalDrywallGreenboard12Sf += roomWallDrywallArea;
+    } else {
+      totalDrywall12Sf += roomWallDrywallArea;
+    }
 
     // Check if it's a foundation room
     let isFoundationRoom = false;
@@ -265,8 +219,17 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     const ceilingMultiplier = room.ceilingMultiplier || 1.0;
     const effectiveCeilingArea = netArea * ceilingMultiplier;
 
-    if (room.hasCeilingDrywall !== false && !isFoundationRoom) {
-      totalCeilingDrywallSf += effectiveCeilingArea;
+    if (room.includeCeilingDrywall !== false && !isFoundationRoom) {
+      const ceilingDrywallType = room.ceilingDrywallType || 'drywall_12';
+      if (ceilingDrywallType === 'drywall_58') {
+        totalDrywall58Sf += effectiveCeilingArea;
+      } else {
+        totalDrywall12Sf += effectiveCeilingArea;
+      }
+
+      if (room.includeResilientChannel) {
+        totalResilientChannelLf += Math.ceil(effectiveCeilingArea * 0.90);
+      }
     }
 
     // Door width deductions for baseboard
@@ -296,7 +259,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       perimeter: Math.round(netPerimeter * 100) / 100,
       floorFinish: room.floorFinish,
       baseboardLf: Math.round(roomBaseboard * 100) / 100,
-      hasCeilingDrywall: room.hasCeilingDrywall !== false && !isFoundationRoom,
+      hasCeilingDrywall: room.includeCeilingDrywall !== false && !isFoundationRoom,
     });
   });
 
@@ -337,9 +300,12 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     totalOsbSubfloorDeckingSf += subfloorArea;
   });
 
-  // Add ceiling drywall to total drywall board
-  totalDrywallBoardSf += totalCeilingDrywallSf;
+  // Grand total drywall for paint coverage
+  const totalDrywallBoardSf = totalDrywall12Sf + totalDrywall58Sf + totalDrywallGreenboard12Sf;
   const totalPaintCoverageSf = totalDrywallBoardSf; // Standard 1-to-1 paintable surface
+
+  const rcRate = settings.costRates?.resilientChannelPerLf || DEFAULT_UNIT_COST_RATES.resilientChannelPerLf;
+  const resilientChannelCost = totalResilientChannelLf * (rcRate.material + rcRate.labor);
 
   // Apertures, Casing, and Door Hardware
   let totalWindowsUnits = 0;
@@ -606,10 +572,15 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     grossFootprintSf: Math.round(grossFootprintSf * 100) / 100,
     netFloorAreaSf: Math.round(totalFlooringPackageSf * 100) / 100,
 
+    drywall12Sf: Math.round(totalDrywall12Sf * 100) / 100,
+    drywall58Sf: Math.round(totalDrywall58Sf * 100) / 100,
+    drywallGreenboard12Sf: Math.round(totalDrywallGreenboard12Sf * 100) / 100,
     drywallBoardSf: Math.round(totalDrywallBoardSf * 100) / 100,
     paintCoverageSf: Math.round(totalPaintCoverageSf * 100) / 100,
     flooringPackageSf: Math.round(totalFlooringPackageSf * 100) / 100,
     extWallInsulationSf: Math.round(totalExtWallInsulationSf * 100) / 100,
+    resilientChannelLf: totalResilientChannelLf,
+    resilientChannelCost: Math.round(resilientChannelCost * 100) / 100,
 
     wallStudFramingLf: Math.round(totalWallStudFramingLf * 100) / 100,
     wallStudCount: totalStudCount,
@@ -726,8 +697,18 @@ export function calculateEstimatedCost(
 
   // 1. Finishes
   if (itemInc.drywallBoard !== false) {
-    matFinishes += mto.drywallBoardSf * (rates.drywallPerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.material) * wasteMultiplier;
-    labFinishes += mto.drywallBoardSf * (rates.drywallPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.labor) * wasteMultiplier;
+    if (mto.drywall12Sf > 0) {
+      matFinishes += mto.drywall12Sf * (rates.drywall12PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywall12PerSf.material) * wasteMultiplier;
+      labFinishes += mto.drywall12Sf * (rates.drywall12PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywall12PerSf.labor) * wasteMultiplier;
+    }
+    if (mto.drywall58Sf > 0) {
+      matFinishes += mto.drywall58Sf * (rates.drywall58PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywall58PerSf.material) * wasteMultiplier;
+      labFinishes += mto.drywall58Sf * (rates.drywall58PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywall58PerSf.labor) * wasteMultiplier;
+    }
+    if (mto.drywallGreenboard12Sf > 0) {
+      matFinishes += mto.drywallGreenboard12Sf * (rates.drywallGreenboard12PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallGreenboard12PerSf.material) * wasteMultiplier;
+      labFinishes += mto.drywallGreenboard12Sf * (rates.drywallGreenboard12PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallGreenboard12PerSf.labor) * wasteMultiplier;
+    }
   }
 
   if (itemInc.paintCoverage !== false) {
@@ -743,6 +724,11 @@ export function calculateEstimatedCost(
   if (itemInc.extWallInsulation !== false) {
     matFinishes += mto.extWallInsulationSf * (rates.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material) * wasteMultiplier;
     labFinishes += mto.extWallInsulationSf * (rates.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor) * wasteMultiplier;
+  }
+
+  if (mto.resilientChannelLf > 0) {
+    matFinishes += mto.resilientChannelLf * (rates.resilientChannelPerLf?.material ?? DEFAULT_UNIT_COST_RATES.resilientChannelPerLf.material) * wasteMultiplier;
+    labFinishes += mto.resilientChannelLf * (rates.resilientChannelPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.resilientChannelPerLf.labor) * wasteMultiplier;
   }
 
   // 2. Carpentry & Framing

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MTOReport, UnitCostRates, FloorplanState, CategoryInclusions, ItemInclusions } from '../types';
-import { calculateEstimatedCost, DEFAULT_UNIT_COST_RATES } from '../engine/estimator';
+import { calculateEstimatedCost } from '../engine/estimator';
+import { DEFAULT_UNIT_COST_RATES } from '../constants/rates';
 import {
   Layers,
   Hammer,
@@ -97,15 +98,39 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
       // 1. Finishes
       [
         '1. Board & Finishes',
-        'Drywall Board (Tape & Sand)',
-        mto.drywallBoardSf,
+        '1/2" Standard Drywall Board',
+        mto.drywall12Sf,
         'SF',
-        r.drywallPerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.material,
-        r.drywallPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.labor,
-        ((r.drywallPerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.material) + (r.drywallPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.labor)).toFixed(2),
-        (mto.drywallBoardSf * (r.drywallPerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.material)).toFixed(2),
-        (mto.drywallBoardSf * (r.drywallPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.labor)).toFixed(2),
-        (mto.drywallBoardSf * ((r.drywallPerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.material) + (r.drywallPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.labor))).toFixed(2),
+        r.drywall12PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywall12PerSf.material,
+        r.drywall12PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywall12PerSf.labor,
+        ((r.drywall12PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywall12PerSf.material) + (r.drywall12PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywall12PerSf.labor)).toFixed(2),
+        (mto.drywall12Sf * (r.drywall12PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywall12PerSf.material) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (mto.drywall12Sf * (r.drywall12PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywall12PerSf.labor) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (mto.drywall12Sf * ((r.drywall12PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywall12PerSf.material) + (r.drywall12PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywall12PerSf.labor)) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+      ],
+      [
+        '1. Board & Finishes',
+        '5/8" Type X Fire-Rated Board',
+        mto.drywall58Sf,
+        'SF',
+        r.drywall58PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywall58PerSf.material,
+        r.drywall58PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywall58PerSf.labor,
+        ((r.drywall58PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywall58PerSf.material) + (r.drywall58PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywall58PerSf.labor)).toFixed(2),
+        (mto.drywall58Sf * (r.drywall58PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywall58PerSf.material) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (mto.drywall58Sf * (r.drywall58PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywall58PerSf.labor) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (mto.drywall58Sf * ((r.drywall58PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywall58PerSf.material) + (r.drywall58PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywall58PerSf.labor)) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+      ],
+      [
+        '1. Board & Finishes',
+        '1/2" Moisture Board / Greenboard',
+        mto.drywallGreenboard12Sf,
+        'SF',
+        r.drywallGreenboard12PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallGreenboard12PerSf.material,
+        r.drywallGreenboard12PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallGreenboard12PerSf.labor,
+        ((r.drywallGreenboard12PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallGreenboard12PerSf.material) + (r.drywallGreenboard12PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallGreenboard12PerSf.labor)).toFixed(2),
+        (mto.drywallGreenboard12Sf * (r.drywallGreenboard12PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallGreenboard12PerSf.material) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (mto.drywallGreenboard12Sf * (r.drywallGreenboard12PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallGreenboard12PerSf.labor) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (mto.drywallGreenboard12Sf * ((r.drywallGreenboard12PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallGreenboard12PerSf.material) + (r.drywallGreenboard12PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallGreenboard12PerSf.labor)) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
       ],
       [
         '1. Board & Finishes',
@@ -142,6 +167,18 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         (mto.extWallInsulationSf * (r.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material)).toFixed(2),
         (mto.extWallInsulationSf * (r.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor)).toFixed(2),
         (mto.extWallInsulationSf * ((r.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material) + (r.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor))).toFixed(2),
+      ],
+      [
+        '1. Board & Finishes',
+        'Resilient Channel (RC-1)',
+        mto.resilientChannelLf,
+        'LF',
+        r.resilientChannelPerLf?.material ?? DEFAULT_UNIT_COST_RATES.resilientChannelPerLf.material,
+        r.resilientChannelPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.resilientChannelPerLf.labor,
+        ((r.resilientChannelPerLf?.material ?? DEFAULT_UNIT_COST_RATES.resilientChannelPerLf.material) + (r.resilientChannelPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.resilientChannelPerLf.labor)).toFixed(2),
+        (mto.resilientChannelLf * (r.resilientChannelPerLf?.material ?? DEFAULT_UNIT_COST_RATES.resilientChannelPerLf.material)).toFixed(2),
+        (mto.resilientChannelLf * (r.resilientChannelPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.resilientChannelPerLf.labor)).toFixed(2),
+        (mto.resilientChannelLf * ((r.resilientChannelPerLf?.material ?? DEFAULT_UNIT_COST_RATES.resilientChannelPerLf.material) + (r.resilientChannelPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.resilientChannelPerLf.labor))).toFixed(2),
       ],
 
       // 2. Carpentry
@@ -725,21 +762,57 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
 
           {!collapsedSections.section1 && (
             <div className="p-2.5 pt-0 border-t border-slate-800/60 space-y-1.5 text-xs">
-              <MetricRow
-                label="Drywall Board"
-                value={mto.drywallBoardSf}
-                unit="SF"
-                subtext="Net walls + ceilings"
-                cost={
-                  isIncluded('finishes') && isItemIncluded('drywallBoard')
-                    ? mto.drywallBoardSf * ((activeRates.drywallPerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.material) + (activeRates.drywallPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.labor))
-                    : 0
-                }
-                isCategoryExcluded={!isIncluded('finishes')}
-                itemKey="drywallBoard"
-                isItemExcluded={!isItemIncluded('drywallBoard')}
-                onToggleItem={onToggleItemInclusion}
-              />
+              {mto.drywall12Sf > 0 && (
+                <MetricRow
+                  label='1/2" Standard Drywall Board'
+                  value={mto.drywall12Sf}
+                  unit="SF"
+                  subtext="Walls & Ceiling"
+                  cost={
+                    isIncluded('finishes') && isItemIncluded('drywallBoard')
+                      ? mto.drywall12Sf * ((activeRates.drywall12PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywall12PerSf.material) + (activeRates.drywall12PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywall12PerSf.labor)) * (1 + state.settings.wasteFactorPercentage / 100)
+                      : 0
+                  }
+                  isCategoryExcluded={!isIncluded('finishes')}
+                  itemKey="drywallBoard"
+                  isItemExcluded={!isItemIncluded('drywallBoard')}
+                  onToggleItem={onToggleItemInclusion}
+                />
+              )}
+              {mto.drywall58Sf > 0 && (
+                <MetricRow
+                  label='5/8" Type X Fire-Rated Board'
+                  value={mto.drywall58Sf}
+                  unit="SF"
+                  subtext="Fire-rated assembly"
+                  cost={
+                    isIncluded('finishes') && isItemIncluded('drywallBoard')
+                      ? mto.drywall58Sf * ((activeRates.drywall58PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywall58PerSf.material) + (activeRates.drywall58PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywall58PerSf.labor)) * (1 + state.settings.wasteFactorPercentage / 100)
+                      : 0
+                  }
+                  isCategoryExcluded={!isIncluded('finishes')}
+                  itemKey="drywallBoard"
+                  isItemExcluded={!isItemIncluded('drywallBoard')}
+                  onToggleItem={onToggleItemInclusion}
+                />
+              )}
+              {mto.drywallGreenboard12Sf > 0 && (
+                <MetricRow
+                  label='1/2" Moisture Board / Greenboard'
+                  value={mto.drywallGreenboard12Sf}
+                  unit="SF"
+                  subtext="Greenboard"
+                  cost={
+                    isIncluded('finishes') && isItemIncluded('drywallBoard')
+                      ? mto.drywallGreenboard12Sf * ((activeRates.drywallGreenboard12PerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallGreenboard12PerSf.material) + (activeRates.drywallGreenboard12PerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallGreenboard12PerSf.labor)) * (1 + state.settings.wasteFactorPercentage / 100)
+                      : 0
+                  }
+                  isCategoryExcluded={!isIncluded('finishes')}
+                  itemKey="drywallBoard"
+                  isItemExcluded={!isItemIncluded('drywallBoard')}
+                  onToggleItem={onToggleItemInclusion}
+                />
+              )}
               <MetricRow
                 label="Paint Coverage"
                 value={mto.paintCoverageSf}
@@ -784,6 +857,20 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 isItemExcluded={!isItemIncluded('extWallInsulation')}
                 onToggleItem={onToggleItemInclusion}
               />
+              {mto.resilientChannelLf > 0 && (
+                <MetricRow
+                  label="Resilient Channel (RC-1)"
+                  value={mto.resilientChannelLf}
+                  unit="LF"
+                  subtext="Ceiling grid sound bar"
+                  cost={
+                    isIncluded('finishes')
+                      ? mto.resilientChannelLf * ((activeRates.resilientChannelPerLf?.material ?? DEFAULT_UNIT_COST_RATES.resilientChannelPerLf.material) + (activeRates.resilientChannelPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.resilientChannelPerLf.labor))
+                      : 0
+                  }
+                  isCategoryExcluded={!isIncluded('finishes')}
+                />
+              )}
             </div>
           )}
         </div>

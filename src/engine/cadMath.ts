@@ -568,7 +568,8 @@ export function detectRoomFaces(
       centroid,
       floorFinish: floorFinish!,
       ceilingHeight,
-      hasCeilingDrywall: existing?.hasCeilingDrywall ?? !isFoundationRoom,
+      includeCeilingDrywall: existing?.includeCeilingDrywall ?? !isFoundationRoom,
+      includeResilientChannel: existing?.includeResilientChannel ?? true,
     };
   });
 

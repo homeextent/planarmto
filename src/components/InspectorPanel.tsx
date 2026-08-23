@@ -389,9 +389,30 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
       onChange({ ...state, rooms: updatedRooms, walls: updatedWalls });
     };
 
-    const handleCeilingDrywallToggle = (hasCeilingDrywall: boolean) => {
+    const handleWallDrywallTypeChange = (wallDrywallType: 'drywall_12' | 'drywall_58' | 'drywall_greenboard_12') => {
       const updatedRooms = state.rooms.map((r) =>
-        r.id === room.id ? { ...r, hasCeilingDrywall } : r
+        r.id === room.id ? { ...r, wallDrywallType } : r
+      );
+      onChange({ ...state, rooms: updatedRooms });
+    };
+
+    const handleCeilingDrywallTypeChange = (ceilingDrywallType: 'drywall_12' | 'drywall_58') => {
+      const updatedRooms = state.rooms.map((r) =>
+        r.id === room.id ? { ...r, ceilingDrywallType } : r
+      );
+      onChange({ ...state, rooms: updatedRooms });
+    };
+
+    const handleCeilingDrywallToggle = (includeCeilingDrywall: boolean) => {
+      const updatedRooms = state.rooms.map((r) =>
+        r.id === room.id ? { ...r, includeCeilingDrywall, includeResilientChannel: includeCeilingDrywall ? true : false } : r
+      );
+      onChange({ ...state, rooms: updatedRooms });
+    };
+
+    const handleResilientChannelToggle = (includeResilientChannel: boolean) => {
+      const updatedRooms = state.rooms.map((r) =>
+        r.id === room.id ? { ...r, includeResilientChannel } : r
       );
       onChange({ ...state, rooms: updatedRooms });
     };
@@ -529,6 +550,24 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             </select>
           </div>
 
+          <div className="pt-2 border-t border-slate-800">
+            <div className="text-[10px] uppercase font-bold text-sky-400 mb-2">Wall Options</div>
+            <div>
+              <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                Wall Drywall Type
+              </label>
+              <select
+                value={room.wallDrywallType || 'drywall_12'}
+                onChange={(e) => handleWallDrywallTypeChange(e.target.value as any)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+              >
+                <option value="drywall_12">1/2" Standard Board</option>
+                <option value="drywall_58">5/8" Type X Fire-Rated</option>
+                <option value="drywall_greenboard_12">1/2" Moisture Board (Greenboard)</option>
+              </select>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-2 bg-slate-950/70 p-2 rounded-xl border border-slate-800">
             <div>
               <div className="text-[10px] text-slate-400 uppercase font-medium">Net Floor Area</div>
@@ -551,50 +590,81 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             </div>
           </div>
 
-          <div className="space-y-2 pt-1 border-t border-slate-800">
-            <label className="flex items-center gap-2 cursor-pointer text-slate-300 text-xs">
-              <input
-                type="checkbox"
-                checked={room.hasCeilingDrywall ?? true}
-                onChange={(e) => handleCeilingDrywallToggle(e.target.checked)}
-                className="rounded bg-slate-950 border-slate-700 text-sky-500"
-              />
-              <span>Include Ceiling Drywall & Paint</span>
-            </label>
+          <div className="pt-2 border-t border-slate-800">
+            <div className="text-[10px] uppercase font-bold text-sky-400 mb-2">Ceiling Options</div>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer text-slate-300 text-xs">
+                <input
+                  type="checkbox"
+                  checked={room.includeCeilingDrywall ?? true}
+                  onChange={(e) => handleCeilingDrywallToggle(e.target.checked)}
+                  className="rounded bg-slate-950 border-slate-700 text-sky-500"
+                />
+                <span>Include Ceiling Drywall & Paint</span>
+              </label>
 
-            {room.hasCeilingDrywall !== false && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                    Ceiling Profile
+              {room.includeCeilingDrywall !== false && (
+                <div className="pl-6 space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-300 text-[11px]">
+                    <input
+                      type="checkbox"
+                      checked={room.includeResilientChannel || false}
+                      onChange={(e) => handleResilientChannelToggle(e.target.checked)}
+                      className="rounded bg-slate-950 border-slate-700 text-sky-500"
+                    />
+                    <span>Include Resilient Channel (RC-1)</span>
                   </label>
-                  <select
-                    value={room.ceilingType || 'flat'}
-                    onChange={(e) => handleCeilingTypeChange(e.target.value as CeilingType)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-sky-500"
-                  >
-                    <option value="flat">Flat (1.00x)</option>
-                    <option value="vaulted">Vaulted (1.18x)</option>
-                    <option value="tray">Tray (1.25x)</option>
-                    <option value="coffered">Coffered (1.45x)</option>
-                    <option value="custom">Custom</option>
-                  </select>
+
+                  <div className="mt-2">
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                      Ceiling Drywall Type
+                    </label>
+                    <select
+                      value={room.ceilingDrywallType || 'drywall_12'}
+                      onChange={(e) => handleCeilingDrywallTypeChange(e.target.value as any)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-sky-500"
+                    >
+                      <option value="drywall_12">1/2" Standard Board</option>
+                      <option value="drywall_58">5/8" Type X Fire-Rated</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                    Area Multiplier
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="1.0"
-                    value={room.ceilingMultiplier || 1.0}
-                    onChange={(e) => handleCeilingMultiplierChange(parseFloat(e.target.value) || 1.0)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-200 font-mono focus:border-sky-500"
-                  />
+              )}
+
+              {room.includeCeilingDrywall !== false && (
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                      Ceiling Profile
+                    </label>
+                    <select
+                      value={room.ceilingType || 'flat'}
+                      onChange={(e) => handleCeilingTypeChange(e.target.value as CeilingType)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-sky-500"
+                    >
+                      <option value="flat">Flat (1.00x)</option>
+                      <option value="vaulted">Vaulted (1.18x)</option>
+                      <option value="tray">Tray (1.25x)</option>
+                      <option value="coffered">Coffered (1.45x)</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                      Area Multiplier
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="1.0"
+                      value={room.ceilingMultiplier || 1.0}
+                      onChange={(e) => handleCeilingMultiplierChange(parseFloat(e.target.value) || 1.0)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-200 font-mono focus:border-sky-500"
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {isFoundationRoom && (

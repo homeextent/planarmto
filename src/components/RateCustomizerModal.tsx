@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UnitCostRates, CostRateItem } from '../types';
-import { DEFAULT_UNIT_COST_RATES } from '../engine/estimator';
+import { DEFAULT_UNIT_COST_RATES } from '../constants/rates';
 import {
   DollarSign,
   X,
@@ -44,10 +44,13 @@ interface RateFieldConfig {
 
 const RATE_FIELDS: RateFieldConfig[] = [
   // 1. Finishes
-  { key: 'drywallPerSf', label: 'Drywall Board (Tape & Finish)', unit: '$/SF', category: 'Board & Finishes', description: 'Includes 1/2" or 5/8" drywall boards, mud, tape, and sanding' },
+  { key: 'drywall12PerSf', label: '1/2" Standard Drywall Board', unit: '$/SF', category: 'Board & Finishes', description: 'Standard interior wall & ceiling board (Tape & Finish)' },
+  { key: 'drywall58PerSf', label: '5/8" Type X Fire-Rated Board', unit: '$/SF', category: 'Board & Finishes', description: 'Fire-rated assembly board (Tape & Finish)' },
+  { key: 'drywallGreenboard12PerSf', label: '1/2" Moisture Board (Greenboard)', unit: '$/SF', category: 'Board & Finishes', description: 'Moisture resistant board for wet areas (Tape & Finish)' },
   { key: 'paintPerSf', label: 'Interior Paint (Primer + 2 Coats)', unit: '$/SF', category: 'Board & Finishes', description: 'Wall & ceiling latex paint coverage' },
   { key: 'flooringPerSf', label: 'Flooring Package (Average)', unit: '$/SF', category: 'Board & Finishes', description: 'Hardwood, LVP, or porcelain tile installation & materials' },
   { key: 'extInsulationPerSf', label: 'Exterior Wall Insulation (R-20+)', unit: '$/SF', category: 'Board & Finishes', description: 'Friction-fit mineral wool or fiberglass batts' },
+  { key: 'resilientChannelPerLf', label: 'Resilient Channel (RC-1)', unit: '$/LF', category: 'Board & Finishes', description: 'Sound attenuation channels for ceiling drywall' },
 
   // 2. Carpentry & Framing
   { key: 'studFramingPerLf', label: 'Wall Stud Framing', unit: '$/LF', category: 'Framing & Carpentry', description: 'Plates, studs, and blocking framing assembly' },

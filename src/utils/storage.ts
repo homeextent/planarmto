@@ -1,5 +1,6 @@
 import { CompanyBranding, FloorplanState, ProjectSettings, UnitCostRates } from '../types';
-import { calculateMTO, calculateEstimatedCost, DEFAULT_UNIT_COST_RATES, safeMergeRates } from '../engine/estimator';
+import { calculateMTO, calculateEstimatedCost, safeMergeRates } from '../engine/estimator';
+import { DEFAULT_UNIT_COST_RATES } from '../constants/rates';
 
 const BRANDING_STORAGE_KEY = 'planarmto_company_branding_v1';
 const PROJECTS_DIRECTORY_KEY = 'planarmto_saved_projects_v1';

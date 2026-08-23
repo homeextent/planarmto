@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { FloorplanState, MTOReport, UnitCostRates } from '../types';
-import { calculateEstimatedCost, DEFAULT_UNIT_COST_RATES } from '../engine/estimator';
+import { calculateEstimatedCost } from '../engine/estimator';
+import { DEFAULT_UNIT_COST_RATES } from '../constants/rates';
 import { getRoomCategory, ROOM_CATEGORIES } from '../engine/roomCategories';
 import { generatePdfFromElement } from '../utils/pdfGenerator';
 import {
@@ -411,16 +412,39 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
       <tr class="category-row">
         <td colspan="8">1. Drywall, Paint & Architectural Finishes</td>
       </tr>
+      ${mto.drywall12Sf > 0 ? `
       <tr>
-        <td style="padding-left: 18px;">Drywall Board (Walls + Ceilings)</td>
-        <td class="num">${mto.drywallBoardSf}</td>
+        <td style="padding-left: 18px;">1/2" Standard Drywall Board</td>
+        <td class="num">${mto.drywall12Sf}</td>
         <td class="num">SF</td>
-        <td class="num">$${r.drywallPerSf.material.toFixed(2)}</td>
-        <td class="num">$${r.drywallPerSf.labor.toFixed(2)}</td>
-        <td class="num">$${(mto.drywallBoardSf * r.drywallPerSf.material).toFixed(2)}</td>
-        <td class="num">$${(mto.drywallBoardSf * r.drywallPerSf.labor).toFixed(2)}</td>
-        <td class="num"><strong>$${(mto.drywallBoardSf * (r.drywallPerSf.material + r.drywallPerSf.labor)).toFixed(2)}</strong></td>
-      </tr>
+        <td class="num">$${r.drywall12PerSf.material.toFixed(2)}</td>
+        <td class="num">$${r.drywall12PerSf.labor.toFixed(2)}</td>
+        <td class="num">$${(mto.drywall12Sf * r.drywall12PerSf.material * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2)}</td>
+        <td class="num">$${(mto.drywall12Sf * r.drywall12PerSf.labor * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2)}</td>
+        <td class="num"><strong>$${(mto.drywall12Sf * (r.drywall12PerSf.material + r.drywall12PerSf.labor) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2)}</strong></td>
+      </tr>` : ''}
+      ${mto.drywall58Sf > 0 ? `
+      <tr>
+        <td style="padding-left: 18px;">5/8" Type X Fire-Rated Board</td>
+        <td class="num">${mto.drywall58Sf}</td>
+        <td class="num">SF</td>
+        <td class="num">$${r.drywall58PerSf.material.toFixed(2)}</td>
+        <td class="num">$${r.drywall58PerSf.labor.toFixed(2)}</td>
+        <td class="num">$${(mto.drywall58Sf * r.drywall58PerSf.material * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2)}</td>
+        <td class="num">$${(mto.drywall58Sf * r.drywall58PerSf.labor * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2)}</td>
+        <td class="num"><strong>$${(mto.drywall58Sf * (r.drywall58PerSf.material + r.drywall58PerSf.labor) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2)}</strong></td>
+      </tr>` : ''}
+      ${mto.drywallGreenboard12Sf > 0 ? `
+      <tr>
+        <td style="padding-left: 18px;">1/2" Moisture Board / Greenboard</td>
+        <td class="num">${mto.drywallGreenboard12Sf}</td>
+        <td class="num">SF</td>
+        <td class="num">$${r.drywallGreenboard12PerSf.material.toFixed(2)}</td>
+        <td class="num">$${r.drywallGreenboard12PerSf.labor.toFixed(2)}</td>
+        <td class="num">$${(mto.drywallGreenboard12Sf * r.drywallGreenboard12PerSf.material * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2)}</td>
+        <td class="num">$${(mto.drywallGreenboard12Sf * r.drywallGreenboard12PerSf.labor * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2)}</td>
+        <td class="num"><strong>$${(mto.drywallGreenboard12Sf * (r.drywallGreenboard12PerSf.material + r.drywallGreenboard12PerSf.labor) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2)}</strong></td>
+      </tr>` : ''}
       <tr>
         <td style="padding-left: 18px;">Interior Paint Coverage (2 Coats)</td>
         <td class="num">${mto.paintCoverageSf}</td>
@@ -451,6 +475,17 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
         <td class="num">$${(mto.extWallInsulationSf * r.extInsulationPerSf.labor).toFixed(2)}</td>
         <td class="num"><strong>$${(mto.extWallInsulationSf * (r.extInsulationPerSf.material + r.extInsulationPerSf.labor)).toFixed(2)}</strong></td>
       </tr>
+      ${mto.resilientChannelLf > 0 ? `
+      <tr>
+        <td style="padding-left: 18px;">Resilient Channel (RC-1) Ceiling Grid</td>
+        <td class="num">${mto.resilientChannelLf}</td>
+        <td class="num">LF</td>
+        <td class="num">$${r.resilientChannelPerLf.material.toFixed(2)}</td>
+        <td class="num">$${r.resilientChannelPerLf.labor.toFixed(2)}</td>
+        <td class="num">$${(mto.resilientChannelLf * r.resilientChannelPerLf.material).toFixed(2)}</td>
+        <td class="num">$${(mto.resilientChannelLf * r.resilientChannelPerLf.labor).toFixed(2)}</td>
+        <td class="num"><strong>$${(mto.resilientChannelLf * (r.resilientChannelPerLf.material + r.resilientChannelPerLf.labor)).toFixed(2)}</strong></td>
+      </tr>` : ''}
 
       <!-- Division 2 -->
       <tr class="category-row">
@@ -774,18 +809,42 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
         'Labor Subtotal ($)',
         'Line Total ($)',
       ],
-      [
+      ...(mto.drywall12Sf > 0 ? [[
         '1. Board & Finishes',
-        'Drywall Board (Walls + Ceilings)',
-        mto.drywallBoardSf,
+        '1/2" Standard Drywall Board',
+        mto.drywall12Sf,
         'SF',
-        r.drywallPerSf.material,
-        r.drywallPerSf.labor,
-        (r.drywallPerSf.material + r.drywallPerSf.labor).toFixed(2),
-        (mto.drywallBoardSf * r.drywallPerSf.material).toFixed(2),
-        (mto.drywallBoardSf * r.drywallPerSf.labor).toFixed(2),
-        (mto.drywallBoardSf * (r.drywallPerSf.material + r.drywallPerSf.labor)).toFixed(2),
-      ],
+        r.drywall12PerSf.material,
+        r.drywall12PerSf.labor,
+        (r.drywall12PerSf.material + r.drywall12PerSf.labor).toFixed(2),
+        (mto.drywall12Sf * r.drywall12PerSf.material * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (mto.drywall12Sf * r.drywall12PerSf.labor * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (mto.drywall12Sf * (r.drywall12PerSf.material + r.drywall12PerSf.labor) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+      ]] : []),
+      ...(mto.drywall58Sf > 0 ? [[
+        '1. Board & Finishes',
+        '5/8" Type X Fire-Rated Board',
+        mto.drywall58Sf,
+        'SF',
+        r.drywall58PerSf.material,
+        r.drywall58PerSf.labor,
+        (r.drywall58PerSf.material + r.drywall58PerSf.labor).toFixed(2),
+        (mto.drywall58Sf * r.drywall58PerSf.material * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (mto.drywall58Sf * r.drywall58PerSf.labor * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (mto.drywall58Sf * (r.drywall58PerSf.material + r.drywall58PerSf.labor) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+      ]] : []),
+      ...(mto.drywallGreenboard12Sf > 0 ? [[
+        '1. Board & Finishes',
+        '1/2" Moisture Board / Greenboard',
+        mto.drywallGreenboard12Sf,
+        'SF',
+        r.drywallGreenboard12PerSf.material,
+        r.drywallGreenboard12PerSf.labor,
+        (r.drywallGreenboard12PerSf.material + r.drywallGreenboard12PerSf.labor).toFixed(2),
+        (mto.drywallGreenboard12Sf * r.drywallGreenboard12PerSf.material * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (mto.drywallGreenboard12Sf * r.drywallGreenboard12PerSf.labor * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (mto.drywallGreenboard12Sf * (r.drywallGreenboard12PerSf.material + r.drywallGreenboard12PerSf.labor) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+      ]] : []),
       [
         '1. Board & Finishes',
         'Interior Paint Coverage (2 Coats)',
@@ -822,6 +881,18 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
         (mto.extWallInsulationSf * r.extInsulationPerSf.labor).toFixed(2),
         (mto.extWallInsulationSf * (r.extInsulationPerSf.material + r.extInsulationPerSf.labor)).toFixed(2),
       ],
+      ...(mto.resilientChannelLf > 0 ? [[
+        '1. Board & Finishes',
+        'Resilient Channel (RC-1) Ceiling Grid',
+        mto.resilientChannelLf,
+        'LF',
+        r.resilientChannelPerLf.material,
+        r.resilientChannelPerLf.labor,
+        (r.resilientChannelPerLf.material + r.resilientChannelPerLf.labor).toFixed(2),
+        (mto.resilientChannelLf * r.resilientChannelPerLf.material).toFixed(2),
+        (mto.resilientChannelLf * r.resilientChannelPerLf.labor).toFixed(2),
+        (mto.resilientChannelLf * (r.resilientChannelPerLf.material + r.resilientChannelPerLf.labor)).toFixed(2),
+      ]] : []),
       [
         '2. Framing & Carpentry',
         'Wall Stud Framing',
@@ -1324,16 +1395,42 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
                     <tr className="bg-slate-900/60 font-bold text-sky-300">
                       <td colSpan={8} className="p-2">1. Drywall, Paint & Finishes</td>
                     </tr>
-                    <tr>
-                      <td className="p-2 pl-4 text-slate-300">Drywall Board (Walls + Ceilings)</td>
-                      <td className="p-2 text-right font-mono">{mto.drywallBoardSf}</td>
-                      <td className="p-2 text-slate-400">SF</td>
-                      <td className="p-2 text-right font-mono text-slate-400">${activeRates.drywallPerSf.material.toFixed(2)}</td>
-                      <td className="p-2 text-right font-mono text-slate-400">${activeRates.drywallPerSf.labor.toFixed(2)}</td>
-                      <td className="p-2 text-right font-mono">${(mto.drywallBoardSf * activeRates.drywallPerSf.material).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="p-2 text-right font-mono">${(mto.drywallBoardSf * activeRates.drywallPerSf.labor).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="p-2 text-right font-mono font-semibold">${(mto.drywallBoardSf * (activeRates.drywallPerSf.material + activeRates.drywallPerSf.labor)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    </tr>
+                    {mto.drywall12Sf > 0 && (
+                      <tr>
+                        <td className="p-2 pl-4 text-slate-300">1/2" Standard Drywall Board</td>
+                        <td className="p-2 text-right font-mono">{mto.drywall12Sf.toLocaleString()}</td>
+                        <td className="p-2 text-slate-400">SF</td>
+                        <td className="p-2 text-right font-mono text-slate-400">${activeRates.drywall12PerSf.material.toFixed(2)}</td>
+                        <td className="p-2 text-right font-mono text-slate-400">${activeRates.drywall12PerSf.labor.toFixed(2)}</td>
+                        <td className="p-2 text-right font-mono">${(mto.drywall12Sf * activeRates.drywall12PerSf.material * (1 + state.settings.wasteFactorPercentage / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="p-2 text-right font-mono">${(mto.drywall12Sf * activeRates.drywall12PerSf.labor * (1 + state.settings.wasteFactorPercentage / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="p-2 text-right font-mono font-semibold">${(mto.drywall12Sf * (activeRates.drywall12PerSf.material + activeRates.drywall12PerSf.labor) * (1 + state.settings.wasteFactorPercentage / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      </tr>
+                    )}
+                    {mto.drywall58Sf > 0 && (
+                      <tr>
+                        <td className="p-2 pl-4 text-slate-300">5/8" Type X Fire-Rated Board</td>
+                        <td className="p-2 text-right font-mono">{mto.drywall58Sf.toLocaleString()}</td>
+                        <td className="p-2 text-slate-400">SF</td>
+                        <td className="p-2 text-right font-mono text-slate-400">${activeRates.drywall58PerSf.material.toFixed(2)}</td>
+                        <td className="p-2 text-right font-mono text-slate-400">${activeRates.drywall58PerSf.labor.toFixed(2)}</td>
+                        <td className="p-2 text-right font-mono">${(mto.drywall58Sf * activeRates.drywall58PerSf.material * (1 + state.settings.wasteFactorPercentage / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="p-2 text-right font-mono">${(mto.drywall58Sf * activeRates.drywall58PerSf.labor * (1 + state.settings.wasteFactorPercentage / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="p-2 text-right font-mono font-semibold">${(mto.drywall58Sf * (activeRates.drywall58PerSf.material + activeRates.drywall58PerSf.labor) * (1 + state.settings.wasteFactorPercentage / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      </tr>
+                    )}
+                    {mto.drywallGreenboard12Sf > 0 && (
+                      <tr>
+                        <td className="p-2 pl-4 text-slate-300">1/2" Moisture Board / Greenboard</td>
+                        <td className="p-2 text-right font-mono">{mto.drywallGreenboard12Sf.toLocaleString()}</td>
+                        <td className="p-2 text-slate-400">SF</td>
+                        <td className="p-2 text-right font-mono text-slate-400">${activeRates.drywallGreenboard12PerSf.material.toFixed(2)}</td>
+                        <td className="p-2 text-right font-mono text-slate-400">${activeRates.drywallGreenboard12PerSf.labor.toFixed(2)}</td>
+                        <td className="p-2 text-right font-mono">${(mto.drywallGreenboard12Sf * activeRates.drywallGreenboard12PerSf.material * (1 + state.settings.wasteFactorPercentage / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="p-2 text-right font-mono">${(mto.drywallGreenboard12Sf * activeRates.drywallGreenboard12PerSf.labor * (1 + state.settings.wasteFactorPercentage / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="p-2 text-right font-mono font-semibold">${(mto.drywallGreenboard12Sf * (activeRates.drywallGreenboard12PerSf.material + activeRates.drywallGreenboard12PerSf.labor) * (1 + state.settings.wasteFactorPercentage / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      </tr>
+                    )}
                     <tr>
                       <td className="p-2 pl-4 text-slate-300">Interior Paint (2 Coats)</td>
                       <td className="p-2 text-right font-mono">{mto.paintCoverageSf}</td>
@@ -1364,6 +1461,18 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
                       <td className="p-2 text-right font-mono">${(mto.extWallInsulationSf * activeRates.extInsulationPerSf.labor).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="p-2 text-right font-mono font-semibold">${(mto.extWallInsulationSf * (activeRates.extInsulationPerSf.material + activeRates.extInsulationPerSf.labor)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     </tr>
+                    {mto.resilientChannelLf > 0 && (
+                      <tr>
+                        <td className="p-2 pl-4 text-slate-300">Resilient Channel (RC-1) Ceiling Grid</td>
+                        <td className="p-2 text-right font-mono">{mto.resilientChannelLf}</td>
+                        <td className="p-2 text-slate-400">LF</td>
+                        <td className="p-2 text-right font-mono text-slate-400">${activeRates.resilientChannelPerLf.material.toFixed(2)}</td>
+                        <td className="p-2 text-right font-mono text-slate-400">${activeRates.resilientChannelPerLf.labor.toFixed(2)}</td>
+                        <td className="p-2 text-right font-mono">${(mto.resilientChannelLf * activeRates.resilientChannelPerLf.material).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="p-2 text-right font-mono">${(mto.resilientChannelLf * activeRates.resilientChannelPerLf.labor).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="p-2 text-right font-mono font-semibold">${(mto.resilientChannelLf * (activeRates.resilientChannelPerLf.material + activeRates.resilientChannelPerLf.labor)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      </tr>
+                    )}
 
                     {/* Division 2 */}
                     <tr className="bg-slate-900/60 font-bold text-sky-300">

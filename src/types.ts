@@ -169,11 +169,14 @@ export interface RoomPolygon {
   centroid: { x: number; y: number };
   floorFinish: FloorFinish;
   ceilingHeight: number; // in feet (defaults to project default)
-  hasCeilingDrywall?: boolean;
+  includeCeilingDrywall?: boolean;
+  includeResilientChannel?: boolean;
   ceilingType?: CeilingType;
   ceilingMultiplier?: number;
   roomType?: string;
   slabThickness?: number;
+  wallDrywallType?: 'drywall_12' | 'drywall_58' | 'drywall_greenboard_12';
+  ceilingDrywallType?: 'drywall_12' | 'drywall_58';
 }
 
 export interface DeckArea {
@@ -197,7 +200,9 @@ export interface CostRateItem {
 }
 
 export interface UnitCostRates {
-  drywallPerSf: CostRateItem;
+  drywall12PerSf: CostRateItem;
+  drywall58PerSf: CostRateItem;
+  drywallGreenboard12PerSf: CostRateItem;
   paintPerSf: CostRateItem;
   flooringPerSf: CostRateItem;
   extInsulationPerSf: CostRateItem;
@@ -249,6 +254,7 @@ export interface UnitCostRates {
   eavestroughPerLf: CostRateItem;
   deckRailingPerLf: CostRateItem;
   hardscapePerSf: CostRateItem;
+  resilientChannelPerLf: CostRateItem;
   categoryLastUpdated?: Record<string, string>; // Map of category name to ISO timestamp
 }
 
@@ -494,10 +500,15 @@ export interface MTOReport {
   netFloorAreaSf: number;
 
   // 1. Board & Finishes
-  drywallBoardSf: number;
+  drywall12Sf: number;
+  drywall58Sf: number;
+  drywallGreenboard12Sf: number;
+  drywallBoardSf: number; // Keep for backward compat or sum? The task says aggregate totals into separated report metrics.
   paintCoverageSf: number;
   flooringPackageSf: number;
   extWallInsulationSf: number;
+  resilientChannelLf: number;
+  resilientChannelCost: number;
 
   // 2. Carpentry, Framing & Substructures
   wallStudFramingLf: number;
