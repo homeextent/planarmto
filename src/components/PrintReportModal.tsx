@@ -527,14 +527,14 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
         <td colspan="8">3. Fenestration & Enclosure Apertures</td>
       </tr>
       <tr>
-        <td style="padding-left: 18px;">Standard Double-Glazed Windows</td>
-        <td class="num">${mto.totalWindowsUnits}</td>
-        <td class="num">UNITS</td>
-        <td class="num">$${r.windowPerUnit.material.toFixed(2)}</td>
-        <td class="num">$${r.windowPerUnit.labor.toFixed(2)}</td>
-        <td class="num">$${(mto.totalWindowsUnits * r.windowPerUnit.material).toFixed(2)}</td>
-        <td class="num">$${(mto.totalWindowsUnits * r.windowPerUnit.labor).toFixed(2)}</td>
-        <td class="num"><strong>$${(mto.totalWindowsUnits * (r.windowPerUnit.material + r.windowPerUnit.labor)).toFixed(2)}</strong></td>
+        <td style="padding-left: 18px;">Standard Windows (6 SF Min Floor)</td>
+        <td class="num">${mto.totalWindowsSf}</td>
+        <td class="num">SF</td>
+        <td class="num">$${r.windowPerSf.material.toFixed(2)}</td>
+        <td class="num">$${r.windowPerSf.labor.toFixed(2)}</td>
+        <td class="num">$${(mto.totalWindowsSf * r.windowPerSf.material).toFixed(2)}</td>
+        <td class="num">$${(mto.totalWindowsSf * r.windowPerSf.labor).toFixed(2)}</td>
+        <td class="num"><strong>$${(mto.totalWindowsSf * (r.windowPerSf.material + r.windowPerSf.labor)).toFixed(2)}</strong></td>
       </tr>
       <tr>
         <td style="padding-left: 18px;">Interior Passage Doors</td>
@@ -931,15 +931,15 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
       ],
       [
         '3. Fenestration',
-        'Standard Windows',
-        mto.totalWindowsUnits,
-        'UNITS',
-        r.windowPerUnit.material,
-        r.windowPerUnit.labor,
-        (r.windowPerUnit.material + r.windowPerUnit.labor).toFixed(2),
-        (mto.totalWindowsUnits * r.windowPerUnit.material).toFixed(2),
-        (mto.totalWindowsUnits * r.windowPerUnit.labor).toFixed(2),
-        (mto.totalWindowsUnits * (r.windowPerUnit.material + r.windowPerUnit.labor)).toFixed(2),
+        'Standard Windows (6 SF Min Floor)',
+        mto.totalWindowsSf,
+        'SF',
+        r.windowPerSf.material,
+        r.windowPerSf.labor,
+        (r.windowPerSf.material + r.windowPerSf.labor).toFixed(2),
+        (mto.totalWindowsSf * r.windowPerSf.material).toFixed(2),
+        (mto.totalWindowsSf * r.windowPerSf.labor).toFixed(2),
+        (mto.totalWindowsSf * (r.windowPerSf.material + r.windowPerSf.labor)).toFixed(2),
       ],
       [
         '3. Fenestration',
@@ -1514,14 +1514,14 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
                       <td colSpan={8} className="p-2">3. Fenestration & Enclosure Openings</td>
                     </tr>
                     <tr>
-                      <td className="p-2 pl-4 text-slate-300">Standard Windows</td>
-                      <td className="p-2 text-right font-mono">{mto.totalWindowsUnits}</td>
-                      <td className="p-2 text-slate-400">UNITS</td>
-                      <td className="p-2 text-right font-mono text-slate-400">${activeRates.windowPerUnit.material.toFixed(2)}</td>
-                      <td className="p-2 text-right font-mono text-slate-400">${activeRates.windowPerUnit.labor.toFixed(2)}</td>
-                      <td className="p-2 text-right font-mono">${(mto.totalWindowsUnits * activeRates.windowPerUnit.material).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="p-2 text-right font-mono">${(mto.totalWindowsUnits * activeRates.windowPerUnit.labor).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="p-2 text-right font-mono font-semibold">${(mto.totalWindowsUnits * (activeRates.windowPerUnit.material + activeRates.windowPerUnit.labor)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="p-2 pl-4 text-slate-300">Standard Windows (6 SF Min Floor)</td>
+                      <td className="p-2 text-right font-mono">{mto.totalWindowsSf.toLocaleString()}</td>
+                      <td className="p-2 text-slate-400">SF</td>
+                      <td className="p-2 text-right font-mono text-slate-400">${activeRates.windowPerSf.material.toFixed(2)}</td>
+                      <td className="p-2 text-right font-mono text-slate-400">${activeRates.windowPerSf.labor.toFixed(2)}</td>
+                      <td className="p-2 text-right font-mono">${(mto.totalWindowsSf * activeRates.windowPerSf.material).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="p-2 text-right font-mono">${(mto.totalWindowsSf * activeRates.windowPerSf.labor).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="p-2 text-right font-mono font-semibold">${(mto.totalWindowsSf * (activeRates.windowPerSf.material + activeRates.windowPerSf.labor)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     </tr>
                     <tr>
                       <td className="p-2 pl-4 text-slate-300">Interior Passage Doors</td>

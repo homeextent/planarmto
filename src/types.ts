@@ -213,7 +213,7 @@ export interface UnitCostRates {
   baseboardPerLf: CostRateItem;
   casingPerLf: CostRateItem;
   stairRiserPerUnit: CostRateItem;
-  windowPerUnit: CostRateItem;
+  windowPerSf: CostRateItem;
   passageDoorPerUnit: CostRateItem;
   pocketDoorPerUnit: CostRateItem;
   exteriorDoorPerUnit: CostRateItem;
@@ -523,6 +523,7 @@ export interface MTOReport {
 
   // 3. Apertures, Doors & Fenestration
   totalWindowsUnits: number;
+  totalWindowsSf: number;
   passageDoorsUnits: number;
   pocketDoorsUnits: number;
   exteriorDoorsUnits: number;

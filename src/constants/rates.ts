@@ -14,7 +14,7 @@ export const DEFAULT_UNIT_COST_RATES: UnitCostRates = {
   baseboardPerLf: { material: 1.75, labor: 2.0 },
   casingPerLf: { material: 2.0, labor: 2.2 },
   stairRiserPerUnit: { material: 35.0, labor: 30.0 },
-  windowPerUnit: { material: 270.0, labor: 110.0 },
+  windowPerSf: { material: 35.0, labor: 15.0 },
   passageDoorPerUnit: { material: 135.0, labor: 85.0 },
   pocketDoorPerUnit: { material: 200.0, labor: 140.0 },
   exteriorDoorPerUnit: { material: 550.0, labor: 300.0 },

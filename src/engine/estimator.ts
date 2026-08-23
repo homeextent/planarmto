@@ -310,6 +310,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
 
   // Apertures, Casing, and Door Hardware
   let totalWindowsUnits = 0;
+  let totalWindowsSf = 0;
   let passageDoorsUnits = 0;
   let pocketDoorsUnits = 0;
   let exteriorDoorsUnits = 0;
@@ -319,7 +320,13 @@ export function calculateMTO(state: FloorplanState): MTOReport {
   apertures.forEach((ap) => {
     if (ap.type.startsWith('window_')) {
       totalWindowsUnits++;
-      // Window casing = 2 * (W + H)
+      
+      // Area calculation with 6 SF minimum floor
+      const actualSf = ap.width * ap.height;
+      const billedSf = Math.max(6.0, actualSf);
+      totalWindowsSf += billedSf;
+
+      // Window casing = 2 * (W + H) - keep independent in LF
       totalApertureCasingLf += 2 * (ap.width + ap.height);
     } else if (ap.type === 'door_passage') {
       passageDoorsUnits++;
@@ -594,6 +601,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     calculatedStairRisers,
 
     totalWindowsUnits,
+    totalWindowsSf: Math.round(totalWindowsSf * 100) / 100,
     passageDoorsUnits,
     pocketDoorsUnits,
     exteriorDoorsUnits,
@@ -776,8 +784,8 @@ export function calculateEstimatedCost(
   let labFenestration = 0;
 
   if (itemInc.totalWindows !== false) {
-    matFenestration += mto.totalWindowsUnits * (rates.windowPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.material) * wasteMultiplier;
-    labFenestration += mto.totalWindowsUnits * (rates.windowPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.labor) * wasteMultiplier;
+    matFenestration += mto.totalWindowsSf * (rates.windowPerSf?.material ?? DEFAULT_UNIT_COST_RATES.windowPerSf.material) * wasteMultiplier;
+    labFenestration += mto.totalWindowsSf * (rates.windowPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerSf.labor) * wasteMultiplier;
   }
 
   if (itemInc.passageDoors !== false) {

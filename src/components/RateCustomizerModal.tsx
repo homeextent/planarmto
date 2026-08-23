@@ -62,7 +62,7 @@ const RATE_FIELDS: RateFieldConfig[] = [
   { key: 'stairRiserPerUnit', label: 'Stair Flight Risers', unit: '$/Riser', category: 'Framing & Carpentry', description: 'Tread, riser, stringer, and glue assembly' },
 
   // 3. Fenestration
-  { key: 'windowPerUnit', label: 'Standard Vinyl Window', unit: '$/Unit', category: 'Openings & Fenestration', description: 'Low-E Argon double-glazed casement/slider window' },
+  { key: 'windowPerSf', label: 'Standard Vinyl Window', unit: '$/SF', category: 'Openings & Fenestration', description: 'Low-E Argon double-glazed casement/slider window' },
   { key: 'passageDoorPerUnit', label: 'Passage Interior Door (Pre-hung)', unit: '$/Unit', category: 'Openings & Fenestration', description: 'Hollow/solid core door, jamb, and hinges' },
   { key: 'pocketDoorPerUnit', label: 'In-Wall Pocket Door', unit: '$/Unit', category: 'Openings & Fenestration', description: 'Pocket frame cage, track, rollers, and slab' },
   { key: 'exteriorDoorPerUnit', label: 'Exterior Insulated Entry Door', unit: '$/Unit', category: 'Openings & Fenestration', description: 'Fiberglass or steel pre-hung entry system with threshold' },

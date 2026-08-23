@@ -270,15 +270,15 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
       // 3. Fenestration
       [
         '3. Apertures & Fenestration',
-        'Total Windows',
-        mto.totalWindowsUnits,
-        'UNITS',
-        r.windowPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.material,
-        r.windowPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.labor,
-        ((r.windowPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.material) + (r.windowPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.labor)).toFixed(2),
-        (mto.totalWindowsUnits * (r.windowPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.material)).toFixed(2),
-        (mto.totalWindowsUnits * (r.windowPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.labor)).toFixed(2),
-        (mto.totalWindowsUnits * ((r.windowPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.material) + (r.windowPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.labor))).toFixed(2),
+        'Total Windows (6 SF Min Floor)',
+        mto.totalWindowsSf,
+        'SF',
+        r.windowPerSf?.material ?? DEFAULT_UNIT_COST_RATES.windowPerSf.material,
+        r.windowPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerSf.labor,
+        ((r.windowPerSf?.material ?? DEFAULT_UNIT_COST_RATES.windowPerSf.material) + (r.windowPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerSf.labor)).toFixed(2),
+        (mto.totalWindowsSf * (r.windowPerSf?.material ?? DEFAULT_UNIT_COST_RATES.windowPerSf.material)).toFixed(2),
+        (mto.totalWindowsSf * (r.windowPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerSf.labor)).toFixed(2),
+        (mto.totalWindowsSf * ((r.windowPerSf?.material ?? DEFAULT_UNIT_COST_RATES.windowPerSf.material) + (r.windowPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerSf.labor))).toFixed(2),
       ],
       [
         '3. Apertures & Fenestration',
@@ -1113,11 +1113,12 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
             <div className="p-2.5 pt-0 border-t border-slate-800/60 space-y-1.5 text-xs">
               <MetricRow
                 label="Total Windows"
-                value={mto.totalWindowsUnits}
-                unit="UNITS"
+                value={mto.totalWindowsSf}
+                unit="SF"
+                subtext={`${mto.totalWindowsUnits} Units (6 SF Min)`}
                 cost={
                   isIncluded('fenestration') && isItemIncluded('totalWindows')
-                    ? mto.totalWindowsUnits * ((activeRates.windowPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.material) + (activeRates.windowPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.labor))
+                    ? mto.totalWindowsSf * ((activeRates.windowPerSf?.material ?? DEFAULT_UNIT_COST_RATES.windowPerSf.material) + (activeRates.windowPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerSf.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('fenestration')}

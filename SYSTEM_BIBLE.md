@@ -114,13 +114,17 @@ $$N_{\text{studs, apertures}} = 4 \times N_{\text{apertures}}$$
 Total Stud Count:
 $$N_{\text{studs, total}} = N_{\text{studs, linear}} + N_{\text{studs, corners}} + N_{\text{studs, apertures}}$$
 
-#### B. OSB Subfloor Decking
+#### B. Resilient Channel (RC-1) Ceiling Grid
+Acoustic and fire-rated ceiling assemblies utilize RC-1 channels spaced at $12"$-$16"$ on center. The engine approximates linear footage based on ceiling area:
+$$L_{\text{RC-1}} = A_{\text{net\_interior}} \times 0.90\text{ LF/SF}$$
+
+#### C. OSB Subfloor Decking
 Subfloor is detached from net interior area to account for area under wall plates.
 - **Interior/Shared Walls**: Offset = 0 (Centerline).
 - **Exterior Walls**: Offset = $-(\text{CoreThickness} / 2)$ (Outer Rim Face).
 $$A_{\text{subfloor}} = \text{Area}(\text{getVariableOffsetPolygon}(C, \text{offsets}))$$
 
-#### C. Ceiling Surface Area (Profiles & Multipliers)
+#### D. Ceiling Surface Area (Profiles & Multipliers)
 Ceiling take-offs support non-flat profiles using an area multiplier $M_{\text{ceil}}$:
 - **Flat**: $M = 1.00$
 - **Vaulted**: $M = 1.18$
@@ -131,7 +135,22 @@ Ceiling take-offs support non-flat profiles using an area multiplier $M_{\text{c
 The net ceiling drywall and paint quantities are calculated as:
 $$A_{\text{ceil, modified}} = A_{\text{net\_interior}} \times M_{\text{ceil}}$$
 
-### 4.2 Division 03 — Concrete Foundations
+### 4.2 Division 08 — Fenestration & Enclosures
+
+#### A. Window Pricing Model
+Standard window units ($A_{\text{window}}$) are priced dynamically by square footage with a minimum billing floor:
+$$P_{\text{window}} = \max(A_{\text{window}}, 6.0\text{ SF}) \times \text{Rate}_{\text{\$/SF}}$$
+Interior and exterior casing trim linear footage is calculated independently as the rough opening perimeter:
+$$L_{\text{trim}} = 2 \times (W_a + H_a)$$
+
+### 4.3 Division 09 — Finishes
+
+#### A. Drywall Thickness Matrix
+The engine supports a 3-tier drywall thickness matrix for wall and ceiling surfaces, mapping to independent rate keys:
+- **Walls**: `1/2" Standard`, `5/8" Type X Fire-Rated`, `1/2" Moisture Board / Greenboard`.
+- **Ceilings**: `1/2" Standard`, `5/8" Type X Fire-Rated`.
+
+### 4.4 Division 03 — Concrete Foundations
 Foundation estimation relies on explicit volumetric variables assigned per-room or per-wall:
 - **Slab Volume**: $V_{\text{slab}} = A_{\text{room}} \times T_{\text{slab}}$
 - **Foundation Wall Volume**: $V_{\text{fnd}} = \sum (L_i \times T_i \times H_i)$
@@ -139,7 +158,7 @@ Foundation estimation relies on explicit volumetric variables assigned per-room 
 - **Total Poured Concrete (CY)**: $V_{\text{total, CY}} = \frac{V_{\text{slab}} + V_{\text{fnd}} + V_{\text{ftg}}}{27}$
 - **Slab Insulation**: $A_{\text{insul}} = A_{\text{room}}$ (SF)
 
-### 4.3 Division 26 — Electrical & Life Safety
+### 4.5 Division 26 — Electrical & Life Safety
 The electrical take-off engine supports granular itemization for devices and service equipment.
 
 #### A. Granular Panel Amperage Tiers

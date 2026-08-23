@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+---
+
+## [2.6.0] - 2026-08-23
+
+### Added
+- **Independent Wall & Ceiling Drywall Thickness Selection**: Added room-level inspector dropdowns for Wall Drywall (`1/2" Standard`, `5/8" Type X Fire-Rated`, `1/2" Moisture Board / Greenboard`) and Ceiling Drywall (`1/2" Standard`, `5/8" Type X Fire-Rated`), mapped to independent rate keys in `DEFAULT_UNIT_COST_RATES`.
+- **Resilient Channel (RC-1) Ceiling Grid Integration**: Added acoustic/fire ceiling metal framing calculation ($\text{Ceiling SF} \times 0.90\text{ LF/SF}$) with a master rate key (`resilientChannelPerLf`), set to toggle ON by default whenever ceiling drywall is enabled.
+- **Dynamic Area-Based Window Pricing ($\text{\$/SF}$)**: Upgraded standard window stamps from flat unit costs to dynamic square-foot pricing with an automated $6.0\text{ SF}$ minimum billing floor per unit, maintaining independent linear feet perimeter calculations for interior/exterior casing trim.
+
+### Fixed
+- **Complete Rate Card Coverage**: Audited and restored missing rate fields (`switchDimmer`, `outlet240v`, `waterHeaterPerUnit`, and differentiated drywall thicknesses) across the customizer modal, print schedules, and subcontractor CSV exports.
+- **Canvas Passive Event Listener Warnings**: Registered native `{ passive: false }` wheel and touch listeners in `CadCanvas.tsx` to prevent console `preventDefault` warnings during canvas pan and zoom interactions.
+- **Vite Production Build Exports**: Exported `DEFAULT_UNIT_COST_RATES` explicitly from `estimator.ts` to resolve Rollup module resolution failures during production bundling.
+
 ## [2.5.0] - 2026-08-23
 
 ### Added
