@@ -14,7 +14,7 @@ import {
   ClipboardState,
 } from './types';
 import { createModernTwoBedroomRancher, createBlankProject } from './engine/samplePlans';
-import { calculateMTO, calculateEstimatedCost, DEFAULT_UNIT_COST_RATES } from './engine/estimator';
+import { calculateMTO, calculateEstimatedCost, DEFAULT_UNIT_COST_RATES, safeMergeRates } from './engine/estimator';
 import { detectRoomFaces, isPointInPolygon } from './engine/cadMath';
 import {
   hydrateSettingsWithBranding,
@@ -52,7 +52,9 @@ export default function App() {
         // If it's a blank project without custom rates, we can apply master rates
         // Otherwise, we keep what's in the project state
         if (persistedMasterRates && !prev.settings.costRates) {
-          nextSettings.costRates = persistedMasterRates;
+          nextSettings.costRates = safeMergeRates(persistedMasterRates);
+        } else if (nextSettings.costRates) {
+          nextSettings.costRates = safeMergeRates(nextSettings.costRates);
         }
 
         return {
@@ -62,7 +64,7 @@ export default function App() {
       });
 
       if (persistedMasterRates) {
-        setMasterRates(persistedMasterRates);
+        setMasterRates(safeMergeRates(persistedMasterRates));
       }
     }
     init();
@@ -354,6 +356,9 @@ export default function App() {
     setContextMenu(null);
     
     const hydratedSettings = await hydrateSettingsWithBranding(loadedState.settings);
+    if (hydratedSettings.costRates) {
+      hydratedSettings.costRates = safeMergeRates(hydratedSettings.costRates);
+    }
     
     setState({
       ...loadedState,

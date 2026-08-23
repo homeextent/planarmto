@@ -1261,8 +1261,29 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           ctx.font = '700 12px system-ui, sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          const sym = st.type === 'switch_dimmer' ? '$D' : st.type === 'switch_3way' ? '$3' : '$';
+          const sym = st.type === 'switch_dimmer' ? '$D' : st.type === 'switch_3way' ? '$3W' : '$';
           ctx.fillText(sym, 0, 0);
+        } else if (st.type === 'stamp_electrical_panel' || st.type === 'electrical_panel') {
+          // Electrical Panel: Rectangular symbol with a diagonal line
+          const pw = Math.max(12, 1.0 * scale);
+          const ph = Math.max(20, 1.67 * scale);
+          ctx.fillStyle = isSelected ? 'rgba(56, 189, 248, 0.2)' : 'rgba(100, 116, 139, 0.15)';
+          ctx.fillRect(-pw / 2, -ph / 2, pw, ph);
+          ctx.strokeStyle = isSelected ? '#38bdf8' : '#64748b';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(-pw / 2, -ph / 2, pw, ph);
+          // Diagonal line
+          ctx.beginPath();
+          ctx.moveTo(-pw / 2, -ph / 2);
+          ctx.lineTo(pw / 2, ph / 2);
+          ctx.stroke();
+          // Panel Label
+          ctx.fillStyle = isSelected ? '#38bdf8' : '#94a3b8';
+          ctx.font = '700 8px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          const pType = st.panelType || 'main';
+          const pAmp = st.panelAmperage || (pType === 'main' ? '200A' : '100A');
+          ctx.fillText(`PANEL ${pType.toUpperCase()} ${pAmp}`, 0, ph / 2 + 10);
         } else if (st.type.startsWith('outlet_')) {
           // Duplex outlet circle with 2 prongs
           ctx.fillStyle = isSelected ? '#38bdf8' : '#0f172a';
@@ -2193,9 +2214,10 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     const stampTypeMap: Record<string, CadStamp['type']> = {
       stamp_column: 'column_post', stamp_pier: 'helical_pier', stamp_beam: 'beam_segment', stamp_stair: 'stair_run',
-      stamp_switch: 'switch_std', stamp_dimmer: 'switch_dimmer', stamp_3way: 'switch_3way', stamp_outlet: 'outlet_std',
+      stamp_switch: 'switch_std', stamp_dimmer: 'switch_dimmer', stamp_3way: 'switch_3way', stamp_electrical_panel: 'electrical_panel', stamp_outlet: 'outlet_std',
       stamp_gfci: 'outlet_gfci', stamp_240v: 'outlet_240v', stamp_ev: 'outlet_ev', stamp_potlight: 'light_potlight',
       stamp_light_fixture: 'light_fixture', stamp_coach_light: 'light_coach', stamp_soffit_light: 'light_soffit',
+      stamp_sconce: 'light_fixture', // Mapping sconce to light_fixture
       stamp_fan_ceiling: 'fan_ceiling', stamp_fan_exhaust: 'fan_exhaust', stamp_rangehood: 'fan_rangehood',
       alarm_smoke_co: 'alarm_smoke_co', stamp_plumbing_toilet: 'plumbing_toilet', stamp_plumbing_sink: 'plumbing_sink',
       stamp_plumbing_shower: 'plumbing_shower', stamp_plumbing_tub: 'plumbing_tub', stamp_plumbing_hose_bib: 'plumbing_hose_bib',
@@ -2204,7 +2226,17 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     if (activeTool in stampTypeMap || activeTool.startsWith('stamp_') || activeTool === 'alarm_smoke_co') {
       const stampType = stampTypeMap[activeTool] || (activeTool.replace('stamp_', '') as CadStamp['type']);
-      const newStamp: CadStamp = { id: `st_${Date.now()}`, type: stampType, x: Math.round(worldPoint.x * 10) / 10, y: Math.round(worldPoint.y * 10) / 10, parentType: 'canvas', rotation: 0, length: stampType === 'beam_segment' ? 12.0 : stampType === 'utility_trench' ? 25.0 : undefined };
+      const newStamp: CadStamp = {
+        id: `st_${Date.now()}`,
+        type: stampType,
+        x: Math.round(worldPoint.x * 10) / 10,
+        y: Math.round(worldPoint.y * 10) / 10,
+        parentType: 'canvas',
+        rotation: 0,
+        length: stampType === 'beam_segment' ? 12.0 : stampType === 'utility_trench' ? 25.0 : undefined,
+        panelType: (stampType === 'electrical_panel' || (stampType as string) === 'stamp_electrical_panel') ? 'main' : undefined,
+        panelAmperage: (stampType === 'electrical_panel' || (stampType as string) === 'stamp_electrical_panel') ? '200A' : undefined
+      };
       onChange({ ...state, stamps: [...state.stamps, newStamp] });
       onSelect({ type: 'stamp', id: newStamp.id });
       if (!isStickyMode) { onToolChange('select'); }

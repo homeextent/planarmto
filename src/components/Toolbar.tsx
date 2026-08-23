@@ -105,6 +105,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       tools: [
         { id: 'stamp_switch', label: 'Standard Switch ($)', icon: <Zap className="w-4 h-4 text-yellow-400" /> },
         { id: 'stamp_dimmer', label: 'Dimmer Switch ($D)', icon: <Zap className="w-4 h-4 text-yellow-500" /> },
+        { id: 'stamp_3way', label: '3-Way Switch ($3W)', icon: <Zap className="w-4 h-4 text-yellow-600" /> },
+        { id: 'stamp_electrical_panel', label: 'Electrical Panel', icon: <Layout className="w-4 h-4 text-slate-400" /> },
+        { id: 'stamp_sconce', label: 'Wall Sconce / Fixture', icon: <Lightbulb className="w-4 h-4 text-yellow-200" /> },
+        { id: 'stamp_coach_light', label: 'Exterior Coach Light', icon: <Lightbulb className="w-4 h-4 text-yellow-400" /> },
+        { id: 'stamp_soffit_light', label: 'Soffit / Eaves Light', icon: <Lightbulb className="w-4 h-4 text-yellow-600" /> },
         { id: 'stamp_outlet', label: '120V Std Outlet', icon: <Zap className="w-4 h-4 text-cyan-400" /> },
         { id: 'stamp_gfci', label: 'GFCI Wet Outlet', icon: <Zap className="w-4 h-4 text-blue-400" /> },
         { id: 'stamp_240v', label: '240V Heavy Outlet', icon: <Zap className="w-4 h-4 text-amber-400" /> },

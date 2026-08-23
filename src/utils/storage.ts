@@ -1,5 +1,5 @@
 import { CompanyBranding, FloorplanState, ProjectSettings, UnitCostRates } from '../types';
-import { calculateMTO, calculateEstimatedCost, DEFAULT_UNIT_COST_RATES } from '../engine/estimator';
+import { calculateMTO, calculateEstimatedCost, DEFAULT_UNIT_COST_RATES, safeMergeRates } from '../engine/estimator';
 
 const BRANDING_STORAGE_KEY = 'planarmto_company_branding_v1';
 const PROJECTS_DIRECTORY_KEY = 'planarmto_saved_projects_v1';
@@ -108,11 +108,14 @@ export async function getPersistedBranding(): Promise<CompanyBranding | null> {
  * Persists global master rate presets.
  */
 export async function savePersistedRateProfile(rates: UnitCostRates): Promise<void> {
+  // Note: timestamps are now expected to be managed by the caller in categoryLastUpdated
+  const ratesToSave = { ...rates };
+
   if (isWP()) {
     try {
       await wpFetch('rates', {
         method: 'POST',
-        body: JSON.stringify(rates),
+        body: JSON.stringify(ratesToSave),
       });
       return;
     } catch (err) {
@@ -121,7 +124,7 @@ export async function savePersistedRateProfile(rates: UnitCostRates): Promise<vo
   }
 
   try {
-    localStorage.setItem(GLOBAL_RATES_STORAGE_KEY, JSON.stringify(rates));
+    localStorage.setItem(GLOBAL_RATES_STORAGE_KEY, JSON.stringify(ratesToSave));
   } catch (err) {
     console.warn('Unable to persist global rates to localStorage:', err);
   }
@@ -131,25 +134,32 @@ export async function savePersistedRateProfile(rates: UnitCostRates): Promise<vo
  * Retrieves persisted global master rate presets.
  */
 export async function getPersistedRateProfile(): Promise<UnitCostRates | null> {
+  let loadedRates: Partial<UnitCostRates> | null = null;
+
   if (isWP()) {
     try {
       const rates = await wpFetch<UnitCostRates | any[]>('rates');
       // If it returns an empty array, it means no meta found
-      if (Array.isArray(rates) && rates.length === 0) return null;
-      return rates as UnitCostRates;
+      if (!(Array.isArray(rates) && rates.length === 0)) {
+        loadedRates = rates as UnitCostRates;
+      }
     } catch (err) {
       console.warn('WP Rates fetch failed, falling back to local:', err);
     }
   }
 
-  try {
-    const raw = localStorage.getItem(GLOBAL_RATES_STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as UnitCostRates;
-  } catch (err) {
-    console.warn('Unable to read global rates from localStorage:', err);
-    return null;
+  if (!loadedRates) {
+    try {
+      const raw = localStorage.getItem(GLOBAL_RATES_STORAGE_KEY);
+      if (raw) {
+        loadedRates = JSON.parse(raw) as UnitCostRates;
+      }
+    } catch (err) {
+      console.warn('Unable to read global rates from localStorage:', err);
+    }
   }
+
+  return loadedRates ? safeMergeRates(loadedRates) : null;
 }
 
 /**
@@ -172,7 +182,13 @@ export async function getSavedProjects(): Promise<SavedProjectEntry[]> {
           estimatedTotal: Number(p.estimatedTotal || p.estimated_total || 0),
           createdAt: Number(p.createdAt || (p.created_at ? new Date(p.created_at).getTime() : Date.now())),
           updatedAt: Number(p.updatedAt || (p.updated_at ? new Date(p.updated_at).getTime() : Date.now())),
-          state: typeof p.state === 'string' ? JSON.parse(p.state) : p.state || (p.project_state ? (typeof p.project_state === 'string' ? JSON.parse(p.project_state) : p.project_state) : {}),
+          state: (() => {
+            const parsedState = typeof p.state === 'string' ? JSON.parse(p.state) : p.state || (p.project_state ? (typeof p.project_state === 'string' ? JSON.parse(p.project_state) : p.project_state) : {});
+            if (parsedState?.settings?.costRates) {
+              parsedState.settings.costRates = safeMergeRates(parsedState.settings.costRates);
+            }
+            return parsedState;
+          })(),
         }))
         .sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0));
     } catch (err) {
@@ -185,7 +201,12 @@ export async function getSavedProjects(): Promise<SavedProjectEntry[]> {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed.sort((a, b) => b.updatedAt - a.updatedAt);
+      return parsed.map(p => {
+        if (p.state?.settings?.costRates) {
+          p.state.settings.costRates = safeMergeRates(p.state.settings.costRates);
+        }
+        return p;
+      }).sort((a, b) => b.updatedAt - a.updatedAt);
     }
     return [];
   } catch (err) {
@@ -224,7 +245,16 @@ export async function saveProjectToDirectory(
     grossSf: mto.grossFootprintSf || mto.flooringPackageSf || 0,
     netSf: mto.netFloorAreaSf || mto.flooringPackageSf || 0,
     estimatedTotal: cost.totalCost,
-    state,
+    state: {
+      ...state,
+      settings: {
+        ...state.settings,
+        costRates: state.settings.costRates ? {
+          ...state.settings.costRates,
+          // No longer using global lastUpdated
+        } : undefined,
+      },
+    },
   };
 
   if (isWP()) {

@@ -72,6 +72,7 @@ export type StampType =
   | 'switch_std'
   | 'switch_dimmer'
   | 'switch_3way'
+  | 'electrical_panel'
   | 'outlet_std'
   | 'outlet_gfci'
   | 'outlet_240v'
@@ -115,6 +116,8 @@ export interface CadStamp {
   points?: Array<{ x: number; y: number }>; // For multi-point paths like trenching or stair run
   stairRisers?: number; // Calculated or custom stair risers
   stairWidth?: number;
+  panelType?: 'main' | 'subpanel';
+  panelAmperage?: '60A' | '100A' | '125A' | '200A' | '400A';
 }
 
 export interface CadWall {
@@ -212,6 +215,16 @@ export interface UnitCostRates {
   garageDoorPerBay: CostRateItem;
   doorHardwarePerSet: CostRateItem;
   switchPerUnit: CostRateItem;
+  switch3Way: CostRateItem;
+  electricalPanelMain100A: CostRateItem;
+  electricalPanelMain200A: CostRateItem;
+  electricalPanelMain400A: CostRateItem;
+  electricalPanelSub60A: CostRateItem;
+  electricalPanelSub100A: CostRateItem;
+  electricalPanelSub125A: CostRateItem;
+  fixtureSconce: CostRateItem;
+  exteriorCoachLight: CostRateItem;
+  soffitLight: CostRateItem;
   outletPerUnit: CostRateItem;
   gfciPerUnit: CostRateItem;
   evChargerPerUnit: CostRateItem;
@@ -233,6 +246,7 @@ export interface UnitCostRates {
   eavestroughPerLf: CostRateItem;
   deckRailingPerLf: CostRateItem;
   hardscapePerSf: CostRateItem;
+  categoryLastUpdated?: Record<string, string>; // Map of category name to ISO timestamp
 }
 
 export interface CadAnnotation {
@@ -295,6 +309,7 @@ export interface ItemInclusions {
 
   // Electrical
   stdSwitches?: boolean;
+  switch3Way?: boolean;
   dimmers?: boolean;
   stdOutlets?: boolean;
   gfciOutlets?: boolean;
@@ -307,6 +322,7 @@ export interface ItemInclusions {
   ceilingFans?: boolean;
   spotExhaustFans?: boolean;
   rangeHoods?: boolean;
+  electricalPanels?: boolean;
   smokeCoAlarms?: boolean;
 
   // Plumbing & Civil
@@ -348,6 +364,7 @@ export const DEFAULT_ITEM_INCLUSIONS: ItemInclusions = {
   overheadGarageBays: true,
   doorHardwareSets: true,
   stdSwitches: true,
+  switch3Way: true,
   dimmers: true,
   stdOutlets: true,
   gfciOutlets: true,
@@ -360,6 +377,7 @@ export const DEFAULT_ITEM_INCLUSIONS: ItemInclusions = {
   ceilingFans: true,
   spotExhaustFans: true,
   rangeHoods: true,
+  electricalPanels: true,
   smokeCoAlarms: true,
   plumbingFixtures: true,
   utilityTrenching: true,
@@ -435,12 +453,13 @@ export type ActiveTool =
   | 'stamp_switch'
   | 'stamp_dimmer'
   | 'stamp_3way'
+  | 'stamp_electrical_panel'
   | 'stamp_outlet'
   | 'stamp_gfci'
   | 'stamp_240v'
   | 'stamp_ev'
   | 'stamp_potlight'
-  | 'stamp_light_fixture'
+  | 'stamp_sconce'
   | 'stamp_coach_light'
   | 'stamp_soffit_light'
   | 'stamp_fan_ceiling'
@@ -510,6 +529,13 @@ export interface MTOReport {
   ceilingFansUnits: number;
   spotExhaustFansUnits: number;
   rangeHoodsUnits: number;
+  electricalPanelsUnits: number;
+  panelBreakdown: Array<{
+    type: 'main' | 'subpanel';
+    amperage: string;
+    count: number;
+  }>;
+  switch3WayUnits: number;
   smokeCoAlarmsUnits: number;
 
   // 5. Mechanical Plumbing & Civil

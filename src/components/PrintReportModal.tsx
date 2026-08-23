@@ -536,16 +536,49 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
       <tr class="category-row">
         <td colspan="8">4 & 5. MEP, Electrical, Safety & Plumbing</td>
       </tr>
+      ${[
+        { name: 'Standard Switches', qty: mto.stdSwitchesUnits, unit: 'UNITS', mat: r.switchPerUnit.material, lab: r.switchPerUnit.labor, inc: state.settings.itemInclusions?.stdSwitches },
+        { name: 'Dimmers', qty: mto.dimmersUnits, unit: 'UNITS', mat: r.switchPerUnit.material * 1.5, lab: r.switchPerUnit.labor * 1.2, inc: state.settings.itemInclusions?.dimmers },
+        { name: '3-Way Switches', qty: mto.switch3WayUnits, unit: 'UNITS', mat: r.switch3Way.material, lab: r.switch3Way.labor, inc: state.settings.itemInclusions?.switch3Way },
+        { name: 'Standard 120V Outlets', qty: mto.stdOutletsUnits, unit: 'UNITS', mat: r.outletPerUnit.material, lab: r.outletPerUnit.labor, inc: state.settings.itemInclusions?.stdOutlets },
+        { name: 'GFCI Outlets', qty: mto.gfciOutletsUnits, unit: 'UNITS', mat: r.gfciPerUnit.material, lab: r.gfciPerUnit.labor, inc: state.settings.itemInclusions?.gfciOutlets },
+        { name: '240V Heavy Outlets', qty: mto.heavyOutlets24vUnits, unit: 'UNITS', mat: r.outletPerUnit.material * 2.5, lab: r.outletPerUnit.labor * 1.8, inc: state.settings.itemInclusions?.heavyOutlets24v },
+        { name: 'EV Level 2 Chargers', qty: mto.evChargersUnits, unit: 'UNITS', mat: r.evChargerPerUnit.material, lab: r.evChargerPerUnit.labor, inc: state.settings.itemInclusions?.evChargers },
+        { name: 'Potlights', qty: mto.potlightsUnits, unit: 'UNITS', mat: r.potlightPerUnit.material, lab: r.potlightPerUnit.labor, inc: state.settings.itemInclusions?.potlights },
+        { name: 'Sconces / Fixtures', qty: mto.fixturesSconcesUnits, unit: 'UNITS', mat: r.fixtureSconce.material, lab: r.fixtureSconce.labor, inc: state.settings.itemInclusions?.fixturesSconces },
+        { name: 'Exterior Coach Lights', qty: mto.exteriorCoachLightsUnits, unit: 'UNITS', mat: r.exteriorCoachLight.material, lab: r.exteriorCoachLight.labor, inc: state.settings.itemInclusions?.exteriorCoachLights },
+        { name: 'Soffit Lights', qty: mto.soffitLightsUnits, unit: 'UNITS', mat: r.soffitLight.material, lab: r.soffitLight.labor, inc: state.settings.itemInclusions?.soffitLights },
+        { name: 'Ceiling Fans', qty: mto.ceilingFansUnits, unit: 'UNITS', mat: r.ceilingFanPerUnit.material, lab: r.ceilingFanPerUnit.labor, inc: state.settings.itemInclusions?.ceilingFans },
+        { name: 'Exhaust Fans', qty: mto.spotExhaustFansUnits, unit: 'UNITS', mat: r.exhaustFanPerUnit.material, lab: r.exhaustFanPerUnit.labor, inc: state.settings.itemInclusions?.spotExhaustFans },
+        { name: 'Range Hoods', qty: mto.rangeHoodsUnits, unit: 'UNITS', mat: r.rangeHoodPerUnit.material, lab: r.rangeHoodPerUnit.labor, inc: state.settings.itemInclusions?.rangeHoods },
+        { name: 'Smoke Alarms', qty: mto.smokeCoAlarmsUnits, unit: 'UNITS', mat: r.smokeAlarmPerUnit.material, lab: r.smokeAlarmPerUnit.labor, inc: state.settings.itemInclusions?.smokeCoAlarms },
+        ...mto.panelBreakdown.map(p => {
+          let rateKey: keyof UnitCostRates = 'electricalPanelMain200A';
+          if (p.type === 'main') {
+            if (p.amperage === '100A') rateKey = 'electricalPanelMain100A';
+            else if (p.amperage === '400A') rateKey = 'electricalPanelMain400A';
+            else rateKey = 'electricalPanelMain200A';
+          } else {
+            if (p.amperage === '60A') rateKey = 'electricalPanelSub60A';
+            else if (p.amperage === '125A') rateKey = 'electricalPanelSub125A';
+            else rateKey = 'electricalPanelSub100A';
+          }
+          const rate = r[rateKey];
+          return { name: `Electrical ${p.type === 'main' ? 'Main Panel' : 'Subpanel'} - ${p.amperage}`, qty: p.count, unit: 'UNITS', mat: rate.material, lab: rate.labor, inc: state.settings.itemInclusions?.electricalPanels };
+        })
+      ]
+        .filter(item => item.qty > 0 && item.inc !== false)
+        .map(item => `
       <tr>
-        <td style="padding-left: 18px;">Electrical Devices, Outlets & Potlights</td>
-        <td class="num">${mto.stdSwitchesUnits + mto.stdOutletsUnits + mto.potlightsUnits}</td>
-        <td class="num">DEVICES</td>
-        <td class="num">-</td>
-        <td class="num">-</td>
-        <td class="num">$${costAnalysis.categoryBreakdown.electricalSafety.material.toFixed(2)}</td>
-        <td class="num">$${costAnalysis.categoryBreakdown.electricalSafety.labor.toFixed(2)}</td>
-        <td class="num"><strong>$${costAnalysis.subtotals.electricalSafety.toFixed(2)}</strong></td>
-      </tr>
+        <td style="padding-left: 18px;">${item.name}</td>
+        <td class="num">${item.qty}</td>
+        <td class="num">${item.unit}</td>
+        <td class="num">$${item.mat.toFixed(2)}</td>
+        <td class="num">$${item.lab.toFixed(2)}</td>
+        <td class="num">$${(item.qty * item.mat * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2)}</td>
+        <td class="num">$${(item.qty * item.lab * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2)}</td>
+        <td class="num"><strong>$${(item.qty * (item.mat + item.lab) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2)}</strong></td>
+      </tr>`).join('')}
       <tr>
         <td style="padding-left: 18px;">Plumbing Fixtures, Drains & Civil Trenching</td>
         <td class="num">${mto.plumbingFixturesUnits}</td>
@@ -873,18 +906,48 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
         (mto.exteriorDoorsUnits * r.exteriorDoorPerUnit.labor).toFixed(2),
         (mto.exteriorDoorsUnits * (r.exteriorDoorPerUnit.material + r.exteriorDoorPerUnit.labor)).toFixed(2),
       ],
-      [
+      ...[
+        { name: 'Standard Switches', qty: mto.stdSwitchesUnits, unit: 'UNITS', mat: r.switchPerUnit.material, lab: r.switchPerUnit.labor, inc: state.settings.itemInclusions?.stdSwitches },
+        { name: 'Dimmers', qty: mto.dimmersUnits, unit: 'UNITS', mat: r.switchPerUnit.material * 1.5, lab: r.switchPerUnit.labor * 1.2, inc: state.settings.itemInclusions?.dimmers },
+        { name: '3-Way Switches', qty: mto.switch3WayUnits, unit: 'UNITS', mat: r.switch3Way.material, lab: r.switch3Way.labor, inc: state.settings.itemInclusions?.switch3Way },
+        { name: 'Standard 120V Outlets', qty: mto.stdOutletsUnits, unit: 'UNITS', mat: r.outletPerUnit.material, lab: r.outletPerUnit.labor, inc: state.settings.itemInclusions?.stdOutlets },
+        { name: 'GFCI Outlets', qty: mto.gfciOutletsUnits, unit: 'UNITS', mat: r.gfciPerUnit.material, lab: r.gfciPerUnit.labor, inc: state.settings.itemInclusions?.gfciOutlets },
+        { name: '240V Heavy Outlets', qty: mto.heavyOutlets24vUnits, unit: 'UNITS', mat: r.outletPerUnit.material * 2.5, lab: r.outletPerUnit.labor * 1.8, inc: state.settings.itemInclusions?.heavyOutlets24v },
+        { name: 'EV Level 2 Chargers', qty: mto.evChargersUnits, unit: 'UNITS', mat: r.evChargerPerUnit.material, lab: r.evChargerPerUnit.labor, inc: state.settings.itemInclusions?.evChargers },
+        { name: 'Potlights', qty: mto.potlightsUnits, unit: 'UNITS', mat: r.potlightPerUnit.material, lab: r.potlightPerUnit.labor, inc: state.settings.itemInclusions?.potlights },
+        { name: 'Sconces / Fixtures', qty: mto.fixturesSconcesUnits, unit: 'UNITS', mat: r.fixtureSconce.material, lab: r.fixtureSconce.labor, inc: state.settings.itemInclusions?.fixturesSconces },
+        { name: 'Exterior Coach Lights', qty: mto.exteriorCoachLightsUnits, unit: 'UNITS', mat: r.exteriorCoachLight.material, lab: r.exteriorCoachLight.labor, inc: state.settings.itemInclusions?.exteriorCoachLights },
+        { name: 'Soffit Lights', qty: mto.soffitLightsUnits, unit: 'UNITS', mat: r.soffitLight.material, lab: r.soffitLight.labor, inc: state.settings.itemInclusions?.soffitLights },
+        { name: 'Ceiling Fans', qty: mto.ceilingFansUnits, unit: 'UNITS', mat: r.ceilingFanPerUnit.material, lab: r.ceilingFanPerUnit.labor, inc: state.settings.itemInclusions?.ceilingFans },
+        { name: 'Exhaust Fans', qty: mto.spotExhaustFansUnits, unit: 'UNITS', mat: r.exhaustFanPerUnit.material, lab: r.exhaustFanPerUnit.labor, inc: state.settings.itemInclusions?.spotExhaustFans },
+        { name: 'Range Hoods', qty: mto.rangeHoodsUnits, unit: 'UNITS', mat: r.rangeHoodPerUnit.material, lab: r.rangeHoodPerUnit.labor, inc: state.settings.itemInclusions?.rangeHoods },
+        { name: 'Smoke Alarms', qty: mto.smokeCoAlarmsUnits, unit: 'UNITS', mat: r.smokeAlarmPerUnit.material, lab: r.smokeAlarmPerUnit.labor, inc: state.settings.itemInclusions?.smokeCoAlarms },
+        ...mto.panelBreakdown.map(p => {
+          let rateKey: keyof UnitCostRates = 'electricalPanelMain200A';
+          if (p.type === 'main') {
+            if (p.amperage === '100A') rateKey = 'electricalPanelMain100A';
+            else if (p.amperage === '400A') rateKey = 'electricalPanelMain400A';
+            else rateKey = 'electricalPanelMain200A';
+          } else {
+            if (p.amperage === '60A') rateKey = 'electricalPanelSub60A';
+            else if (p.amperage === '125A') rateKey = 'electricalPanelSub125A';
+            else rateKey = 'electricalPanelSub100A';
+          }
+          const rate = r[rateKey];
+          return { name: `Electrical ${p.type === 'main' ? 'Main Panel' : 'Subpanel'} - ${p.amperage}`, qty: p.count, unit: 'UNITS', mat: rate.material, lab: rate.labor, inc: state.settings.itemInclusions?.electricalPanels };
+        })
+      ].filter(item => item.qty > 0 && item.inc !== false).map(item => [
         '4. Electrical & Safety',
-        'Switches, Outlets, & Potlights',
-        mto.stdSwitchesUnits + mto.stdOutletsUnits + mto.potlightsUnits,
-        'DEVICES',
-        '-',
-        '-',
-        '-',
-        costAnalysis.categoryBreakdown.electricalSafety.material.toFixed(2),
-        costAnalysis.categoryBreakdown.electricalSafety.labor.toFixed(2),
-        costAnalysis.subtotals.electricalSafety.toFixed(2),
-      ],
+        item.name,
+        item.qty,
+        item.unit,
+        item.mat.toFixed(2),
+        item.lab.toFixed(2),
+        (item.mat + item.lab).toFixed(2),
+        (item.qty * item.mat * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (item.qty * item.lab * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (item.qty * (item.mat + item.lab) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+      ]),
       [
         '5. Plumbing & Civil',
         'Plumbing Fixtures & Civil Trenching',
@@ -1386,6 +1449,48 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
                     <tr className="bg-slate-900/60 font-bold text-sky-300">
                       <td colSpan={8} className="p-2">4 & 5. MEP, Plumbing & Electrical</td>
                     </tr>
+                    {[
+                      { name: 'Standard Switches', qty: mto.stdSwitchesUnits, unit: 'UNITS', mat: activeRates.switchPerUnit.material, lab: activeRates.switchPerUnit.labor, inc: state.settings.itemInclusions?.stdSwitches },
+                      { name: 'Dimmers', qty: mto.dimmersUnits, unit: 'UNITS', mat: activeRates.switchPerUnit.material * 1.5, lab: activeRates.switchPerUnit.labor * 1.2, inc: state.settings.itemInclusions?.dimmers },
+                      { name: '3-Way Switches', qty: mto.switch3WayUnits, unit: 'UNITS', mat: activeRates.switch3Way.material, lab: activeRates.switch3Way.labor, inc: state.settings.itemInclusions?.switch3Way },
+                      { name: 'Standard 120V Outlets', qty: mto.stdOutletsUnits, unit: 'UNITS', mat: activeRates.outletPerUnit.material, lab: activeRates.outletPerUnit.labor, inc: state.settings.itemInclusions?.stdOutlets },
+                      { name: 'GFCI Outlets', qty: mto.gfciOutletsUnits, unit: 'UNITS', mat: activeRates.gfciPerUnit.material, lab: activeRates.gfciPerUnit.labor, inc: state.settings.itemInclusions?.gfciOutlets },
+                      { name: '240V Heavy Outlets', qty: mto.heavyOutlets24vUnits, unit: 'UNITS', mat: activeRates.outletPerUnit.material * 2.5, lab: activeRates.outletPerUnit.labor * 1.8, inc: state.settings.itemInclusions?.heavyOutlets24v },
+                      { name: 'EV Level 2 Chargers', qty: mto.evChargersUnits, unit: 'UNITS', mat: activeRates.evChargerPerUnit.material, lab: activeRates.evChargerPerUnit.labor, inc: state.settings.itemInclusions?.evChargers },
+                      { name: 'Potlights', qty: mto.potlightsUnits, unit: 'UNITS', mat: activeRates.potlightPerUnit.material, lab: activeRates.potlightPerUnit.labor, inc: state.settings.itemInclusions?.potlights },
+                      { name: 'Sconces / Fixtures', qty: mto.fixturesSconcesUnits, unit: 'UNITS', mat: activeRates.fixtureSconce.material, lab: activeRates.fixtureSconce.labor, inc: state.settings.itemInclusions?.fixturesSconces },
+                      { name: 'Exterior Coach Lights', qty: mto.exteriorCoachLightsUnits, unit: 'UNITS', mat: activeRates.exteriorCoachLight.material, lab: activeRates.exteriorCoachLight.labor, inc: state.settings.itemInclusions?.exteriorCoachLights },
+                      { name: 'Soffit Lights', qty: mto.soffitLightsUnits, unit: 'UNITS', mat: activeRates.soffitLight.material, lab: activeRates.soffitLight.labor, inc: state.settings.itemInclusions?.soffitLights },
+                      { name: 'Ceiling Fans', qty: mto.ceilingFansUnits, unit: 'UNITS', mat: activeRates.ceilingFanPerUnit.material, lab: activeRates.ceilingFanPerUnit.labor, inc: state.settings.itemInclusions?.ceilingFans },
+                      { name: 'Exhaust Fans', qty: mto.spotExhaustFansUnits, unit: 'UNITS', mat: activeRates.exhaustFanPerUnit.material, lab: activeRates.exhaustFanPerUnit.labor, inc: state.settings.itemInclusions?.spotExhaustFans },
+                      { name: 'Range Hoods', qty: mto.rangeHoodsUnits, unit: 'UNITS', mat: activeRates.rangeHoodPerUnit.material, lab: activeRates.rangeHoodPerUnit.labor, inc: state.settings.itemInclusions?.rangeHoods },
+                      { name: 'Smoke Alarms', qty: mto.smokeCoAlarmsUnits, unit: 'UNITS', mat: activeRates.smokeAlarmPerUnit.material, lab: activeRates.smokeAlarmPerUnit.labor, inc: state.settings.itemInclusions?.smokeCoAlarms },
+                      ...mto.panelBreakdown.map(p => {
+                        let rateKey: keyof UnitCostRates = 'electricalPanelMain200A';
+                        if (p.type === 'main') {
+                          if (p.amperage === '100A') rateKey = 'electricalPanelMain100A';
+                          else if (p.amperage === '400A') rateKey = 'electricalPanelMain400A';
+                          else rateKey = 'electricalPanelMain200A';
+                        } else {
+                          if (p.amperage === '60A') rateKey = 'electricalPanelSub60A';
+                          else if (p.amperage === '125A') rateKey = 'electricalPanelSub125A';
+                          else rateKey = 'electricalPanelSub100A';
+                        }
+                        const rate = activeRates[rateKey];
+                        return { name: `Electrical ${p.type === 'main' ? 'Main Panel' : 'Subpanel'} - ${p.amperage}`, qty: p.count, unit: 'UNITS', mat: rate.material, lab: rate.labor, inc: state.settings.itemInclusions?.electricalPanels };
+                      })
+                    ].filter(item => item.qty > 0 && item.inc !== false).map((item, idx) => (
+                      <tr key={`elec-${idx}`}>
+                        <td className="p-2 pl-4 text-slate-300">{item.name}</td>
+                        <td className="p-2 text-right font-mono">{item.qty}</td>
+                        <td className="p-2 text-slate-400">{item.unit}</td>
+                        <td className="p-2 text-right font-mono text-slate-400">${item.mat.toFixed(2)}</td>
+                        <td className="p-2 text-right font-mono text-slate-400">${item.lab.toFixed(2)}</td>
+                        <td className="p-2 text-right font-mono">${(item.qty * item.mat * (1 + state.settings.wasteFactorPercentage / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="p-2 text-right font-mono">${(item.qty * item.lab * (1 + state.settings.wasteFactorPercentage / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="p-2 text-right font-mono font-semibold">${(item.qty * (item.mat + item.lab) * (1 + state.settings.wasteFactorPercentage / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      </tr>
+                    ))}
                     <tr>
                       <td className="p-2 pl-4 text-slate-300">Plumbing Fixtures & Civil Trenching</td>
                       <td className="p-2 text-right font-mono">{mto.plumbingFixturesUnits}</td>
@@ -1396,17 +1501,6 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
                       <td className="p-2 text-right font-mono">${costAnalysis.categoryBreakdown.plumbingCivil.labor.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="p-2 text-right font-mono font-semibold">${costAnalysis.subtotals.plumbingCivil.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     </tr>
-                    <tr>
-                      <td className="p-2 pl-4 text-slate-300">Electrical Devices & Lighting Fixtures</td>
-                      <td className="p-2 text-right font-mono">{mto.stdSwitchesUnits + mto.stdOutletsUnits + mto.potlightsUnits}</td>
-                      <td className="p-2 text-slate-400">DEVICES</td>
-                      <td className="p-2 text-right font-mono text-slate-400">-</td>
-                      <td className="p-2 text-right font-mono text-slate-400">-</td>
-                      <td className="p-2 text-right font-mono">${costAnalysis.categoryBreakdown.electricalSafety.material.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="p-2 text-right font-mono">${costAnalysis.categoryBreakdown.electricalSafety.labor.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="p-2 text-right font-mono font-semibold">${costAnalysis.subtotals.electricalSafety.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    </tr>
-
                     {/* Division 6 & 7 */}
                     <tr className="bg-slate-900/60 font-bold text-sky-300">
                       <td colSpan={8} className="p-2">6 & 7. Foundation, Roof & Exterior Envelope</td>

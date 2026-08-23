@@ -62,7 +62,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
 
   const inclusions = state.settings.categoryInclusions;
   const itemInclusions = state.settings.itemInclusions;
-  const costAnalysis = calculateEstimatedCost(mto, costRates, inclusions, itemInclusions, state.settings);
+  const costAnalysis = calculateEstimatedCost(mto, costRates, inclusions, itemInclusions, state.settings, state.stamps);
   const activeRates = costRates || DEFAULT_UNIT_COST_RATES;
   const isInteriorMode = state.settings.calculationMode === 'interior_finish';
 
@@ -100,48 +100,48 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         'Drywall Board (Tape & Sand)',
         mto.drywallBoardSf,
         'SF',
-        r.drywallPerSf.material,
-        r.drywallPerSf.labor,
-        (r.drywallPerSf.material + r.drywallPerSf.labor).toFixed(2),
-        (mto.drywallBoardSf * r.drywallPerSf.material).toFixed(2),
-        (mto.drywallBoardSf * r.drywallPerSf.labor).toFixed(2),
-        (mto.drywallBoardSf * (r.drywallPerSf.material + r.drywallPerSf.labor)).toFixed(2),
+        r.drywallPerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.material,
+        r.drywallPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.labor,
+        ((r.drywallPerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.material) + (r.drywallPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.labor)).toFixed(2),
+        (mto.drywallBoardSf * (r.drywallPerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.material)).toFixed(2),
+        (mto.drywallBoardSf * (r.drywallPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.labor)).toFixed(2),
+        (mto.drywallBoardSf * ((r.drywallPerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.material) + (r.drywallPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.labor))).toFixed(2),
       ],
       [
         '1. Board & Finishes',
         'Paint Coverage (Primer + 2 Coats)',
         mto.paintCoverageSf,
         'SF',
-        r.paintPerSf.material,
-        r.paintPerSf.labor,
-        (r.paintPerSf.material + r.paintPerSf.labor).toFixed(2),
-        (mto.paintCoverageSf * r.paintPerSf.material).toFixed(2),
-        (mto.paintCoverageSf * r.paintPerSf.labor).toFixed(2),
-        (mto.paintCoverageSf * (r.paintPerSf.material + r.paintPerSf.labor)).toFixed(2),
+        r.paintPerSf?.material ?? DEFAULT_UNIT_COST_RATES.paintPerSf.material,
+        r.paintPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.paintPerSf.labor,
+        ((r.paintPerSf?.material ?? DEFAULT_UNIT_COST_RATES.paintPerSf.material) + (r.paintPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.paintPerSf.labor)).toFixed(2),
+        (mto.paintCoverageSf * (r.paintPerSf?.material ?? DEFAULT_UNIT_COST_RATES.paintPerSf.material)).toFixed(2),
+        (mto.paintCoverageSf * (r.paintPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.paintPerSf.labor)).toFixed(2),
+        (mto.paintCoverageSf * ((r.paintPerSf?.material ?? DEFAULT_UNIT_COST_RATES.paintPerSf.material) + (r.paintPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.paintPerSf.labor))).toFixed(2),
       ],
       [
         '1. Board & Finishes',
         'Flooring Package',
         mto.flooringPackageSf,
         'SF',
-        r.flooringPerSf.material,
-        r.flooringPerSf.labor,
-        (r.flooringPerSf.material + r.flooringPerSf.labor).toFixed(2),
-        (mto.flooringPackageSf * r.flooringPerSf.material).toFixed(2),
-        (mto.flooringPackageSf * r.flooringPerSf.labor).toFixed(2),
-        (mto.flooringPackageSf * (r.flooringPerSf.material + r.flooringPerSf.labor)).toFixed(2),
+        r.flooringPerSf?.material ?? DEFAULT_UNIT_COST_RATES.flooringPerSf.material,
+        r.flooringPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.flooringPerSf.labor,
+        ((r.flooringPerSf?.material ?? DEFAULT_UNIT_COST_RATES.flooringPerSf.material) + (r.flooringPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.flooringPerSf.labor)).toFixed(2),
+        (mto.flooringPackageSf * (r.flooringPerSf?.material ?? DEFAULT_UNIT_COST_RATES.flooringPerSf.material)).toFixed(2),
+        (mto.flooringPackageSf * (r.flooringPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.flooringPerSf.labor)).toFixed(2),
+        (mto.flooringPackageSf * ((r.flooringPerSf?.material ?? DEFAULT_UNIT_COST_RATES.flooringPerSf.material) + (r.flooringPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.flooringPerSf.labor))).toFixed(2),
       ],
       [
         '1. Board & Finishes',
         'Ext. Wall Insulation (R-20)',
         mto.extWallInsulationSf,
         'SF',
-        r.extInsulationPerSf.material,
-        r.extInsulationPerSf.labor,
-        (r.extInsulationPerSf.material + r.extInsulationPerSf.labor).toFixed(2),
-        (mto.extWallInsulationSf * r.extInsulationPerSf.material).toFixed(2),
-        (mto.extWallInsulationSf * r.extInsulationPerSf.labor).toFixed(2),
-        (mto.extWallInsulationSf * (r.extInsulationPerSf.material + r.extInsulationPerSf.labor)).toFixed(2),
+        r.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material,
+        r.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor,
+        ((r.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material) + (r.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor)).toFixed(2),
+        (mto.extWallInsulationSf * (r.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material)).toFixed(2),
+        (mto.extWallInsulationSf * (r.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor)).toFixed(2),
+        (mto.extWallInsulationSf * ((r.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material) + (r.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor))).toFixed(2),
       ],
 
       // 2. Carpentry
@@ -150,84 +150,84 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         'Wall Stud Framing',
         mto.wallStudFramingLf,
         'LF',
-        r.studFramingPerLf.material,
-        r.studFramingPerLf.labor,
-        (r.studFramingPerLf.material + r.studFramingPerLf.labor).toFixed(2),
-        (mto.wallStudFramingLf * r.studFramingPerLf.material).toFixed(2),
-        (mto.wallStudFramingLf * r.studFramingPerLf.labor).toFixed(2),
-        (mto.wallStudFramingLf * (r.studFramingPerLf.material + r.studFramingPerLf.labor)).toFixed(2),
+        r.studFramingPerLf?.material ?? DEFAULT_UNIT_COST_RATES.studFramingPerLf.material,
+        r.studFramingPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.studFramingPerLf.labor,
+        ((r.studFramingPerLf?.material ?? DEFAULT_UNIT_COST_RATES.studFramingPerLf.material) + (r.studFramingPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.studFramingPerLf.labor)).toFixed(2),
+        (mto.wallStudFramingLf * (r.studFramingPerLf?.material ?? DEFAULT_UNIT_COST_RATES.studFramingPerLf.material)).toFixed(2),
+        (mto.wallStudFramingLf * (r.studFramingPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.studFramingPerLf.labor)).toFixed(2),
+        (mto.wallStudFramingLf * ((r.studFramingPerLf?.material ?? DEFAULT_UNIT_COST_RATES.studFramingPerLf.material) + (r.studFramingPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.studFramingPerLf.labor))).toFixed(2),
       ],
       [
         '2. Carpentry & Framing',
         'OSB Subfloor Decking',
         mto.osbSubfloorDeckingSf,
         'SF',
-        r.osbSubfloorPerSf.material,
-        r.osbSubfloorPerSf.labor,
-        (r.osbSubfloorPerSf.material + r.osbSubfloorPerSf.labor).toFixed(2),
-        (mto.osbSubfloorDeckingSf * r.osbSubfloorPerSf.material).toFixed(2),
-        (mto.osbSubfloorDeckingSf * r.osbSubfloorPerSf.labor).toFixed(2),
-        (mto.osbSubfloorDeckingSf * (r.osbSubfloorPerSf.material + r.osbSubfloorPerSf.labor)).toFixed(2),
+        r.osbSubfloorPerSf?.material ?? DEFAULT_UNIT_COST_RATES.osbSubfloorPerSf.material,
+        r.osbSubfloorPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.osbSubfloorPerSf.labor,
+        ((r.osbSubfloorPerSf?.material ?? DEFAULT_UNIT_COST_RATES.osbSubfloorPerSf.material) + (r.osbSubfloorPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.osbSubfloorPerSf.labor)).toFixed(2),
+        (mto.osbSubfloorDeckingSf * (r.osbSubfloorPerSf?.material ?? DEFAULT_UNIT_COST_RATES.osbSubfloorPerSf.material)).toFixed(2),
+        (mto.osbSubfloorDeckingSf * (r.osbSubfloorPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.osbSubfloorPerSf.labor)).toFixed(2),
+        (mto.osbSubfloorDeckingSf * ((r.osbSubfloorPerSf?.material ?? DEFAULT_UNIT_COST_RATES.osbSubfloorPerSf.material) + (r.osbSubfloorPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.osbSubfloorPerSf.labor))).toFixed(2),
       ],
       [
         '2. Carpentry & Framing',
         'Structural Beams',
         mto.structuralBeamsLf,
         'LF',
-        r.beamPerLf.material,
-        r.beamPerLf.labor,
-        (r.beamPerLf.material + r.beamPerLf.labor).toFixed(2),
-        (mto.structuralBeamsLf * r.beamPerLf.material).toFixed(2),
-        (mto.structuralBeamsLf * r.beamPerLf.labor).toFixed(2),
-        (mto.structuralBeamsLf * (r.beamPerLf.material + r.beamPerLf.labor)).toFixed(2),
+        r.beamPerLf?.material ?? DEFAULT_UNIT_COST_RATES.beamPerLf.material,
+        r.beamPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.beamPerLf.labor,
+        ((r.beamPerLf?.material ?? DEFAULT_UNIT_COST_RATES.beamPerLf.material) + (r.beamPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.beamPerLf.labor)).toFixed(2),
+        (mto.structuralBeamsLf * (r.beamPerLf?.material ?? DEFAULT_UNIT_COST_RATES.beamPerLf.material)).toFixed(2),
+        (mto.structuralBeamsLf * (r.beamPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.beamPerLf.labor)).toFixed(2),
+        (mto.structuralBeamsLf * ((r.beamPerLf?.material ?? DEFAULT_UNIT_COST_RATES.beamPerLf.material) + (r.beamPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.beamPerLf.labor))).toFixed(2),
       ],
       [
         '2. Carpentry & Framing',
         'Support Columns / Posts',
         mto.supportColumnsPosts,
         'POSTS',
-        r.postPerUnit.material,
-        r.postPerUnit.labor,
-        (r.postPerUnit.material + r.postPerUnit.labor).toFixed(2),
-        (mto.supportColumnsPosts * r.postPerUnit.material).toFixed(2),
-        (mto.supportColumnsPosts * r.postPerUnit.labor).toFixed(2),
-        (mto.supportColumnsPosts * (r.postPerUnit.material + r.postPerUnit.labor)).toFixed(2),
+        r.postPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.postPerUnit.material,
+        r.postPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.postPerUnit.labor,
+        ((r.postPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.postPerUnit.material) + (r.postPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.postPerUnit.labor)).toFixed(2),
+        (mto.supportColumnsPosts * (r.postPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.postPerUnit.material)).toFixed(2),
+        (mto.supportColumnsPosts * (r.postPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.postPerUnit.labor)).toFixed(2),
+        (mto.supportColumnsPosts * ((r.postPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.postPerUnit.material) + (r.postPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.postPerUnit.labor))).toFixed(2),
       ],
       [
         '2. Carpentry & Framing',
         'Baseboard Trims',
         mto.baseboardTrimsLf,
         'LF',
-        r.baseboardPerLf.material,
-        r.baseboardPerLf.labor,
-        (r.baseboardPerLf.material + r.baseboardPerLf.labor).toFixed(2),
-        (mto.baseboardTrimsLf * r.baseboardPerLf.material).toFixed(2),
-        (mto.baseboardTrimsLf * r.baseboardPerLf.labor).toFixed(2),
-        (mto.baseboardTrimsLf * (r.baseboardPerLf.material + r.baseboardPerLf.labor)).toFixed(2),
+        r.baseboardPerLf?.material ?? DEFAULT_UNIT_COST_RATES.baseboardPerLf.material,
+        r.baseboardPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.baseboardPerLf.labor,
+        ((r.baseboardPerLf?.material ?? DEFAULT_UNIT_COST_RATES.baseboardPerLf.material) + (r.baseboardPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.baseboardPerLf.labor)).toFixed(2),
+        (mto.baseboardTrimsLf * (r.baseboardPerLf?.material ?? DEFAULT_UNIT_COST_RATES.baseboardPerLf.material)).toFixed(2),
+        (mto.baseboardTrimsLf * (r.baseboardPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.baseboardPerLf.labor)).toFixed(2),
+        (mto.baseboardTrimsLf * ((r.baseboardPerLf?.material ?? DEFAULT_UNIT_COST_RATES.baseboardPerLf.material) + (r.baseboardPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.baseboardPerLf.labor))).toFixed(2),
       ],
       [
         '2. Carpentry & Framing',
         'Aperture Casing',
         mto.apertureCasingLf,
         'LF',
-        r.casingPerLf.material,
-        r.casingPerLf.labor,
-        (r.casingPerLf.material + r.casingPerLf.labor).toFixed(2),
-        (mto.apertureCasingLf * r.casingPerLf.material).toFixed(2),
-        (mto.apertureCasingLf * r.casingPerLf.labor).toFixed(2),
-        (mto.apertureCasingLf * (r.casingPerLf.material + r.casingPerLf.labor)).toFixed(2),
+        r.casingPerLf?.material ?? DEFAULT_UNIT_COST_RATES.casingPerLf.material,
+        r.casingPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.casingPerLf.labor,
+        ((r.casingPerLf?.material ?? DEFAULT_UNIT_COST_RATES.casingPerLf.material) + (r.casingPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.casingPerLf.labor)).toFixed(2),
+        (mto.apertureCasingLf * (r.casingPerLf?.material ?? DEFAULT_UNIT_COST_RATES.casingPerLf.material)).toFixed(2),
+        (mto.apertureCasingLf * (r.casingPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.casingPerLf.labor)).toFixed(2),
+        (mto.apertureCasingLf * ((r.casingPerLf?.material ?? DEFAULT_UNIT_COST_RATES.casingPerLf.material) + (r.casingPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.casingPerLf.labor))).toFixed(2),
       ],
       [
         '2. Carpentry & Framing',
         'Calculated Stair Risers',
         mto.calculatedStairRisers,
         'RISERS',
-        r.stairRiserPerUnit.material,
-        r.stairRiserPerUnit.labor,
-        (r.stairRiserPerUnit.material + r.stairRiserPerUnit.labor).toFixed(2),
-        (mto.calculatedStairRisers * r.stairRiserPerUnit.material).toFixed(2),
-        (mto.calculatedStairRisers * r.stairRiserPerUnit.labor).toFixed(2),
-        (mto.calculatedStairRisers * (r.stairRiserPerUnit.material + r.stairRiserPerUnit.labor)).toFixed(2),
+        r.stairRiserPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.stairRiserPerUnit.material,
+        r.stairRiserPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.stairRiserPerUnit.labor,
+        ((r.stairRiserPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.stairRiserPerUnit.material) + (r.stairRiserPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.stairRiserPerUnit.labor)).toFixed(2),
+        (mto.calculatedStairRisers * (r.stairRiserPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.stairRiserPerUnit.material)).toFixed(2),
+        (mto.calculatedStairRisers * (r.stairRiserPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.stairRiserPerUnit.labor)).toFixed(2),
+        (mto.calculatedStairRisers * ((r.stairRiserPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.stairRiserPerUnit.material) + (r.stairRiserPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.stairRiserPerUnit.labor))).toFixed(2),
       ],
 
       // 3. Fenestration
@@ -236,72 +236,72 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         'Total Windows',
         mto.totalWindowsUnits,
         'UNITS',
-        r.windowPerUnit.material,
-        r.windowPerUnit.labor,
-        (r.windowPerUnit.material + r.windowPerUnit.labor).toFixed(2),
-        (mto.totalWindowsUnits * r.windowPerUnit.material).toFixed(2),
-        (mto.totalWindowsUnits * r.windowPerUnit.labor).toFixed(2),
-        (mto.totalWindowsUnits * (r.windowPerUnit.material + r.windowPerUnit.labor)).toFixed(2),
+        r.windowPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.material,
+        r.windowPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.labor,
+        ((r.windowPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.material) + (r.windowPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.labor)).toFixed(2),
+        (mto.totalWindowsUnits * (r.windowPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.material)).toFixed(2),
+        (mto.totalWindowsUnits * (r.windowPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.labor)).toFixed(2),
+        (mto.totalWindowsUnits * ((r.windowPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.material) + (r.windowPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.labor))).toFixed(2),
       ],
       [
         '3. Apertures & Fenestration',
         'Passage Doors',
         mto.passageDoorsUnits,
         'UNITS',
-        r.passageDoorPerUnit.material,
-        r.passageDoorPerUnit.labor,
-        (r.passageDoorPerUnit.material + r.passageDoorPerUnit.labor).toFixed(2),
-        (mto.passageDoorsUnits * r.passageDoorPerUnit.material).toFixed(2),
-        (mto.passageDoorsUnits * r.passageDoorPerUnit.labor).toFixed(2),
-        (mto.passageDoorsUnits * (r.passageDoorPerUnit.material + r.passageDoorPerUnit.labor)).toFixed(2),
+        r.passageDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.material,
+        r.passageDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.labor,
+        ((r.passageDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.material) + (r.passageDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.labor)).toFixed(2),
+        (mto.passageDoorsUnits * (r.passageDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.material)).toFixed(2),
+        (mto.passageDoorsUnits * (r.passageDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.labor)).toFixed(2),
+        (mto.passageDoorsUnits * ((r.passageDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.material) + (r.passageDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.labor))).toFixed(2),
       ],
       [
         '3. Apertures & Fenestration',
         'Pocket Doors',
         mto.pocketDoorsUnits,
         'UNITS',
-        r.pocketDoorPerUnit.material,
-        r.pocketDoorPerUnit.labor,
-        (r.pocketDoorPerUnit.material + r.pocketDoorPerUnit.labor).toFixed(2),
-        (mto.pocketDoorsUnits * r.pocketDoorPerUnit.material).toFixed(2),
-        (mto.pocketDoorsUnits * r.pocketDoorPerUnit.labor).toFixed(2),
-        (mto.pocketDoorsUnits * (r.pocketDoorPerUnit.material + r.pocketDoorPerUnit.labor)).toFixed(2),
+        r.pocketDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.material,
+        r.pocketDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.labor,
+        ((r.pocketDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.material) + (r.pocketDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.labor)).toFixed(2),
+        (mto.pocketDoorsUnits * (r.pocketDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.material)).toFixed(2),
+        (mto.pocketDoorsUnits * (r.pocketDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.labor)).toFixed(2),
+        (mto.pocketDoorsUnits * ((r.pocketDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.material) + (r.pocketDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.labor))).toFixed(2),
       ],
       [
         '3. Apertures & Fenestration',
         'Exterior Doors',
         mto.exteriorDoorsUnits,
         'UNITS',
-        r.exteriorDoorPerUnit.material,
-        r.exteriorDoorPerUnit.labor,
-        (r.exteriorDoorPerUnit.material + r.exteriorDoorPerUnit.labor).toFixed(2),
-        (mto.exteriorDoorsUnits * r.exteriorDoorPerUnit.material).toFixed(2),
-        (mto.exteriorDoorsUnits * r.exteriorDoorPerUnit.labor).toFixed(2),
-        (mto.exteriorDoorsUnits * (r.exteriorDoorPerUnit.material + r.exteriorDoorPerUnit.labor)).toFixed(2),
+        r.exteriorDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.material,
+        r.exteriorDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.labor,
+        ((r.exteriorDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.material) + (r.exteriorDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.labor)).toFixed(2),
+        (mto.exteriorDoorsUnits * (r.exteriorDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.material)).toFixed(2),
+        (mto.exteriorDoorsUnits * (r.exteriorDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.labor)).toFixed(2),
+        (mto.exteriorDoorsUnits * ((r.exteriorDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.material) + (r.exteriorDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.labor))).toFixed(2),
       ],
       [
         '3. Apertures & Fenestration',
         'Overhead Garage Bays',
         mto.overheadGarageBays,
         'BAYS',
-        r.garageDoorPerBay.material,
-        r.garageDoorPerBay.labor,
-        (r.garageDoorPerBay.material + r.garageDoorPerBay.labor).toFixed(2),
-        (mto.overheadGarageBays * r.garageDoorPerBay.material).toFixed(2),
-        (mto.overheadGarageBays * r.garageDoorPerBay.labor).toFixed(2),
-        (mto.overheadGarageBays * (r.garageDoorPerBay.material + r.garageDoorPerBay.labor)).toFixed(2),
+        r.garageDoorPerBay?.material ?? DEFAULT_UNIT_COST_RATES.garageDoorPerBay.material,
+        r.garageDoorPerBay?.labor ?? DEFAULT_UNIT_COST_RATES.garageDoorPerBay.labor,
+        ((r.garageDoorPerBay?.material ?? DEFAULT_UNIT_COST_RATES.garageDoorPerBay.material) + (r.garageDoorPerBay?.labor ?? DEFAULT_UNIT_COST_RATES.garageDoorPerBay.labor)).toFixed(2),
+        (mto.overheadGarageBays * (r.garageDoorPerBay?.material ?? DEFAULT_UNIT_COST_RATES.garageDoorPerBay.material)).toFixed(2),
+        (mto.overheadGarageBays * (r.garageDoorPerBay?.labor ?? DEFAULT_UNIT_COST_RATES.garageDoorPerBay.labor)).toFixed(2),
+        (mto.overheadGarageBays * ((r.garageDoorPerBay?.material ?? DEFAULT_UNIT_COST_RATES.garageDoorPerBay.material) + (r.garageDoorPerBay?.labor ?? DEFAULT_UNIT_COST_RATES.garageDoorPerBay.labor))).toFixed(2),
       ],
       [
         '3. Apertures & Fenestration',
         'Door Hardware Sets',
         mto.doorHardwareSets,
         'SETS',
-        r.doorHardwarePerSet.material,
-        r.doorHardwarePerSet.labor,
-        (r.doorHardwarePerSet.material + r.doorHardwarePerSet.labor).toFixed(2),
-        (mto.doorHardwareSets * r.doorHardwarePerSet.material).toFixed(2),
-        (mto.doorHardwareSets * r.doorHardwarePerSet.labor).toFixed(2),
-        (mto.doorHardwareSets * (r.doorHardwarePerSet.material + r.doorHardwarePerSet.labor)).toFixed(2),
+        r.doorHardwarePerSet?.material ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.material,
+        r.doorHardwarePerSet?.labor ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.labor,
+        ((r.doorHardwarePerSet?.material ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.material) + (r.doorHardwarePerSet?.labor ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.labor)).toFixed(2),
+        (mto.doorHardwareSets * (r.doorHardwarePerSet?.material ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.material)).toFixed(2),
+        (mto.doorHardwareSets * (r.doorHardwarePerSet?.labor ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.labor)).toFixed(2),
+        (mto.doorHardwareSets * ((r.doorHardwarePerSet?.material ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.material) + (r.doorHardwarePerSet?.labor ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.labor))).toFixed(2),
       ],
 
       // 4. Electrical
@@ -310,73 +310,115 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         'Std Switches',
         mto.stdSwitchesUnits,
         'UNITS',
-        r.switchPerUnit.material,
-        r.switchPerUnit.labor,
-        (r.switchPerUnit.material + r.switchPerUnit.labor).toFixed(2),
-        (mto.stdSwitchesUnits * r.switchPerUnit.material).toFixed(2),
-        (mto.stdSwitchesUnits * r.switchPerUnit.labor).toFixed(2),
-        (mto.stdSwitchesUnits * (r.switchPerUnit.material + r.switchPerUnit.labor)).toFixed(2),
+        r.switchPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.switchPerUnit.material,
+        r.switchPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.switchPerUnit.labor,
+        ((r.switchPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.switchPerUnit.material) + (r.switchPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.switchPerUnit.labor)).toFixed(2),
+        (mto.stdSwitchesUnits * (r.switchPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.switchPerUnit.material)).toFixed(2),
+        (mto.stdSwitchesUnits * (r.switchPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.switchPerUnit.labor)).toFixed(2),
+        (mto.stdSwitchesUnits * ((r.switchPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.switchPerUnit.material) + (r.switchPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.switchPerUnit.labor))).toFixed(2),
+      ],
+      [
+        '4. Electrical & Safety',
+        '3-Way Switches',
+        mto.switch3WayUnits,
+        'UNITS',
+        r.switch3Way?.material ?? DEFAULT_UNIT_COST_RATES.switch3Way.material,
+        r.switch3Way?.labor ?? DEFAULT_UNIT_COST_RATES.switch3Way.labor,
+        ((r.switch3Way?.material ?? DEFAULT_UNIT_COST_RATES.switch3Way.material) + (r.switch3Way?.labor ?? DEFAULT_UNIT_COST_RATES.switch3Way.labor)).toFixed(2),
+        (mto.switch3WayUnits * (r.switch3Way?.material ?? DEFAULT_UNIT_COST_RATES.switch3Way.material)).toFixed(2),
+        (mto.switch3WayUnits * (r.switch3Way?.labor ?? DEFAULT_UNIT_COST_RATES.switch3Way.labor)).toFixed(2),
+        (mto.switch3WayUnits * ((r.switch3Way?.material ?? DEFAULT_UNIT_COST_RATES.switch3Way.material) + (r.switch3Way?.labor ?? DEFAULT_UNIT_COST_RATES.switch3Way.labor))).toFixed(2),
       ],
       [
         '4. Electrical & Safety',
         'Std Outlets (120V)',
         mto.stdOutletsUnits,
         'UNITS',
-        r.outletPerUnit.material,
-        r.outletPerUnit.labor,
-        (r.outletPerUnit.material + r.outletPerUnit.labor).toFixed(2),
-        (mto.stdOutletsUnits * r.outletPerUnit.material).toFixed(2),
-        (mto.stdOutletsUnits * r.outletPerUnit.labor).toFixed(2),
-        (mto.stdOutletsUnits * (r.outletPerUnit.material + r.outletPerUnit.labor)).toFixed(2),
+        r.outletPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.outletPerUnit.material,
+        r.outletPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.outletPerUnit.labor,
+        ((r.outletPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.outletPerUnit.material) + (r.outletPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.outletPerUnit.labor)).toFixed(2),
+        (mto.stdOutletsUnits * (r.outletPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.outletPerUnit.material)).toFixed(2),
+        (mto.stdOutletsUnits * (r.outletPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.outletPerUnit.labor)).toFixed(2),
+        (mto.stdOutletsUnits * ((r.outletPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.outletPerUnit.material) + (r.outletPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.outletPerUnit.labor))).toFixed(2),
       ],
       [
         '4. Electrical & Safety',
         'GFCI Outlets',
         mto.gfciOutletsUnits,
         'UNITS',
-        r.gfciPerUnit.material,
-        r.gfciPerUnit.labor,
-        (r.gfciPerUnit.material + r.gfciPerUnit.labor).toFixed(2),
-        (mto.gfciOutletsUnits * r.gfciPerUnit.material).toFixed(2),
-        (mto.gfciOutletsUnits * r.gfciPerUnit.labor).toFixed(2),
-        (mto.gfciOutletsUnits * (r.gfciPerUnit.material + r.gfciPerUnit.labor)).toFixed(2),
+        r.gfciPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.gfciPerUnit.material,
+        r.gfciPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.gfciPerUnit.labor,
+        ((r.gfciPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.gfciPerUnit.material) + (r.gfciPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.gfciPerUnit.labor)).toFixed(2),
+        (mto.gfciOutletsUnits * (r.gfciPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.gfciPerUnit.material)).toFixed(2),
+        (mto.gfciOutletsUnits * (r.gfciPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.gfciPerUnit.labor)).toFixed(2),
+        (mto.gfciOutletsUnits * ((r.gfciPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.gfciPerUnit.material) + (r.gfciPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.gfciPerUnit.labor))).toFixed(2),
       ],
       [
         '4. Electrical & Safety',
         'EV Level 2 Chargers',
         mto.evChargersUnits,
         'UNITS',
-        r.evChargerPerUnit.material,
-        r.evChargerPerUnit.labor,
-        (r.evChargerPerUnit.material + r.evChargerPerUnit.labor).toFixed(2),
-        (mto.evChargersUnits * r.evChargerPerUnit.material).toFixed(2),
-        (mto.evChargersUnits * r.evChargerPerUnit.labor).toFixed(2),
-        (mto.evChargersUnits * (r.evChargerPerUnit.material + r.evChargerPerUnit.labor)).toFixed(2),
+        r.evChargerPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.evChargerPerUnit.material,
+        r.evChargerPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.evChargerPerUnit.labor,
+        ((r.evChargerPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.evChargerPerUnit.material) + (r.evChargerPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.evChargerPerUnit.labor)).toFixed(2),
+        (mto.evChargersUnits * (r.evChargerPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.evChargerPerUnit.material)).toFixed(2),
+        (mto.evChargersUnits * (r.evChargerPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.evChargerPerUnit.labor)).toFixed(2),
+        (mto.evChargersUnits * ((r.evChargerPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.evChargerPerUnit.material) + (r.evChargerPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.evChargerPerUnit.labor))).toFixed(2),
       ],
       [
         '4. Electrical & Safety',
         'Potlights (Slim Recessed)',
         mto.potlightsUnits,
         'UNITS',
-        r.potlightPerUnit.material,
-        r.potlightPerUnit.labor,
-        (r.potlightPerUnit.material + r.potlightPerUnit.labor).toFixed(2),
-        (mto.potlightsUnits * r.potlightPerUnit.material).toFixed(2),
-        (mto.potlightsUnits * r.potlightPerUnit.labor).toFixed(2),
-        (mto.potlightsUnits * (r.potlightPerUnit.material + r.potlightPerUnit.labor)).toFixed(2),
+        r.potlightPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.potlightPerUnit.material,
+        r.potlightPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.potlightPerUnit.labor,
+        ((r.potlightPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.potlightPerUnit.material) + (r.potlightPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.potlightPerUnit.labor)).toFixed(2),
+        (mto.potlightsUnits * (r.potlightPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.potlightPerUnit.material)).toFixed(2),
+        (mto.potlightsUnits * (r.potlightPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.potlightPerUnit.labor)).toFixed(2),
+        (mto.potlightsUnits * ((r.potlightPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.potlightPerUnit.material) + (r.potlightPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.potlightPerUnit.labor))).toFixed(2),
       ],
       [
         '4. Electrical & Safety',
         'Smoke & CO Alarms',
         mto.smokeCoAlarmsUnits,
         'UNITS',
-        r.smokeAlarmPerUnit.material,
-        r.smokeAlarmPerUnit.labor,
-        (r.smokeAlarmPerUnit.material + r.smokeAlarmPerUnit.labor).toFixed(2),
-        (mto.smokeCoAlarmsUnits * r.smokeAlarmPerUnit.material).toFixed(2),
-        (mto.smokeCoAlarmsUnits * r.smokeAlarmPerUnit.labor).toFixed(2),
-        (mto.smokeCoAlarmsUnits * (r.smokeAlarmPerUnit.material + r.smokeAlarmPerUnit.labor)).toFixed(2),
+        r.smokeAlarmPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.smokeAlarmPerUnit.material,
+        r.smokeAlarmPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.smokeAlarmPerUnit.labor,
+        ((r.smokeAlarmPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.smokeAlarmPerUnit.material) + (r.smokeAlarmPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.smokeAlarmPerUnit.labor)).toFixed(2),
+        (mto.smokeCoAlarmsUnits * (r.smokeAlarmPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.smokeAlarmPerUnit.material)).toFixed(2),
+        (mto.smokeCoAlarmsUnits * (r.smokeAlarmPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.smokeAlarmPerUnit.labor)).toFixed(2),
+        (mto.smokeCoAlarmsUnits * ((r.smokeAlarmPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.smokeAlarmPerUnit.material) + (r.smokeAlarmPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.smokeAlarmPerUnit.labor))).toFixed(2),
       ],
+      ...mto.panelBreakdown.map((panel: any) => {
+        const isSub = panel.type === 'subpanel';
+        const amp = panel.amperage;
+        let rateKey: keyof UnitCostRates = 'electricalPanelMain200A';
+        if (panel.type === 'main') {
+          if (amp === '100A') rateKey = 'electricalPanelMain100A';
+          else if (amp === '400A') rateKey = 'electricalPanelMain400A';
+          else rateKey = 'electricalPanelMain200A';
+        } else {
+          if (amp === '60A') rateKey = 'electricalPanelSub60A';
+          else if (amp === '125A') rateKey = 'electricalPanelSub125A';
+          else if (amp === '100A') rateKey = 'electricalPanelSub100A';
+          else rateKey = 'electricalPanelSub100A';
+        }
+        const rate = r[rateKey] || DEFAULT_UNIT_COST_RATES[rateKey];
+        const material = rate?.material ?? DEFAULT_UNIT_COST_RATES[rateKey].material;
+        const labor = rate?.labor ?? DEFAULT_UNIT_COST_RATES[rateKey].labor;
+        return [
+          '4. Electrical & Safety',
+          `Electrical ${isSub ? 'Subpanel' : 'Main Panel'} - ${amp}`,
+          panel.count,
+          'UNITS',
+          material,
+          labor,
+          (material + labor).toFixed(2),
+          (panel.count * material).toFixed(2),
+          (panel.count * labor).toFixed(2),
+          (panel.count * (material + labor)).toFixed(2),
+        ];
+      }),
 
       // 5. Plumbing
       [
@@ -384,24 +426,24 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         'Plumbing Fixtures',
         mto.plumbingFixturesUnits,
         'UNITS',
-        r.plumbingPerFixture.material,
-        r.plumbingPerFixture.labor,
-        (r.plumbingPerFixture.material + r.plumbingPerFixture.labor).toFixed(2),
-        (mto.plumbingFixturesUnits * r.plumbingPerFixture.material).toFixed(2),
-        (mto.plumbingFixturesUnits * r.plumbingPerFixture.labor).toFixed(2),
-        (mto.plumbingFixturesUnits * (r.plumbingPerFixture.material + r.plumbingPerFixture.labor)).toFixed(2),
+        r.plumbingPerFixture?.material ?? DEFAULT_UNIT_COST_RATES.plumbingPerFixture.material,
+        r.plumbingPerFixture?.labor ?? DEFAULT_UNIT_COST_RATES.plumbingPerFixture.labor,
+        ((r.plumbingPerFixture?.material ?? DEFAULT_UNIT_COST_RATES.plumbingPerFixture.material) + (r.plumbingPerFixture?.labor ?? DEFAULT_UNIT_COST_RATES.plumbingPerFixture.labor)).toFixed(2),
+        (mto.plumbingFixturesUnits * (r.plumbingPerFixture?.material ?? DEFAULT_UNIT_COST_RATES.plumbingPerFixture.material)).toFixed(2),
+        (mto.plumbingFixturesUnits * (r.plumbingPerFixture?.labor ?? DEFAULT_UNIT_COST_RATES.plumbingPerFixture.labor)).toFixed(2),
+        (mto.plumbingFixturesUnits * ((r.plumbingPerFixture?.material ?? DEFAULT_UNIT_COST_RATES.plumbingPerFixture.material) + (r.plumbingPerFixture?.labor ?? DEFAULT_UNIT_COST_RATES.plumbingPerFixture.labor))).toFixed(2),
       ],
       [
         '5. Plumbing & Civil',
         'Utility Trenching',
         mto.utilityTrenchingLf,
         'LF',
-        r.utilityTrenchPerLf.material,
-        r.utilityTrenchPerLf.labor,
-        (r.utilityTrenchPerLf.material + r.utilityTrenchPerLf.labor).toFixed(2),
-        (mto.utilityTrenchingLf * r.utilityTrenchPerLf.material).toFixed(2),
-        (mto.utilityTrenchingLf * r.utilityTrenchPerLf.labor).toFixed(2),
-        (mto.utilityTrenchingLf * (r.utilityTrenchPerLf.material + r.utilityTrenchPerLf.labor)).toFixed(2),
+        r.utilityTrenchPerLf?.material ?? DEFAULT_UNIT_COST_RATES.utilityTrenchPerLf.material,
+        r.utilityTrenchPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.utilityTrenchPerLf.labor,
+        ((r.utilityTrenchPerLf?.material ?? DEFAULT_UNIT_COST_RATES.utilityTrenchPerLf.material) + (r.utilityTrenchPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.utilityTrenchPerLf.labor)).toFixed(2),
+        (mto.utilityTrenchingLf * (r.utilityTrenchPerLf?.material ?? DEFAULT_UNIT_COST_RATES.utilityTrenchPerLf.material)).toFixed(2),
+        (mto.utilityTrenchingLf * (r.utilityTrenchPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.utilityTrenchPerLf.labor)).toFixed(2),
+        (mto.utilityTrenchingLf * ((r.utilityTrenchPerLf?.material ?? DEFAULT_UNIT_COST_RATES.utilityTrenchPerLf.material) + (r.utilityTrenchPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.utilityTrenchPerLf.labor))).toFixed(2),
       ],
 
       // 6. Concrete
@@ -410,24 +452,24 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         'Poured Concrete',
         mto.pouredConcreteCy,
         'CY',
-        r.concretePerCy.material,
-        r.concretePerCy.labor,
-        (r.concretePerCy.material + r.concretePerCy.labor).toFixed(2),
-        (mto.pouredConcreteCy * r.concretePerCy.material).toFixed(2),
-        (mto.pouredConcreteCy * r.concretePerCy.labor).toFixed(2),
-        (mto.pouredConcreteCy * (r.concretePerCy.material + r.concretePerCy.labor)).toFixed(2),
+        r.concretePerCy?.material ?? DEFAULT_UNIT_COST_RATES.concretePerCy.material,
+        r.concretePerCy?.labor ?? DEFAULT_UNIT_COST_RATES.concretePerCy.labor,
+        ((r.concretePerCy?.material ?? DEFAULT_UNIT_COST_RATES.concretePerCy.material) + (r.concretePerCy?.labor ?? DEFAULT_UNIT_COST_RATES.concretePerCy.labor)).toFixed(2),
+        (mto.pouredConcreteCy * (r.concretePerCy?.material ?? DEFAULT_UNIT_COST_RATES.concretePerCy.material)).toFixed(2),
+        (mto.pouredConcreteCy * (r.concretePerCy?.labor ?? DEFAULT_UNIT_COST_RATES.concretePerCy.labor)).toFixed(2),
+        (mto.pouredConcreteCy * ((r.concretePerCy?.material ?? DEFAULT_UNIT_COST_RATES.concretePerCy.material) + (r.concretePerCy?.labor ?? DEFAULT_UNIT_COST_RATES.concretePerCy.labor))).toFixed(2),
       ],
       [
         '6. Concrete & Foundations',
         'Helical Piers / Piles',
         mto.helicalPiersPiles,
         'PIERS',
-        r.pierPerUnit.material,
-        r.pierPerUnit.labor,
-        (r.pierPerUnit.material + r.pierPerUnit.labor).toFixed(2),
-        (mto.helicalPiersPiles * r.pierPerUnit.material).toFixed(2),
-        (mto.helicalPiersPiles * r.pierPerUnit.labor).toFixed(2),
-        (mto.helicalPiersPiles * (r.pierPerUnit.material + r.pierPerUnit.labor)).toFixed(2),
+        r.pierPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pierPerUnit.material,
+        r.pierPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pierPerUnit.labor,
+        ((r.pierPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pierPerUnit.material) + (r.pierPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pierPerUnit.labor)).toFixed(2),
+        (mto.helicalPiersPiles * (r.pierPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pierPerUnit.material)).toFixed(2),
+        (mto.helicalPiersPiles * (r.pierPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pierPerUnit.labor)).toFixed(2),
+        (mto.helicalPiersPiles * ((r.pierPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pierPerUnit.material) + (r.pierPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pierPerUnit.labor))).toFixed(2),
       ],
 
       // 7. Roofing
@@ -436,36 +478,36 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         'Roofing Area',
         mto.roofingAreaSq,
         'SQ',
-        r.roofingPerSq.material,
-        r.roofingPerSq.labor,
-        (r.roofingPerSq.material + r.roofingPerSq.labor).toFixed(2),
-        (mto.roofingAreaSq * r.roofingPerSq.material).toFixed(2),
-        (mto.roofingAreaSq * r.roofingPerSq.labor).toFixed(2),
-        (mto.roofingAreaSq * (r.roofingPerSq.material + r.roofingPerSq.labor)).toFixed(2),
+        r.roofingPerSq?.material ?? DEFAULT_UNIT_COST_RATES.roofingPerSq.material,
+        r.roofingPerSq?.labor ?? DEFAULT_UNIT_COST_RATES.roofingPerSq.labor,
+        ((r.roofingPerSq?.material ?? DEFAULT_UNIT_COST_RATES.roofingPerSq.material) + (r.roofingPerSq?.labor ?? DEFAULT_UNIT_COST_RATES.roofingPerSq.labor)).toFixed(2),
+        (mto.roofingAreaSq * (r.roofingPerSq?.material ?? DEFAULT_UNIT_COST_RATES.roofingPerSq.material)).toFixed(2),
+        (mto.roofingAreaSq * (r.roofingPerSq?.labor ?? DEFAULT_UNIT_COST_RATES.roofingPerSq.labor)).toFixed(2),
+        (mto.roofingAreaSq * ((r.roofingPerSq?.material ?? DEFAULT_UNIT_COST_RATES.roofingPerSq.material) + (r.roofingPerSq?.labor ?? DEFAULT_UNIT_COST_RATES.roofingPerSq.labor))).toFixed(2),
       ],
       [
         '7. Roofing & Envelope',
         'Primary Exterior Siding',
         mto.primarySidingSf,
         'SF',
-        r.sidingPerSf.material,
-        r.sidingPerSf.labor,
-        (r.sidingPerSf.material + r.sidingPerSf.labor).toFixed(2),
-        (mto.primarySidingSf * r.sidingPerSf.material).toFixed(2),
-        (mto.primarySidingSf * r.sidingPerSf.labor).toFixed(2),
-        (mto.primarySidingSf * (r.sidingPerSf.material + r.sidingPerSf.labor)).toFixed(2),
+        r.sidingPerSf?.material ?? DEFAULT_UNIT_COST_RATES.sidingPerSf.material,
+        r.sidingPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.sidingPerSf.labor,
+        ((r.sidingPerSf?.material ?? DEFAULT_UNIT_COST_RATES.sidingPerSf.material) + (r.sidingPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.sidingPerSf.labor)).toFixed(2),
+        (mto.primarySidingSf * (r.sidingPerSf?.material ?? DEFAULT_UNIT_COST_RATES.sidingPerSf.material)).toFixed(2),
+        (mto.primarySidingSf * (r.sidingPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.sidingPerSf.labor)).toFixed(2),
+        (mto.primarySidingSf * ((r.sidingPerSf?.material ?? DEFAULT_UNIT_COST_RATES.sidingPerSf.material) + (r.sidingPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.sidingPerSf.labor))).toFixed(2),
       ],
       [
         '7. Roofing & Envelope',
         'Timber Decking',
         mto.timberDeckingSf,
         'SF',
-        r.deckingPerSf.material,
-        r.deckingPerSf.labor,
-        (r.deckingPerSf.material + r.deckingPerSf.labor).toFixed(2),
-        (mto.timberDeckingSf * r.deckingPerSf.material).toFixed(2),
-        (mto.timberDeckingSf * r.deckingPerSf.labor).toFixed(2),
-        (mto.timberDeckingSf * (r.deckingPerSf.material + r.deckingPerSf.labor)).toFixed(2),
+        r.deckingPerSf?.material ?? DEFAULT_UNIT_COST_RATES.deckingPerSf.material,
+        r.deckingPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.deckingPerSf.labor,
+        ((r.deckingPerSf?.material ?? DEFAULT_UNIT_COST_RATES.deckingPerSf.material) + (r.deckingPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.deckingPerSf.labor)).toFixed(2),
+        (mto.timberDeckingSf * (r.deckingPerSf?.material ?? DEFAULT_UNIT_COST_RATES.deckingPerSf.material)).toFixed(2),
+        (mto.timberDeckingSf * (r.deckingPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.deckingPerSf.labor)).toFixed(2),
+        (mto.timberDeckingSf * ((r.deckingPerSf?.material ?? DEFAULT_UNIT_COST_RATES.deckingPerSf.material) + (r.deckingPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.deckingPerSf.labor))).toFixed(2),
       ],
 
       // Rollups
@@ -690,7 +732,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 subtext="Net walls + ceilings"
                 cost={
                   isIncluded('finishes') && isItemIncluded('drywallBoard')
-                    ? mto.drywallBoardSf * (activeRates.drywallPerSf.material + activeRates.drywallPerSf.labor)
+                    ? mto.drywallBoardSf * ((activeRates.drywallPerSf?.material ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.material) + (activeRates.drywallPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.drywallPerSf.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('finishes')}
@@ -704,7 +746,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="SF"
                 cost={
                   isIncluded('finishes') && isItemIncluded('paintCoverage')
-                    ? mto.paintCoverageSf * (activeRates.paintPerSf.material + activeRates.paintPerSf.labor)
+                    ? mto.paintCoverageSf * ((activeRates.paintPerSf?.material ?? DEFAULT_UNIT_COST_RATES.paintPerSf.material) + (activeRates.paintPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.paintPerSf.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('finishes')}
@@ -719,7 +761,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 subtext="Room polygon areas"
                 cost={
                   isIncluded('finishes') && isItemIncluded('flooringPackage')
-                    ? mto.flooringPackageSf * (activeRates.flooringPerSf.material + activeRates.flooringPerSf.labor)
+                    ? mto.flooringPackageSf * ((activeRates.flooringPerSf?.material ?? DEFAULT_UNIT_COST_RATES.flooringPerSf.material) + (activeRates.flooringPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.flooringPerSf.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('finishes')}
@@ -734,7 +776,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 subtext="R-20 batts"
                 cost={
                   isIncluded('finishes') && isItemIncluded('extWallInsulation')
-                    ? mto.extWallInsulationSf * (activeRates.extInsulationPerSf.material + activeRates.extInsulationPerSf.labor)
+                    ? mto.extWallInsulationSf * ((activeRates.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material) + (activeRates.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('finishes')}
@@ -817,7 +859,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="LF"
                 cost={
                   isIncluded('carpentryFraming') && isItemIncluded('wallStudFraming')
-                    ? mto.wallStudFramingLf * (activeRates.studFramingPerLf.material + activeRates.studFramingPerLf.labor)
+                    ? mto.wallStudFramingLf * ((activeRates.studFramingPerLf?.material ?? DEFAULT_UNIT_COST_RATES.studFramingPerLf.material) + (activeRates.studFramingPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.studFramingPerLf.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('carpentryFraming')}
@@ -832,7 +874,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="SF"
                 cost={
                   isIncluded('carpentryFraming') && isItemIncluded('osbSubfloorDecking')
-                    ? mto.osbSubfloorDeckingSf * (activeRates.osbSubfloorPerSf.material + activeRates.osbSubfloorPerSf.labor)
+                    ? mto.osbSubfloorDeckingSf * ((activeRates.osbSubfloorPerSf?.material ?? DEFAULT_UNIT_COST_RATES.osbSubfloorPerSf.material) + (activeRates.osbSubfloorPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.osbSubfloorPerSf.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('carpentryFraming')}
@@ -846,7 +888,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="LF"
                 cost={
                   isIncluded('carpentryFraming') && isItemIncluded('structuralBeams')
-                    ? mto.structuralBeamsLf * (activeRates.beamPerLf.material + activeRates.beamPerLf.labor)
+                    ? mto.structuralBeamsLf * ((activeRates.beamPerLf?.material ?? DEFAULT_UNIT_COST_RATES.beamPerLf.material) + (activeRates.beamPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.beamPerLf.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('carpentryFraming')}
@@ -860,7 +902,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="POSTS"
                 cost={
                   isIncluded('carpentryFraming') && isItemIncluded('supportColumnsPosts')
-                    ? mto.supportColumnsPosts * (activeRates.postPerUnit.material + activeRates.postPerUnit.labor)
+                    ? mto.supportColumnsPosts * ((activeRates.postPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.postPerUnit.material) + (activeRates.postPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.postPerUnit.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('carpentryFraming')}
@@ -875,7 +917,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 subtext="Perimeter - Door widths"
                 cost={
                   isIncluded('carpentryFraming') && isItemIncluded('baseboardTrims')
-                    ? mto.baseboardTrimsLf * (activeRates.baseboardPerLf.material + activeRates.baseboardPerLf.labor)
+                    ? mto.baseboardTrimsLf * ((activeRates.baseboardPerLf?.material ?? DEFAULT_UNIT_COST_RATES.baseboardPerLf.material) + (activeRates.baseboardPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.baseboardPerLf.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('carpentryFraming')}
@@ -890,7 +932,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 subtext="Doors + Windows trim"
                 cost={
                   isIncluded('carpentryFraming') && isItemIncluded('apertureCasing')
-                    ? mto.apertureCasingLf * (activeRates.casingPerLf.material + activeRates.casingPerLf.labor)
+                    ? mto.apertureCasingLf * ((activeRates.casingPerLf?.material ?? DEFAULT_UNIT_COST_RATES.casingPerLf.material) + (activeRates.casingPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.casingPerLf.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('carpentryFraming')}
@@ -905,7 +947,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="RISERS"
                 cost={
                   isIncluded('carpentryFraming') && isItemIncluded('calculatedStairRisers')
-                    ? mto.calculatedStairRisers * (activeRates.stairRiserPerUnit.material + activeRates.stairRiserPerUnit.labor)
+                    ? mto.calculatedStairRisers * ((activeRates.stairRiserPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.stairRiserPerUnit.material) + (activeRates.stairRiserPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.stairRiserPerUnit.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('carpentryFraming')}
@@ -988,7 +1030,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="UNITS"
                 cost={
                   isIncluded('fenestration') && isItemIncluded('totalWindows')
-                    ? mto.totalWindowsUnits * (activeRates.windowPerUnit.material + activeRates.windowPerUnit.labor)
+                    ? mto.totalWindowsUnits * ((activeRates.windowPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.material) + (activeRates.windowPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerUnit.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('fenestration')}
@@ -1002,7 +1044,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="UNITS"
                 cost={
                   isIncluded('fenestration') && isItemIncluded('passageDoors')
-                    ? mto.passageDoorsUnits * (activeRates.passageDoorPerUnit.material + activeRates.passageDoorPerUnit.labor)
+                    ? mto.passageDoorsUnits * ((activeRates.passageDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.material) + (activeRates.passageDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('fenestration')}
@@ -1016,7 +1058,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="UNITS"
                 cost={
                   isIncluded('fenestration') && isItemIncluded('pocketDoors')
-                    ? mto.pocketDoorsUnits * (activeRates.pocketDoorPerUnit.material + activeRates.pocketDoorPerUnit.labor)
+                    ? mto.pocketDoorsUnits * ((activeRates.pocketDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.material) + (activeRates.pocketDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('fenestration')}
@@ -1030,7 +1072,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="UNITS"
                 cost={
                   isIncluded('fenestration') && isItemIncluded('exteriorDoors')
-                    ? mto.exteriorDoorsUnits * (activeRates.exteriorDoorPerUnit.material + activeRates.exteriorDoorPerUnit.labor)
+                    ? mto.exteriorDoorsUnits * ((activeRates.exteriorDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.material) + (activeRates.exteriorDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('fenestration')}
@@ -1044,7 +1086,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="BAYS"
                 cost={
                   isIncluded('fenestration') && isItemIncluded('overheadGarageBays')
-                    ? mto.overheadGarageBays * (activeRates.garageDoorPerBay.material + activeRates.garageDoorPerBay.labor)
+                    ? mto.overheadGarageBays * ((activeRates.garageDoorPerBay?.material ?? DEFAULT_UNIT_COST_RATES.garageDoorPerBay.material) + (activeRates.garageDoorPerBay?.labor ?? DEFAULT_UNIT_COST_RATES.garageDoorPerBay.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('fenestration')}
@@ -1059,7 +1101,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 subtext="Locksets & hinges"
                 cost={
                   isIncluded('fenestration') && isItemIncluded('doorHardwareSets')
-                    ? mto.doorHardwareSets * (activeRates.doorHardwarePerSet.material + activeRates.doorHardwarePerSet.labor)
+                    ? mto.doorHardwareSets * ((activeRates.doorHardwarePerSet?.material ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.material) + (activeRates.doorHardwarePerSet?.labor ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('fenestration')}
@@ -1142,7 +1184,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="UNITS"
                 cost={
                   isIncluded('electricalSafety') && isItemIncluded('stdSwitches')
-                    ? mto.stdSwitchesUnits * (activeRates.switchPerUnit.material + activeRates.switchPerUnit.labor)
+                    ? mto.stdSwitchesUnits * ((activeRates.switchPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.switchPerUnit.material) + (activeRates.switchPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.switchPerUnit.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('electricalSafety')}
@@ -1154,7 +1196,11 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 label="Dimmers"
                 value={mto.dimmersUnits}
                 unit="UNITS"
-                cost={0}
+                cost={
+                  isIncluded('electricalSafety') && isItemIncluded('dimmers')
+                    ? mto.dimmersUnits * ((activeRates.switchPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.switchPerUnit.material) * 1.5 + (activeRates.switchPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.switchPerUnit.labor) * 1.2)
+                    : 0
+                }
                 isCategoryExcluded={!isIncluded('electricalSafety')}
                 itemKey="dimmers"
                 isItemExcluded={!isItemIncluded('dimmers')}
@@ -1166,7 +1212,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="UNITS"
                 cost={
                   isIncluded('electricalSafety') && isItemIncluded('stdOutlets')
-                    ? mto.stdOutletsUnits * (activeRates.outletPerUnit.material + activeRates.outletPerUnit.labor)
+                    ? mto.stdOutletsUnits * ((activeRates.outletPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.outletPerUnit.material) + (activeRates.outletPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.outletPerUnit.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('electricalSafety')}
@@ -1180,7 +1226,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="UNITS"
                 cost={
                   isIncluded('electricalSafety') && isItemIncluded('gfciOutlets')
-                    ? mto.gfciOutletsUnits * (activeRates.gfciPerUnit.material + activeRates.gfciPerUnit.labor)
+                    ? mto.gfciOutletsUnits * ((activeRates.gfciPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.gfciPerUnit.material) + (activeRates.gfciPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.gfciPerUnit.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('electricalSafety')}
@@ -1192,7 +1238,11 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 label="24V/240V Heavy Outlets"
                 value={mto.heavyOutlets24vUnits}
                 unit="UNITS"
-                cost={0}
+                cost={
+                  isIncluded('electricalSafety') && isItemIncluded('heavyOutlets24v')
+                    ? mto.heavyOutlets24vUnits * ((activeRates.outletPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.outletPerUnit.material) * 2.5 + (activeRates.outletPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.outletPerUnit.labor) * 1.8)
+                    : 0
+                }
                 isCategoryExcluded={!isIncluded('electricalSafety')}
                 itemKey="heavyOutlets24v"
                 isItemExcluded={!isItemIncluded('heavyOutlets24v')}
@@ -1204,7 +1254,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="UNITS"
                 cost={
                   isIncluded('electricalSafety') && isItemIncluded('evChargers')
-                    ? mto.evChargersUnits * (activeRates.evChargerPerUnit.material + activeRates.evChargerPerUnit.labor)
+                    ? mto.evChargersUnits * ((activeRates.evChargerPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.evChargerPerUnit.material) + (activeRates.evChargerPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.evChargerPerUnit.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('electricalSafety')}
@@ -1216,7 +1266,11 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 label="Fixtures / Sconces"
                 value={mto.fixturesSconcesUnits}
                 unit="UNITS"
-                cost={0}
+                cost={
+                  isIncluded('electricalSafety') && isItemIncluded('fixturesSconces')
+                    ? mto.fixturesSconcesUnits * ((activeRates.fixtureSconce?.material ?? DEFAULT_UNIT_COST_RATES.fixtureSconce.material) + (activeRates.fixtureSconce?.labor ?? DEFAULT_UNIT_COST_RATES.fixtureSconce.labor))
+                    : 0
+                }
                 isCategoryExcluded={!isIncluded('electricalSafety')}
                 itemKey="fixturesSconces"
                 isItemExcluded={!isItemIncluded('fixturesSconces')}
@@ -1226,7 +1280,11 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 label="Exterior Coach Lights"
                 value={mto.exteriorCoachLightsUnits}
                 unit="UNITS"
-                cost={0}
+                cost={
+                  isIncluded('electricalSafety') && isItemIncluded('exteriorCoachLights')
+                    ? mto.exteriorCoachLightsUnits * ((activeRates.exteriorCoachLight?.material ?? DEFAULT_UNIT_COST_RATES.exteriorCoachLight.material) + (activeRates.exteriorCoachLight?.labor ?? DEFAULT_UNIT_COST_RATES.exteriorCoachLight.labor))
+                    : 0
+                }
                 isCategoryExcluded={!isIncluded('electricalSafety')}
                 itemKey="exteriorCoachLights"
                 isItemExcluded={!isItemIncluded('exteriorCoachLights')}
@@ -1236,7 +1294,11 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 label="Soffit Lights"
                 value={mto.soffitLightsUnits}
                 unit="UNITS"
-                cost={0}
+                cost={
+                  isIncluded('electricalSafety') && isItemIncluded('soffitLights')
+                    ? mto.soffitLightsUnits * ((activeRates.soffitLight?.material ?? DEFAULT_UNIT_COST_RATES.soffitLight.material) + (activeRates.soffitLight?.labor ?? DEFAULT_UNIT_COST_RATES.soffitLight.labor))
+                    : 0
+                }
                 isCategoryExcluded={!isIncluded('electricalSafety')}
                 itemKey="soffitLights"
                 isItemExcluded={!isItemIncluded('soffitLights')}
@@ -1248,7 +1310,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="UNITS"
                 cost={
                   isIncluded('electricalSafety') && isItemIncluded('potlights')
-                    ? mto.potlightsUnits * (activeRates.potlightPerUnit.material + activeRates.potlightPerUnit.labor)
+                    ? mto.potlightsUnits * ((activeRates.potlightPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.potlightPerUnit.material) + (activeRates.potlightPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.potlightPerUnit.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('electricalSafety')}
@@ -1260,7 +1322,11 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 label="Ceiling Fans"
                 value={mto.ceilingFansUnits}
                 unit="UNITS"
-                cost={0}
+                cost={
+                  isIncluded('electricalSafety') && isItemIncluded('ceilingFans')
+                    ? mto.ceilingFansUnits * ((activeRates.ceilingFanPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.ceilingFanPerUnit.material) + (activeRates.ceilingFanPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.ceilingFanPerUnit.labor))
+                    : 0
+                }
                 isCategoryExcluded={!isIncluded('electricalSafety')}
                 itemKey="ceilingFans"
                 isItemExcluded={!isItemIncluded('ceilingFans')}
@@ -1270,7 +1336,11 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 label="Spot Exhaust Fans"
                 value={mto.spotExhaustFansUnits}
                 unit="UNITS"
-                cost={0}
+                cost={
+                  isIncluded('electricalSafety') && isItemIncluded('spotExhaustFans')
+                    ? mto.spotExhaustFansUnits * ((activeRates.exhaustFanPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.exhaustFanPerUnit.material) + (activeRates.exhaustFanPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.exhaustFanPerUnit.labor))
+                    : 0
+                }
                 isCategoryExcluded={!isIncluded('electricalSafety')}
                 itemKey="spotExhaustFans"
                 isItemExcluded={!isItemIncluded('spotExhaustFans')}
@@ -1280,7 +1350,11 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 label="Range Hoods"
                 value={mto.rangeHoodsUnits}
                 unit="UNITS"
-                cost={0}
+                cost={
+                  isIncluded('electricalSafety') && isItemIncluded('rangeHoods')
+                    ? mto.rangeHoodsUnits * ((activeRates.rangeHoodPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.rangeHoodPerUnit.material) + (activeRates.rangeHoodPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.rangeHoodPerUnit.labor))
+                    : 0
+                }
                 isCategoryExcluded={!isIncluded('electricalSafety')}
                 itemKey="rangeHoods"
                 isItemExcluded={!isItemIncluded('rangeHoods')}
@@ -1292,7 +1366,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="UNITS"
                 cost={
                   isIncluded('electricalSafety') && isItemIncluded('smokeCoAlarms')
-                    ? mto.smokeCoAlarmsUnits * (activeRates.smokeAlarmPerUnit.material + activeRates.smokeAlarmPerUnit.labor)
+                    ? mto.smokeCoAlarmsUnits * ((activeRates.smokeAlarmPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.smokeAlarmPerUnit.material) + (activeRates.smokeAlarmPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.smokeAlarmPerUnit.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('electricalSafety')}
@@ -1300,6 +1374,61 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 isItemExcluded={!isItemIncluded('smokeCoAlarms')}
                 onToggleItem={onToggleItemInclusion}
               />
+
+              {mto.switch3WayUnits > 0 && (
+                <MetricRow
+                  label="3-Way Switches"
+                  value={mto.switch3WayUnits}
+                  unit="UNITS"
+                  cost={
+                    isIncluded('electricalSafety') && isItemIncluded('switch3Way')
+                      ? mto.switch3WayUnits * ((activeRates.switch3Way?.material ?? DEFAULT_UNIT_COST_RATES.switch3Way.material) + (activeRates.switch3Way?.labor ?? DEFAULT_UNIT_COST_RATES.switch3Way.labor))
+                      : 0
+                  }
+                  isCategoryExcluded={!isIncluded('electricalSafety')}
+                  itemKey="switch3Way"
+                  isItemExcluded={!isItemIncluded('switch3Way')}
+                  onToggleItem={onToggleItemInclusion}
+                />
+              )}
+
+              {mto.panelBreakdown.map((panel: any, idx: number) => {
+                const isSub = panel.type === 'subpanel';
+                const amp = panel.amperage;
+
+                let rateKey: keyof UnitCostRates = 'electricalPanelMain200A';
+                if (panel.type === 'main') {
+                  if (amp === '100A') rateKey = 'electricalPanelMain100A';
+                  else if (amp === '400A') rateKey = 'electricalPanelMain400A';
+                  else rateKey = 'electricalPanelMain200A';
+                } else {
+                  if (amp === '60A') rateKey = 'electricalPanelSub60A';
+                  else if (amp === '125A') rateKey = 'electricalPanelSub125A';
+                  else if (amp === '100A') rateKey = 'electricalPanelSub100A';
+                  else rateKey = 'electricalPanelSub100A';
+                }
+
+                const rate = activeRates[rateKey] || DEFAULT_UNIT_COST_RATES[rateKey];
+                const panelLabel = `Electrical ${isSub ? 'Subpanel' : 'Main Panel'} - ${amp}`;
+
+                return (
+                  <MetricRow
+                    key={`${panel.type}-${panel.amperage}-${idx}`}
+                    label={panelLabel}
+                    value={panel.count}
+                    unit="UNIT"
+                    cost={
+                      isIncluded('electricalSafety') && isItemIncluded('electricalPanels')
+                        ? panel.count * ((rate?.material ?? DEFAULT_UNIT_COST_RATES[rateKey].material) + (rate?.labor ?? DEFAULT_UNIT_COST_RATES[rateKey].labor))
+                        : 0
+                    }
+                    isCategoryExcluded={!isIncluded('electricalSafety')}
+                    itemKey="electricalPanels"
+                    isItemExcluded={!isItemIncluded('electricalPanels')}
+                    onToggleItem={onToggleItemInclusion}
+                  />
+                );
+              })}
             </div>
           )}
         </div>
@@ -1375,7 +1504,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="UNITS"
                 cost={
                   isIncluded('plumbingCivil') && isItemIncluded('plumbingFixtures')
-                    ? mto.plumbingFixturesUnits * (activeRates.plumbingPerFixture.material + activeRates.plumbingPerFixture.labor)
+                    ? mto.plumbingFixturesUnits * ((activeRates.plumbingPerFixture?.material ?? DEFAULT_UNIT_COST_RATES.plumbingPerFixture.material) + (activeRates.plumbingPerFixture?.labor ?? DEFAULT_UNIT_COST_RATES.plumbingPerFixture.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('plumbingCivil')}
@@ -1389,7 +1518,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="LF"
                 cost={
                   isIncluded('plumbingCivil') && isItemIncluded('utilityTrenching')
-                    ? mto.utilityTrenchingLf * (activeRates.utilityTrenchPerLf.material + activeRates.utilityTrenchPerLf.labor)
+                    ? mto.utilityTrenchingLf * ((activeRates.utilityTrenchPerLf?.material ?? DEFAULT_UNIT_COST_RATES.utilityTrenchPerLf.material) + (activeRates.utilityTrenchPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.utilityTrenchPerLf.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('plumbingCivil')}
@@ -1473,7 +1602,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 subtext={`${state.settings.slabThicknessInches}&quot; Slab + Footings`}
                 cost={
                   isIncluded('concreteFoundations') && isItemIncluded('pouredConcreteCy')
-                    ? mto.pouredConcreteCy * (activeRates.concretePerCy.material + activeRates.concretePerCy.labor)
+                    ? mto.pouredConcreteCy * ((activeRates.concretePerCy?.material ?? DEFAULT_UNIT_COST_RATES.concretePerCy.material) + (activeRates.concretePerCy?.labor ?? DEFAULT_UNIT_COST_RATES.concretePerCy.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('concreteFoundations')}
@@ -1487,7 +1616,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="# PIERS"
                 cost={
                   isIncluded('concreteFoundations') && isItemIncluded('helicalPiersPiles')
-                    ? mto.helicalPiersPiles * (activeRates.pierPerUnit.material + activeRates.pierPerUnit.labor)
+                    ? mto.helicalPiersPiles * ((activeRates.pierPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pierPerUnit.material) + (activeRates.pierPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pierPerUnit.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('concreteFoundations')}
@@ -1581,7 +1710,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 subtext={`${mto.roofingAreaSf} SF (${state.settings.roofPitchScale}:12 pitch)`}
                 cost={
                   isIncluded('roofingEnvelope') && isItemIncluded('roofingArea')
-                    ? mto.roofingAreaSq * (activeRates.roofingPerSq.material + activeRates.roofingPerSq.labor)
+                    ? mto.roofingAreaSq * ((activeRates.roofingPerSq?.material ?? DEFAULT_UNIT_COST_RATES.roofingPerSq.material) + (activeRates.roofingPerSq?.labor ?? DEFAULT_UNIT_COST_RATES.roofingPerSq.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('roofingEnvelope')}
@@ -1596,7 +1725,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 subtext="Net exterior walls"
                 cost={
                   isIncluded('roofingEnvelope') && isItemIncluded('primarySiding')
-                    ? mto.primarySidingSf * (activeRates.sidingPerSf.material + activeRates.sidingPerSf.labor)
+                    ? mto.primarySidingSf * ((activeRates.sidingPerSf?.material ?? DEFAULT_UNIT_COST_RATES.sidingPerSf.material) + (activeRates.sidingPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.sidingPerSf.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('roofingEnvelope')}
@@ -1650,7 +1779,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="SF"
                 cost={
                   isIncluded('roofingEnvelope') && isItemIncluded('timberDecking')
-                    ? mto.timberDeckingSf * (activeRates.deckingPerSf.material + activeRates.deckingPerSf.labor)
+                    ? mto.timberDeckingSf * ((activeRates.deckingPerSf?.material ?? DEFAULT_UNIT_COST_RATES.deckingPerSf.material) + (activeRates.deckingPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.deckingPerSf.labor))
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('roofingEnvelope')}

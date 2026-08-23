@@ -20,6 +20,7 @@ import {
   Star,
   Download,
   Printer,
+  Upload,
 } from 'lucide-react';
 
 import { getPersistedRateProfile, savePersistedRateProfile } from '../utils/storage';
@@ -67,6 +68,16 @@ const RATE_FIELDS: RateFieldConfig[] = [
 
   // 4. Electrical
   { key: 'switchPerUnit', label: 'Standard Light Switch (Decora)', unit: '$/Unit', category: 'Electrical & Lighting', description: 'Box, romex wire, switch, and coverplate' },
+  { key: 'switch3Way', label: '3-Way Switch ($3W)', unit: '$/Unit', category: 'Electrical & Lighting', description: 'Dual switch control wiring and devices' },
+  { key: 'electricalPanelMain100A', label: 'Main Panel - 100A', unit: '$/Unit', category: 'Electrical & Lighting', description: '100A Service entrance and breaker panel' },
+  { key: 'electricalPanelMain200A', label: 'Main Panel - 200A', unit: '$/Unit', category: 'Electrical & Lighting', description: '200A Service entrance and breaker panel' },
+  { key: 'electricalPanelMain400A', label: 'Main Panel - 400A', unit: '$/Unit', category: 'Electrical & Lighting', description: '400A Service entrance and breaker panel' },
+  { key: 'electricalPanelSub60A', label: 'Subpanel - 60A', unit: '$/Unit', category: 'Electrical & Lighting', description: '60A Distribution subpanel' },
+  { key: 'electricalPanelSub100A', label: 'Subpanel - 100A', unit: '$/Unit', category: 'Electrical & Lighting', description: '100A Distribution subpanel' },
+  { key: 'electricalPanelSub125A', label: 'Subpanel - 125A', unit: '$/Unit', category: 'Electrical & Lighting', description: '125A Distribution subpanel' },
+  { key: 'fixtureSconce', label: 'Wall Sconce / Interior Fixture', unit: '$/Unit', category: 'Electrical & Lighting', description: 'Decorative wall-mounted fixture' },
+  { key: 'exteriorCoachLight', label: 'Exterior Coach Light', unit: '$/Unit', category: 'Electrical & Lighting', description: 'Exterior-rated decorative fixture' },
+  { key: 'soffitLight', label: 'Exterior Soffit / Eaves Light', unit: '$/Unit', category: 'Electrical & Lighting', description: 'Recessed soffit potlight' },
   { key: 'outletPerUnit', label: '120V Standard Duplex Outlet', unit: '$/Unit', category: 'Electrical & Lighting', description: '15A/20A tamper-resistant outlet box and wiring' },
   { key: 'gfciPerUnit', label: 'GFCI Wet Location Outlet', unit: '$/Unit', category: 'Electrical & Lighting', description: 'Bath/kitchen GFCI circuit breaker/receptacle' },
   { key: 'evChargerPerUnit', label: 'EV Level 2 Fast Charger', unit: '$/Unit', category: 'Electrical & Lighting', description: '50A breaker, 6/3 wire run, and Wallbox/NEMA 14-50 outlet' },
@@ -103,6 +114,7 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
   masterRates,
   onSaveMasterRates,
 }) => {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [localRates, setLocalRates] = useState<UnitCostRates>(rates || DEFAULT_UNIT_COST_RATES);
   const [selectedCategory, setSelectedCategory] = useState<string>('All Categories');
   const [globalLaborMultiplier, setGlobalLaborMultiplier] = useState<string>('0');
@@ -124,13 +136,23 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
     type: 'material' | 'labor',
     value: number
   ) => {
-    setLocalRates((prev) => ({
-      ...prev,
-      [fieldKey]: {
-        ...prev[fieldKey],
-        [type]: Math.max(0, value),
-      },
-    }));
+    const field = RATE_FIELDS.find((f) => f.key === fieldKey);
+    const category = field?.category || 'Unknown';
+    
+    setLocalRates((prev) => {
+      const currentRate = prev[fieldKey] || DEFAULT_UNIT_COST_RATES[fieldKey];
+      return {
+        ...prev,
+        [fieldKey]: {
+          ...currentRate,
+          [type]: Math.max(0, value),
+        },
+        categoryLastUpdated: {
+          ...(prev.categoryLastUpdated || {}),
+          [category]: new Date().toISOString(),
+        },
+      };
+    });
   };
 
   const handleResetToDefaults = () => {
@@ -142,13 +164,28 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
     const labMul = 1 + (parseFloat(globalLaborMultiplier) || 0) / 100;
 
     const updated = { ...localRates };
+    const affectedCategories = new Set<string>();
+
     for (const field of RATE_FIELDS) {
+      if (selectedCategory !== 'All Categories' && field.category !== selectedCategory) continue;
+      
       const current = updated[field.key] || DEFAULT_UNIT_COST_RATES[field.key];
+      const mat = current?.material ?? DEFAULT_UNIT_COST_RATES[field.key].material;
+      const lab = current?.labor ?? DEFAULT_UNIT_COST_RATES[field.key].labor;
       updated[field.key] = {
-        material: Math.round(current.material * matMul * 100) / 100,
-        labor: Math.round(current.labor * labMul * 100) / 100,
+        material: Math.round(mat * matMul * 100) / 100,
+        labor: Math.round(lab * labMul * 100) / 100,
       };
+      affectedCategories.add(field.category);
     }
+
+    const newCategoryLastUpdated = { ...(updated.categoryLastUpdated || {}) };
+    const now = new Date().toISOString();
+    affectedCategories.forEach(cat => {
+      newCategoryLastUpdated[cat] = now;
+    });
+    updated.categoryLastUpdated = newCategoryLastUpdated;
+
     setLocalRates(updated);
     setGlobalLaborMultiplier('0');
     setGlobalMaterialMultiplier('0');
@@ -194,14 +231,16 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
   const handleExportCSV = () => {
     const headers = ['Category', 'Item', 'Unit', 'Material Rate', 'Labor Rate', 'Total Rate'];
     const rows = filteredFields.map((field) => {
-      const rateItem = localRates[field.key] || DEFAULT_UNIT_COST_RATES[field.key] || { material: 0, labor: 0 };
-      const total = (rateItem.material || 0) + (rateItem.labor || 0);
+      const rateItem = localRates[field.key] || DEFAULT_UNIT_COST_RATES[field.key];
+      const material = rateItem?.material ?? DEFAULT_UNIT_COST_RATES[field.key].material;
+      const labor = rateItem?.labor ?? DEFAULT_UNIT_COST_RATES[field.key].labor;
+      const total = material + labor;
       return [
         field.category,
         field.label,
         field.unit,
-        `$${rateItem.material.toFixed(2)}`,
-        `$${rateItem.labor.toFixed(2)}`,
+        `$${material.toFixed(2)}`,
+        `$${labor.toFixed(2)}`,
         `$${total.toFixed(2)}`,
       ];
     });
@@ -231,14 +270,17 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
     const date = new Date().toISOString().split('T')[0];
     const rows = filteredFields
       .map((field) => {
-        const rateItem = localRates[field.key] || DEFAULT_UNIT_COST_RATES[field.key] || { material: 0, labor: 0 };
-        const total = (rateItem.material || 0) + (rateItem.labor || 0);
+        const defaultRate = DEFAULT_UNIT_COST_RATES[field.key];
+        const rateItem = localRates[field.key] || defaultRate;
+        const material = rateItem?.material ?? defaultRate.material;
+        const labor = rateItem?.labor ?? defaultRate.labor;
+        const total = material + labor;
         return `
         <tr>
           <td>${field.label}</td>
           <td>${field.unit}</td>
-          <td>$${rateItem.material.toFixed(2)}</td>
-          <td>$${rateItem.labor.toFixed(2)}</td>
+          <td>$${material.toFixed(2)}</td>
+          <td>$${labor.toFixed(2)}</td>
           <td><strong>$${total.toFixed(2)}</strong></td>
         </tr>
       `;
@@ -285,10 +327,108 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
     printWindow.close();
   };
 
+  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      if (!content) return;
+
+      const lines = content.split('\n');
+      if (lines.length < 2) return;
+
+      const updated = { ...localRates };
+      let updatedCount = 0;
+      const updatedCategories = new Set<string>();
+
+      // Simple CSV parser that handles quoted values
+      const parseCSVLine = (line: string) => {
+        const result = [];
+        let cur = '';
+        let inQuote = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            inQuote = !inQuote;
+          } else if (char === ',' && !inQuote) {
+            result.push(cur);
+            cur = '';
+          } else {
+            cur += char;
+          }
+        }
+        result.push(cur);
+        return result;
+      };
+
+      const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
+      const categoryIdx = headers.indexOf('category');
+      const itemIdx = headers.indexOf('item');
+      const materialIdx = headers.indexOf('material rate');
+      const laborIdx = headers.indexOf('labor rate');
+
+      if (itemIdx === -1 || materialIdx === -1 || laborIdx === -1) {
+        setSyncStatus('Invalid CSV format. Missing required columns.');
+        setTimeout(() => setSyncStatus(null), 3000);
+        return;
+      }
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const cells = parseCSVLine(line);
+        const itemName = cells[itemIdx]?.trim();
+        const categoryName = categoryIdx !== -1 ? cells[categoryIdx]?.trim() : '';
+        const materialStr = cells[materialIdx]?.trim().replace(/[$,]/g, '') || '0';
+        const laborStr = cells[laborIdx]?.trim().replace(/[$,]/g, '') || '0';
+
+        const materialVal = parseFloat(materialStr) || 0;
+        const laborVal = parseFloat(laborStr) || 0;
+
+        // Find matching field
+        const field = RATE_FIELDS.find(f => 
+          f.label === itemName && (categoryIdx === -1 || f.category === categoryName)
+        );
+
+        if (field) {
+          updated[field.key] = {
+            material: materialVal,
+            labor: laborVal
+          };
+          updatedCount++;
+          updatedCategories.add(field.category);
+        }
+      }
+
+      const newCategoryLastUpdated = { ...(updated.categoryLastUpdated || {}) };
+      const now = new Date().toISOString();
+      updatedCategories.forEach(cat => {
+        newCategoryLastUpdated[cat] = now;
+      });
+      updated.categoryLastUpdated = newCategoryLastUpdated;
+
+      setLocalRates(updated);
+      setSyncStatus(`Successfully updated ${updatedCount} rates!`);
+      setTimeout(() => setSyncStatus(null), 3000);
+
+      // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsText(file);
+  };
+
   const filteredFields =
     selectedCategory === 'All Categories'
       ? RATE_FIELDS
       : RATE_FIELDS.filter((f) => f.category === selectedCategory);
+
+  const activeCategoryTimestamp =
+    selectedCategory !== 'All Categories'
+      ? localRates.categoryLastUpdated?.[selectedCategory]
+      : null;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
@@ -329,23 +469,59 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
 
         {/* Global Bulk Adjustments Bar */}
         <div className="bg-slate-950/60 px-4 py-2.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                  selectedCategory === cat
-                    ? 'bg-sky-600 text-white font-bold shadow'
-                    : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                    selectedCategory === cat
+                      ? 'bg-sky-600 text-white font-bold shadow'
+                      : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            {selectedCategory !== 'All Categories' && (
+              <div className="flex items-center gap-2 text-[11px]">
+                <span className="text-slate-400 font-semibold">{selectedCategory} —</span>
+                {activeCategoryTimestamp ? (
+                  <span className="text-sky-400 flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    Last Updated: {new Date(activeCategoryTimestamp).toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true,
+                    }).replace(',', ' at')}
+                  </span>
+                ) : (
+                  <span className="text-slate-500 italic">Last Updated: Standard Defaults</span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-2.5 py-1.5 bg-slate-800/50 hover:bg-slate-700 text-sky-400 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-700 cursor-pointer transition-colors"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Import CSV</span>
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImportCSV}
+              accept=".csv"
+              className="hidden"
+            />
             <button
               onClick={handleExportCSV}
               className="px-2.5 py-1.5 bg-slate-800/50 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-700 cursor-pointer transition-colors"
@@ -412,9 +588,12 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {filteredFields.map((field) => {
+                  const defaultRate = DEFAULT_UNIT_COST_RATES[field.key];
                   const rateItem: CostRateItem =
-                    localRates[field.key] || DEFAULT_UNIT_COST_RATES[field.key] || { material: 0, labor: 0 };
-                  const total = (rateItem.material || 0) + (rateItem.labor || 0);
+                    localRates[field.key] || defaultRate;
+                  const material = rateItem?.material ?? defaultRate.material;
+                  const labor = rateItem?.labor ?? defaultRate.labor;
+                  const total = material + labor;
 
                   return (
                     <tr key={field.key} className="hover:bg-slate-800/40 transition-colors">
@@ -434,7 +613,7 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
                             type="number"
                             step="0.05"
                             min="0"
-                            value={rateItem.material}
+                            value={material}
                             onChange={(e) =>
                               handleRateChange(
                                 field.key,
@@ -453,7 +632,7 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
                             type="number"
                             step="0.05"
                             min="0"
-                            value={rateItem.labor}
+                            value={labor}
                             onChange={(e) =>
                               handleRateChange(
                                 field.key,

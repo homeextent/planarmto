@@ -926,6 +926,21 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
       onChange({ ...state, stamps: updated });
     };
 
+    const handlePanelTypeChange = (panelType: 'main' | 'subpanel') => {
+      const defaultAmperage = panelType === 'main' ? '200A' : '100A';
+      const updated = state.stamps.map((s) =>
+        s.id === stamp.id ? { ...s, panelType, panelAmperage: defaultAmperage } : s
+      );
+      onChange({ ...state, stamps: updated });
+    };
+
+    const handlePanelAmperageChange = (panelAmperage: any) => {
+      const updated = state.stamps.map((s) =>
+        s.id === stamp.id ? { ...s, panelAmperage } : s
+      );
+      onChange({ ...state, stamps: updated });
+    };
+
     return (
       <div className="absolute top-16 right-88 w-72 bg-slate-900/95 border border-slate-700/80 backdrop-blur-md rounded-2xl shadow-2xl p-4 text-slate-200 z-20 text-xs">
         <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-800">
@@ -1005,6 +1020,51 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                 }}
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-200 font-mono focus:border-sky-500"
               />
+            </div>
+          )}
+
+          {(stamp.type === 'stamp_electrical_panel' || stamp.type === 'electrical_panel') && (
+            <div className="space-y-3 pt-2 border-t border-slate-800">
+              <div className="text-[10px] uppercase font-bold text-sky-400">Electrical Panel</div>
+              
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                  Panel Type
+                </label>
+                <select
+                  value={stamp.panelType || 'main'}
+                  onChange={(e) => handlePanelTypeChange(e.target.value as 'main' | 'subpanel')}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+                >
+                  <option value="main">Main Panel</option>
+                  <option value="subpanel">Subpanel</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                  Amperage
+                </label>
+                <select
+                  value={stamp.panelAmperage || (stamp.panelType === 'subpanel' ? '100A' : '200A')}
+                  onChange={(e) => handlePanelAmperageChange(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+                >
+                  {(stamp.panelType || 'main') === 'subpanel' ? (
+                    <>
+                      <option value="60A">60A</option>
+                      <option value="100A">100A</option>
+                      <option value="125A">125A</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="100A">100A</option>
+                      <option value="200A">200A</option>
+                      <option value="400A">400A</option>
+                    </>
+                  )}
+                </select>
+              </div>
             </div>
           )}
 

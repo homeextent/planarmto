@@ -139,6 +139,26 @@ Foundation estimation relies on explicit volumetric variables assigned per-room 
 - **Total Poured Concrete (CY)**: $V_{\text{total, CY}} = \frac{V_{\text{slab}} + V_{\text{fnd}} + V_{\text{ftg}}}{27}$
 - **Slab Insulation**: $A_{\text{insul}} = A_{\text{room}}$ (SF)
 
+### 4.3 Division 26 — Electrical & Life Safety
+The electrical take-off engine supports granular itemization for devices and service equipment.
+
+#### A. Granular Panel Amperage Tiers
+Rate models for electrical panels are categorized by type and amperage:
+- **Main Panels**: 100A, 200A, 400A
+- **Subpanels**: 60A, 100A, 125A
+
+Each tier is tracked as a distinct line item with dedicated material/labor unit rates, rather than a generic "Panel" rollup.
+
+#### B. Lighting & Device Expansion
+Expanded stamp suite includes specialized rate calculations for:
+- **3-Way Switches ($3W)**: Itemized separately from standard single-pole switches.
+- **Sconces & Interior Fixtures**: Dedicated labor rates for wall-mounted lighting.
+- **Exterior Coach Lights**: Integrated with building envelope trade rules.
+- **Soffit/Eaves Downlights**: Calculated based on placement within roof/eave projections.
+
+#### C. Itemized Reporting Logic
+In `PrintReportModal.tsx`, electrical items are itemized line-by-line. The aggregator bypasses generic category rollups for the Electrical division to ensure that different panel tiers and device types are clearly visible in the final contract document.
+
 ---
 
 ## 5. Numerical Stability & Precision
@@ -206,6 +226,7 @@ PlanarMTO utilizes a multi-layered storage strategy to balance project-level int
 2. **`wp_usermeta` (Global Metadata)**: Stores tenant-wide configuration independent of specific projects:
    - **`planarmto_company_branding`**: Persists company identity (name, logo, contact info) across all projects.
    - **`planarmto_global_rates` (Master Rates)**: Stores the single-source-of-truth unit price template for materials and labor.
+   - **Per-Category Timestamps**: Tracks `categoryLastUpdated` for each trade division (e.g., Electrical, Framing) within the master rate object, enabling granular tracking of pricing expiration.
 
 ### 10.2 Dual-Layer Rate Architecture
 The system maintains a strict separation between global templates and project-specific costs:
@@ -220,6 +241,7 @@ The system exposes a custom namespace `planarmto/v1` for authenticated communica
 - **`DELETE /projects/{id}`**: Permanently removes a project record.
 - **`GET /rates`**: Retrieves the global master rate template from user metadata.
 - **`POST /rates`**: Updates the global master rate template.
+- **CSV Export/Import Utility**: `RateCustomizerModal` implements a CSV serialization layer for exporting trade-specific price sheets (e.g., for RFQ distribution to subcontractors) and re-importing updated unit rates.
 
 ### 10.3 Authorization & X-WP-Nonce
 To prevent Cross-Site Request Forgery (CSRF) and ensure tenant isolation:

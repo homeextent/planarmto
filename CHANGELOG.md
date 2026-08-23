@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.5.0] - 2026-08-23
+
+### Added
+- **Subcontractor Rate CSV Export/Import & Category Timestamps**: Added trade-specific CSV export, print RFQ sheets, and CSV rate importing in `RateCustomizerModal` with independent per-category `categoryLastUpdated` timestamp tracking.
+- **Granular Electrical Panel Amperage Tiers**: Added 6 distinct rate tiers (Main Panel 100A, 200A, 400A and Subpanel 60A, 100A, 125A) with dynamic configuration dropdowns in the Inspector card.
+- **Lighting & Device Stamp Suite Expansion**: Added CAD stamps and rate models for 3-Way Switches ($3W), Wall Sconces/Interior Fixtures, Exterior Coach Lights, and Soffit/Eaves Downlights.
+- **Itemized PDF & Print Take-Off Reports**: Updated `PrintReportModal.tsx` to itemize every active electrical device, light fixture, and panel tier with material/labor subtotals instead of collapsing them into summary rows.
+
+### Fixed
+- **Live MTO Matrix Cost Visibility**: Ensured all active electrical items and panel breakdown tiers display both unit counts and calculated dollar amounts ($) in the sidebar.
+- **Electrical Panel Placement & Safety**: Resolved canvas placement white screen crash by adding default property initialization (`panelType: 'main'`, `panelAmperage: '200A'`) and fallback rate key lookups.
+- **Sconce & Exterior Light Canvas Placement**: Fixed tool handlers in `CadCanvas.tsx` to enable direct canvas click placement for all light fixture stamps.
+
+---
+
 ## [2.4.0] - 2026-08-22
 
 ### Added
