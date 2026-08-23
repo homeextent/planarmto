@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Live MTO Matrix Cost Visibility**: Ensured all active electrical items and panel breakdown tiers display both unit counts and calculated dollar amounts ($) in the sidebar.
 - **Electrical Panel Placement & Safety**: Resolved canvas placement white screen crash by adding default property initialization (`panelType: 'main'`, `panelAmperage: '200A'`) and fallback rate key lookups.
 - **Sconce & Exterior Light Canvas Placement**: Fixed tool handlers in `CadCanvas.tsx` to enable direct canvas click placement for all light fixture stamps.
+- **Passive Event Listener Fix**: Registered native { passive: false } event listeners on the canvas container for wheel and touchmove events to eliminate browser console preventDefault warnings during pan and zoom interactions.
 
 ---
 

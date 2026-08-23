@@ -358,7 +358,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   );
 
   // Zoom controls
-  const handleZoom = (factor: number, centerX?: number, centerY?: number) => {
+  const handleZoom = useCallback((factor: number, centerX?: number, centerY?: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -371,7 +371,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       const newY = cy - (cy - prev.y) * (newScale / prev.scale);
       return { scale: newScale, x: newX, y: newY };
     });
-  };
+  }, []);
 
   const handleZoomFit = () => {
     const canvas = canvasRef.current;
@@ -476,6 +476,37 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       lastUnderlayId.current = undefined;
     }
   }, [state.underlay?.id, state, onChange, screenToWorld]);
+
+  // Prevent default for wheel and touchmove events (passive event listener fix)
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const clientX = e.clientX - rect.left;
+      const clientY = e.clientY - rect.top;
+
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+      handleZoom(zoomFactor, clientX, clientY);
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 1) {
+        e.preventDefault();
+      }
+    };
+
+    container.addEventListener('wheel', onWheel, { passive: false });
+    container.addEventListener('touchmove', onTouchMove, { passive: false });
+
+    return () => {
+      container.removeEventListener('wheel', onWheel);
+      container.removeEventListener('touchmove', onTouchMove);
+    };
+  }, [handleZoom]);
 
   // Keyboard shortcut listener (Delete, Escape, Space)
   useEffect(() => {
@@ -2505,18 +2536,6 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     }
   };
 
-  // Handle Wheel (Zoom)
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const clientX = e.clientX - rect.left;
-    const clientY = e.clientY - rect.top;
-
-    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-    handleZoom(zoomFactor, clientX, clientY);
-  };
-
   return (
     <div
       ref={containerRef}
@@ -2529,7 +2548,6 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onDoubleClick={handleDoubleClick}
-        onWheel={handleWheel}
         onContextMenu={(e) => {
           e.preventDefault();
           const rect = canvasRef.current?.getBoundingClientRect();
