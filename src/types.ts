@@ -650,6 +650,15 @@ export interface UnderlayImage {
   opacity: number; // 0.1 to 1.0 (default: 0.5)
   isLocked: boolean; // Prevent dragging when tracing
   isVisible: boolean; // Show/hide toggle
+  // Keeping backward compatible naming for clarity if requested by internal components
+  blueprintUrl?: string; 
+  url?: string;
+  blueprintOpacity?: number;
+  blueprintScale?: number;
+  blueprintOffsetX?: number;
+  blueprintOffsetY?: number;
+  blueprintVisible?: boolean;
+  blueprintLocked?: boolean;
 }
 
 export interface ClipboardState {

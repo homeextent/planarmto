@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.9.0] - 2026-08-24
+
+### Added
+- **Shift-Key Ortho Lock for Scale Calibration**: Supported 360° free-floating reference line selection by default to handle skewed blueprint scans, with an optional `Shift`-key constraint for locking calibration lines to exact 90° horizontal or vertical axes.
+- **Automatic Grid Snap Bypass**: Automatic bypass of all node, wall, and grid snapping while the scale calibration tool is active or when grid snap is toggled off (`isSnapEnabled === false`), ensuring pixel-perfect calibration.
+
+### Fixed
+- **Blueprint Underlay Persistence & Rehydration**: Fully preserved blueprint image URLs, visibility, opacity, position offsets, scale factor, and lock states across WordPress database and LocalStorage save/load cycles.
+- **Streamlined Underlay Settings UI**: Cleaned up the Blueprint Underlay Inspector card to 5 mistake-proof controls (Opacity Slider, Visibility Toggle, Lock Toggle, Re-Calibrate Scale, Remove Image), eliminating raw floating-point numeric input fields.
+- **Underlay Selection & Canvas Interactivity**: Reconnected canvas click hit-testing for rehydrated blueprint underlays, allowing instant selection, moving, scaling, and visibility toggling upon reopening saved projects.
+
 ## [2.8.0] - 2026-08-24
 
 ### Added

@@ -8,7 +8,8 @@
 
 ### 1. Interactive 2D Vector CAD Canvas
 - **Planar Graph Drafting**: Automatic node snapping, collinear vertex intersection, orthogonal locking (90° Ortho), and live dimension overlays.
-- **2D Blueprint Underlay & Scale Calibration**: Import floor plan images (`.png`, `.jpg`, `.webp`, `.svg`) with 2-point reference calibration for pixel-to-foot mapping. Includes opacity controls and canvas position locking.
+- **2D Blueprint Underlay & Scale Calibration**: Import floor plan images (`.png`, `.jpg`, `.webp`, `.svg`) with 2-point reference calibration for pixel-to-foot mapping. Includes **360° free-floating reference selection** (default) or **Shift-key Ortho locking** for exact 90° axes. Features **automatic grid snap bypass** during calibration, opacity controls, canvas position locking, and full rehydration of image URLs and settings across save cycles.
+- **Streamlined Underlay Inspector Card**: Replaced complex numeric fields with 5 mistake-proof controls: Opacity Slider, Visibility Toggle, Lock Toggle, Re-Calibrate Scale, and Remove Image.
 - **Multi-Corner Drag Anchoring & Magnetic Snapping**: Enhanced room movement via specific corner nodes with multi-corner magnetic snapping and visual snap indicators.
 - **Orthogonal Rectangular Corner Resizing**: Constrained corner dragging on 4-node rectangular rooms to automatically adjust adjacent nodes, preserving 90° wall joins.
 - **Marquee Box Selection**: Click-and-drag box selection across canvas entities (walls, vertices, rooms, apertures, stamps, annotations) with support for multi-item group dragging.

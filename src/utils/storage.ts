@@ -185,6 +185,28 @@ export async function getSavedProjects(): Promise<SavedProjectEntry[]> {
           updatedAt: Number(p.updatedAt || (p.updated_at ? new Date(p.updated_at).getTime() : Date.now())),
           state: (() => {
             const parsedState = typeof p.state === 'string' ? JSON.parse(p.state) : p.state || (p.project_state ? (typeof p.project_state === 'string' ? JSON.parse(p.project_state) : p.project_state) : {});
+            
+            // Rehydrate blueprint data for backward compatibility and completeness
+            if (parsedState?.underlay) {
+              const u = parsedState.underlay;
+              u.src = u.src || u.blueprintUrl || '';
+              u.url = u.src; // Ensure both src and url are present
+              u.blueprintUrl = u.src;
+              u.opacity = u.opacity !== undefined ? u.opacity : (u.blueprintOpacity !== undefined ? u.blueprintOpacity : 0.5);
+              u.blueprintOpacity = u.opacity;
+              u.scale = u.scale !== undefined ? u.scale : (u.blueprintScale !== undefined ? u.blueprintScale : 1.0);
+              u.blueprintScale = u.scale;
+              u.x = u.x !== undefined ? u.x : (u.blueprintOffsetX !== undefined ? u.blueprintOffsetX : 0);
+              u.blueprintOffsetX = u.x;
+              u.y = u.y !== undefined ? u.y : (u.blueprintOffsetY !== undefined ? u.blueprintOffsetY : 0);
+              u.blueprintOffsetY = u.y;
+              u.isVisible = u.isVisible !== undefined ? u.isVisible : (u.blueprintVisible !== undefined ? u.blueprintVisible : true);
+              u.blueprintVisible = u.isVisible;
+              u.isLocked = u.isLocked !== undefined ? u.isLocked : (u.blueprintLocked !== undefined ? u.blueprintLocked : false);
+              u.blueprintLocked = u.isLocked;
+              u.id = u.id || 'blueprint_main';
+            }
+
             if (parsedState?.settings?.costRates) {
               parsedState.settings.costRates = safeMergeRates(parsedState.settings.costRates);
             }
@@ -248,6 +270,18 @@ export async function saveProjectToDirectory(
     estimatedTotal: cost.totalCost,
     state: {
       ...state,
+      underlay: state.underlay ? {
+        ...state.underlay,
+        // Sync properties before saving to ensure both naming conventions are preserved
+        blueprintUrl: state.underlay.src,
+        blueprintOpacity: state.underlay.opacity,
+        blueprintScale: state.underlay.scale,
+        blueprintOffsetX: state.underlay.x,
+        blueprintOffsetY: state.underlay.y,
+        blueprintVisible: state.underlay.isVisible,
+        blueprintLocked: state.underlay.isLocked,
+        url: state.underlay.src
+      } : undefined,
       settings: {
         ...state.settings,
         costRates: state.settings.costRates ? {

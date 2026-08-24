@@ -20,6 +20,8 @@ import {
 import { DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT } from '../constants/stamps';
 import { Settings2, Trash2, X, Sliders, Box, Layers, RotateCw, Type } from 'lucide-react';
 
+import { useProject } from '../context/ProjectContext';
+
 interface InspectorPanelProps {
   state: FloorplanState;
   onChange: (newState: FloorplanState) => void;
@@ -37,6 +39,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   onDelete,
   onToolChange,
 }) => {
+  const { saveSnapSetting } = useProject();
   if (selection.type === 'none' || !selection.id) return null;
 
   const nodeMap = new Map();
@@ -1610,21 +1613,57 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
     const handleOpacityChange = (opacity: number) => {
       onChange({
         ...state,
-        underlay: { ...underlay, opacity }
+        underlay: { 
+          ...underlay, 
+          opacity,
+          blueprintOpacity: opacity 
+        }
       });
     };
 
     const handleLockedChange = (isLocked: boolean) => {
       onChange({
         ...state,
-        underlay: { ...underlay, isLocked }
+        underlay: { 
+          ...underlay, 
+          isLocked,
+          blueprintLocked: isLocked 
+        }
       });
     };
 
     const handleVisibleChange = (isVisible: boolean) => {
       onChange({
         ...state,
-        underlay: { ...underlay, isVisible }
+        underlay: { 
+          ...underlay, 
+          isVisible,
+          blueprintVisible: isVisible 
+        }
+      });
+    };
+
+    const handlePositionChange = (x: number, y: number) => {
+      onChange({
+        ...state,
+        underlay: { 
+          ...underlay, 
+          x, 
+          y,
+          blueprintOffsetX: x,
+          blueprintOffsetY: y
+        }
+      });
+    };
+
+    const handleScaleChange = (scale: number) => {
+      onChange({
+        ...state,
+        underlay: { 
+          ...underlay, 
+          scale,
+          blueprintScale: scale
+        }
       });
     };
 
@@ -1664,30 +1703,47 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             />
           </div>
 
-          <div className="flex items-center justify-between">
-            <label className="flex items-center gap-2 cursor-pointer text-slate-300 text-xs font-semibold">
-              <input
-                type="checkbox"
-                checked={underlay.isLocked}
-                onChange={(e) => handleLockedChange(e.target.checked)}
-                className="rounded bg-slate-950 border-slate-700 text-sky-500"
-              />
-              Lock Position
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer text-slate-300 text-xs font-semibold">
-              <input
-                type="checkbox"
-                checked={underlay.isVisible}
-                onChange={(e) => handleVisibleChange(e.target.checked)}
-                className="rounded bg-slate-950 border-slate-700 text-sky-500"
-              />
-              Visible
-            </label>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                Visibility
+              </label>
+              <button
+                onClick={() => handleVisibleChange(!underlay.isVisible)}
+                className={`w-full py-1.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
+                  underlay.isVisible
+                    ? 'bg-sky-600/30 border-sky-500 text-sky-300'
+                    : 'bg-slate-950/80 border-slate-800 text-slate-500'
+                }`}
+              >
+                {underlay.isVisible ? 'Visible' : 'Hidden'}
+              </button>
+            </div>
+            <div>
+              <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                Movement
+              </label>
+              <button
+                onClick={() => handleLockedChange(!underlay.isLocked)}
+                className={`w-full py-1.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
+                  underlay.isLocked
+                    ? 'bg-amber-600/30 border-amber-500 text-amber-300'
+                    : 'bg-slate-950/80 border-slate-800 text-slate-400'
+                }`}
+              >
+                {underlay.isLocked ? 'Locked' : 'Unlocked'}
+              </button>
+            </div>
           </div>
 
           <div className="pt-2 border-t border-slate-800 space-y-2">
             <button
               onClick={() => {
+                saveSnapSetting({ enabled: state.settings.gridSnap, size: state.settings.gridSnapSize });
+                onChange({
+                  ...state,
+                  settings: { ...state.settings, gridSnap: false }
+                });
                 if (onToolChange) onToolChange('calibrate_scale');
                 onClose();
               }}

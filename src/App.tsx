@@ -34,7 +34,18 @@ import { RateCustomizerModal } from './components/RateCustomizerModal';
 import { GlobalProjectSettingsModal } from './components/GlobalProjectSettingsModal';
 import { ProjectDirectoryModal } from './components/ProjectDirectoryModal';
 
+import { ProjectProvider, useProject } from './context/ProjectContext';
+
 export default function App() {
+  return (
+    <ProjectProvider>
+      <AppContent />
+    </ProjectProvider>
+  );
+}
+
+function AppContent() {
+  const { saveSnapSetting, previousSnapSetting, clearSnapSetting } = useProject();
   // Project State initialized with a clean blank canvas
   const [state, setState] = useState<FloorplanState>(createBlankProject());
 
@@ -556,6 +567,26 @@ export default function App() {
     });
   }, []);
 
+  const handleToolChange = useCallback((tool: ActiveTool) => {
+    if (tool === 'calibrate_scale' && activeTool !== 'calibrate_scale') {
+      saveSnapSetting({ enabled: state.settings.gridSnap, size: state.settings.gridSnapSize });
+      handleUpdateSettings({ ...state.settings, gridSnap: false }, false);
+    } else if (activeTool === 'calibrate_scale' && tool !== 'calibrate_scale') {
+      if (previousSnapSetting) {
+        handleUpdateSettings({
+          ...state.settings,
+          gridSnap: previousSnapSetting.enabled,
+          gridSnapSize: previousSnapSetting.size
+        }, false);
+        clearSnapSetting();
+      }
+    }
+    setActiveTool(tool);
+    if (tool !== 'select') {
+      setSelection({ type: 'none' });
+    }
+  }, [activeTool, state.settings, handleUpdateSettings, previousSnapSetting, saveSnapSetting, clearSnapSetting]);
+
   // Real-Time Material Take-Off calculation
   const mtoReport = useMemo(() => {
     return calculateMTO(state);
@@ -602,12 +633,7 @@ export default function App() {
         {/* Left CAD Tool Palette */}
         <Toolbar
           activeTool={activeTool}
-          onSelectTool={(tool) => {
-            setActiveTool(tool);
-            if (tool !== 'select') {
-              setSelection({ type: 'none' });
-            }
-          }}
+          onSelectTool={handleToolChange}
           activeWallPreset={activeWallPreset}
           onSelectWallPreset={setActiveWallPreset}
         />
@@ -617,7 +643,7 @@ export default function App() {
           state={state}
           onChange={handleStateChange}
           activeTool={activeTool}
-          onToolChange={setActiveTool}
+          onToolChange={handleToolChange}
           selection={selection}
           onSelect={setSelection}
           onDeleteSelected={handleDeleteSelected}
@@ -652,7 +678,7 @@ export default function App() {
             selection={selection}
             onClose={() => setSelection({ type: 'none' })}
             onDelete={handleDeleteSelected}
-            onToolChange={setActiveTool}
+            onToolChange={handleToolChange}
           />
       </div>
 

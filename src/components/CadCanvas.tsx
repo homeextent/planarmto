@@ -49,6 +49,8 @@ import {
   FileText,
 } from 'lucide-react';
 
+import { useProject } from '../context/ProjectContext';
+
 interface CadCanvasProps {
   state: FloorplanState;
   onChange: (newState: FloorplanState) => void;
@@ -228,18 +230,21 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   const lastProjectId = useRef<string | undefined>(undefined);
   const lastUnderlayId = useRef<string | undefined>(state.underlay?.id);
 
-  // Underlay image cache
+    // Underlay image cache
   const [underlayImage, setUnderlayImage] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
-    if (state.underlay?.src) {
+    const src = state.underlay?.blueprintUrl || state.underlay?.src;
+    if (src) {
       const img = new Image();
-      img.onload = () => setUnderlayImage(img);
-      img.src = state.underlay.src;
+      img.onload = () => {
+        setUnderlayImage(img);
+      };
+      img.src = src;
     } else {
       setUnderlayImage(null);
     }
-  }, [state.underlay?.src]);
+  }, [state.underlay?.blueprintUrl, state.underlay?.src]);
 
   // Measurement ruler drafting
   const [rulerPoints, setRulerPoints] = useState<Point2D[]>([]);
@@ -300,11 +305,21 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   // Find nearest snap point (node snap has highest priority, then grid snap)
   const getSmartSnapPoint = useCallback(
     (rawWorld: Point2D, excludeNodeId?: string | null) => {
+      const isSnapEnabled = state.settings.gridSnap;
+      const shouldSnap = isSnapEnabled && activeTool !== 'calibrate_scale';
+
+      if (!shouldSnap) {
+        return {
+          point: { x: rawWorld.x, y: rawWorld.y },
+          type: 'grid' as const, // Default to grid type but with raw coordinates
+        };
+      }
+
       const snapRadius = 1.0; // 1 ft snap radius
       let nearestNode: CadNode | null = null;
       let minNodeDist = snapRadius;
 
-      state.nodes.forEach((n) => {
+      state.nodes.forEach((n: CadNode) => {
         if (excludeNodeId && n.id === excludeNodeId) return;
         const d = distance(rawWorld, n);
         if (d < minNodeDist) {
@@ -314,22 +329,23 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       });
 
       if (nearestNode) {
+        const n = nearestNode as CadNode;
         return {
-          point: { x: nearestNode.x, y: nearestNode.y },
+          point: { x: n.x, y: n.y },
           type: 'node' as const,
-          nodeId: nearestNode.id,
+          nodeId: n.id,
         };
       }
 
       // Check wall centerline snap
       const nodeMap = new Map<string, CadNode>();
-      state.nodes.forEach((n) => nodeMap.set(n.id, n));
+      state.nodes.forEach((n: CadNode) => nodeMap.set(n.id, n));
 
       let nearestWallProj: { point: Point2D; wallId: string } | null = null;
       const snapInc = state.settings.gridSnapSize || 0.5;
       let minWallDist = Math.max(0.2, snapInc / 2);
 
-      state.walls.forEach((w) => {
+      state.walls.forEach((w: CadWall) => {
         const n1 = nodeMap.get(w.startNodeId);
         const n2 = nodeMap.get(w.endNodeId);
         if (!n1 || !n2) return;
@@ -341,10 +357,11 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       });
 
       if (nearestWallProj) {
+        const p = nearestWallProj as { point: Point2D; wallId: string };
         return {
-          point: nearestWallProj.point,
+          point: p.point,
           type: 'wall' as const,
-          wallId: nearestWallProj.wallId,
+          wallId: p.wallId,
         };
       }
 
@@ -355,7 +372,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         type: 'grid' as const,
       };
     },
-    [state.nodes, state.walls, state.settings.gridSnapSize]
+    [state.nodes, state.walls, state.settings.gridSnapSize, state.settings.gridSnap, activeTool]
   );
 
   // Zoom controls
@@ -524,6 +541,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         setRulerStart(null);
         setRulerEnd(null);
         onSelect({ type: 'none' });
+        onToolChange('select');
       }
     };
 
@@ -593,15 +611,22 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       return false;
     };
 
-    // --- DRAW UNDERLAY IMAGE ---
-    if (state.underlay && state.underlay.isVisible && underlayImage) {
+    // --- DRAW UNDERLAY IMAGE (BLUEPRINT) ---
+    const underlay = state.underlay;
+    const isVisible = underlay?.isVisible;
+    const opacity = underlay?.opacity;
+    const uX = underlay?.x;
+    const uY = underlay?.y;
+    const uScale = underlay?.scale;
+
+    if (underlay && isVisible && underlayImage) {
       ctx.save();
-      ctx.globalAlpha = state.underlay.opacity;
-      const isSelected = isEntitySelected('underlay', state.underlay.id);
-      const drawX = state.underlay.x * scale + panX;
-      const drawY = state.underlay.y * scale + panY;
-      const drawW = (state.underlay.width / state.underlay.scale) * scale;
-      const drawH = (state.underlay.height / state.underlay.scale) * scale;
+      ctx.globalAlpha = opacity !== undefined ? opacity : 0.5;
+      const isSelected = isEntitySelected('underlay', underlay.id);
+      const drawX = (uX || 0) * scale + panX;
+      const drawY = (uY || 0) * scale + panY;
+      const drawW = (underlay.width / (uScale || 1)) * scale;
+      const drawH = (underlay.height / (uScale || 1)) * scale;
       ctx.drawImage(underlayImage, drawX, drawY, drawW, drawH);
       
       if (isSelected) {
@@ -2040,6 +2065,8 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     if (e.button !== 0) return; // Only left click for drawing/selecting
 
     const snap = getSmartSnapPoint(rawWorld, activeWallStartNodeId);
+    const isSnapEnabled = state.settings.gridSnap;
+    const shouldSnap = isSnapEnabled && activeTool !== 'calibrate_scale';
 
     const toggleSelection = (type: SelectionState['type'], id: string, event: React.MouseEvent) => {
       const isShift = event.shiftKey;
@@ -2087,7 +2114,19 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         setCalibrationPoints([rawWorld]);
       } else {
         const p1 = calibrationPoints[0];
-        const p2 = rawWorld;
+        let p2 = rawWorld;
+
+        // Apply Ortho snapping if Shift is held
+        if (e.shiftKey) {
+          const dx = Math.abs(p2.x - p1.x);
+          const dy = Math.abs(p2.y - p1.y);
+          if (dx > dy) {
+            p2 = { x: p2.x, y: p1.y };
+          } else {
+            p2 = { x: p1.x, y: p2.y };
+          }
+        }
+
         const distWorld = distance(p1, p2);
         
         const actualDist = prompt("Enter actual distance for this segment (e.g. 12' 6\" or 12.5):", "10");
@@ -2117,14 +2156,16 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     const snapInc = state.settings.gridSnapSize || 0.5;
     let worldPoint = (activeTool === 'wall_rect' || activeTool === 'room_box')
-      ? snapPointToGrid(rawWorld, snapInc)
+      ? (shouldSnap ? snapPointToGrid(rawWorld, snapInc) : rawWorld)
       : snap.point;
 
     if (activeTool === 'wall_rect' || activeTool === 'room_box') {
-      worldPoint = {
-        x: Math.round(worldPoint.x / snapInc) * snapInc,
-        y: Math.round(worldPoint.y / snapInc) * snapInc
-      };
+      if (shouldSnap) {
+        worldPoint = {
+          x: Math.round(worldPoint.x / snapInc) * snapInc,
+          y: Math.round(worldPoint.y / snapInc) * snapInc
+        };
+      }
     }
 
     if (activeTool === 'ruler_measure') {
@@ -2324,10 +2365,16 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       if (hitDeck) { toggleSelection('deck', hitDeck.id, e); setIsDraggingElement(true); setDragStartPoint(worldPoint); setHasMovedDuringDrag(false); return; }
       const hitHardscape = state.hardscapes.find((h) => isPointInPolygon(rawWorld, h.points));
       if (hitHardscape) { toggleSelection('hardscape', hitHardscape.id, e); setIsDraggingElement(true); setDragStartPoint(worldPoint); setHasMovedDuringDrag(false); return; }
-      if (state.underlay && state.underlay.isVisible && !state.underlay.isLocked) {
+      if (state.underlay && state.underlay.isVisible) {
         const uw = state.underlay.width / state.underlay.scale, uh = state.underlay.height / state.underlay.scale;
         if (rawWorld.x >= state.underlay.x && rawWorld.x <= state.underlay.x + uw && rawWorld.y >= state.underlay.y && rawWorld.y <= state.underlay.y + uh) {
-          toggleSelection('underlay', state.underlay.id, e); setIsDraggingElement(true); setDragStartPoint(rawWorld); setHasMovedDuringDrag(false); return;
+          if (!state.underlay.isLocked) {
+            toggleSelection('underlay', state.underlay.id, e); 
+            setIsDraggingElement(true); 
+            setDragStartPoint(rawWorld); 
+            setHasMovedDuringDrag(false); 
+            return;
+          }
         }
       }
       if (!e.shiftKey && !(e.ctrlKey || e.metaKey)) onSelect({ type: 'none' });
@@ -2348,6 +2395,23 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     const snap = getSmartSnapPoint(rawWorld, activeWallStartNodeId);
     setSnapCandidate(snap);
     let currentPoint = snap.point;
+    
+    // Ortho snapping for calibration tool
+    if (activeTool === 'calibrate_scale' && calibrationPoints.length > 0) {
+      if (e.shiftKey) {
+        const p1 = calibrationPoints[0];
+        const dx = Math.abs(rawWorld.x - p1.x);
+        const dy = Math.abs(rawWorld.y - p1.y);
+        if (dx > dy) {
+          currentPoint = { x: rawWorld.x, y: p1.y };
+        } else {
+          currentPoint = { x: p1.x, y: rawWorld.y };
+        }
+      } else {
+        currentPoint = rawWorld;
+      }
+    }
+
     if (activeTool === 'wall_rect' || activeTool === 'room_box') { currentPoint = { x: Math.round(currentPoint.x * 12) / 12, y: Math.round(currentPoint.y * 12) / 12 }; }
     if (activeTool === 'wall_pen' && activeWallStartNodeId) {
       const startNode = state.nodes.find((n) => n.id === activeWallStartNodeId);
@@ -2360,7 +2424,11 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     if (marqueeStart && !isDraggingElement) { setMarqueeEnd(rawWorld); return; }
     if (isDraggingElement && selection.type !== 'none') {
       const snapInc = state.settings.gridSnapSize || 0.5;
-      const currentPointSnapped = { x: Math.round(currentPoint.x / snapInc) * snapInc, y: Math.round(currentPoint.y / snapInc) * snapInc };
+      const isSnapEnabled = state.settings.gridSnap;
+      const currentPointSnapped = isSnapEnabled 
+        ? { x: Math.round(currentPoint.x / snapInc) * snapInc, y: Math.round(currentPoint.y / snapInc) * snapInc }
+        : currentPoint;
+      
       const dx = currentPointSnapped.x - dragStartPoint.x, dy = currentPointSnapped.y - dragStartPoint.y;
       if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001) {
         setHasMovedDuringDrag(true);
@@ -2580,6 +2648,8 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
             ? activeWallStartNodeId
               ? 'Click to place next wall node (Double-click / ESC to finish)'
               : 'Click to drop start node for wall'
+            : activeTool === 'calibrate_scale'
+            ? "Scale Calibration Mode: Click start and end points of a known dimension (Hold Shift for straight 90° lines)"
             : activeTool === 'wall_rect' || activeTool === 'room_box'
             ? 'Click & drag or click 2 points to create 4-wall Room'
             : activeTool.startsWith('aperture_')

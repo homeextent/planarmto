@@ -9,7 +9,14 @@ PlanarMTO models an architectural floorplan as an embedded **Planar Straight Lin
 - **Edges (Walls) $E$**: Set of line segments $e_{ij} = (v_i, v_j)$ with assigned geometric thickness $T_w$, height $H_w$, and framing specifications.
 
 ### 1.1 Collinear Snapping & Node Merging
-When drafting or moving a node $v_{\text{new}}$ within a threshold radius $\epsilon_{\text{snap}} = 0.5\text{ ft}$ of an existing node $v_k$, $v_{\text{new}}$ is merged into $v_k$. When a node falls within $\epsilon_{\text{snap}}$ of a wall segment $(v_a, v_b)$, the wall is partitioned at the orthogonal projection point:
+When drafting or moving a node $v_{\text{new}}$ within a threshold radius $\epsilon_{\text{snap}} = 0.5\text{ ft}$ of an existing node $v_k$, $v_{\text{new}}$ is merged into $v_k$. 
+
+#### 1.1.0 Automatic Snap Bypass
+To ensure pixel-perfect blueprint calibration, all snapping logic ($\epsilon_{\text{snap}}$ and grid-based alignment) is automatically bypassed when:
+1. The **Scale Calibration Tool** is active.
+2. Grid snap is explicitly toggled off (`state.settings.isSnapEnabled === false`).
+
+When a node falls within $\epsilon_{\text{snap}}$ of a wall segment $(v_a, v_b)$, the wall is partitioned at the orthogonal projection point:
 $$t = \frac{(v_{\text{new}} - v_a) \cdot (v_b - v_a)}{\|v_b - v_a\|^2}, \quad t \in [0, 1]$$
 The original edge $(v_a, v_b)$ is replaced by two sub-edges $(v_a, v_{\text{new}})$ and $(v_{\text{new}}, v_b)$.
 
@@ -343,14 +350,44 @@ Aggressive caching layers (SiteGround Optimizer, Nginx, Varnish) can often cache
 
 ---
 
-## 12. UI Architecture & Document Controls
+## 8. Blueprint Underlay & Scale Calibration Pipeline
 
-### 12.1 Single-Source-of-Truth Top Header Bar
+### 8.1 Image Rehydration & Persistence
+Blueprint underlays are persisted within the `FloorplanState.underlay` object. To ensure seamless session restoration, the pipeline preserves:
+- **`url`**: The absolute or relative source of the image.
+- **`opacity` & `isVisible`**: Rendering state properties.
+- **`isLocked`**: Interaction state preventing accidental dragging.
+- **`scale`**: Calculated pixel-to-foot multiplier.
+- **`offset`**: Vector displacement from canvas origin.
+
+### 8.2 Two-Point Calibration with Ortho-Locking
+The calibration tool establishes a mapping $M: \text{pixel} \to \text{foot}$ by measuring a reference segment of known length $L_{\text{ref}}$.
+- **Free-Floating Selection**: By default, the tool allows 360° rotation for the reference line to accommodate skewed scans.
+- **Shift-Key Ortho Lock**: Holding `Shift` constrains the calibration vector to the nearest 90° cardinal axis ($0^\circ, 90^\circ, 180^\circ, 270^\circ$).
+- **Calibration Formula**:
+  $$\text{scale} = \frac{L_{\text{ref}}}{\|P_2 - P_1\|_{\text{pixel}}}$$
+
+### 8.3 Interaction & Hit-Testing
+Rehydrated underlays maintain full interactivity. Hit-testing is reconnected on project load, allowing for selection and transformation of the blueprint image until `isLocked` is enabled.
+
+---
+
+## 9. UI Architecture & Document Controls
+
+### 9.1 Single-Source-of-Truth Top Header Bar
 To streamline the user experience, all document-level controls are consolidated into the **Top Header Bar**:
 - **Consolidated Control**: Global Settings, Master Rates, Printing, and Saving are managed exclusively from the header, removing duplicate action buttons from the MTO Matrix Panel.
 - **Canvas Lifecycle Management**: Includes a dedicated **"+ New Project"** button that triggers a hard canvas reset and hydrates the new project with active **Master Rates**.
 
-### 12.3 Canvas Context Menu & Clipboard UI
+### 9.2 Blueprint Underlay Inspector (5-Control UI)
+The underlay management interface is constrained to 5 primary functional controls to prevent configuration errors:
+1. **Opacity Slider**: Granular Alpha blending.
+2. **Visibility Toggle**: Instant layer suppression.
+3. **Lock Toggle**: Prevents spatial transformation.
+4. **Re-Calibrate Scale**: Re-triggers the 2-point calibration tool.
+5. **Remove Image**: Purges the underlay from state.
+
+### 9.3 Canvas Context Menu & Clipboard UI
 A dedicated context menu provides rapid access to clipboard operations:
 - **Floating Menu**: Dark-themed overlay triggered on `contextmenu` events within the `CadCanvas` viewport.
 - **Selection Awareness**: Menu options (Cut, Copy, Duplicate, Delete) are dynamically enabled/disabled based on the current selection state.
