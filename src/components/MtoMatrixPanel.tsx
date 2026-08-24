@@ -63,7 +63,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
 
   const inclusions = state.settings.categoryInclusions;
   const itemInclusions = state.settings.itemInclusions;
-  const costAnalysis = calculateEstimatedCost(mto, costRates, inclusions, itemInclusions, state.settings, state.stamps);
+  const costAnalysis = calculateEstimatedCost(mto, costRates, inclusions, itemInclusions, state.settings, state.stamps, state.apertures);
   const activeRates = costRates || DEFAULT_UNIT_COST_RATES;
   const isInteriorMode = state.settings.calculationMode === 'interior_finish';
 
@@ -276,9 +276,9 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         r.windowPerSf?.material ?? DEFAULT_UNIT_COST_RATES.windowPerSf.material,
         r.windowPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerSf.labor,
         ((r.windowPerSf?.material ?? DEFAULT_UNIT_COST_RATES.windowPerSf.material) + (r.windowPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerSf.labor)).toFixed(2),
-        (mto.totalWindowsSf * (r.windowPerSf?.material ?? DEFAULT_UNIT_COST_RATES.windowPerSf.material)).toFixed(2),
-        (mto.totalWindowsSf * (r.windowPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerSf.labor)).toFixed(2),
-        (mto.totalWindowsSf * ((r.windowPerSf?.material ?? DEFAULT_UNIT_COST_RATES.windowPerSf.material) + (r.windowPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerSf.labor))).toFixed(2),
+        '-',
+        '-',
+        costAnalysis.itemizedCosts.totalWindows.toFixed(2),
       ],
       [
         '3. Apertures & Fenestration',
@@ -288,9 +288,9 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         r.passageDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.material,
         r.passageDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.labor,
         ((r.passageDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.material) + (r.passageDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.labor)).toFixed(2),
-        (mto.passageDoorsUnits * (r.passageDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.material)).toFixed(2),
-        (mto.passageDoorsUnits * (r.passageDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.labor)).toFixed(2),
-        (mto.passageDoorsUnits * ((r.passageDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.material) + (r.passageDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.labor))).toFixed(2),
+        (mto.passageDoorsUnits * (r.passageDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.material) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (mto.passageDoorsUnits * (r.passageDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.labor) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        costAnalysis.itemizedCosts.passageDoors.toFixed(2),
       ],
       [
         '3. Apertures & Fenestration',
@@ -300,9 +300,9 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         r.pocketDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.material,
         r.pocketDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.labor,
         ((r.pocketDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.material) + (r.pocketDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.labor)).toFixed(2),
-        (mto.pocketDoorsUnits * (r.pocketDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.material)).toFixed(2),
-        (mto.pocketDoorsUnits * (r.pocketDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.labor)).toFixed(2),
-        (mto.pocketDoorsUnits * ((r.pocketDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.material) + (r.pocketDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.labor))).toFixed(2),
+        (mto.pocketDoorsUnits * (r.pocketDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.material) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        (mto.pocketDoorsUnits * (r.pocketDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.labor) * (1 + state.settings.wasteFactorPercentage / 100)).toFixed(2),
+        costAnalysis.itemizedCosts.pocketDoors.toFixed(2),
       ],
       [
         '3. Apertures & Fenestration',
@@ -312,9 +312,9 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         r.exteriorDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.material,
         r.exteriorDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.labor,
         ((r.exteriorDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.material) + (r.exteriorDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.labor)).toFixed(2),
-        (mto.exteriorDoorsUnits * (r.exteriorDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.material)).toFixed(2),
-        (mto.exteriorDoorsUnits * (r.exteriorDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.labor)).toFixed(2),
-        (mto.exteriorDoorsUnits * ((r.exteriorDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.material) + (r.exteriorDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.labor))).toFixed(2),
+        '-',
+        '-',
+        costAnalysis.itemizedCosts.exteriorDoors.toFixed(2),
       ],
       [
         '3. Apertures & Fenestration',
@@ -1135,6 +1135,24 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
 
           {!collapsedSections.section3 && (
             <div className="p-2.5 pt-0 border-t border-slate-800/60 space-y-1.5 text-xs">
+              {(() => {
+                const windowBreakdown: Record<string, number> = {};
+                state.apertures.forEach(ap => {
+                  if (ap.type.startsWith('window_')) {
+                    const wIn = Math.round(ap.width * 12);
+                    const hIn = Math.round(ap.height * 12);
+                    const style = ap.windowStyle ? ap.windowStyle.charAt(0).toUpperCase() + ap.windowStyle.slice(1) : 'Slider';
+                    const finish = ap.windowFinish ? ap.windowFinish.charAt(0).toUpperCase() + ap.windowFinish.slice(1) : 'White';
+                    const label = `${wIn}" x ${hIn}" ${style} (${finish})`;
+                    windowBreakdown[label] = (windowBreakdown[label] || 0) + 1;
+                  }
+                });
+                return Object.entries(windowBreakdown).map(([label, count]) => (
+                  <div key={label} className="text-[10px] text-slate-500 italic pl-6">
+                    {count}x {label}
+                  </div>
+                ));
+              })()}
               <MetricRow
                 label="Total Windows"
                 value={mto.totalWindowsSf}
@@ -1142,7 +1160,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 subtext={`${mto.totalWindowsUnits} Units (6 SF Min)`}
                 cost={
                   isIncluded('fenestration') && isItemIncluded('totalWindows')
-                    ? mto.totalWindowsSf * ((activeRates.windowPerSf?.material ?? DEFAULT_UNIT_COST_RATES.windowPerSf.material) + (activeRates.windowPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.windowPerSf.labor))
+                    ? costAnalysis.itemizedCosts.totalWindows
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('fenestration')}
@@ -1156,7 +1174,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="UNITS"
                 cost={
                   isIncluded('fenestration') && isItemIncluded('passageDoors')
-                    ? mto.passageDoorsUnits * ((activeRates.passageDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.material) + (activeRates.passageDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.labor))
+                    ? costAnalysis.itemizedCosts.passageDoors
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('fenestration')}
@@ -1170,7 +1188,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="UNITS"
                 cost={
                   isIncluded('fenestration') && isItemIncluded('pocketDoors')
-                    ? mto.pocketDoorsUnits * ((activeRates.pocketDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.material) + (activeRates.pocketDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.pocketDoorPerUnit.labor))
+                    ? costAnalysis.itemizedCosts.pocketDoors
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('fenestration')}
@@ -1184,7 +1202,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="UNITS"
                 cost={
                   isIncluded('fenestration') && isItemIncluded('exteriorDoors')
-                    ? mto.exteriorDoorsUnits * ((activeRates.exteriorDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.material) + (activeRates.exteriorDoorPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.exteriorDoorPerUnit.labor))
+                    ? costAnalysis.itemizedCosts.exteriorDoors
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('fenestration')}
@@ -1198,7 +1216,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 unit="BAYS"
                 cost={
                   isIncluded('fenestration') && isItemIncluded('overheadGarageBays')
-                    ? mto.overheadGarageBays * ((activeRates.garageDoorPerBay?.material ?? DEFAULT_UNIT_COST_RATES.garageDoorPerBay.material) + (activeRates.garageDoorPerBay?.labor ?? DEFAULT_UNIT_COST_RATES.garageDoorPerBay.labor))
+                    ? costAnalysis.itemizedCosts.overheadGarageBays
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('fenestration')}
@@ -1213,7 +1231,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 subtext="Locksets & hinges"
                 cost={
                   isIncluded('fenestration') && isItemIncluded('doorHardwareSets')
-                    ? mto.doorHardwareSets * ((activeRates.doorHardwarePerSet?.material ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.material) + (activeRates.doorHardwarePerSet?.labor ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.labor))
+                    ? costAnalysis.itemizedCosts.doorHardwareSets
                     : 0
                 }
                 isCategoryExcluded={!isIncluded('fenestration')}
@@ -1221,6 +1239,45 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 isItemExcluded={!isItemIncluded('doorHardwareSets')}
                 onToggleItem={onToggleItemInclusion}
               />
+              {mto.trimBrickmoldLf > 0 && (
+                <MetricRow
+                  label="Vinyl Brickmold Trim"
+                  value={mto.trimBrickmoldLf}
+                  unit="LF"
+                  cost={
+                    isIncluded('fenestration')
+                      ? mto.trimBrickmoldLf * ((activeRates.trimBrickmoldPerLf?.material ?? DEFAULT_UNIT_COST_RATES.trimBrickmoldPerLf.material) + (activeRates.trimBrickmoldPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.trimBrickmoldPerLf.labor))
+                      : 0
+                  }
+                  isCategoryExcluded={!isIncluded('fenestration')}
+                />
+              )}
+              {mto.trimCappingLf > 0 && (
+                <MetricRow
+                  label="Aluminum Site-Capping"
+                  value={mto.trimCappingLf}
+                  unit="LF"
+                  cost={
+                    isIncluded('fenestration')
+                      ? mto.trimCappingLf * ((activeRates.trimCappingPerLf?.material ?? DEFAULT_UNIT_COST_RATES.trimCappingPerLf.material) + (activeRates.trimCappingPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.trimCappingPerLf.labor))
+                      : 0
+                  }
+                  isCategoryExcluded={!isIncluded('fenestration')}
+                />
+              )}
+              {mto.trimBrickmoldSubsillLf > 0 && (
+                <MetricRow
+                  label="Brickmold + Sub-Sill"
+                  value={mto.trimBrickmoldSubsillLf}
+                  unit="LF"
+                  cost={
+                    isIncluded('fenestration')
+                      ? mto.trimBrickmoldSubsillLf * ((activeRates.trimBrickmoldSubsillPerLf?.material ?? DEFAULT_UNIT_COST_RATES.trimBrickmoldSubsillPerLf.material) + (activeRates.trimBrickmoldSubsillPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.trimBrickmoldSubsillPerLf.labor))
+                      : 0
+                  }
+                  isCategoryExcluded={!isIncluded('fenestration')}
+                />
+              )}
             </div>
           )}
         </div>

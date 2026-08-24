@@ -67,6 +67,8 @@ $$A_{\text{deduct}} = W_a \times H_a$$
 - **Bifold Doors (Single/Double)**: Features parametric chevron vector rendering. Single bifold (30") and Double bifold (60") use a `flipSwing` boolean to control fold direction. Double bifolds enforce leaf symmetry via mirrored normal vector calculations.
 - **Cased Openings**: Non-door passages (`cased_opening`) that deduct framing and drywall but do not break room polygon cycles, ensuring continuous flooring and ceiling take-offs.
 - **Pocket Doors**: Includes a `pocketDirection` toggle to determine which side of the wall segment hosts the sliding pocket frame.
+- **Universal Aperture Type Switcher & Inch Presets**: Integrated switcher allowing instant conversion between door and window types. Supports inch-based dimension inputs (Width/Height) with automated architectural quick size presets.
+- **Canvas Label Formatting**: Professional CAD labels are formatted in rounded whole inches (e.g., `D32"x80"`, `W36"x48"`) derived from floating-point feet coordinates.
 
 ---
 
@@ -138,9 +140,29 @@ $$A_{\text{ceil, modified}} = A_{\text{net\_interior}} \times M_{\text{ceil}}$$
 ### 4.2 Division 08 — Fenestration & Enclosures
 
 #### A. Window Pricing Model
-Standard window units ($A_{\text{window}}$) are priced dynamically by square footage with a minimum billing floor:
-$$P_{\text{window}} = \max(A_{\text{window}}, 6.0\text{ SF}) \times \text{Rate}_{\text{\$/SF}}$$
-Interior and exterior casing trim linear footage is calculated independently as the rough opening perimeter:
+Standard window units ($A_{\text{window}}$) are priced dynamically by square footage with a style and finish multiplier matrix:
+$$P_{\text{window}} = \max(A_{\text{window}}, 6.0\text{ SF}) \times \text{Rate}_{\text{\$/SF}} \times M_{\text{style}} \times M_{\text{finish}}$$
+
+**Style Multipliers ($M_{\text{style}}$):**
+- **Slider**: 1.00x
+- **Fixed Picture**: 0.85x
+- **Casement Crank**: 1.25x
+
+**Finish Multipliers ($M_{\text{finish}}$):**
+- **White Vinyl**: 1.00x
+- **Black Exterior**: 1.175x
+
+#### B. Exterior Trim & Capping Engine
+Linear foot (LF) exterior opening trim calculations are applied to Windows and Exterior Doors:
+- **Standard Nailing Fin**: $0.00/LF
+- **2" Vinyl Brickmold**: $5.00/LF
+- **Aluminum Site-Brake Capping**: $13.00/LF
+- **Vinyl Brickmold + Sub-Sill Nose**: $7.00/LF
+
+Exterior door trim costs are isolated from window totals in `estimator.ts` to ensure independent trade categorization in the MTO matrix.
+
+#### C. Casing Trim
+Interior and exterior casing trim linear footage is calculated as the rough opening perimeter:
 $$L_{\text{trim}} = 2 \times (W_a + H_a)$$
 
 ### 4.3 Division 09 — Finishes
@@ -178,6 +200,17 @@ Expanded stamp suite includes specialized rate calculations for:
 #### C. Itemized Reporting Logic
 In `PrintReportModal.tsx`, electrical items are itemized line-by-line. The aggregator bypasses generic category rollups for the Electrical division to ensure that different panel tiers and device types are clearly visible in the final contract document.
 
+### 4.6 Division 22 — Plumbing & Civil Infrastructure
+
+#### A. 4-Tier Water Heater Takeoff Engine
+The system supports itemized equipment takeoffs for water heating units via a dedicated CAD stamp:
+- **40-Gal Tank**
+- **50-Gal Tank**
+- **Tankless Gas/Electric**
+- **Hybrid Heat Pump Tank**
+
+Each tier maps to independent material and labor unit rates in the Master Rate Customizer.
+
 ---
 
 ## 5. Numerical Stability & Precision
@@ -204,6 +237,8 @@ To prevent 1-inch estimation gaps and grid-snap drift, the engine enforces:
 [jsPDF Document Instance (format: 'letter' / 'a4', orientation: 'portrait')]
             │
             ├─ Calculate aspect ratio: imgHeight = (imgWidth / W_px) * H_px
+            ├─ Apply Clean Bid Schedule Filtering:
+            │    Suppress lines where (quantity === 0 || value === 0)
             ├─ Multi-page vertical slice calculation:
             │    position = 0
             │    while (heightLeft > 0):

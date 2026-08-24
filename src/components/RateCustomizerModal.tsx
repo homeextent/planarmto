@@ -68,6 +68,9 @@ const RATE_FIELDS: RateFieldConfig[] = [
   { key: 'exteriorDoorPerUnit', label: 'Exterior Insulated Entry Door', unit: '$/Unit', category: 'Openings & Fenestration', description: 'Fiberglass or steel pre-hung entry system with threshold' },
   { key: 'garageDoorPerBay', label: 'Overhead Garage Bay Door', unit: '$/Bay', category: 'Openings & Fenestration', description: 'Insulated sectional door with tracks, torsion spring & motor' },
   { key: 'doorHardwarePerSet', label: 'Door Lockset & Handleset', unit: '$/Set', category: 'Openings & Fenestration', description: 'Lever handle, latch, strike plate, and privacy lock' },
+  { key: 'trimBrickmoldPerLf', label: 'Exterior Vinyl Brickmold Trim', unit: '$/LF', category: 'Openings & Fenestration', description: '2" Standard vinyl brickmold around window/door perimeter' },
+  { key: 'trimCappingPerLf', label: 'Aluminum Site-Brake Capping', unit: '$/LF', category: 'Openings & Fenestration', description: 'Custom bent aluminum coil capping over wooden casing' },
+  { key: 'trimBrickmoldSubsillPerLf', label: 'Vinyl Brickmold + Sub-Sill Nose', unit: '$/LF', category: 'Openings & Fenestration', description: 'Brickmold with integrated sloped sub-sill projection' },
 
   // 4. Electrical
   { key: 'switchPerUnit', label: 'Standard Light Switch (Decora)', unit: '$/Unit', category: 'Electrical & Lighting', description: 'Box, romex wire, switch, and coverplate' },

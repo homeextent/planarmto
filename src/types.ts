@@ -44,11 +44,14 @@ export interface Aperture {
   sillHeight?: number; // in feet from floor (default 0 for doors, 3.0 for windows)
   type: ApertureType;
   label?: string;
+  windowFinish?: 'white' | 'black';
+  windowStyle?: 'slider' | 'fixed' | 'casement';
   swingSide?: 'left' | 'right' | 'inward' | 'outward';
   hingeSide?: 'left' | 'right';
   pocketDirection?: 'left' | 'right';
   casingSides?: 1 | 2; // 2 for interior passage doors, 1 for exterior doors
   rotation?: number;
+  exteriorTrim?: 'fin' | 'brickmold' | 'capping' | 'brickmold_subsill';
 }
 
 export type StampCategory =
@@ -259,6 +262,9 @@ export interface UnitCostRates {
   deckRailingPerLf: CostRateItem;
   hardscapePerSf: CostRateItem;
   resilientChannelPerLf: CostRateItem;
+  trimBrickmoldPerLf: CostRateItem;
+  trimCappingPerLf: CostRateItem;
+  trimBrickmoldSubsillPerLf: CostRateItem;
   categoryLastUpdated?: Record<string, string>; // Map of category name to ISO timestamp
 }
 
@@ -533,6 +539,12 @@ export interface MTOReport {
   exteriorDoorsUnits: number;
   overheadGarageBays: number;
   doorHardwareSets: number;
+  trimBrickmoldLf: number;
+  trimCappingLf: number;
+  trimBrickmoldSubsillLf: number;
+  windowTrimCost: number;
+  exteriorDoorTrimCost: number;
+  trimTotalCost: number;
 
   // 4. Electrical, Lighting & Safety
   stdSwitchesUnits: number;

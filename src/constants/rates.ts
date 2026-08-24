@@ -58,4 +58,7 @@ export const DEFAULT_UNIT_COST_RATES: UnitCostRates = {
   deckRailingPerLf: { material: 22.0, labor: 20.0 },
   hardscapePerSf: { material: 6.5, labor: 7.5 },
   resilientChannelPerLf: { material: 0.45, labor: 0.65 },
+  trimBrickmoldPerLf: { material: 5.0, labor: 0.0 },
+  trimCappingPerLf: { material: 8.0, labor: 5.0 },
+  trimBrickmoldSubsillPerLf: { material: 7.0, labor: 0.0 },
 };

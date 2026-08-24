@@ -86,7 +86,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         { id: 'aperture_bifold_single', label: 'Bifold Single (30")', icon: <DoorOpen className="w-4 h-4 text-emerald-400" /> },
         { id: 'aperture_bifold_double', label: 'Bifold Double (60")', icon: <DoorOpen className="w-4 h-4 text-emerald-400" /> },
         { id: 'aperture_cased_opening', label: 'Cased Opening (36")', icon: <Square className="w-4 h-4 text-slate-400" /> },
-        { id: 'aperture_window', label: 'Standard Window (4\')', icon: <AppWindow className="w-4 h-4 text-sky-400" /> },
+        { id: 'aperture_window', label: 'Standard Window (36"x48")', icon: <AppWindow className="w-4 h-4 text-sky-400" /> },
       ],
     },
     {

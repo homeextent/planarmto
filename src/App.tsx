@@ -567,9 +567,11 @@ export default function App() {
       costRates,
       state.settings.categoryInclusions,
       state.settings.itemInclusions,
-      state.settings
+      state.settings,
+      state.stamps,
+      state.apertures
     );
-  }, [mtoReport, costRates, state.settings]);
+  }, [mtoReport, costRates, state.settings, state.stamps, state.apertures]);
 
   return (
     <div className="h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans select-none" onClick={() => setContextMenu(null)}>

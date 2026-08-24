@@ -17,6 +17,7 @@ import {
   calculateSignedPolygonArea,
   calculatePolygonPerimeter,
 } from '../engine/cadMath';
+import { DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT } from '../constants/stamps';
 import { Settings2, Trash2, X, Sliders, Box, Layers, RotateCw, Type } from 'lucide-react';
 
 interface InspectorPanelProps {
@@ -767,33 +768,51 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
     const wallLength = hostGeom ? hostGeom.length : 10;
     const maxOffset = Math.max(0, wallLength - ap.width);
 
-    const handleWidthChange = (width: number) => {
+    const isWindow = ap.type.startsWith('window_');
+    const isDoor = !isWindow;
+
+    const apertureOptions = [
+      { label: 'Passage Door (32")', type: 'door_passage', w: 32 / 12, h: 80 / 12 },
+      { label: 'Exterior Entry Door (36")', type: 'door_exterior', w: 36 / 12, h: 80 / 12 },
+      { label: 'Pocket Door', type: 'door_pocket', w: 32 / 12, h: 80 / 12 },
+      { label: 'Bifold Door (30")', type: 'door_bifold_single', w: 30 / 12, h: 80 / 12 },
+      { label: 'Double Bifold (60")', type: 'door_bifold_double', w: 60 / 12, h: 80 / 12 },
+      { label: 'Patio Slider (6\')', type: 'door_sliding_patio', w: 6, h: 80 / 12 },
+      { label: 'Garage Overhead Bay (9\')', type: 'door_garage', w: 9, h: 84 / 12 },
+      { label: 'Cased Opening', type: 'cased_opening', w: 36 / 12, h: 80 / 12 },
+      { label: 'Standard Window', type: 'window_standard', w: DEFAULT_WINDOW_WIDTH, h: DEFAULT_WINDOW_HEIGHT },
+    ];
+
+    const handleUpdateAperture = (updates: Partial<typeof ap>) => {
       const updated = state.apertures.map((a) =>
-        a.id === ap.id ? { ...a, width: Math.max(1.0, width) } : a
+        a.id === ap.id ? { ...a, ...updates } : a
       );
       onChange({ ...state, apertures: updated });
     };
 
+    const handleWidthChange = (width: number) => {
+      handleUpdateAperture({ width: Math.max(1.0 / 12, width) });
+    };
+
     const handleHeightChange = (height: number) => {
-      const updated = state.apertures.map((a) =>
-        a.id === ap.id ? { ...a, height: Math.max(1.0, height) } : a
-      );
-      onChange({ ...state, apertures: updated });
+      handleUpdateAperture({ height: Math.max(1.0 / 12, height) });
     };
 
     const handleOffsetChange = (offset: number) => {
       const clampedOffset = Math.max(0, Math.min(maxOffset, offset));
-      const updated = state.apertures.map((a) =>
-        a.id === ap.id ? { ...a, offset: Math.round(clampedOffset * 100) / 100 } : a
-      );
-      onChange({ ...state, apertures: updated });
+      handleUpdateAperture({ offset: Math.round(clampedOffset * 100) / 100 });
     };
 
-    const handleTypeChange = (type: ApertureType) => {
-      const updated = state.apertures.map((a) =>
-        a.id === ap.id ? { ...a, type } : a
-      );
-      onChange({ ...state, apertures: updated });
+    const handleWindowFinishChange = (windowFinish: 'white' | 'black') => {
+      handleUpdateAperture({ windowFinish });
+    };
+
+    const handleWindowStyleChange = (windowStyle: 'slider' | 'fixed' | 'casement') => {
+      handleUpdateAperture({ windowStyle });
+    };
+
+    const handleExteriorTrimChange = (exteriorTrim: 'fin' | 'brickmold' | 'capping' | 'brickmold_subsill') => {
+      handleUpdateAperture({ exteriorTrim });
     };
 
     const distFromStart = ap.offset;
@@ -817,156 +836,291 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
         <div className="space-y-3">
           <div>
             <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-              Fenestration Type
+              Aperture Type
             </label>
             <select
-              value={ap.type}
-              onChange={(e) => handleTypeChange(e.target.value as ApertureType)}
+              value={apertureOptions.some(o => o.type === ap.type) ? ap.type : (isWindow ? 'window_standard' : 'door_passage')}
+              onChange={(e) => {
+                const selected = apertureOptions.find(opt => opt.type === e.target.value);
+                if (selected) {
+                  handleUpdateAperture({ 
+                    type: selected.type as ApertureType,
+                    width: selected.w,
+                    height: selected.h
+                  });
+                }
+              }}
               className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
             >
-              <option value="door_passage">Passage Interior Door</option>
-              <option value="door_pocket">Pocket Door (In-Wall)</option>
-              <option value="door_bifold_single">Bifold Closet Door (Single)</option>
-              <option value="door_bifold_double">Bifold Closet Door (Double)</option>
-              <option value="cased_opening">Cased Wall Opening</option>
-              <option value="door_exterior">Exterior Entry Door</option>
-              <option value="door_garage">Overhead Garage Bay</option>
-              <option value="door_sliding_patio">Sliding Patio Door</option>
-              <option value="window_standard">Standard Casement / Double Hung Window</option>
-              <option value="window_slider">Slider Window</option>
-              <option value="window_picture">Fixed Picture Window</option>
+              <optgroup label="Doors" className="bg-slate-900">
+                {apertureOptions.filter(o => o.type.startsWith('door') || o.type === 'cased_opening').map(o => (
+                  <option key={o.type} value={o.type}>{o.label}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Windows" className="bg-slate-900">
+                {apertureOptions.filter(o => o.type.startsWith('window')).map(o => (
+                  <option key={o.type} value={o.type}>{o.label}</option>
+                ))}
+              </optgroup>
             </select>
           </div>
 
-          {/* Wall Position & Offset Callout */}
-          <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-slate-400">
-                Wall Offset Position
-              </span>
-              <span className="text-[11px] font-mono text-sky-400 font-bold">
-                {ap.offset.toFixed(2)} ft
-              </span>
+          {isWindow && (
+            <>
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                  Window Finish
+                </label>
+                <select
+                  value={ap.windowFinish || 'white'}
+                  onChange={(e) => handleWindowFinishChange(e.target.value as 'white' | 'black')}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+                >
+                  <option value="white">White Vinyl (Standard)</option>
+                  <option value="black">Black / Dark Exterior (+17.5%)</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                  Window Style
+                </label>
+                <select
+                  value={ap.windowStyle || 'slider'}
+                  onChange={(e) => handleWindowStyleChange(e.target.value as any)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+                >
+                  <option value="slider">Single / Double Slider</option>
+                  <option value="fixed">Fixed / Picture (-15%)</option>
+                  <option value="casement">Casement / Awning (+25%)</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          {(isWindow || ap.type === 'door_exterior' || ap.type === 'door_sliding_patio' || ap.type === 'door_garage') && (
+            <div>
+              <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                Exterior Trim Finish
+              </label>
+              <select
+                value={ap.exteriorTrim || 'fin'}
+                onChange={(e) => handleExteriorTrimChange(e.target.value as any)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+              >
+                <option value="fin">Standard Nailing Fin ($0/LF)</option>
+                <option value="brickmold">
+                  2" Vinyl Brickmold ($
+                  {(
+                    (state.settings.costRates?.trimBrickmoldPerLf?.material ?? 5) +
+                    (state.settings.costRates?.trimBrickmoldPerLf?.labor ?? 0)
+                  ).toFixed(2)}
+                  /LF)
+                </option>
+                <option value="capping">
+                  Aluminum Site-Brake Capping ($
+                  {(
+                    (state.settings.costRates?.trimCappingPerLf?.material ?? 8) +
+                    (state.settings.costRates?.trimCappingPerLf?.labor ?? 5)
+                  ).toFixed(2)}
+                  /LF)
+                </option>
+                <option value="brickmold_subsill">
+                  Vinyl Brickmold + Sub-Sill ($
+                  {(
+                    (state.settings.costRates?.trimBrickmoldSubsillPerLf?.material ?? 7) +
+                    (state.settings.costRates?.trimBrickmoldSubsillPerLf?.labor ?? 0)
+                  ).toFixed(2)}
+                  /LF)
+                </option>
+              </select>
             </div>
-            <input
-              type="range"
-              min="0"
-              max={maxOffset}
-              step="0.25"
-              value={ap.offset}
-              onChange={(e) => handleOffsetChange(parseFloat(e.target.value) || 0)}
-              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-400"
-            />
-            <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-              <span>⟵ Start: {distFromStart.toFixed(2)}'</span>
-              <span>End: {distFromEnd.toFixed(2)}' ⟶</span>
-            </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                Width (ft)
+                WIDTH (IN)
               </label>
               <input
                 type="number"
-                step="0.25"
+                step="1"
                 min="1"
-                value={ap.width}
-                onChange={(e) => handleWidthChange(parseFloat(e.target.value) || 3)}
+                value={Math.round(ap.width * 12)}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value) || 0;
+                  handleWidthChange(val / 12);
+                }}
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-200 font-mono focus:border-sky-500"
               />
             </div>
             <div>
               <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                Height (ft)
+                HEIGHT (IN)
               </label>
               <input
                 type="number"
-                step="0.25"
+                step="1"
                 min="1"
-                value={ap.height}
-                onChange={(e) => handleHeightChange(parseFloat(e.target.value) || 6.67)}
+                value={Math.round(ap.height * 12)}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value) || 0;
+                  handleHeightChange(val / 12);
+                }}
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-200 font-mono focus:border-sky-500"
               />
             </div>
           </div>
 
-          {/* Swing, Hinge & Inversion Actions */}
-          <div className="pt-2 border-t border-slate-800 space-y-2">
-            <label className="text-[10px] uppercase font-bold text-slate-400 block">
-              Orientation & Swing Dynamics
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => {
-                  const updated = state.apertures.map((a) =>
-                    a.id === ap.id
-                      ? {
-                          ...a,
-                          swingSide:
-                            a.swingSide === 'inward'
-                              ? ('outward' as const)
-                              : ('inward' as const),
-                        }
-                      : a
-                  );
-                  onChange({ ...state, apertures: updated });
-                }}
-                className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                title="Flip door/window swing direction"
-              >
-                <RotateCw className="w-3.5 h-3.5 text-sky-400" />
-                Flip Swing ({ap.swingSide || 'inward'})
-              </button>
-
-              <button
-                onClick={() => {
-                  const updated = state.apertures.map((a) =>
-                    a.id === ap.id
-                      ? {
-                          ...a,
-                          hingeSide:
-                            a.hingeSide === 'right'
-                              ? ('left' as const)
-                              : ('right' as const),
-                        }
-                      : a
-                  );
-                  onChange({ ...state, apertures: updated });
-                }}
-                className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                title="Flip hinge side"
-              >
-                <RotateCw className="w-3.5 h-3.5 text-emerald-400" />
-                Hinge: {ap.hingeSide === 'right' ? 'Right' : 'Left'}
-              </button>
-
-              {ap.type === 'door_pocket' && (
-                <button
-                  onClick={() => {
-                    const updated = state.apertures.map((a) =>
-                      a.id === ap.id
-                        ? {
-                            ...a,
-                            pocketDirection:
-                              a.pocketDirection === 'right'
-                                ? ('left' as const)
-                                : ('right' as const),
-                          }
-                        : a
-                    );
-                    onChange({ ...state, apertures: updated });
-                  }}
-                  className="col-span-2 px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                  title="Flip pocket sliding direction"
-                >
-                  <RotateCw className="w-3.5 h-3.5 text-purple-400" />
-                  Flip Pocket ({ap.pocketDirection || 'left'})
-                </button>
-              )}
+          {isWindow && (
+            <div className="space-y-2">
+              <div className="text-[9px] uppercase font-bold text-slate-500">Quick Size Presets (IN)</div>
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { w: 30, h: 36, label: '30"x36"' },
+                  { w: 36, h: 48, label: '36"x48"' },
+                  { w: 36, h: 60, label: '36"x60"' },
+                  { w: 48, h: 48, label: '48"x48"' },
+                  { w: 60, h: 48, label: '60"x48"' },
+                  { w: 72, h: 48, label: '72"x48"' },
+                  { w: 72, h: 60, label: '72"x60"' },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    onClick={() => handleUpdateAperture({ width: preset.w / 12, height: preset.h / 12 })}
+                    className="py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] rounded border border-slate-700 font-mono"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {isDoor && (
+            <>
+              <div className="space-y-2">
+                <div className="text-[9px] uppercase font-bold text-slate-500">Door Quick Presets (IN)</div>
+                <div className="grid grid-cols-3 gap-1">
+                  {[
+                    { w: 30, h: 80, label: '30"x80"' },
+                    { w: 32, h: 80, label: '32"x80"' },
+                    { w: 36, h: 80, label: '36"x80"' },
+                    { w: 60, h: 80, label: '60"x80"' },
+                    { w: 72, h: 80, label: '72"x80"' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      onClick={() => handleUpdateAperture({ width: preset.w / 12, height: preset.h / 12 })}
+                      className="py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] rounded border border-slate-700 font-mono"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Wall Position & Offset Callout */}
+              <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">
+                    Wall Offset Position
+                  </span>
+                  <span className="text-[11px] font-mono text-sky-400 font-bold">
+                    {ap.offset.toFixed(2)} ft
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max={maxOffset}
+                  step="0.25"
+                  value={ap.offset}
+                  onChange={(e) => handleOffsetChange(parseFloat(e.target.value) || 0)}
+                  className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-400"
+                />
+                <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                  <span>⟵ Start: {distFromStart.toFixed(2)}'</span>
+                  <span>End: {distFromEnd.toFixed(2)}' ⟶</span>
+                </div>
+              </div>
+
+              {/* Swing, Hinge & Inversion Actions */}
+              <div className="pt-2 border-t border-slate-800 space-y-2">
+                <label className="text-[10px] uppercase font-bold text-slate-400 block">
+                  Orientation & Swing Dynamics
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      const updated = state.apertures.map((a) =>
+                        a.id === ap.id
+                          ? {
+                              ...a,
+                              swingSide:
+                                a.swingSide === 'inward'
+                                  ? ('outward' as const)
+                                  : ('inward' as const),
+                            }
+                          : a
+                      );
+                      onChange({ ...state, apertures: updated });
+                    }}
+                    className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                    title="Flip door/window swing direction"
+                  >
+                    <RotateCw className="w-3.5 h-3.5 text-sky-400" />
+                    Flip Swing ({ap.swingSide || 'inward'})
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const updated = state.apertures.map((a) =>
+                        a.id === ap.id
+                          ? {
+                              ...a,
+                              hingeSide:
+                                a.hingeSide === 'right'
+                                  ? ('left' as const)
+                                  : ('right' as const),
+                            }
+                          : a
+                      );
+                      onChange({ ...state, apertures: updated });
+                    }}
+                    className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                    title="Flip hinge side"
+                  >
+                    <RotateCw className="w-3.5 h-3.5 text-emerald-400" />
+                    Hinge: {ap.hingeSide === 'right' ? 'Right' : 'Left'}
+                  </button>
+
+                  {ap.type === 'door_pocket' && (
+                    <button
+                      onClick={() => {
+                        const updated = state.apertures.map((a) =>
+                          a.id === ap.id
+                            ? {
+                                ...a,
+                                pocketDirection:
+                                  a.pocketDirection === 'right'
+                                    ? ('left' as const)
+                                    : ('right' as const),
+                              }
+                            : a
+                        );
+                        onChange({ ...state, apertures: updated });
+                      }}
+                      className="col-span-2 px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                      title="Flip pocket sliding direction"
+                    >
+                      <RotateCw className="w-3.5 h-3.5 text-purple-400" />
+                      Flip Pocket ({ap.pocketDirection || 'left'})
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="pt-2 border-t border-slate-800 flex justify-end">
             <button

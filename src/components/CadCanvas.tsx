@@ -33,6 +33,7 @@ import {
   deduplicateWalls,
 } from '../engine/cadMath';
 import { getRoomCategory } from '../engine/roomCategories';
+import { DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT } from '../constants/stamps';
 import {
   ZoomIn,
   ZoomOut,
@@ -980,7 +981,9 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         ctx.fillStyle = '#38bdf8';
         ctx.font = '600 10px system-ui, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(`W ${ap.width}'×${ap.height}'`, sCenter.x + nx * 1.6, sCenter.y + ny * 1.6);
+        const wIn = Math.round(ap.width * 12);
+        const hIn = Math.round(ap.height * 12);
+        ctx.fillText(`W${wIn}"x${hIn}"`, sCenter.x + nx * 1.6, sCenter.y + ny * 1.6);
       } else if (ap.type === 'door_garage') {
         // Overhead garage door: segmented rolling panels
         ctx.strokeStyle = isSelected ? '#38bdf8' : '#f59e0b';
@@ -1187,7 +1190,9 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         ctx.fillStyle = isSelected ? '#38bdf8' : '#cbd5e1';
         ctx.font = '600 10px system-ui, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(`D ${ap.width}'`, sCenter.x, sCenter.y);
+        const wIn = Math.round(ap.width * 12);
+        const hIn = Math.round(ap.height * 12);
+        ctx.fillText(`D${wIn}"x${hIn}"`, sCenter.x, sCenter.y);
       }
 
       ctx.restore();
@@ -2227,7 +2232,11 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       });
       if (hitWall) {
         let apType: Aperture['type'] = 'door_passage', width = 3.0, height = 6.67;
-        if (activeTool === 'aperture_window') { apType = 'window_standard'; width = 4.0; height = 4.0; }
+        if (activeTool === 'aperture_window') { 
+          apType = 'window_standard'; 
+          width = DEFAULT_WINDOW_WIDTH; 
+          height = DEFAULT_WINDOW_HEIGHT; 
+        }
         else if (activeTool === 'aperture_pocket_door') { apType = 'door_pocket'; width = 2.67; }
         else if (activeTool === 'aperture_exterior_door') { apType = 'door_exterior'; width = 3.0; }
         else if (activeTool === 'aperture_garage') { apType = 'door_garage'; width = 9.0; height = 8.0; }

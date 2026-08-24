@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.7.0] - 2026-08-24
+
+### Added
+- **4-Tier Water Heater Takeoff Engine & CAD Stamp**: Integrated dedicated "Water Heater / Boiler" CAD stamp with 4 equipment tiers (40-Gal Tank, 50-Gal Tank, Tankless Gas/Electric, Hybrid Heat Pump Tank) itemized in the live MTO matrix sidebar and PDF estimates.
+- **Dynamic Window Finish & Operation Multipliers**: Added inspector controls for Window Styles (Slider 1.0x, Fixed Picture 0.85x, Casement Crank 1.25x) and Exterior Color Finishes (White Vinyl 1.0x, Black Exterior 1.175x) scaling directly against master $/SF rates.
+- **Exterior Trim & Capping Takeoff Engine**: Added dynamic linear foot (LF) exterior opening trim calculations for Windows and Exterior Doors:
+  - Standard Nailing Fin ($0.00/LF)
+  - 2" Vinyl Brickmold ($5.00/LF)
+  - Aluminum Site-Brake Capping ($13.00/LF)
+  - Vinyl Brickmold + Sub-Sill Nose ($7.00/LF)
+- **Rate Customizer Integration**: Added editable material and labor rate fields for all exterior trim options in the Master Rate Customizer.
+- **Universal Aperture Type Switcher & Inch Presets**: Integrated an Aperture Type switcher allowing instant conversion between door and window types, with inch-based dimension inputs (width/height in inches) and common architectural quick size presets.
+
+### Fixed
+- **Clean Bid Schedule Filtering**: Added dynamic zero-quantity (`quantity === 0`) and $0.00 value filtering across modal previews, PDF exports, HTML print documents, and CSV spreadsheets to suppress inactive trade line items and empty category headers.
+- **Exterior Door Trim Cost Isolation**: Isolated exterior door trim calculations from window totals in `estimator.ts` so door trim changes register strictly under Exterior Doors in the MTO matrix.
+- **Clean Canvas Label Formatting**: Formatted CAD canvas aperture labels in rounded whole inches (e.g., `D32"x80"`, `W36"x48"`) instead of raw unformatted floating-point feet.
+
 ## [2.6.0] - 2026-08-23
 
 ### Added

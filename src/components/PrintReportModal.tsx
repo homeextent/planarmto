@@ -133,8 +133,26 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
     activeRates,
     state.settings.categoryInclusions,
     state.settings.itemInclusions,
-    state.settings
+    state.settings,
+    state.stamps,
+    state.apertures
   );
+
+  const windowBreakdown = (() => {
+    const breakdown: Record<string, number> = {};
+    state.apertures.forEach(ap => {
+      if (ap.type.startsWith('window_')) {
+        const wIn = Math.round(ap.width * 12);
+        const hIn = Math.round(ap.height * 12);
+        const style = ap.windowStyle ? ap.windowStyle.charAt(0).toUpperCase() + ap.windowStyle.slice(1) : 'Slider';
+        const finish = ap.windowFinish ? ap.windowFinish.charAt(0).toUpperCase() + ap.windowFinish.slice(1) : 'White';
+        const label = `${wIn}" x ${hIn}" ${style} (${finish})`;
+        breakdown[label] = (breakdown[label] || 0) + 1;
+      }
+    });
+    return breakdown;
+  })();
+
   const mepRows = getMepItemizedRows(mto, activeRates, state);
   const printDate = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
@@ -148,10 +166,37 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
   const firmTitle = branding?.companyName || 'PlanarMTO Construction Group';
   const jobRef = branding?.projectNumber || 'PRJ-2026-MTO';
 
+  const firmsSlug = firmTitle.replace(/[^a-zA-Z0-9]/g, '_');
+
   const generateFullReportHTML = () => {
     const r = activeRates;
     const waste = 1 + (state.settings.wasteFactorPercentage / 100);
     const mepRows = getMepItemizedRows(mto, activeRates, state);
+
+    let windowDivisionRows = '';
+    if (!shouldSkip(mto.totalWindowsSf, activeRates.windowPerSf.material, activeRates.windowPerSf.labor, waste)) {
+      windowDivisionRows += `
+        <tr>
+          <td style="padding-left: 18px;">Total Windows (6 SF Min Floor)</td>
+          <td class="num">${mto.totalWindowsSf}</td>
+          <td class="num">SF</td>
+          <td class="num">$${activeRates.windowPerSf.material.toFixed(2)}</td>
+          <td class="num">$${activeRates.windowPerSf.labor.toFixed(2)}</td>
+          <td class="num">-</td>
+          <td class="num">-</td>
+          <td class="num"><strong>$${costAnalysis.itemizedCosts.totalWindows.toFixed(2)}</strong></td>
+        </tr>
+      `;
+      Object.entries(windowBreakdown).forEach(([label, count]) => {
+        windowDivisionRows += `
+          <tr>
+            <td colspan="8" style="padding-left: 32px; font-size: 10px; color: #64748b; font-style: italic;">
+              ${count}x ${label} units applied to material calculation
+            </td>
+          </tr>
+        `;
+      });
+    }
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -654,21 +699,9 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
       })()}
 
       <!-- Division 3 -->
+      ${windowDivisionRows}
       ${(() => {
         const rows = [];
-        if (!shouldSkip(mto.totalWindowsSf, r.windowPerSf.material, r.windowPerSf.labor, waste)) {
-          rows.push(`
-          <tr>
-            <td style="padding-left: 18px;">Standard Windows (6 SF Min Floor)</td>
-            <td class="num">${mto.totalWindowsSf}</td>
-            <td class="num">SF</td>
-            <td class="num">$${r.windowPerSf.material.toFixed(2)}</td>
-            <td class="num">$${r.windowPerSf.labor.toFixed(2)}</td>
-            <td class="num">$${(mto.totalWindowsSf * r.windowPerSf.material * waste).toFixed(2)}</td>
-            <td class="num">$${(mto.totalWindowsSf * r.windowPerSf.labor * waste).toFixed(2)}</td>
-            <td class="num"><strong>$${(mto.totalWindowsSf * (r.windowPerSf.material + r.windowPerSf.labor) * waste).toFixed(2)}</strong></td>
-          </tr>`);
-        }
         if (!shouldSkip(mto.passageDoorsUnits, r.passageDoorPerUnit.material, r.passageDoorPerUnit.labor, waste)) {
           rows.push(`
           <tr>
@@ -703,9 +736,48 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
             <td class="num">UNITS</td>
             <td class="num">$${r.exteriorDoorPerUnit.material.toFixed(2)}</td>
             <td class="num">$${r.exteriorDoorPerUnit.labor.toFixed(2)}</td>
-            <td class="num">$${(mto.exteriorDoorsUnits * r.exteriorDoorPerUnit.material * waste).toFixed(2)}</td>
-            <td class="num">$${(mto.exteriorDoorsUnits * r.exteriorDoorPerUnit.labor * waste).toFixed(2)}</td>
-            <td class="num"><strong>$${(mto.exteriorDoorsUnits * (r.exteriorDoorPerUnit.material + r.exteriorDoorPerUnit.labor) * waste).toFixed(2)}</strong></td>
+            <td class="num">-</td>
+            <td class="num">-</td>
+            <td class="num"><strong>$${costAnalysis.itemizedCosts.exteriorDoors.toFixed(2)}</strong></td>
+          </tr>`);
+        }
+        if (!shouldSkip(mto.trimBrickmoldLf, r.trimBrickmoldPerLf.material, r.trimBrickmoldPerLf.labor, waste)) {
+          rows.push(`
+          <tr>
+            <td style="padding-left: 18px;">Exterior Vinyl Brickmold Trim</td>
+            <td class="num">${mto.trimBrickmoldLf}</td>
+            <td class="num">LF</td>
+            <td class="num">$${r.trimBrickmoldPerLf.material.toFixed(2)}</td>
+            <td class="num">$${r.trimBrickmoldPerLf.labor.toFixed(2)}</td>
+            <td class="num">$${(mto.trimBrickmoldLf * r.trimBrickmoldPerLf.material * waste).toFixed(2)}</td>
+            <td class="num">$${(mto.trimBrickmoldLf * r.trimBrickmoldPerLf.labor * waste).toFixed(2)}</td>
+            <td class="num"><strong>$${(mto.trimBrickmoldLf * (r.trimBrickmoldPerLf.material + r.trimBrickmoldPerLf.labor) * waste).toFixed(2)}</strong></td>
+          </tr>`);
+        }
+        if (!shouldSkip(mto.trimCappingLf, r.trimCappingPerLf.material, r.trimCappingPerLf.labor, waste)) {
+          rows.push(`
+          <tr>
+            <td style="padding-left: 18px;">Aluminum Site-Brake Capping</td>
+            <td class="num">${mto.trimCappingLf}</td>
+            <td class="num">LF</td>
+            <td class="num">$${r.trimCappingPerLf.material.toFixed(2)}</td>
+            <td class="num">$${r.trimCappingPerLf.labor.toFixed(2)}</td>
+            <td class="num">$${(mto.trimCappingLf * r.trimCappingPerLf.material * waste).toFixed(2)}</td>
+            <td class="num">$${(mto.trimCappingLf * r.trimCappingPerLf.labor * waste).toFixed(2)}</td>
+            <td class="num"><strong>$${(mto.trimCappingLf * (r.trimCappingPerLf.material + r.trimCappingPerLf.labor) * waste).toFixed(2)}</strong></td>
+          </tr>`);
+        }
+        if (!shouldSkip(mto.trimBrickmoldSubsillLf, r.trimBrickmoldSubsillPerLf.material, r.trimBrickmoldSubsillPerLf.labor, waste)) {
+          rows.push(`
+          <tr>
+            <td style="padding-left: 18px;">Vinyl Brickmold + Sub-Sill Nose</td>
+            <td class="num">${mto.trimBrickmoldSubsillLf}</td>
+            <td class="num">LF</td>
+            <td class="num">$${r.trimBrickmoldSubsillPerLf.material.toFixed(2)}</td>
+            <td class="num">$${r.trimBrickmoldSubsillPerLf.labor.toFixed(2)}</td>
+            <td class="num">$${(mto.trimBrickmoldSubsillLf * r.trimBrickmoldSubsillPerLf.material * waste).toFixed(2)}</td>
+            <td class="num">$${(mto.trimBrickmoldSubsillLf * r.trimBrickmoldSubsillPerLf.labor * waste).toFixed(2)}</td>
+            <td class="num"><strong>$${(mto.trimBrickmoldSubsillLf * (r.trimBrickmoldSubsillPerLf.material + r.trimBrickmoldSubsillPerLf.labor) * waste).toFixed(2)}</strong></td>
           </tr>`);
         }
 
@@ -1067,9 +1139,9 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
         r.windowPerSf.material,
         r.windowPerSf.labor,
         (r.windowPerSf.material + r.windowPerSf.labor).toFixed(2),
-        (mto.totalWindowsSf * r.windowPerSf.material * waste).toFixed(2),
-        (mto.totalWindowsSf * r.windowPerSf.labor * waste).toFixed(2),
-        (mto.totalWindowsSf * (r.windowPerSf.material + r.windowPerSf.labor) * waste).toFixed(2),
+        '-',
+        '-',
+        costAnalysis.itemizedCosts.totalWindows.toFixed(2),
       ]] : []),
       ...(!shouldSkip(mto.passageDoorsUnits, r.passageDoorPerUnit.material, r.passageDoorPerUnit.labor, waste) ? [[
         '3. Fenestration',
@@ -1081,7 +1153,7 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
         (r.passageDoorPerUnit.material + r.passageDoorPerUnit.labor).toFixed(2),
         (mto.passageDoorsUnits * r.passageDoorPerUnit.material * waste).toFixed(2),
         (mto.passageDoorsUnits * r.passageDoorPerUnit.labor * waste).toFixed(2),
-        (mto.passageDoorsUnits * (r.passageDoorPerUnit.material + r.passageDoorPerUnit.labor) * waste).toFixed(2),
+        costAnalysis.itemizedCosts.passageDoors.toFixed(2),
       ]] : []),
       ...(!shouldSkip(mto.pocketDoorsUnits, r.pocketDoorPerUnit.material, r.pocketDoorPerUnit.labor, waste) ? [[
         '3. Fenestration',
@@ -1093,7 +1165,7 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
         (r.pocketDoorPerUnit.material + r.pocketDoorPerUnit.labor).toFixed(2),
         (mto.pocketDoorsUnits * r.pocketDoorPerUnit.material * waste).toFixed(2),
         (mto.pocketDoorsUnits * r.pocketDoorPerUnit.labor * waste).toFixed(2),
-        (mto.pocketDoorsUnits * (r.pocketDoorPerUnit.material + r.pocketDoorPerUnit.labor) * waste).toFixed(2),
+        costAnalysis.itemizedCosts.pocketDoors.toFixed(2),
       ]] : []),
       ...(!shouldSkip(mto.exteriorDoorsUnits, r.exteriorDoorPerUnit.material, r.exteriorDoorPerUnit.labor, waste) ? [[
         '3. Fenestration',
@@ -1103,9 +1175,45 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
         r.exteriorDoorPerUnit.material,
         r.exteriorDoorPerUnit.labor,
         (r.exteriorDoorPerUnit.material + r.exteriorDoorPerUnit.labor).toFixed(2),
-        (mto.exteriorDoorsUnits * r.exteriorDoorPerUnit.material * waste).toFixed(2),
-        (mto.exteriorDoorsUnits * r.exteriorDoorPerUnit.labor * waste).toFixed(2),
-        (mto.exteriorDoorsUnits * (r.exteriorDoorPerUnit.material + r.exteriorDoorPerUnit.labor) * waste).toFixed(2),
+        '-',
+        '-',
+        costAnalysis.itemizedCosts.exteriorDoors.toFixed(2),
+      ]] : []),
+      ...(!shouldSkip(mto.trimBrickmoldLf, r.trimBrickmoldPerLf.material, r.trimBrickmoldPerLf.labor, waste) ? [[
+        '3. Fenestration',
+        'Exterior Vinyl Brickmold Trim',
+        mto.trimBrickmoldLf,
+        'LF',
+        r.trimBrickmoldPerLf.material,
+        r.trimBrickmoldPerLf.labor,
+        (r.trimBrickmoldPerLf.material + r.trimBrickmoldPerLf.labor).toFixed(2),
+        (mto.trimBrickmoldLf * r.trimBrickmoldPerLf.material * waste).toFixed(2),
+        (mto.trimBrickmoldLf * r.trimBrickmoldPerLf.labor * waste).toFixed(2),
+        (mto.trimBrickmoldLf * (r.trimBrickmoldPerLf.material + r.trimBrickmoldPerLf.labor) * waste).toFixed(2),
+      ]] : []),
+      ...(!shouldSkip(mto.trimCappingLf, r.trimCappingPerLf.material, r.trimCappingPerLf.labor, waste) ? [[
+        '3. Fenestration',
+        'Aluminum Site-Brake Capping',
+        mto.trimCappingLf,
+        'LF',
+        r.trimCappingPerLf.material,
+        r.trimCappingPerLf.labor,
+        (r.trimCappingPerLf.material + r.trimCappingPerLf.labor).toFixed(2),
+        (mto.trimCappingLf * r.trimCappingPerLf.material * waste).toFixed(2),
+        (mto.trimCappingLf * r.trimCappingPerLf.labor * waste).toFixed(2),
+        (mto.trimCappingLf * (r.trimCappingPerLf.material + r.trimCappingPerLf.labor) * waste).toFixed(2),
+      ]] : []),
+      ...(!shouldSkip(mto.trimBrickmoldSubsillLf, r.trimBrickmoldSubsillPerLf.material, r.trimBrickmoldSubsillPerLf.labor, waste) ? [[
+        '3. Fenestration',
+        'Vinyl Brickmold + Sub-Sill Nose',
+        mto.trimBrickmoldSubsillLf,
+        'LF',
+        r.trimBrickmoldSubsillPerLf.material,
+        r.trimBrickmoldSubsillPerLf.labor,
+        (r.trimBrickmoldSubsillPerLf.material + r.trimBrickmoldSubsillPerLf.labor).toFixed(2),
+        (mto.trimBrickmoldSubsillLf * r.trimBrickmoldSubsillPerLf.material * waste).toFixed(2),
+        (mto.trimBrickmoldSubsillLf * r.trimBrickmoldSubsillPerLf.labor * waste).toFixed(2),
+        (mto.trimBrickmoldSubsillLf * (r.trimBrickmoldSubsillPerLf.material + r.trimBrickmoldSubsillPerLf.labor) * waste).toFixed(2),
       ]] : []),
       ...mepRows.map(item => [
         '4 & 5. MEP & Plumbing',
@@ -1656,17 +1764,26 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
                       const rows = [];
                       if (!shouldSkip(mto.totalWindowsSf, activeRates.windowPerSf.material, activeRates.windowPerSf.labor, waste)) {
                         rows.push(
-                          <tr key="windows">
-                            <td className="p-2 pl-4 text-slate-300">Standard Windows (6 SF Min Floor)</td>
+                          <tr key="windows-header">
+                            <td className="p-2 pl-4 text-slate-300">Total Windows (6 SF Min Floor)</td>
                             <td className="p-2 text-right font-mono">{mto.totalWindowsSf.toLocaleString()}</td>
                             <td className="p-2 text-slate-400">SF</td>
                             <td className="p-2 text-right font-mono text-slate-400">${activeRates.windowPerSf.material.toFixed(2)}</td>
                             <td className="p-2 text-right font-mono text-slate-400">${activeRates.windowPerSf.labor.toFixed(2)}</td>
-                            <td className="p-2 text-right font-mono">${(mto.totalWindowsSf * activeRates.windowPerSf.material * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td className="p-2 text-right font-mono">${(mto.totalWindowsSf * activeRates.windowPerSf.labor * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td className="p-2 text-right font-mono font-semibold">${(mto.totalWindowsSf * (activeRates.windowPerSf.material + activeRates.windowPerSf.labor) * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="p-2 text-right font-mono">${costAnalysis.categoryBreakdown.fenestration.material.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="p-2 text-right font-mono">${costAnalysis.categoryBreakdown.fenestration.labor.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="p-2 text-right font-mono font-semibold">${costAnalysis.categoryBreakdown.fenestration.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                           </tr>
                         );
+                        Object.entries(windowBreakdown).forEach(([label, count]) => {
+                          rows.push(
+                            <tr key={`win-${label}`}>
+                              <td colSpan={8} className="p-1 pl-8 text-[10px] text-slate-500 italic font-mono border-none">
+                                {count}x {label} units applied to material calculation
+                              </td>
+                            </tr>
+                          );
+                        });
                       }
                       if (!shouldSkip(mto.passageDoorsUnits, activeRates.passageDoorPerUnit.material, activeRates.passageDoorPerUnit.labor, waste)) {
                         rows.push(
@@ -1707,6 +1824,48 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
                             <td className="p-2 text-right font-mono">${(mto.exteriorDoorsUnits * activeRates.exteriorDoorPerUnit.material * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             <td className="p-2 text-right font-mono">${(mto.exteriorDoorsUnits * activeRates.exteriorDoorPerUnit.labor * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             <td className="p-2 text-right font-mono font-semibold">${(mto.exteriorDoorsUnits * (activeRates.exteriorDoorPerUnit.material + activeRates.exteriorDoorPerUnit.labor) * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          </tr>
+                        );
+                      }
+                      if (!shouldSkip(mto.trimBrickmoldLf, activeRates.trimBrickmoldPerLf.material, activeRates.trimBrickmoldPerLf.labor, waste)) {
+                        rows.push(
+                          <tr key="trim-bm">
+                            <td className="p-2 pl-4 text-slate-300">Exterior Vinyl Brickmold Trim</td>
+                            <td className="p-2 text-right font-mono">{mto.trimBrickmoldLf.toLocaleString()}</td>
+                            <td className="p-2 text-slate-400">LF</td>
+                            <td className="p-2 text-right font-mono text-slate-400">${activeRates.trimBrickmoldPerLf.material.toFixed(2)}</td>
+                            <td className="p-2 text-right font-mono text-slate-400">${activeRates.trimBrickmoldPerLf.labor.toFixed(2)}</td>
+                            <td className="p-2 text-right font-mono">${(mto.trimBrickmoldLf * activeRates.trimBrickmoldPerLf.material * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="p-2 text-right font-mono">${(mto.trimBrickmoldLf * activeRates.trimBrickmoldPerLf.labor * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="p-2 text-right font-mono font-semibold">${(mto.trimBrickmoldLf * (activeRates.trimBrickmoldPerLf.material + activeRates.trimBrickmoldPerLf.labor) * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          </tr>
+                        );
+                      }
+                      if (!shouldSkip(mto.trimCappingLf, activeRates.trimCappingPerLf.material, activeRates.trimCappingPerLf.labor, waste)) {
+                        rows.push(
+                          <tr key="trim-cap">
+                            <td className="p-2 pl-4 text-slate-300">Aluminum Site-Brake Capping</td>
+                            <td className="p-2 text-right font-mono">{mto.trimCappingLf.toLocaleString()}</td>
+                            <td className="p-2 text-slate-400">LF</td>
+                            <td className="p-2 text-right font-mono text-slate-400">${activeRates.trimCappingPerLf.material.toFixed(2)}</td>
+                            <td className="p-2 text-right font-mono text-slate-400">${activeRates.trimCappingPerLf.labor.toFixed(2)}</td>
+                            <td className="p-2 text-right font-mono">${(mto.trimCappingLf * activeRates.trimCappingPerLf.material * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="p-2 text-right font-mono">${(mto.trimCappingLf * activeRates.trimCappingPerLf.labor * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="p-2 text-right font-mono font-semibold">${(mto.trimCappingLf * (activeRates.trimCappingPerLf.material + activeRates.trimCappingPerLf.labor) * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          </tr>
+                        );
+                      }
+                      if (!shouldSkip(mto.trimBrickmoldSubsillLf, activeRates.trimBrickmoldSubsillPerLf.material, activeRates.trimBrickmoldSubsillPerLf.labor, waste)) {
+                        rows.push(
+                          <tr key="trim-subsill">
+                            <td className="p-2 pl-4 text-slate-300">Vinyl Brickmold + Sub-Sill Nose</td>
+                            <td className="p-2 text-right font-mono">{mto.trimBrickmoldSubsillLf.toLocaleString()}</td>
+                            <td className="p-2 text-slate-400">LF</td>
+                            <td className="p-2 text-right font-mono text-slate-400">${activeRates.trimBrickmoldSubsillPerLf.material.toFixed(2)}</td>
+                            <td className="p-2 text-right font-mono text-slate-400">${activeRates.trimBrickmoldSubsillPerLf.labor.toFixed(2)}</td>
+                            <td className="p-2 text-right font-mono">${(mto.trimBrickmoldSubsillLf * activeRates.trimBrickmoldSubsillPerLf.material * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="p-2 text-right font-mono">${(mto.trimBrickmoldSubsillLf * activeRates.trimBrickmoldSubsillPerLf.labor * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="p-2 text-right font-mono font-semibold">${(mto.trimBrickmoldSubsillLf * (activeRates.trimBrickmoldSubsillPerLf.material + activeRates.trimBrickmoldSubsillPerLf.labor) * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                           </tr>
                         );
                       }

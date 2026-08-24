@@ -15,13 +15,15 @@
 - **Custom Canvas Context Menu**: A dark-themed, floating right-click context menu on the CAD canvas for rapid clipboard and item management.
 - **Sub-Pixel Precision**: Enforces true interior clear-space drafting capabilities via a synchronized dual-geometry pipeline.
 - **Active Wall Type Presets**: Pre-selection of wall framing assemblies (Interior 2x4, Exterior 2x6, Foundation 10") prior to drafting, ensuring new segments inherit correct thickness and cladding properties instantly.
+- **Universal Aperture Type Switcher & Inch Presets**: Integrated an Aperture Type switcher allowing instant conversion between door and window types, with inch-based dimension inputs (width/height in inches) and common architectural quick size presets.
 - **Parametric Apertures**:
   - Doors: Passage, Exterior, Pocket (with slide direction toggle), Bifold Single (30"), Bifold Double (60"), and Overhead Garage.
-  - Windows: Standard, Picture, Slider.
+  - Windows: Standard, Picture, Slider with dynamic style multipliers (Slider 1.0x, Fixed Picture 0.85x, Casement Crank 1.25x) and exterior color finish scaling (White Vinyl 1.0x, Black Exterior 1.175x).
   - Openings: Cased wall openings / archways that preserve room topology for flooring and ceiling take-offs.
-- **Architectural Stamps**: Placed fixtures with automatic clearance envelope visualization (toilets, sinks, bathtubs, kitchen islands, appliances, LED potlights, GFCI receptacles, 240V EV chargers, subpanels, HVAC condensing units).
+- **Exterior Trim & Capping Engine**: Dynamic linear foot (LF) exterior opening trim calculations for Windows and Exterior Doors, supporting Standard Nailing Fin, 2" Vinyl Brickmold, Aluminum Site-Brake Capping, and Vinyl Brickmold + Sub-Sill Nose.
+- **Architectural Stamps**: Placed fixtures with automatic clearance envelope visualization (toilets, sinks, bathtubs, kitchen islands, appliances, LED potlights, GFCI receptacles, 240V EV chargers, subpanels, HVAC condensing units). Includes **4-Tier Water Heater Spec Engine** (40-Gal Tank, 50-Gal Tank, Tankless Gas/Electric, Hybrid Heat Pump Tank).
 - **Hardscapes & Decks**: Outer structural zones including composite decks with ledger boards, footings, framing, concrete driveways, and paver patios.
-- **Dimensioning & Annotations**: Aligned dimension strings and leader text callouts.
+- **Dimensioning & Annotations**: Aligned dimension strings and leader text callouts. Canvas aperture labels are formatted in rounded whole inches (e.g., `D32"x80"`, `W36"x48"`) for professional clarity.
 
 ### 2. Computational Geometry & Automatic Room Face Detection
 - **PSLG Half-Edge Graph Traversal**: Computes interior polygonal cycles from undirected wall segments in real time.
@@ -47,12 +49,14 @@
   - Finishes & Insulation: Batt insulation with opening deductions, finish flooring with configurable waste factors (default 10%), interior wall paint (2 coats @ 350 SF/gal), and ceiling drywall (1/2" Standard or 5/8" Type X). Foundation walls and rooms are automatically stripped of interior finishes. Interior face dimensioning provides clear-distance measurements from interior corners rather than centerline endpoints.
   - Electrical & Plumbing: Automated take-offs for fixtures, wiring homerun lengths, piping runs, and life safety devices. Itemized reporting for every active electrical device, light fixture, and panel tier with material/labor subtotals instead of collapsing them into summary rows.
   
-### 4. Professional Export & Reporting Suite
-- **Single-Source-of-Truth Top Header Bar**: Consolidated document controls (Settings, Rates, Print, Save) into a unified top-level bar, removing duplicate controls from the MTO matrix for a streamlined interface. Includes an instant "+ New Project" canvas reset button.
-- **Direct Client-Side PDF Generation**: High-resolution rasterization to multi-page vector-styled PDF via `jsPDF` and `html2canvas`—no physical printer connection required.
-- **Executive HTML Take-Off & Specification Export**: Standalone formatted HTML document complete with company branding, CSI trade breakdowns, unit costs, and room finish schedules.
-- **In-App Project Directory Manager**: Multi-tenant persistence layer using WordPress MySQL database (via `wp_planarmto_projects`) with browser `localStorage` fallbacks for local development. Supports project duplication, renaming, auto-recovery, two-step deletion confirmation, and JSON exports.
-- **Persistent Company Branding**: Multi-tenant company profile storage mapped to WordPress user metadata, ensuring branding and custom rates follow the user across devices.
+- **Professional Export & Reporting Suite**:
+  - **Clean Bid Schedule Filtering**: Automatically suppresses inactive trade line items (zero-quantity or $0.00 value) and empty category headers across all export formats (PDF, HTML, CSV) for professional clarity.
+  - **Single-Source-of-Truth Top Header Bar**: Consolidated document controls (Settings, Rates, Print, Save) into a unified top-level bar, removing duplicate controls from the MTO matrix for a streamlined interface. Includes an instant "+ New Project" canvas reset button.
+  - **Direct Client-Side PDF Generation**: High-resolution rasterization to multi-page vector-styled PDF via `jsPDF` and `html2canvas`—no physical printer connection required.
+  - **Executive HTML Take-Off & Specification Export**: Standalone formatted HTML document complete with company branding, CSI trade breakdowns, unit costs, and room finish schedules.
+  - **In-App Project Directory Manager**: Multi-tenant persistence layer using WordPress MySQL database (via `wp_planarmto_projects`) with browser `localStorage` fallbacks for local development. Supports project duplication, renaming, auto-recovery, two-step deletion confirmation, and JSON exports.
+  - **Persistent Company Branding**: Multi-tenant company profile storage mapped to WordPress user metadata, ensuring branding and custom rates follow the user across devices.
+  - **Master Rate Customizer Integration**: Direct editing of material and labor rates for all assemblies, including new 4-tier water heaters and exterior trim capping options.
 
 ### 5. Multi-Tenant WordPress Persistence
 - **Secure Data Isolation**: Project data is strictly scoped by WordPress `user_id` (`tenant_id`), ensuring estimators only see and manage their own floor plans and project metrics.
