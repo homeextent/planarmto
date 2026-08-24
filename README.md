@@ -17,8 +17,8 @@
 - **Active Wall Type Presets**: Pre-selection of wall framing assemblies (Interior 2x4, Exterior 2x6, Foundation 10") prior to drafting, ensuring new segments inherit correct thickness and cladding properties instantly.
 - **Universal Aperture Type Switcher & Inch Presets**: Integrated an Aperture Type switcher allowing instant conversion between door and window types, with inch-based dimension inputs (width/height in inches) and common architectural quick size presets.
 - **Parametric Apertures**:
-  - Doors: Passage, Exterior, Pocket (with slide direction toggle), Bifold Single (30"), Bifold Double (60"), and Overhead Garage.
-  - Windows: Standard, Picture, Slider with dynamic style multipliers (Slider 1.0x, Fixed Picture 0.85x, Casement Crank 1.25x) and exterior color finish scaling (White Vinyl 1.0x, Black Exterior 1.175x).
+  - Doors: Passage, Exterior, Pocket (with slide direction toggle), Bifold Single (30"), Bifold Double (60"), Patio Sliders, and Overhead Garage. Features an **Expanded 8-Tier Door Rate Model** with unique rate keys for each subtype.
+  - Windows: Standard, Picture, Slider with dynamic style multipliers (Slider 1.0x, Fixed Picture 0.85x, Casement Crank 1.25x) and exterior color finish scaling (White Vinyl 1.0x, Black Exterior 1.175x). Standard window stamp initial placement defaults to 36" W × 48" H.
   - Openings: Cased wall openings / archways that preserve room topology for flooring and ceiling take-offs.
 - **Exterior Trim & Capping Engine**: Dynamic linear foot (LF) exterior opening trim calculations for Windows and Exterior Doors, supporting Standard Nailing Fin, 2" Vinyl Brickmold, Aluminum Site-Brake Capping, and Vinyl Brickmold + Sub-Sill Nose.
 - **Architectural Stamps**: Placed fixtures with automatic clearance envelope visualization (toilets, sinks, bathtubs, kitchen islands, appliances, LED potlights, GFCI receptacles, 240V EV chargers, subpanels, HVAC condensing units). Includes **4-Tier Water Heater Spec Engine** (40-Gal Tank, 50-Gal Tank, Tankless Gas/Electric, Hybrid Heat Pump Tank).
@@ -32,7 +32,7 @@
 
 ### 3. Dual-Cost Estimation & Multi-Trade Quantity Surveying
 - **Dual-Layer Rate Architecture**: Implements a strict separation between **Global Master Rates** (stored in WordPress user metadata for tenant-wide persistence) and **Project Cost Rates** (frozen snapshots stored within the project state). This allows users to update global pricing without unintentionally altering historically saved project estimates.
-- **Split Material & Labor Rates**: Configurable unit rates for all items across 7 construction divisions with independent per-category `categoryLastUpdated` timestamp tracking and trade-specific CSV export/import for RFQ distribution.
+- **Split Material & Labor Rates**: Configurable unit rates for all items across 7 construction divisions with independent per-category `categoryLastUpdated` timestamp tracking and trade-specific CSV export/import for RFQ distribution. Includes **Dynamic Matrix Inclusion Toggles** (eye icons) for individual line items like Patio Sliders, Bifold Doors, and Cased Openings.
 - **Granular Electrical Panel Amperage Tiers**: Support for 6 distinct rate tiers (Main Panel 100A, 200A, 400A and Subpanel 60A, 100A, 125A) with dynamic configuration dropdowns in the Inspector card.
 - **Lighting & Device Stamp Suite Expansion**: Added CAD stamps and rate models for 3-Way Switches ($3W), Wall Sconces/Interior Fixtures, Exterior Coach Lights, and Soffit/Eaves Downlights.
 - **Dual-Geometry Accuracy**: Synchronized calculation of structural framing vs. interior finishes using independent geometric layers for unmatched take-off precision. Defaults to **Interior Finish Mode** for trade-focused drywall and finish scheduling.
@@ -50,6 +50,7 @@
   - Electrical & Plumbing: Automated take-offs for fixtures, wiring homerun lengths, piping runs, and life safety devices. Itemized reporting for every active electrical device, light fixture, and panel tier with material/labor subtotals instead of collapsing them into summary rows.
   
 - **Professional Export & Reporting Suite**:
+  - **Unified Fenestration Print Schedule**: Integrated `getFenestrationItemizedRows()` helper to ensure perfectly aligned unit rates, subtotals, and waste adjustments across modal previews, PDF exports, and CSV spreadsheets.
   - **Clean Bid Schedule Filtering**: Automatically suppresses inactive trade line items (zero-quantity or $0.00 value) and empty category headers across all export formats (PDF, HTML, CSV) for professional clarity.
   - **Single-Source-of-Truth Top Header Bar**: Consolidated document controls (Settings, Rates, Print, Save) into a unified top-level bar, removing duplicate controls from the MTO matrix for a streamlined interface. Includes an instant "+ New Project" canvas reset button.
   - **Direct Client-Side PDF Generation**: High-resolution rasterization to multi-page vector-styled PDF via `jsPDF` and `html2canvas`—no physical printer connection required.

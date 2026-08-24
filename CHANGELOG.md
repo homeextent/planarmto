@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.8.0] - 2026-08-24
+
+### Added
+- **Expanded Door Subtype Rate Card**: Added explicit rate keys and Master Customizer inputs for Single Bifolds ($110 Mat / $75 Lab), Double Bifolds ($190 Mat / $110 Lab), Patio Sliders ($750 Mat / $400 Lab), and Cased Openings ($45 Mat / $45 Lab).
+- **Dynamic Matrix Inclusion Toggles**: Integrated inclusion toggle switches (eye icons) for Patio Sliders, Bifold Closet Doors, and Cased Openings in the Live MTO Matrix sidebar.
+
+### Fixed
+- **Unified Fenestration Schedule & PDF Alignment**: Extracted Section 3 itemization into `getFenestrationItemizedRows()`, populating missing unit rates, material subtotals, labor subtotals, and waste adjustments for bifolds and patio sliders across modal previews, PDF exports, and CSV spreadsheets.
+- **Exterior Door Trim Cost Isolation**: Fixed trim cost routing in `estimator.ts` to ensure exterior door capping and brickmold accumulate strictly into Exterior Doors subtotals rather than window totals.
+- **Default Window Preset Dimensions**: Updated standard window stamp initial placement defaults to 36" W × 48" H.
+
 ## [2.7.0] - 2026-08-24
 
 ### Added

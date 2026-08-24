@@ -64,6 +64,10 @@ const RATE_FIELDS: RateFieldConfig[] = [
   // 3. Fenestration
   { key: 'windowPerSf', label: 'Standard Vinyl Window', unit: '$/SF', category: 'Openings & Fenestration', description: 'Low-E Argon double-glazed casement/slider window' },
   { key: 'passageDoorPerUnit', label: 'Passage Interior Door (Pre-hung)', unit: '$/Unit', category: 'Openings & Fenestration', description: 'Hollow/solid core door, jamb, and hinges' },
+  { key: 'doorBifoldSinglePerUnit', label: 'Single Bifold Closet Door (30")', unit: '$/Unit', category: 'Openings & Fenestration', description: 'Single bifold slab, track, and hardware' },
+  { key: 'doorBifoldDoublePerUnit', label: 'Double Bifold Closet Door (60")', unit: '$/Unit', category: 'Openings & Fenestration', description: 'Double bifold slabs, track, and hardware' },
+  { key: 'doorPatioSliderPerUnit', label: 'Patio Glass Sliding Door (6\')', unit: '$/Unit', category: 'Openings & Fenestration', description: 'Double-glazed sliding patio door system' },
+  { key: 'doorCasedOpeningPerUnit', label: 'Cased Opening Trim & Jamb', unit: '$/Unit', category: 'Openings & Fenestration', description: 'Interior door-less jamb with casing on both sides' },
   { key: 'pocketDoorPerUnit', label: 'In-Wall Pocket Door', unit: '$/Unit', category: 'Openings & Fenestration', description: 'Pocket frame cage, track, rollers, and slab' },
   { key: 'exteriorDoorPerUnit', label: 'Exterior Insulated Entry Door', unit: '$/Unit', category: 'Openings & Fenestration', description: 'Fiberglass or steel pre-hung entry system with threshold' },
   { key: 'garageDoorPerBay', label: 'Overhead Garage Bay Door', unit: '$/Bay', category: 'Openings & Fenestration', description: 'Insulated sectional door with tracks, torsion spring & motor' },

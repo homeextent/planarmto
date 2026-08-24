@@ -18,8 +18,8 @@ import {
   TrendingUp,
   SlidersHorizontal,
   Settings,
-  ToggleLeft,
-  ToggleRight,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface MtoMatrixPanelProps {
@@ -282,6 +282,42 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
       ],
       [
         '3. Apertures & Fenestration',
+        'Patio Sliding Doors',
+        mto.patioSliderDoorsCount,
+        'UNITS',
+        r.doorPatioSliderPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.doorPatioSliderPerUnit.material,
+        r.doorPatioSliderPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.doorPatioSliderPerUnit.labor,
+        ((r.doorPatioSliderPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.doorPatioSliderPerUnit.material) + (r.doorPatioSliderPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.doorPatioSliderPerUnit.labor)).toFixed(2),
+        '-',
+        '-',
+        costAnalysis.itemizedCosts.patioSliderDoors.toFixed(2),
+      ],
+      [
+        '3. Apertures & Fenestration',
+        'Bifold Closet Doors',
+        mto.bifoldDoorsCount,
+        'UNITS',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        costAnalysis.itemizedCosts.bifoldDoors.toFixed(2),
+      ],
+      [
+        '3. Apertures & Fenestration',
+        'Cased Openings',
+        mto.casedOpeningsCount,
+        'UNITS',
+        r.doorCasedOpeningPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.doorCasedOpeningPerUnit.material,
+        r.doorCasedOpeningPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.doorCasedOpeningPerUnit.labor,
+        ((r.doorCasedOpeningPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.doorCasedOpeningPerUnit.material) + (r.doorCasedOpeningPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.doorCasedOpeningPerUnit.labor)).toFixed(2),
+        '-',
+        '-',
+        costAnalysis.itemizedCosts.casedOpenings.toFixed(2),
+      ],
+      [
+        '3. Apertures & Fenestration',
         'Passage Doors',
         mto.passageDoorsUnits,
         'UNITS',
@@ -338,7 +374,43 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         ((r.doorHardwarePerSet?.material ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.material) + (r.doorHardwarePerSet?.labor ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.labor)).toFixed(2),
         (mto.doorHardwareSets * (r.doorHardwarePerSet?.material ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.material)).toFixed(2),
         (mto.doorHardwareSets * (r.doorHardwarePerSet?.labor ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.labor)).toFixed(2),
-        (mto.doorHardwareSets * ((r.doorHardwarePerSet?.material ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.material) + (r.doorHardwarePerSet?.labor ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.labor))).toFixed(2),
+        costAnalysis.itemizedCosts.doorHardwareSets.toFixed(2),
+      ],
+      [
+        '3. Apertures & Fenestration',
+        'Vinyl Brickmold Trim',
+        mto.trimBrickmoldLf,
+        'LF',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        costAnalysis.itemizedCosts.trimBrickmold.toFixed(2),
+      ],
+      [
+        '3. Apertures & Fenestration',
+        'Aluminum Site-Capping',
+        mto.trimCappingLf,
+        'LF',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        costAnalysis.itemizedCosts.trimCapping.toFixed(2),
+      ],
+      [
+        '3. Apertures & Fenestration',
+        'Brickmold + Sub-Sill',
+        mto.trimBrickmoldSubsillLf,
+        'LF',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        costAnalysis.itemizedCosts.trimBrickmoldSubsill.toFixed(2),
       ],
 
       // 4. Electrical
@@ -754,9 +826,9 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                   title={isIncluded('finishes') ? 'Exclude from financial total' : 'Include in financial total'}
                 >
                   {isIncluded('finishes') ? (
-                    <ToggleRight className="w-5 h-5 text-sky-400" />
+                    <Eye className="w-5 h-5 text-sky-400" />
                   ) : (
-                    <ToggleLeft className="w-5 h-5 text-slate-600" />
+                    <EyeOff className="w-5 h-5 text-slate-600" />
                   )}
                 </button>
               )}
@@ -932,9 +1004,9 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                   title={isIncluded('carpentryFraming') ? 'Exclude from financial total' : 'Include in financial total'}
                 >
                   {isIncluded('carpentryFraming') ? (
-                    <ToggleRight className="w-5 h-5 text-sky-400" />
+                    <Eye className="w-5 h-5 text-sky-400" />
                   ) : (
-                    <ToggleLeft className="w-5 h-5 text-slate-600" />
+                    <EyeOff className="w-5 h-5 text-slate-600" />
                   )}
                 </button>
               )}
@@ -1103,9 +1175,9 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                   title={isIncluded('fenestration') ? 'Exclude from financial total' : 'Include in financial total'}
                 >
                   {isIncluded('fenestration') ? (
-                    <ToggleRight className="w-5 h-5 text-sky-400" />
+                    <Eye className="w-5 h-5 text-sky-400" />
                   ) : (
-                    <ToggleLeft className="w-5 h-5 text-slate-600" />
+                    <EyeOff className="w-5 h-5 text-slate-600" />
                   )}
                 </button>
               )}
@@ -1168,10 +1240,62 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 isItemExcluded={!isItemIncluded('totalWindows')}
                 onToggleItem={onToggleItemInclusion}
               />
+              {mto.patioSliderDoorsCount > 0 && (
+                <MetricRow
+                  label="Patio Sliding Doors"
+                  value={mto.patioSliderDoorsCount}
+                  unit="UNITS"
+                  subtext="Exterior sliders"
+                  cost={
+                    isIncluded('fenestration') && isItemIncluded('patioSliderDoors')
+                      ? costAnalysis.itemizedCosts.patioSliderDoors
+                      : 0
+                  }
+                  isCategoryExcluded={!isIncluded('fenestration')}
+                  itemKey="patioSliderDoors"
+                  isItemExcluded={!isItemIncluded('patioSliderDoors')}
+                  onToggleItem={onToggleItemInclusion}
+                />
+              )}
+              {mto.bifoldDoorsCount > 0 && (
+                <MetricRow
+                  label="Bifold Closet Doors"
+                  value={mto.bifoldDoorsCount}
+                  unit="UNITS"
+                  subtext="Single & double units"
+                  cost={
+                    isIncluded('fenestration') && isItemIncluded('bifoldDoors')
+                      ? costAnalysis.itemizedCosts.bifoldDoors
+                      : 0
+                  }
+                  isCategoryExcluded={!isIncluded('fenestration')}
+                  itemKey="bifoldDoors"
+                  isItemExcluded={!isItemIncluded('bifoldDoors')}
+                  onToggleItem={onToggleItemInclusion}
+                />
+              )}
+              {mto.casedOpeningsCount > 0 && (
+                <MetricRow
+                  label="Cased Openings"
+                  value={mto.casedOpeningsCount}
+                  unit="UNITS"
+                  subtext="Trim-only apertures"
+                  cost={
+                    isIncluded('fenestration') && isItemIncluded('casedOpenings')
+                      ? costAnalysis.itemizedCosts.casedOpenings
+                      : 0
+                  }
+                  isCategoryExcluded={!isIncluded('fenestration')}
+                  itemKey="casedOpenings"
+                  isItemExcluded={!isItemIncluded('casedOpenings')}
+                  onToggleItem={onToggleItemInclusion}
+                />
+              )}
               <MetricRow
                 label="Passage Doors"
                 value={mto.passageDoorsUnits}
                 unit="UNITS"
+                subtext="Int. swing units"
                 cost={
                   isIncluded('fenestration') && isItemIncluded('passageDoors')
                     ? costAnalysis.itemizedCosts.passageDoors
@@ -1186,6 +1310,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 label="Pocket Doors"
                 value={mto.pocketDoorsUnits}
                 unit="UNITS"
+                subtext="In-wall sliding"
                 cost={
                   isIncluded('fenestration') && isItemIncluded('pocketDoors')
                     ? costAnalysis.itemizedCosts.pocketDoors
@@ -1200,6 +1325,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 label="Exterior Doors"
                 value={mto.exteriorDoorsUnits}
                 unit="UNITS"
+                subtext="Entry & exit units"
                 cost={
                   isIncluded('fenestration') && isItemIncluded('exteriorDoors')
                     ? costAnalysis.itemizedCosts.exteriorDoors
@@ -1214,6 +1340,7 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 label="Overhead Garage Bays"
                 value={mto.overheadGarageBays}
                 unit="BAYS"
+                subtext="Insulated sectional"
                 cost={
                   isIncluded('fenestration') && isItemIncluded('overheadGarageBays')
                     ? costAnalysis.itemizedCosts.overheadGarageBays
@@ -1244,12 +1371,16 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                   label="Vinyl Brickmold Trim"
                   value={mto.trimBrickmoldLf}
                   unit="LF"
+                  subtext="Exterior vinyl trim"
                   cost={
-                    isIncluded('fenestration')
-                      ? mto.trimBrickmoldLf * ((activeRates.trimBrickmoldPerLf?.material ?? DEFAULT_UNIT_COST_RATES.trimBrickmoldPerLf.material) + (activeRates.trimBrickmoldPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.trimBrickmoldPerLf.labor))
+                    isIncluded('fenestration') && isItemIncluded('trimBrickmold')
+                      ? costAnalysis.itemizedCosts.trimBrickmold
                       : 0
                   }
                   isCategoryExcluded={!isIncluded('fenestration')}
+                  itemKey="trimBrickmold"
+                  isItemExcluded={!isItemIncluded('trimBrickmold')}
+                  onToggleItem={onToggleItemInclusion}
                 />
               )}
               {mto.trimCappingLf > 0 && (
@@ -1257,12 +1388,16 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                   label="Aluminum Site-Capping"
                   value={mto.trimCappingLf}
                   unit="LF"
+                  subtext="Custom brake-formed"
                   cost={
-                    isIncluded('fenestration')
-                      ? mto.trimCappingLf * ((activeRates.trimCappingPerLf?.material ?? DEFAULT_UNIT_COST_RATES.trimCappingPerLf.material) + (activeRates.trimCappingPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.trimCappingPerLf.labor))
+                    isIncluded('fenestration') && isItemIncluded('trimCapping')
+                      ? costAnalysis.itemizedCosts.trimCapping
                       : 0
                   }
                   isCategoryExcluded={!isIncluded('fenestration')}
+                  itemKey="trimCapping"
+                  isItemExcluded={!isItemIncluded('trimCapping')}
+                  onToggleItem={onToggleItemInclusion}
                 />
               )}
               {mto.trimBrickmoldSubsillLf > 0 && (
@@ -1270,12 +1405,16 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                   label="Brickmold + Sub-Sill"
                   value={mto.trimBrickmoldSubsillLf}
                   unit="LF"
+                  subtext="Exterior sill + trim"
                   cost={
-                    isIncluded('fenestration')
-                      ? mto.trimBrickmoldSubsillLf * ((activeRates.trimBrickmoldSubsillPerLf?.material ?? DEFAULT_UNIT_COST_RATES.trimBrickmoldSubsillPerLf.material) + (activeRates.trimBrickmoldSubsillPerLf?.labor ?? DEFAULT_UNIT_COST_RATES.trimBrickmoldSubsillPerLf.labor))
+                    isIncluded('fenestration') && isItemIncluded('trimBrickmoldSubsill')
+                      ? costAnalysis.itemizedCosts.trimBrickmoldSubsill
                       : 0
                   }
                   isCategoryExcluded={!isIncluded('fenestration')}
+                  itemKey="trimBrickmoldSubsill"
+                  isItemExcluded={!isItemIncluded('trimBrickmoldSubsill')}
+                  onToggleItem={onToggleItemInclusion}
                 />
               )}
             </div>
@@ -1315,9 +1454,9 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                   title={isIncluded('electricalSafety') ? 'Exclude from financial total' : 'Include in financial total'}
                 >
                   {isIncluded('electricalSafety') ? (
-                    <ToggleRight className="w-5 h-5 text-sky-400" />
+                    <Eye className="w-5 h-5 text-sky-400" />
                   ) : (
-                    <ToggleLeft className="w-5 h-5 text-slate-600" />
+                    <EyeOff className="w-5 h-5 text-slate-600" />
                   )}
                 </button>
               )}
@@ -1635,9 +1774,9 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                   title={isIncluded('plumbingCivil') ? 'Exclude from financial total' : 'Include in financial total'}
                 >
                   {isIncluded('plumbingCivil') ? (
-                    <ToggleRight className="w-5 h-5 text-sky-400" />
+                    <Eye className="w-5 h-5 text-sky-400" />
                   ) : (
-                    <ToggleLeft className="w-5 h-5 text-slate-600" />
+                    <EyeOff className="w-5 h-5 text-slate-600" />
                   )}
                 </button>
               )}
@@ -1761,9 +1900,9 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                   title={isIncluded('concreteFoundations') ? 'Exclude from financial total' : 'Include in financial total'}
                 >
                   {isIncluded('concreteFoundations') ? (
-                    <ToggleRight className="w-5 h-5 text-sky-400" />
+                    <Eye className="w-5 h-5 text-sky-400" />
                   ) : (
-                    <ToggleLeft className="w-5 h-5 text-slate-600" />
+                    <EyeOff className="w-5 h-5 text-slate-600" />
                   )}
                 </button>
               )}
@@ -1869,9 +2008,9 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                   title={isIncluded('roofingEnvelope') ? 'Exclude from financial total' : 'Include in financial total'}
                 >
                   {isIncluded('roofingEnvelope') ? (
-                    <ToggleRight className="w-5 h-5 text-sky-400" />
+                    <Eye className="w-5 h-5 text-sky-400" />
                   ) : (
-                    <ToggleLeft className="w-5 h-5 text-slate-600" />
+                    <EyeOff className="w-5 h-5 text-slate-600" />
                   )}
                 </button>
               )}
@@ -2061,9 +2200,9 @@ const MetricRow: React.FC<MetricRowProps> = ({
             }
           >
             {isItemExcluded || isCategoryExcluded ? (
-              <ToggleLeft className="w-3.5 h-3.5" />
+              <EyeOff className="w-3.5 h-3.5" />
             ) : (
-              <ToggleRight className="w-3.5 h-3.5" />
+              <Eye className="w-3.5 h-3.5" />
             )}
           </button>
         )}

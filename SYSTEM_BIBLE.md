@@ -67,7 +67,8 @@ $$A_{\text{deduct}} = W_a \times H_a$$
 - **Bifold Doors (Single/Double)**: Features parametric chevron vector rendering. Single bifold (30") and Double bifold (60") use a `flipSwing` boolean to control fold direction. Double bifolds enforce leaf symmetry via mirrored normal vector calculations.
 - **Cased Openings**: Non-door passages (`cased_opening`) that deduct framing and drywall but do not break room polygon cycles, ensuring continuous flooring and ceiling take-offs.
 - **Pocket Doors**: Includes a `pocketDirection` toggle to determine which side of the wall segment hosts the sliding pocket frame.
-- **Universal Aperture Type Switcher & Inch Presets**: Integrated switcher allowing instant conversion between door and window types. Supports inch-based dimension inputs (Width/Height) with automated architectural quick size presets.
+- **Expanded Door Subtype Rate Model**: Doors are itemized by specific subtype (Passage, Exterior, Pocket, Bifold Single, Bifold Double, Patio Slider, Cased Opening, Overhead Garage) with independent rate keys.
+- **Universal Aperture Type Switcher & Inch Presets**: Integrated switcher allowing instant conversion between door and window types. Supports inch-based dimension inputs (Width/Height) with automated architectural quick size presets. Standard window stamp initial placement defaults to 36" W × 48" H.
 - **Canvas Label Formatting**: Professional CAD labels are formatted in rounded whole inches (e.g., `D32"x80"`, `W36"x48"`) derived from floating-point feet coordinates.
 
 ---
@@ -161,7 +162,14 @@ Linear foot (LF) exterior opening trim calculations are applied to Windows and E
 
 Exterior door trim costs are isolated from window totals in `estimator.ts` to ensure independent trade categorization in the MTO matrix.
 
-#### C. Casing Trim
+#### C. Unified Fenestration Itemization
+The system utilizes `getFenestrationItemizedRows()` to extract and format Section 3 (Fenestration) data. This helper function:
+- Iterates through all active door and window stamps.
+- Applies subtype-specific material and labor unit rates.
+- Calculates subtotals including waste adjustments.
+- Synchronizes output across the Live MTO Matrix, PDF Export, and CSV spreadsheets.
+
+#### D. Casing Trim
 Interior and exterior casing trim linear footage is calculated as the rough opening perimeter:
 $$L_{\text{trim}} = 2 \times (W_a + H_a)$$
 
@@ -286,6 +294,7 @@ PlanarMTO utilizes a multi-layered storage strategy to balance project-level int
 The system maintains a strict separation between global templates and project-specific costs:
 - **Master Rates (`masterRates`)**: The active template stored in `wp_usermeta`. These are the baseline prices applied to all new projects.
 - **Project Cost Rates (`costRates`)**: A frozen snapshot of rates saved within the `project_state` JSON blob. This ensures that historical project estimates remain accurate even if global market material rates are updated later.
+- **Matrix Inclusion Toggles**: Individual line items can be dynamically toggled (eye icon) to include/exclude them from cost rollups. This state is persisted within the `project_state`.
 - **Synchronization Pipeline**: Users can manually "Sync Master" to pull current global pricing into an old project, or "Save as Master" to push a project's custom rates to the global template.
 
 ### 10.3 REST API Endpoint Specification

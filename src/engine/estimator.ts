@@ -322,6 +322,13 @@ export function calculateMTO(state: FloorplanState): MTOReport {
   let windowTrimCost = 0;
   let exteriorDoorTrimCost = 0;
   let trimTotalCost = 0;
+
+  let bifoldDoorsCount = 0;
+  let bifoldDoorsCost = 0;
+  let patioSliderDoorsCount = 0;
+  let patioSliderDoorsCost = 0;
+  let casedOpeningsCount = 0;
+  let casedOpeningsCost = 0;
   const rates = safeMergeRates(settings.costRates);
 
   apertures.forEach((ap) => {
@@ -379,13 +386,21 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       // Garage exterior jamb casing = W + 2*H
       totalApertureCasingLf += ap.width + 2 * ap.height;
     } else if (ap.type === 'door_bifold_single' || ap.type === 'door_bifold_double') {
-      passageDoorsUnits++;
+      bifoldDoorsCount++;
+      const rateKey = ap.type === 'door_bifold_single' ? 'doorBifoldSinglePerUnit' : 'doorBifoldDoublePerUnit';
+      const rate = rates[rateKey];
+      bifoldDoorsCost += (rate.material + rate.labor);
       totalApertureCasingLf += 2 * (ap.width + 2 * ap.height);
     } else if (ap.type === 'cased_opening') {
+      casedOpeningsCount++;
+      const rate = rates.doorCasedOpeningPerUnit;
+      casedOpeningsCost += (rate.material + rate.labor);
       // Cased opening has casing on both sides, but no door unit
       totalApertureCasingLf += 2 * (ap.width + 2 * ap.height);
     } else if (ap.type === 'door_sliding_patio') {
-      passageDoorsUnits++;
+      patioSliderDoorsCount++;
+      const rate = rates.doorPatioSliderPerUnit;
+      patioSliderDoorsCost += (rate.material + rate.labor);
       totalApertureCasingLf += 2 * (ap.width + 2 * ap.height);
     }
   });
@@ -646,6 +661,12 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     totalWindowsUnits,
     totalWindowsSf: Math.round(totalWindowsSf * 100) / 100,
     passageDoorsUnits,
+    bifoldDoorsCount,
+    bifoldDoorsCost: Math.round(bifoldDoorsCost * 100) / 100,
+    patioSliderDoorsCount,
+    patioSliderDoorsCost: Math.round(patioSliderDoorsCost * 100) / 100,
+    casedOpeningsCount,
+    casedOpeningsCost: Math.round(casedOpeningsCost * 100) / 100,
     pocketDoorsUnits,
     exteriorDoorsUnits,
     overheadGarageBays,
@@ -731,11 +752,17 @@ export interface EstimatedCostResult {
   // Itemized costs for precise UI mapping
   itemizedCosts: {
     totalWindows: number;
+    patioSliderDoors: number;
+    bifoldDoors: number;
+    casedOpenings: number;
     passageDoors: number;
     pocketDoors: number;
     exteriorDoors: number;
     overheadGarageBays: number;
     doorHardwareSets: number;
+    trimBrickmold: number;
+    trimCapping: number;
+    trimBrickmoldSubsill: number;
   };
   // Financial Rollup
   baseDirectCost: number;
@@ -848,13 +875,14 @@ export function calculateEstimatedCost(
   let extDoorsMatTotal = 0;
   let extDoorsLabTotal = 0;
 
+  let trimBrickmoldTotal = 0;
+  let trimCappingTotal = 0;
+  let trimBrickmoldSubsillTotal = 0;
+
   if (itemInc.totalWindows !== false) {
     const windowRate = rates.windowPerSf || DEFAULT_UNIT_COST_RATES.windowPerSf;
 
     apertures.forEach((ap: any) => {
-      let apMat = 0;
-      let apLab = 0;
-
       if (ap.type.startsWith('window_')) {
         const billedSf = Math.max(6.0, ap.width * ap.height);
         let styleMult = 1.0;
@@ -863,51 +891,51 @@ export function calculateEstimatedCost(
         let finishMult = 1.0;
         if (ap.windowFinish === 'black') finishMult = 1.175;
 
-        apMat += billedSf * windowRate.material * styleMult * finishMult;
-        apLab += billedSf * windowRate.labor;
-      }
-
-      // Exterior Trim Costing Logic
-      if (ap.exteriorTrim && ap.exteriorTrim !== 'fin') {
-        const trimLf = 2 * (ap.width + ap.height);
-        let trimMat = 0;
-        let trimLab = 0;
-
-        if (ap.exteriorTrim === 'brickmold') {
-          const rate = rates.trimBrickmoldPerLf || DEFAULT_UNIT_COST_RATES.trimBrickmoldPerLf;
-          let finishMult = 1.0;
-          if (ap.windowFinish === 'black') finishMult = 1.175;
-          trimMat = trimLf * (rate.material ?? DEFAULT_UNIT_COST_RATES.trimBrickmoldPerLf.material) * finishMult;
-          trimLab = trimLf * (rate.labor ?? DEFAULT_UNIT_COST_RATES.trimBrickmoldPerLf.labor);
-        } else if (ap.exteriorTrim === 'capping') {
-          const rate = rates.trimCappingPerLf || DEFAULT_UNIT_COST_RATES.trimCappingPerLf;
-          trimMat = trimLf * (rate.material ?? DEFAULT_UNIT_COST_RATES.trimCappingPerLf.material);
-          trimLab = trimLf * (rate.labor ?? DEFAULT_UNIT_COST_RATES.trimCappingPerLf.labor);
-        } else if (ap.exteriorTrim === 'brickmold_subsill') {
-          const rate = rates.trimBrickmoldSubsillPerLf || DEFAULT_UNIT_COST_RATES.trimBrickmoldSubsillPerLf;
-          trimMat = trimLf * (rate.material ?? DEFAULT_UNIT_COST_RATES.trimBrickmoldSubsillPerLf.material);
-          trimLab = trimLf * (rate.labor ?? DEFAULT_UNIT_COST_RATES.trimBrickmoldSubsillPerLf.labor);
-        }
-
-        if (ap.type.startsWith('window_')) {
-          apMat += trimMat;
-          apLab += trimLab;
-        } else {
-          // Allocation for doors
-          extDoorsMatTotal += trimMat * wasteMultiplier;
-          extDoorsLabTotal += trimLab * wasteMultiplier;
-        }
-      }
-
-      if (ap.type.startsWith('window_')) {
-        windowsMatTotal += apMat * wasteMultiplier;
-        windowsLabTotal += apLab * wasteMultiplier;
+        windowsMatTotal += billedSf * windowRate.material * styleMult * finishMult * wasteMultiplier;
+        windowsLabTotal += billedSf * windowRate.labor * wasteMultiplier;
       }
     });
-
-    matFenestration += windowsMatTotal;
-    labFenestration += windowsLabTotal;
   }
+
+  // Calculate aggregated trim costs for all apertures (windows & doors)
+  apertures.forEach((ap: any) => {
+    if (ap.exteriorTrim && ap.exteriorTrim !== 'fin') {
+      const trimLf = 2 * (ap.width + ap.height);
+      if (ap.exteriorTrim === 'brickmold') {
+        const rate = rates.trimBrickmoldPerLf || DEFAULT_UNIT_COST_RATES.trimBrickmoldPerLf;
+        let finishMult = 1.0;
+        if (ap.windowFinish === 'black') finishMult = 1.175;
+        const trimCost = trimLf * (rate.material * finishMult + rate.labor) * wasteMultiplier;
+        if (itemInc.trimBrickmold !== false) trimBrickmoldTotal += trimCost;
+      } else if (ap.exteriorTrim === 'capping') {
+        const rate = rates.trimCappingPerLf || DEFAULT_UNIT_COST_RATES.trimCappingPerLf;
+        const trimCost = trimLf * (rate.material + rate.labor) * wasteMultiplier;
+        if (itemInc.trimCapping !== false) trimCappingTotal += trimCost;
+      } else if (ap.exteriorTrim === 'brickmold_subsill') {
+        const rate = rates.trimBrickmoldSubsillPerLf || DEFAULT_UNIT_COST_RATES.trimBrickmoldSubsillPerLf;
+        const trimCost = trimLf * (rate.material + rate.labor) * wasteMultiplier;
+        if (itemInc.trimBrickmoldSubsill !== false) trimBrickmoldSubsillTotal += trimCost;
+      }
+    }
+  });
+
+  matFenestration += windowsMatTotal + trimBrickmoldTotal + trimCappingTotal + trimBrickmoldSubsillTotal;
+  labFenestration += windowsLabTotal;
+
+  const patioSliderDoorsCost = itemInc.patioSliderDoors !== false ? {
+    mat: mto.patioSliderDoorsCount * (rates.doorPatioSliderPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.doorPatioSliderPerUnit.material) * wasteMultiplier,
+    lab: mto.patioSliderDoorsCount * (rates.doorPatioSliderPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.doorPatioSliderPerUnit.labor) * wasteMultiplier
+  } : { mat: 0, lab: 0 };
+
+  const bifoldDoorsCost = itemInc.bifoldDoors !== false ? {
+    mat: mto.bifoldDoorsCount * (rates.doorBifoldSinglePerUnit?.material ?? DEFAULT_UNIT_COST_RATES.doorBifoldSinglePerUnit.material) * wasteMultiplier,
+    lab: mto.bifoldDoorsCount * (rates.doorBifoldSinglePerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.doorBifoldSinglePerUnit.labor) * wasteMultiplier
+  } : { mat: 0, lab: 0 };
+
+  const casedOpeningsCost = itemInc.casedOpenings !== false ? {
+    mat: mto.casedOpeningsCount * (rates.doorCasedOpeningPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.doorCasedOpeningPerUnit.material) * wasteMultiplier,
+    lab: mto.casedOpeningsCount * (rates.doorCasedOpeningPerUnit?.labor ?? DEFAULT_UNIT_COST_RATES.doorCasedOpeningPerUnit.labor) * wasteMultiplier
+  } : { mat: 0, lab: 0 };
 
   const passageDoorsCost = itemInc.passageDoors !== false ? {
     mat: mto.passageDoorsUnits * (rates.passageDoorPerUnit?.material ?? DEFAULT_UNIT_COST_RATES.passageDoorPerUnit.material) * wasteMultiplier,
@@ -938,8 +966,8 @@ export function calculateEstimatedCost(
     lab: mto.doorHardwareSets * (rates.doorHardwarePerSet?.labor ?? DEFAULT_UNIT_COST_RATES.doorHardwarePerSet.labor) * wasteMultiplier
   } : { mat: 0, lab: 0 };
 
-  matFenestration += passageDoorsCost.mat + pocketDoorsCost.mat + exteriorDoorsBaseCost.mat + garageDoorsCost.mat + doorHardwareCost.mat;
-  labFenestration += passageDoorsCost.lab + pocketDoorsCost.lab + exteriorDoorsBaseCost.lab + garageDoorsCost.lab + doorHardwareCost.lab;
+  matFenestration += patioSliderDoorsCost.mat + bifoldDoorsCost.mat + casedOpeningsCost.mat + passageDoorsCost.mat + pocketDoorsCost.mat + exteriorDoorsBaseCost.mat + garageDoorsCost.mat + doorHardwareCost.mat;
+  labFenestration += patioSliderDoorsCost.lab + bifoldDoorsCost.lab + casedOpeningsCost.lab + passageDoorsCost.lab + pocketDoorsCost.lab + exteriorDoorsBaseCost.lab + garageDoorsCost.lab + doorHardwareCost.lab;
 
   // Add the previously calculated door trim cost to the category total
   // (already added to matFenestration via the apertures loop? NO, it wasn't. Let's check.)
@@ -1249,11 +1277,17 @@ export function calculateEstimatedCost(
     },
     itemizedCosts: {
       totalWindows: Math.round(windowsMatTotal + windowsLabTotal),
+      patioSliderDoors: Math.round(patioSliderDoorsCost.mat + patioSliderDoorsCost.lab),
+      bifoldDoors: Math.round(bifoldDoorsCost.mat + bifoldDoorsCost.lab),
+      casedOpenings: Math.round(casedOpeningsCost.mat + casedOpeningsCost.lab),
       passageDoors: Math.round(passageDoorsCost.mat + passageDoorsCost.lab),
       pocketDoors: Math.round(pocketDoorsCost.mat + pocketDoorsCost.lab),
-      exteriorDoors: Math.round(extDoorsMatTotal + extDoorsLabTotal),
+      exteriorDoors: Math.round(exteriorDoorsBaseCost.mat + exteriorDoorsBaseCost.lab),
       overheadGarageBays: Math.round(garageDoorsCost.mat + garageDoorsCost.lab),
       doorHardwareSets: Math.round(doorHardwareCost.mat + doorHardwareCost.lab),
+      trimBrickmold: Math.round(trimBrickmoldTotal),
+      trimCapping: Math.round(trimCappingTotal),
+      trimBrickmoldSubsill: Math.round(trimBrickmoldSubsillTotal),
     },
     baseDirectCost: Math.round(baseDirectCost),
     indirectProjectManagement: Math.round(indirectProjectManagement),

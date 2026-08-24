@@ -219,6 +219,10 @@ export interface UnitCostRates {
   stairRiserPerUnit: CostRateItem;
   windowPerSf: CostRateItem;
   passageDoorPerUnit: CostRateItem;
+  doorBifoldSinglePerUnit: CostRateItem;
+  doorBifoldDoublePerUnit: CostRateItem;
+  doorPatioSliderPerUnit: CostRateItem;
+  doorCasedOpeningPerUnit: CostRateItem;
   pocketDoorPerUnit: CostRateItem;
   exteriorDoorPerUnit: CostRateItem;
   garageDoorPerBay: CostRateItem;
@@ -320,11 +324,17 @@ export interface ItemInclusions {
 
   // Fenestration
   totalWindows?: boolean;
+  patioSliderDoors?: boolean;
+  bifoldDoors?: boolean;
+  casedOpenings?: boolean;
   passageDoors?: boolean;
   pocketDoors?: boolean;
   exteriorDoors?: boolean;
   overheadGarageBays?: boolean;
   doorHardwareSets?: boolean;
+  trimBrickmold?: boolean;
+  trimCapping?: boolean;
+  trimBrickmoldSubsill?: boolean;
 
   // Electrical
   stdSwitches?: boolean;
@@ -377,11 +387,17 @@ export const DEFAULT_ITEM_INCLUSIONS: ItemInclusions = {
   stairHandGuardrail: true,
   calculatedStairRisers: true,
   totalWindows: true,
+  patioSliderDoors: true,
+  bifoldDoors: true,
+  casedOpenings: true,
   passageDoors: true,
   pocketDoors: true,
   exteriorDoors: true,
   overheadGarageBays: true,
   doorHardwareSets: true,
+  trimBrickmold: true,
+  trimCapping: true,
+  trimBrickmoldSubsill: true,
   stdSwitches: true,
   switch3Way: true,
   dimmers: true,
@@ -535,6 +551,12 @@ export interface MTOReport {
   totalWindowsUnits: number;
   totalWindowsSf: number;
   passageDoorsUnits: number;
+  bifoldDoorsCount: number;
+  bifoldDoorsCost: number;
+  patioSliderDoorsCount: number;
+  patioSliderDoorsCost: number;
+  casedOpeningsCount: number;
+  casedOpeningsCost: number;
   pocketDoorsUnits: number;
   exteriorDoorsUnits: number;
   overheadGarageBays: number;
