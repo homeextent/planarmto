@@ -94,7 +94,10 @@ const RATE_FIELDS: RateFieldConfig[] = [
 
   // 5. Plumbing & Civil
   { key: 'plumbingPerFixture', label: 'Plumbing Fixture Rough-in & Trim', unit: '$/Fixture', category: 'Plumbing & Mechanical', description: 'Toilet, vanity sink, shower valve, or tub waste & vent rough-in' },
-  { key: 'waterHeaterPerUnit', label: 'Water Heater / Boiler System', unit: '$/Unit', category: 'Plumbing & Mechanical', description: 'Tank or tankless heater installation and connections' },
+  { key: 'waterHeaterTank40PerUnit', label: '40-Gal Standard Tank Water Heater', unit: '$/Unit', category: 'Plumbing & Mechanical', description: 'Standard 40-gallon atmospheric or power vent gas/electric tank' },
+  { key: 'waterHeaterTank50PerUnit', label: '50-Gal Standard Tank Water Heater', unit: '$/Unit', category: 'Plumbing & Mechanical', description: 'Standard 50-gallon atmospheric or power vent gas/electric tank' },
+  { key: 'waterHeaterTanklessPerUnit', label: 'Tankless Water Heater (Gas/Electric)', unit: '$/Unit', category: 'Plumbing & Mechanical', description: 'On-demand high-efficiency tankless unit with venting' },
+  { key: 'waterHeaterHybridPerUnit', label: 'Hybrid Heat Pump Water Heater', unit: '$/Unit', category: 'Plumbing & Mechanical', description: 'Ultra-high efficiency heat pump tank with condensate drain' },
   { key: 'utilityTrenchPerLf', label: 'Civil / Utility Trenching', unit: '$/LF', category: 'Plumbing & Mechanical', description: 'Excavation, sand bed, conduit, and backfill' },
 
   // 6. Concrete

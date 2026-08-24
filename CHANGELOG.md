@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Complete Rate Card Coverage**: Audited and restored missing rate fields (`switchDimmer`, `outlet240v`, `waterHeaterPerUnit`, and differentiated drywall thicknesses) across the customizer modal, print schedules, and subcontractor CSV exports.
 - **Canvas Passive Event Listener Warnings**: Registered native `{ passive: false }` wheel and touch listeners in `CadCanvas.tsx` to prevent console `preventDefault` warnings during canvas pan and zoom interactions.
 - **Vite Production Build Exports**: Exported `DEFAULT_UNIT_COST_RATES` explicitly from `estimator.ts` to resolve Rollup module resolution failures during production bundling.
+- **Clean Bid Schedule Filtering**: Added dynamic zero-quantity and $0.00 value filtering across the report preview modal, PDF exports, HTML print documents, and CSV spreadsheets, automatically hiding unused line items and empty trade category headers.
 
 ## [2.5.0] - 2026-08-23
 

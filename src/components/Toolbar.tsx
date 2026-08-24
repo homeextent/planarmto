@@ -129,6 +129,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         { id: 'stamp_plumbing_sink', label: 'Lavatory / Kitchen Sink', icon: <Droplets className="w-4 h-4 text-cyan-400" /> },
         { id: 'stamp_plumbing_shower', label: 'Walk-In Shower', icon: <Droplets className="w-4 h-4 text-cyan-400" /> },
         { id: 'stamp_plumbing_tub', label: 'Soaker Bathtub', icon: <Droplets className="w-4 h-4 text-cyan-400" /> },
+        { id: 'stamp_plumbing_water_heater', label: 'Water Heater / Boiler', icon: <Droplets className="w-4 h-4 text-cyan-500" /> },
         { id: 'stamp_utility_trench', label: 'Utility Trenching (LF)', icon: <Layers className="w-4 h-4 text-amber-400" /> },
       ],
     },

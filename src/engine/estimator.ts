@@ -386,6 +386,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
   let smokeCoAlarmsUnits = 0;
 
   let plumbingFixturesUnits = 0;
+  const waterHeaterBreakdown: Array<{ type: 'tank_40' | 'tank_50' | 'tankless' | 'hybrid'; count: number }> = [];
   let utilityTrenchingLf = 0;
 
   stamps.forEach((st) => {
@@ -467,8 +468,17 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       case 'plumbing_shower':
       case 'plumbing_tub':
       case 'plumbing_hose_bib':
+        plumbingFixturesUnits++;
+        break;
       case 'plumbing_water_heater':
         plumbingFixturesUnits++;
+        const hType = st.heaterType || 'tank_50';
+        const existingHeater = waterHeaterBreakdown.find(h => h.type === hType);
+        if (existingHeater) {
+          existingHeater.count++;
+        } else {
+          waterHeaterBreakdown.push({ type: hType, count: 1 });
+        }
         break;
       case 'utility_trench':
         utilityTrenchingLf += st.length || 20.0;
@@ -627,6 +637,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     smokeCoAlarmsUnits,
 
     plumbingFixturesUnits,
+    waterHeaterBreakdown,
     utilityTrenchingLf: Math.round(utilityTrenchingLf * 100) / 100,
 
     pouredConcreteCy,
@@ -925,6 +936,20 @@ export function calculateEstimatedCost(
   if (itemInc.plumbingFixtures !== false) {
     matPlumbing += mto.plumbingFixturesUnits * (rates.plumbingPerFixture?.material ?? DEFAULT_UNIT_COST_RATES.plumbingPerFixture.material) * wasteMultiplier;
     labPlumbing += mto.plumbingFixturesUnits * (rates.plumbingPerFixture?.labor ?? DEFAULT_UNIT_COST_RATES.plumbingPerFixture.labor) * wasteMultiplier;
+
+    // Itemized Water Heater Costs
+    mto.waterHeaterBreakdown.forEach(heater => {
+      let rateKey: keyof UnitCostRates = 'waterHeaterTank50PerUnit';
+      if (heater.type === 'tank_40') rateKey = 'waterHeaterTank40PerUnit';
+      else if (heater.type === 'tankless') rateKey = 'waterHeaterTanklessPerUnit';
+      else if (heater.type === 'hybrid') rateKey = 'waterHeaterHybridPerUnit';
+
+      const rate = rates[rateKey] || DEFAULT_UNIT_COST_RATES[rateKey];
+      if (rate) {
+        matPlumbing += (rate.material ?? DEFAULT_UNIT_COST_RATES[rateKey].material) * heater.count * wasteMultiplier;
+        labPlumbing += (rate.labor ?? DEFAULT_UNIT_COST_RATES[rateKey].labor) * heater.count * wasteMultiplier;
+      }
+    });
   }
 
   if (itemInc.utilityTrenching !== false) {

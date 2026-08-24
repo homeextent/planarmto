@@ -470,6 +470,30 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         (mto.plumbingFixturesUnits * (r.plumbingPerFixture?.labor ?? DEFAULT_UNIT_COST_RATES.plumbingPerFixture.labor)).toFixed(2),
         (mto.plumbingFixturesUnits * ((r.plumbingPerFixture?.material ?? DEFAULT_UNIT_COST_RATES.plumbingPerFixture.material) + (r.plumbingPerFixture?.labor ?? DEFAULT_UNIT_COST_RATES.plumbingPerFixture.labor))).toFixed(2),
       ],
+      ...mto.waterHeaterBreakdown.map(heater => {
+        let label = '50-Gal Standard Tank';
+        let rateKey: keyof UnitCostRates = 'waterHeaterTank50PerUnit';
+        if (heater.type === 'tank_40') { label = '40-Gal Standard Tank'; rateKey = 'waterHeaterTank40PerUnit'; }
+        else if (heater.type === 'tankless') { label = 'Tankless Water Heater'; rateKey = 'waterHeaterTanklessPerUnit'; }
+        else if (heater.type === 'hybrid') { label = 'Hybrid Heat Pump Tank'; rateKey = 'waterHeaterHybridPerUnit'; }
+        
+        const rate = r[rateKey] || DEFAULT_UNIT_COST_RATES[rateKey];
+        const mat = rate?.material ?? DEFAULT_UNIT_COST_RATES[rateKey].material;
+        const lab = rate?.labor ?? DEFAULT_UNIT_COST_RATES[rateKey].labor;
+        const waste = 1 + (state.settings.wasteFactorPercentage / 100);
+        return [
+          '5. Plumbing & Civil',
+          `Water Heater: ${label}`,
+          heater.count,
+          'UNITS',
+          mat,
+          lab,
+          (mat + lab).toFixed(2),
+          (heater.count * mat * waste).toFixed(2),
+          (heater.count * lab * waste).toFixed(2),
+          (heater.count * (mat + lab) * waste).toFixed(2),
+        ];
+      }),
       [
         '5. Plumbing & Civil',
         'Utility Trenching',
@@ -1600,6 +1624,35 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 isItemExcluded={!isItemIncluded('plumbingFixtures')}
                 onToggleItem={onToggleItemInclusion}
               />
+              {mto.waterHeaterBreakdown.map((heater: any, idx: number) => {
+                let label = '50-Gallon Standard Tank';
+                let rateKey: keyof UnitCostRates = 'waterHeaterTank50PerUnit';
+                if (heater.type === 'tank_40') { label = '40-Gallon Standard Tank'; rateKey = 'waterHeaterTank40PerUnit'; }
+                else if (heater.type === 'tankless') { label = 'Tankless Water Heater'; rateKey = 'waterHeaterTanklessPerUnit'; }
+                else if (heater.type === 'hybrid') { label = 'Hybrid Heat Pump Tank'; rateKey = 'waterHeaterHybridPerUnit'; }
+
+                const rate = activeRates[rateKey] || DEFAULT_UNIT_COST_RATES[rateKey];
+                const waste = 1 + (state.settings.wasteFactorPercentage / 100);
+                
+                return (
+                  <MetricRow
+                    key={`${heater.type}-${idx}`}
+                    label={label}
+                    value={heater.count}
+                    unit="UNITS"
+                    subtext="Equipment cost + install"
+                    cost={
+                      isIncluded('plumbingCivil') && isItemIncluded('plumbingFixtures')
+                        ? heater.count * ((rate?.material ?? DEFAULT_UNIT_COST_RATES[rateKey].material) + (rate?.labor ?? DEFAULT_UNIT_COST_RATES[rateKey].labor)) * waste
+                        : 0
+                    }
+                    isCategoryExcluded={!isIncluded('plumbingCivil')}
+                    itemKey="plumbingFixtures"
+                    isItemExcluded={!isItemIncluded('plumbingFixtures')}
+                    onToggleItem={onToggleItemInclusion}
+                  />
+                );
+              })}
               <MetricRow
                 label="Utility Trenching"
                 value={mto.utilityTrenchingLf}

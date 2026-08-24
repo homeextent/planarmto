@@ -118,6 +118,7 @@ export interface CadStamp {
   stairWidth?: number;
   panelType?: 'main' | 'subpanel';
   panelAmperage?: '60A' | '100A' | '125A' | '200A' | '400A';
+  heaterType?: 'tank_40' | 'tank_50' | 'tankless' | 'hybrid';
 }
 
 export interface CadWall {
@@ -247,7 +248,10 @@ export interface UnitCostRates {
   exhaustFanPerUnit: CostRateItem;
   rangeHoodPerUnit: CostRateItem;
   smokeAlarmPerUnit: CostRateItem;
-  waterHeaterPerUnit: CostRateItem;
+  waterHeaterTank40PerUnit: CostRateItem;
+  waterHeaterTank50PerUnit: CostRateItem;
+  waterHeaterTanklessPerUnit: CostRateItem;
+  waterHeaterHybridPerUnit: CostRateItem;
   utilityTrenchPerLf: CostRateItem;
   soffitPerLf: CostRateItem;
   fasciaPerLf: CostRateItem;
@@ -555,6 +559,10 @@ export interface MTOReport {
 
   // 5. Mechanical Plumbing & Civil
   plumbingFixturesUnits: number;
+  waterHeaterBreakdown: Array<{
+    type: 'tank_40' | 'tank_50' | 'tankless' | 'hybrid';
+    count: number;
+  }>;
   utilityTrenchingLf: number;
 
   // 6. Concrete & Foundations

@@ -1011,6 +1011,13 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
       onChange({ ...state, stamps: updated });
     };
 
+    const handleHeaterTypeChange = (heaterType: 'tank_40' | 'tank_50' | 'tankless' | 'hybrid') => {
+      const updated = state.stamps.map((s) =>
+        s.id === stamp.id ? { ...s, heaterType } : s
+      );
+      onChange({ ...state, stamps: updated });
+    };
+
     return (
       <div className="absolute top-16 right-88 w-72 bg-slate-900/95 border border-slate-700/80 backdrop-blur-md rounded-2xl shadow-2xl p-4 text-slate-200 z-20 text-xs">
         <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-800">
@@ -1133,6 +1140,28 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                       <option value="400A">400A</option>
                     </>
                   )}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {stamp.type === 'plumbing_water_heater' && (
+            <div className="space-y-3 pt-2 border-t border-slate-800">
+              <div className="text-[10px] uppercase font-bold text-sky-400">Water Heater Equipment</div>
+              
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                  Equipment Type
+                </label>
+                <select
+                  value={stamp.heaterType || 'tank_50'}
+                  onChange={(e) => handleHeaterTypeChange(e.target.value as any)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+                >
+                  <option value="tank_40">40-Gallon Standard Tank</option>
+                  <option value="tank_50">50-Gallon Standard Tank</option>
+                  <option value="tankless">Tankless Water Heater (Gas/Electric)</option>
+                  <option value="hybrid">Hybrid Heat Pump Tank</option>
                 </select>
               </div>
             </div>
