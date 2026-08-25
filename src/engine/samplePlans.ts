@@ -9,6 +9,9 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   defaultWallHeight: 9.0, // 9ft standard
   defaultCeilingHeight: 9.0,
   defaultWallThickness: 0.375, // 4.5"
+  defaultWallInsulationType: 'fiberglass_batt_r20',
+  defaultAtticInsulationType: 'blown_cellulose_r60',
+  defaultFloorInsulationType: 'none',
   slabThicknessInches: 4.0,
   roofPitchScale: 4.0, // 4:12 pitch
   roofOverhangInches: 18.0,

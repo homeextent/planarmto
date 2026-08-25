@@ -10,6 +10,7 @@ import {
   CadWall,
   Aperture,
   RoomPolygon,
+  InsulationTakeoffItem,
 } from '../types';
 import { DEFAULT_UNIT_COST_RATES } from '../constants/rates';
 export { DEFAULT_UNIT_COST_RATES };
@@ -46,6 +47,148 @@ export function safeMergeRates(loadedRates?: Partial<UnitCostRates>): UnitCostRa
   });
 
   return result;
+}
+
+export interface InsulationCostCalculation {
+  label: string;
+  unit: 'SF' | 'BF';
+  areaSf: number;
+  boardFeet?: number;
+  qty: number;
+  matRate: number;
+  labRate: number;
+  matCost: number;
+  labCost: number;
+  totalCost: number;
+}
+
+export function computeWallInsulationCost(
+  areaSf: number,
+  insulationType?: string,
+  depthInches?: number,
+  rates: UnitCostRates = DEFAULT_UNIT_COST_RATES,
+  wasteMultiplier: number = 1.0
+): InsulationCostCalculation {
+  const type = insulationType || 'fiberglass_batt_r20';
+  if (type === 'none' || type === 'uninsulated' || areaSf <= 0) {
+    return {
+      label: 'Uninsulated / None',
+      unit: 'SF',
+      areaSf,
+      qty: 0,
+      matRate: 0,
+      labRate: 0,
+      matCost: 0,
+      labCost: 0,
+      totalCost: 0,
+    };
+  }
+
+  let label = 'Fiberglass Batt R-20';
+  let unit: 'SF' | 'BF' = 'SF';
+  let matRate = rates.insulationFiberglassBattPerSf?.material ?? (rates.extInsulationPerSf?.material ?? 0.85);
+  let labRate = rates.insulationFiberglassBattPerSf?.labor ?? (rates.extInsulationPerSf?.labor ?? 0.55);
+  let qty = areaSf;
+  let boardFeet: number | undefined = undefined;
+
+  switch (type) {
+    case 'fiberglass_batt_r20':
+      label = 'Fiberglass Batt R-20';
+      unit = 'SF';
+      matRate = rates.insulationFiberglassBattPerSf?.material ?? 0.85;
+      labRate = rates.insulationFiberglassBattPerSf?.labor ?? 0.55;
+      qty = areaSf;
+      break;
+    case 'mineral_wool_batt_r22':
+    case 'mineral_wool_batt_r23':
+      label = 'Mineral Wool Batt R-22';
+      unit = 'SF';
+      matRate = rates.insulationMineralWoolBattPerSf?.material ?? 1.25;
+      labRate = rates.insulationMineralWoolBattPerSf?.labor ?? 0.75;
+      qty = areaSf;
+      break;
+    case 'closed_cell_foam_wall_r22':
+    case 'closed_cell_spray_foam_r22':
+      label = 'Closed-Cell Spray Foam Wall (R-22)';
+      unit = 'BF';
+      const wallDepth = depthInches ?? 3.67;
+      boardFeet = areaSf * wallDepth;
+      qty = boardFeet;
+      matRate = rates.insulationClosedCellWallPerBf?.material ?? 1.01;
+      labRate = rates.insulationClosedCellWallPerBf?.labor ?? 0.54;
+      break;
+    case 'closed_cell_foam_floor_r31':
+      label = 'Closed-Cell Spray Foam Floor (R-31)';
+      unit = 'BF';
+      const floorDepth = depthInches ?? 5.17;
+      boardFeet = areaSf * floorDepth;
+      qty = boardFeet;
+      matRate = rates.insulationClosedCellFloorPerBf?.material ?? 0.93;
+      labRate = rates.insulationClosedCellFloorPerBf?.labor ?? 0.50;
+      break;
+    case 'closed_cell_foam_roof_r60':
+      label = 'Closed-Cell Spray Foam Roof (R-60)';
+      unit = 'BF';
+      const roofDepth = depthInches ?? 10.0;
+      boardFeet = areaSf * roofDepth;
+      qty = boardFeet;
+      matRate = rates.insulationClosedCellRoofPerBf?.material ?? 0.85;
+      labRate = rates.insulationClosedCellRoofPerBf?.labor ?? 0.45;
+      break;
+    case 'open_cell_foam':
+      label = 'Open-Cell Spray Foam';
+      unit = 'BF';
+      const ocDepth = depthInches ?? 3.5;
+      boardFeet = areaSf * ocDepth;
+      qty = boardFeet;
+      matRate = rates.insulationOpenCellFoamPerBf?.material ?? 0.45;
+      labRate = rates.insulationOpenCellFoamPerBf?.labor ?? 0.25;
+      break;
+    case 'blown_cellulose_r60':
+      label = 'Blown-In Cellulose R-60';
+      unit = 'SF';
+      matRate = rates.insulationBlownCellulosePerSf?.material ?? 1.15;
+      labRate = rates.insulationBlownCellulosePerSf?.labor ?? 0.65;
+      qty = areaSf;
+      break;
+    case 'sound_batt':
+      label = 'Sound Batt Acoustic (R-14)';
+      unit = 'SF';
+      matRate = rates.insulationSoundBattPerSf?.material ?? 0.65;
+      labRate = rates.insulationSoundBattPerSf?.labor ?? 0.45;
+      qty = areaSf;
+      break;
+    case 'fiberglass_floor_batt_r30':
+      label = 'Fiberglass Floor Batt R-30';
+      unit = 'SF';
+      matRate = rates.insulationFiberglassFloorBattPerSf?.material ?? 1.10;
+      labRate = rates.insulationFiberglassFloorBattPerSf?.labor ?? 0.60;
+      qty = areaSf;
+      break;
+    default:
+      label = 'Batt Insulation';
+      unit = 'SF';
+      matRate = rates.extInsulationPerSf?.material ?? 1.10;
+      labRate = rates.extInsulationPerSf?.labor ?? 0.75;
+      qty = areaSf;
+      break;
+  }
+
+  const matCost = qty * matRate * wasteMultiplier;
+  const labCost = qty * labRate * wasteMultiplier;
+
+  return {
+    label,
+    unit,
+    areaSf,
+    boardFeet,
+    qty,
+    matRate,
+    labRate,
+    matCost,
+    labCost,
+    totalCost: matCost + labCost,
+  };
 }
 
 export function calculateMTO(state: FloorplanState): MTOReport {
@@ -107,6 +250,9 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       totalWallStudFramingLf += wallLength;
     }
 
+    let extNetArea = 0;
+    const effectiveInsType = wall.insulationType || settings.defaultWallInsulationType || 'fiberglass_batt_r20';
+
     // Drywall & Siding faces:
     // Exterior: 1 interior face drywall, 1 exterior siding/insulation wrapping outer envelope
     // Shared interior: 2 interior faces drywall
@@ -120,14 +266,13 @@ export function calculateMTO(state: FloorplanState): MTOReport {
 
       // In Exterior Framing mode, account for structural framing thickness & corner wraps
       const wallThickness = wall.thickness || settings.defaultWallThickness || 0.537;
-      // +t per exterior corner means for a simple box we add 2 * thickness to each wall's calculated exterior length
-      // more precisely, it's about the outer envelope. The current implementation uses wallLength + wallThickness * 2
-      // for all exterior walls if not in interior_finish mode.
       const extFaceLength = isInteriorFinishMode ? wallLength : wallLength + wallThickness * 2;
       const extGrossArea = extFaceLength * wallHeight;
-      const extNetArea = Math.max(0, extGrossArea - apertureTotalArea);
+      extNetArea = Math.max(0, extGrossArea - apertureTotalArea);
 
-      totalExtWallInsulationSf += extNetArea;
+      if (effectiveInsType !== 'none' && effectiveInsType !== 'uninsulated') {
+        totalExtWallInsulationSf += extNetArea;
+      }
 
       if (wall.finishExterior === 'brick_veneer') {
         totalStoneBrickVeneerSf += extNetArea;
@@ -136,7 +281,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       }
     } else if (classification === 'shared_interior') {
       drywallFaces = 2;
-      if (wall.soundInsulated) {
+      if (wall.soundInsulated || effectiveInsType === 'sound_batt') {
         totalExtWallInsulationSf += grossArea; // Sound batt insulation
       }
     } else {
@@ -153,6 +298,10 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       classification,
       adjacentRoomsCount,
       studsCalculated: studsInWall,
+      insulationType: effectiveInsType,
+      insulationDepthInches: wall.insulationDepthInches,
+      extNetArea: classification === 'exterior' ? Math.round(extNetArea * 100) / 100 : 0,
+      soundInsulated: wall.soundInsulated || effectiveInsType === 'sound_batt',
     });
   });
 
@@ -160,6 +309,8 @@ export function calculateMTO(state: FloorplanState): MTOReport {
   let totalFlooringPackageSf = 0;
   let totalCeilingDrywallSf = 0;
   let totalBaseboardTrimsLf = 0;
+  let totalFloorInsulationSf = 0;
+  let totalFloorInsulationBf = 0;
   const roomDetails: MTOReport['roomDetails'] = [];
 
   rooms.forEach((room) => {
@@ -217,6 +368,16 @@ export function calculateMTO(state: FloorplanState): MTOReport {
 
     totalFlooringPackageSf += (isFoundationRoom && room.floorFinish === 'polished_concrete') ? 0 : netArea;
     
+    // Floor insulation (elevated/crawlspace floors)
+    const effectiveFloorInsType = room.floorInsulationType || settings.defaultFloorInsulationType || 'none';
+    if (!isFoundationRoom && effectiveFloorInsType !== 'none' && effectiveFloorInsType !== 'uninsulated') {
+      totalFloorInsulationSf += netArea;
+      if (effectiveFloorInsType.includes('foam') || effectiveFloorInsType.includes('cell')) {
+        const d = room.floorInsulationDepthInches ?? 5.17;
+        totalFloorInsulationBf += netArea * d;
+      }
+    }
+
     const ceilingMultiplier = room.ceilingMultiplier || 1.0;
     const effectiveCeilingArea = netArea * ceilingMultiplier;
 
@@ -265,10 +426,6 @@ export function calculateMTO(state: FloorplanState): MTOReport {
   });
 
   // OSB Subfloor Decking logic:
-  // 1. Detached from net interior area; starts at the raw centerline room polygon.
-  // 2. For shared interior walls, we stay at centerline (covering the area under the plates).
-  // 3. For exterior walls, we expand outward by (coreFramingThickness / 2) to reach the rim face.
-  // 4. Foundation rooms (slabs) are excluded.
   let totalOsbSubfloorDeckingSf = 0;
   rooms.forEach((room) => {
     let isFoundationRoom = false;
@@ -282,13 +439,11 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       const wall = walls.find((w) => w.id === wid);
       const classification = wallClassification.get(wid)?.classification;
 
-      // In interior_finish mode, evaluate subflooring using net interior clear space
       if (isInteriorFinishMode) {
         const t = wall ? getWallThickness(wall) : (settings.defaultWallThickness || 0.375);
         return t / 2; // Inward offset from centerline
       }
 
-      // Expand outward if wall is exterior OR if we are in global exterior framing mode
       if (classification === 'exterior' || settings.calculationMode === 'exterior_framing') {
         const coreT = getCoreThickness({ thickness: wall?.thickness || settings.defaultWallThickness || 0.375 });
         return -(coreT / 2); // negative = outward expansion from centerline
@@ -303,7 +458,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
 
   // Grand total drywall for paint coverage
   const totalDrywallBoardSf = totalDrywall12Sf + totalDrywall58Sf + totalDrywallGreenboard12Sf;
-  const totalPaintCoverageSf = totalDrywallBoardSf; // Standard 1-to-1 paintable surface
+  const totalPaintCoverageSf = totalDrywallBoardSf;
 
   const rcRate = settings.costRates?.resilientChannelPerLf || DEFAULT_UNIT_COST_RATES.resilientChannelPerLf;
   const resilientChannelCost = totalResilientChannelLf * (rcRate.material + rcRate.labor);
@@ -332,7 +487,6 @@ export function calculateMTO(state: FloorplanState): MTOReport {
   const rates = safeMergeRates(settings.costRates);
 
   apertures.forEach((ap) => {
-    // Exterior Trim Calculations
     if (ap.type.startsWith('window_') || ap.type === 'door_exterior' || ap.type === 'door_sliding_patio' || ap.type === 'door_garage') {
       const trimLf = 2 * (ap.width + ap.height);
       let apTrimCost = 0;
@@ -360,17 +514,12 @@ export function calculateMTO(state: FloorplanState): MTOReport {
 
     if (ap.type.startsWith('window_')) {
       totalWindowsUnits++;
-      
-      // Area calculation with 6 SF minimum floor
       const actualSf = ap.width * ap.height;
       const billedSf = Math.max(6.0, actualSf);
       totalWindowsSf += billedSf;
-
-      // Window casing = 2 * (W + H) - keep independent in LF
       totalApertureCasingLf += 2 * (ap.width + ap.height);
     } else if (ap.type === 'door_passage') {
       passageDoorsUnits++;
-      // Interior door casing = 2 sides * (W + 2*H)
       const sides = ap.casingSides ?? 2;
       totalApertureCasingLf += sides * (ap.width + 2 * ap.height);
     } else if (ap.type === 'door_pocket') {
@@ -379,11 +528,9 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       totalApertureCasingLf += sides * (ap.width + 2 * ap.height);
     } else if (ap.type === 'door_exterior') {
       exteriorDoorsUnits++;
-      // Exterior door casing = 1 interior trim + 1 exterior brickmould = 2 sides
       totalApertureCasingLf += 2 * (ap.width + 2 * ap.height);
     } else if (ap.type === 'door_garage') {
       overheadGarageBays++;
-      // Garage exterior jamb casing = W + 2*H
       totalApertureCasingLf += ap.width + 2 * ap.height;
     } else if (ap.type === 'door_bifold_single' || ap.type === 'door_bifold_double') {
       bifoldDoorsCount++;
@@ -395,7 +542,6 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       casedOpeningsCount++;
       const rate = rates.doorCasedOpeningPerUnit;
       casedOpeningsCost += (rate.material + rate.labor);
-      // Cased opening has casing on both sides, but no door unit
       totalApertureCasingLf += 2 * (ap.width + 2 * ap.height);
     } else if (ap.type === 'door_sliding_patio') {
       patioSliderDoorsCount++;
@@ -405,8 +551,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     }
   });
 
-  const doorHardwareSets =
-    passageDoorsUnits + pocketDoorsUnits + exteriorDoorsUnits;
+  const doorHardwareSets = passageDoorsUnits + pocketDoorsUnits + exteriorDoorsUnits;
 
   // Stamps categorization
   let structuralBeamsLf = 0;
@@ -450,7 +595,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
         break;
       case 'stair_run':
         const stairLength = st.length || 12.0;
-        stairHandGuardrailLf += stairLength * 2; // handrail + guardrail
+        stairHandGuardrailLf += stairLength * 2;
         calculatedStairRisers += st.stairRisers || Math.round((settings.defaultWallHeight * 12) / 7.5);
         break;
       case 'switch_std':
@@ -550,27 +695,20 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       const wallLength = geom.length;
       const f = wall.foundationDetails || {};
       
-      const fWallHeight = f.wallHeight ?? 8; // ft
-      const fWallThickness = wall.thickness || (10 / 12); // ft
-      const fFootingWidth = (f.footingWidth ?? 16) / 12; // ft (Default 16" wide)
-      const fFootingThickness = (f.footingThickness ?? 8) / 12; // ft (Default 8" thick)
+      const fWallHeight = f.wallHeight ?? 8;
+      const fWallThickness = wall.thickness || (10 / 12);
+      const fFootingWidth = (f.footingWidth ?? 16) / 12;
+      const fFootingThickness = (f.footingThickness ?? 8) / 12;
 
-      // In exterior_framing mode, include footing projection overhangs and thickened-edge slab beams
-      // Current logic uses wallLength which is centerline.
-      // For exterior framing we should ideally use the exterior perimeter of the foundation.
       const foundationLength = isInteriorFinishMode ? wallLength : (wallLength + fWallThickness);
-
-      // Wall Volume
       totalFoundationWallVolumeCf += foundationLength * fWallHeight * fWallThickness;
-      // Footing Volume
       totalFootingVolumeCf += foundationLength * fFootingWidth * fFootingThickness;
     }
   });
 
-  // Let's refine: Slabs and Slab insulation should probably still be area-based but only for rooms bounded by foundation walls.
   rooms.forEach(room => {
     let isFoundationRoom = room.roomType === 'Basement / Foundation Space';
-    let roomSlabThickness = room.slabThickness ?? settings.slabThicknessInches; // use room override or global default
+    let roomSlabThickness = room.slabThickness ?? settings.slabThicknessInches;
 
     if (!isFoundationRoom) {
       room.wallIds.forEach(wid => {
@@ -585,7 +723,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     }
 
     if (isFoundationRoom) {
-      const slabT = roomSlabThickness || 4; // fallback to 4"
+      const slabT = roomSlabThickness || 4;
       totalExplicitSlabVolumeCf += room.area * (slabT / 12);
       totalExplicitSlabInsulationSf += room.area;
     }
@@ -594,10 +732,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
   const pouredConcreteCy = Math.round(((totalFoundationWallVolumeCf + totalFootingVolumeCf + totalExplicitSlabVolumeCf) / 27) * 10) / 10;
   const foundationSlabInsulationSf = Math.round(totalExplicitSlabInsulationSf);
 
-
   // Roofing, Facades & Site Envelope
-  // Pitch multiplier: sqrt(1 + (pitch / 12)^2)
-  // Foundation rooms are excluded from auto-derived roofing.
   const roofingFootprintSf = rooms.reduce((acc, r) => {
     let isFoundationRoom = false;
     r.wallIds.forEach(wid => {
@@ -608,7 +743,6 @@ export function calculateMTO(state: FloorplanState): MTOReport {
 
   const pitchMultiplier = Math.sqrt(1 + Math.pow(settings.roofPitchScale / 12, 2));
   const overhangFt = settings.roofOverhangInches / 12;
-  // In interior_finish mode, suppress roof/eave projections
   const roofOverhangAreaSf = (isInteriorFinishMode || totalExteriorWallLf === 0)
     ? 0
     : (totalExteriorWallLf * overhangFt + 4 * Math.pow(overhangFt, 2));
@@ -616,7 +750,6 @@ export function calculateMTO(state: FloorplanState): MTOReport {
   const grossRoofingAreaSf = (roofingFootprintSf + roofOverhangAreaSf) * pitchMultiplier;
   const roofingAreaSq = Math.round((grossRoofingAreaSf / 100) * 10) / 10;
   
-  // Calculate fascia LF, soffit area (represented here as LF for now), and eave overhangs based on the exterior wall perimeter
   const soffitTotalLf = isInteriorFinishMode ? 0 : Math.round(totalExteriorWallLf * 10) / 10;
   const fasciaTotalLf = isInteriorFinishMode ? 0 : Math.round(totalExteriorWallLf * (1 + (settings.roofPitchScale / 12) * 0.15) * 10) / 10;
   const eavestroughsLf = isInteriorFinishMode ? 0 : Math.round(totalExteriorWallLf * 0.9 * 10) / 10;
@@ -634,6 +767,144 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     siteHardscapingSf += h.area;
   });
 
+  // Attic / Ceiling Insulation Area
+  const defaultAtticType = settings.defaultAtticInsulationType || 'blown_cellulose_r60';
+  const atticInsulationSf = (defaultAtticType !== 'none' && defaultAtticType !== 'uninsulated')
+    ? Math.round((roofingFootprintSf > 0 ? roofingFootprintSf : grossFootprintSf) * 100) / 100
+    : 0;
+
+  // Dynamic Itemized Insulation Takeoffs Construction
+  const wasteMultiplier = 1 + (settings.wasteFactorPercentage || 0) / 100;
+  const insulationTakeoffs: InsulationTakeoffItem[] = [];
+
+  // 1. Exterior Walls Insulation (grouped by type and depth)
+  const wallInsMap = new Map<string, { type: string; depth?: number; sf: number }>();
+  wallDetails.forEach((wd) => {
+    if (wd.classification === 'exterior' && (wd.extNetArea || 0) > 0) {
+      const type = wd.insulationType || settings.defaultWallInsulationType || 'fiberglass_batt_r20';
+      if (type !== 'none' && type !== 'uninsulated') {
+        const key = `${type}_${wd.insulationDepthInches ?? 'def'}`;
+        const existing = wallInsMap.get(key) || { type, depth: wd.insulationDepthInches, sf: 0 };
+        existing.sf += wd.extNetArea || 0;
+        wallInsMap.set(key, existing);
+      }
+    }
+  });
+
+  wallInsMap.forEach((entry, key) => {
+    const calc = computeWallInsulationCost(entry.sf, entry.type, entry.depth, rates, wasteMultiplier);
+    if (calc.qty > 0) {
+      insulationTakeoffs.push({
+        id: `ins_wall_${key}`,
+        category: 'wall',
+        label: `Exterior Wall: ${calc.label}`,
+        insulationType: entry.type,
+        isVolumeBased: calc.unit === 'BF',
+        depthInches: entry.depth,
+        areaSf: Math.round(calc.areaSf * 100) / 100,
+        boardFeet: calc.boardFeet ? Math.round(calc.boardFeet * 100) / 100 : undefined,
+        unit: calc.unit,
+        qty: Math.round(calc.qty * 100) / 100,
+        matRate: calc.matRate,
+        labRate: calc.labRate,
+        matCost: Math.round(calc.matCost * 100) / 100,
+        labCost: Math.round(calc.labCost * 100) / 100,
+        totalCost: Math.round((calc.matCost + calc.labCost) * 100) / 100,
+      });
+    }
+  });
+
+  // 2. Interior Walls Sound Batt Insulation
+  let soundBattAreaSf = 0;
+  wallDetails.forEach((wd) => {
+    if (wd.classification !== 'exterior' && wd.soundInsulated) {
+      soundBattAreaSf += wd.grossArea;
+    }
+  });
+  if (soundBattAreaSf > 0) {
+    const soundCalc = computeWallInsulationCost(soundBattAreaSf, 'sound_batt', undefined, rates, wasteMultiplier);
+    insulationTakeoffs.push({
+      id: 'ins_sound_batt',
+      category: 'sound',
+      label: 'Interior Sound Batt Insulation',
+      insulationType: 'sound_batt',
+      isVolumeBased: false,
+      areaSf: Math.round(soundBattAreaSf * 100) / 100,
+      unit: 'SF',
+      qty: Math.round(soundBattAreaSf * 100) / 100,
+      matRate: soundCalc.matRate,
+      labRate: soundCalc.labRate,
+      matCost: Math.round(soundCalc.matCost * 100) / 100,
+      labCost: Math.round(soundCalc.labCost * 100) / 100,
+      totalCost: Math.round((soundCalc.matCost + soundCalc.labCost) * 100) / 100,
+    });
+  }
+
+  // 3. Attic / Roof Insulation
+  if (atticInsulationSf > 0 && defaultAtticType !== 'none' && defaultAtticType !== 'uninsulated') {
+    const atticCalc = computeWallInsulationCost(atticInsulationSf, defaultAtticType, undefined, rates, wasteMultiplier);
+    if (atticCalc.qty > 0) {
+      insulationTakeoffs.push({
+        id: `ins_attic_${defaultAtticType}`,
+        category: 'attic',
+        label: `Attic Assembly: ${atticCalc.label}`,
+        insulationType: defaultAtticType,
+        isVolumeBased: atticCalc.unit === 'BF',
+        areaSf: Math.round(atticInsulationSf * 100) / 100,
+        boardFeet: atticCalc.boardFeet ? Math.round(atticCalc.boardFeet * 100) / 100 : undefined,
+        unit: atticCalc.unit,
+        qty: Math.round(atticCalc.qty * 100) / 100,
+        matRate: atticCalc.matRate,
+        labRate: atticCalc.labRate,
+        matCost: Math.round(atticCalc.matCost * 100) / 100,
+        labCost: Math.round(atticCalc.labCost * 100) / 100,
+        totalCost: Math.round((atticCalc.matCost + atticCalc.labCost) * 100) / 100,
+      });
+    }
+  }
+
+  // 4. Floor / Subfloor Insulation
+  const floorInsMap = new Map<string, { type: string; depth?: number; sf: number }>();
+  rooms.forEach((room) => {
+    let isFoundationRoom = false;
+    room.wallIds.forEach((wid) => {
+      if (walls.find(w => w.id === wid)?.wallType === 'foundation_wall') isFoundationRoom = true;
+    });
+
+    if (!isFoundationRoom) {
+      const fType = room.floorInsulationType || settings.defaultFloorInsulationType || 'none';
+      if (fType !== 'none' && fType !== 'uninsulated') {
+        const key = `${fType}_${room.floorInsulationDepthInches ?? 'def'}`;
+        const existing = floorInsMap.get(key) || { type: fType, depth: room.floorInsulationDepthInches, sf: 0 };
+        existing.sf += room.area;
+        floorInsMap.set(key, existing);
+      }
+    }
+  });
+
+  floorInsMap.forEach((entry, key) => {
+    const calc = computeWallInsulationCost(entry.sf, entry.type, entry.depth, rates, wasteMultiplier);
+    if (calc.qty > 0) {
+      insulationTakeoffs.push({
+        id: `ins_floor_${key}`,
+        category: 'floor',
+        label: `Elevated Floor: ${calc.label}`,
+        insulationType: entry.type,
+        isVolumeBased: calc.unit === 'BF',
+        depthInches: entry.depth,
+        areaSf: Math.round(calc.areaSf * 100) / 100,
+        boardFeet: calc.boardFeet ? Math.round(calc.boardFeet * 100) / 100 : undefined,
+        unit: calc.unit,
+        qty: Math.round(calc.qty * 100) / 100,
+        matRate: calc.matRate,
+        labRate: calc.labRate,
+        matCost: Math.round(calc.matCost * 100) / 100,
+        labCost: Math.round(calc.labCost * 100) / 100,
+        totalCost: Math.round((calc.matCost + calc.labCost) * 100) / 100,
+      });
+    }
+  });
+
   return {
     grossFootprintSf: Math.round(grossFootprintSf * 100) / 100,
     netFloorAreaSf: Math.round(totalFlooringPackageSf * 100) / 100,
@@ -645,6 +916,10 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     paintCoverageSf: Math.round(totalPaintCoverageSf * 100) / 100,
     flooringPackageSf: Math.round(totalFlooringPackageSf * 100) / 100,
     extWallInsulationSf: Math.round(totalExtWallInsulationSf * 100) / 100,
+    atticInsulationSf,
+    floorInsulationSf: Math.round(totalFloorInsulationSf * 100) / 100,
+    floorInsulationBf: Math.round(totalFloorInsulationBf * 100) / 100,
+    insulationTakeoffs,
     resilientChannelLf: totalResilientChannelLf,
     resilientChannelCost: Math.round(resilientChannelCost * 100) / 100,
 
@@ -780,7 +1055,8 @@ export function calculateEstimatedCost(
   itemInclusions: ItemInclusions = DEFAULT_ITEM_INCLUSIONS,
   settings?: FloorplanState['settings'],
   stamps: any[] = [],
-  apertures: Aperture[] = []
+  apertures: Aperture[] = [],
+  walls: CadWall[] = []
 ): EstimatedCostResult {
   const inc = { ...DEFAULT_CATEGORY_INCLUSIONS, ...inclusions };
   const itemInc = { ...DEFAULT_ITEM_INCLUSIONS, ...itemInclusions };
@@ -817,9 +1093,45 @@ export function calculateEstimatedCost(
     labFinishes += mto.flooringPackageSf * (rates.flooringPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.flooringPerSf.labor) * wasteMultiplier;
   }
 
-  if (itemInc.extWallInsulation !== false) {
-    matFinishes += mto.extWallInsulationSf * (rates.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material) * wasteMultiplier;
-    labFinishes += mto.extWallInsulationSf * (rates.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor) * wasteMultiplier;
+  // Thermal & acoustic insulation from dynamic takeoffs
+  if (mto.insulationTakeoffs && mto.insulationTakeoffs.length > 0) {
+    mto.insulationTakeoffs.forEach((item) => {
+      if (item.category === 'wall' && itemInc.extWallInsulation === false) return;
+      if (item.category === 'attic' && itemInc.atticRoofInsulation === false) return;
+      if (item.category === 'floor' && itemInc.floorInsulation === false) return;
+
+      // Recalculate using active rates and waste
+      const calc = computeWallInsulationCost(
+        item.areaSf,
+        item.insulationType,
+        item.depthInches,
+        rates,
+        wasteMultiplier
+      );
+      matFinishes += calc.matCost;
+      labFinishes += calc.labCost;
+    });
+  } else if (itemInc.extWallInsulation !== false) {
+    if (mto.wallDetails && mto.wallDetails.length > 0) {
+      mto.wallDetails.forEach((wd) => {
+        if (wd.classification === 'exterior') {
+          const areaSf = wd.extNetArea ?? Math.max(0, wd.grossArea - wd.apertureDeduction);
+          const insType = wd.insulationType || settings?.defaultWallInsulationType || 'fiberglass_batt_r20';
+          const calc = computeWallInsulationCost(areaSf, insType, wd.insulationDepthInches, rates, wasteMultiplier);
+          matFinishes += calc.matCost;
+          labFinishes += calc.labCost;
+        } else if (wd.soundInsulated) {
+          const soundCalc = computeWallInsulationCost(wd.grossArea, 'sound_batt', undefined, rates, wasteMultiplier);
+          matFinishes += soundCalc.matCost;
+          labFinishes += soundCalc.labCost;
+        }
+      });
+    } else if (mto.extWallInsulationSf > 0) {
+      const defaultType = settings?.defaultWallInsulationType || 'fiberglass_batt_r20';
+      const calc = computeWallInsulationCost(mto.extWallInsulationSf, defaultType, undefined, rates, wasteMultiplier);
+      matFinishes += calc.matCost;
+      labFinishes += calc.labCost;
+    }
   }
 
   if (mto.resilientChannelLf > 0) {

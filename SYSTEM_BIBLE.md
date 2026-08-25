@@ -190,14 +190,68 @@ The system utilizes `getFenestrationItemizedRows()` to extract and format Sectio
 Interior and exterior casing trim linear footage is calculated as the rough opening perimeter:
 $$L_{\text{trim}} = 2 \times (W_a + H_a)$$
 
-### 4.3 Division 09 — Finishes
+### 4.3 Division 07 — Thermal Envelope & Insulation Engine
+
+PlanarMTO implements a multi-tier thermal envelope takeoff engine covering exterior walls, cathedral hot roofs, vented attic spaces, sound partitions, and elevated/cantilevered floors.
+
+#### A. Board Foot ($\text{BF}$) Volumetric Engine
+For spray foam insulation assemblies (closed-cell and open-cell), pricing is quantified volumetrically in **Board Feet** ($1\text{ BF} = 1\text{ ft} \times 1\text{ ft} \times 1\text{ in} = \frac{1}{12}\text{ ft}^3$):
+$$\text{BF} = A_{\text{surface}} \times D_{\text{in}}$$
+where $A_{\text{surface}}$ is the net surface area in square feet ($\text{SF}$) and $D_{\text{in}}$ is the specified insulation application depth in inches ($1.0" - 12.0"$).
+
+#### B. Multi-Tier Assembly Takeoffs & Formulas
+
+1. **Exterior Wall Cavity Insulation**:
+   - Calculated across all exterior wall segments using net exterior wall area ($A_{\text{ext, net}} = A_{\text{gross}} - A_{\text{aperture}}$).
+   - Area-based ($\text{SF}$): $\text{Cost} = A_{\text{ext, net}} \times (1 + \text{Waste}) \times (\text{Rate}_{\text{mat, SF}} + \text{Rate}_{\text{lab, SF}})$ for Fiberglass Batt R-20 and Mineral Wool Batt R-22.
+   - Volume-based ($\text{BF}$): $\text{Cost} = (A_{\text{ext, net}} \times D_{\text{in}}) \times (1 + \text{Waste}) \times (\text{Rate}_{\text{mat, BF}} + \text{Rate}_{\text{lab, BF}})$ for 2 lb Closed-Cell and 0.5 lb Open-Cell spray foam.
+
+2. **Roof & Attic Insulation**:
+   - **Cathedral Ceiling / Hot Roof (Closed-Cell Spray Foam)**: Calculated across sloped roof area incorporating pitch multiplier $M_{\text{pitch}} = \sqrt{1 + (P/12)^2}$:
+     $$\text{BF}_{\text{roof}} = A_{\text{roof, proj}} \times M_{\text{pitch}} \times D_{\text{in}}$$
+   - **Vented Flat Attic (Blown Cellulose R-50 / R-60)**: Calculated across projected horizontal footprint:
+     $$A_{\text{attic}} = A_{\text{roof, proj}}$$
+
+3. **Elevated & Cantilevered Floor Assemblies**:
+   - Applied to rooms configured with elevated/crawlspace floor structures over unconditioned spaces ($A_{\text{floor}}$):
+     - Fiberglass Batt R-31: Area-based $\text{SF}$ takeoff.
+     - 2 lb Closed-Cell Floor Spray Foam: Volumetric $\text{BF} = A_{\text{floor}} \times D_{\text{in}}$ takeoff.
+
+4. **Interior Acoustic Sound Partitions**:
+   - Applied to interior walls flagged with `soundInsulated: true` or `insulationType: 'sound_batt'`:
+     $$A_{\text{sound}} = A_{\text{gross}}$$
+     priced per square foot using `insulationSoundBattPerSf`.
+
+#### C. Rate Structure & Granular Keys
+The engine maps distinct material and labor rates in `costRates` and `masterRates`:
+- `insulationFiberglassBattPerSf`: Fiberglass Batt R-20 ($\text{\$/SF}$)
+- `insulationMineralWoolBattPerSf`: Mineral Wool Batt R-22 ($\text{\$/SF}$)
+- `insulationClosedCellWallPerBf`: 2 lb Closed-Cell Wall Foam ($\text{\$/BF}$)
+- `insulationClosedCellFloorPerBf`: 2 lb Closed-Cell Floor Foam ($\text{\$/BF}$)
+- `insulationClosedCellRoofPerBf`: 2 lb Closed-Cell Hot Roof Foam ($\text{\$/BF}$)
+- `insulationOpenCellFoamPerBf`: 0.5 lb Open-Cell Foam ($\text{\$/BF}$)
+- `insulationBlownCellulosePerSf`: Blown Attic Cellulose R-50/R-60 ($\text{\$/SF}$)
+- `insulationSoundBattPerSf`: Sound Batt Partition ($\text{\$/SF}$)
+- `insulationFiberglassFloorBattPerSf`: Fiberglass Floor Batt R-31 ($\text{\$/SF}$)
+
+#### D. Global-to-Local Override Architecture & Ontario Baselines
+The system applies a cascading inheritance hierarchy:
+1. **Global Baseline**: Configured in `GlobalProjectSettingsModal` (`defaultWallInsulationType`, `defaultFloorInsulationType`, `defaultAtticInsulationType`).
+   - Default Exterior Wall: **Fiberglass Batt R-20** (`fiberglass_batt_r20`)
+   - Default Elevated Floor: **Uninsulated** (`'none'`)
+   - Default Attic Assembly: **Blown Cellulose R-60** (`blown_cellulose_r60`)
+2. **Local Inspector Overrides**: Individual `CadWall` segments and `CadRoom` polygons can override insulation type and depth directly in the Wall/Room Inspector panel.
+   $$\text{Type}_{\text{effective}} = \text{Entity}.\text{insulationType} \parallel \text{Settings}.\text{defaultType} \parallel \text{Fallback}$$
+3. **Suppression & Filtering**: Assemblies evaluated as `'none'` or `'uninsulated'`, or with zero area/volume, are automatically filtered from matrix rollups, PDF exports, and subcontract CSV schedules.
+
+### 4.4 Division 09 — Finishes
 
 #### A. Drywall Thickness Matrix
 The engine supports a 3-tier drywall thickness matrix for wall and ceiling surfaces, mapping to independent rate keys:
 - **Walls**: `1/2" Standard`, `5/8" Type X Fire-Rated`, `1/2" Moisture Board / Greenboard`.
 - **Ceilings**: `1/2" Standard`, `5/8" Type X Fire-Rated`.
 
-### 4.4 Division 03 — Concrete Foundations
+### 4.5 Division 03 — Concrete Foundations
 Foundation estimation relies on explicit volumetric variables assigned per-room or per-wall:
 - **Slab Volume**: $V_{\text{slab}} = A_{\text{room}} \times T_{\text{slab}}$
 - **Foundation Wall Volume**: $V_{\text{fnd}} = \sum (L_i \times T_i \times H_i)$
@@ -205,7 +259,7 @@ Foundation estimation relies on explicit volumetric variables assigned per-room 
 - **Total Poured Concrete (CY)**: $V_{\text{total, CY}} = \frac{V_{\text{slab}} + V_{\text{fnd}} + V_{\text{ftg}}}{27}$
 - **Slab Insulation**: $A_{\text{insul}} = A_{\text{room}}$ (SF)
 
-### 4.5 Division 26 — Electrical & Life Safety
+### 4.6 Division 26 — Electrical & Life Safety
 The electrical take-off engine supports granular itemization for devices and service equipment.
 
 #### A. Granular Panel Amperage Tiers
@@ -225,7 +279,7 @@ Expanded stamp suite includes specialized rate calculations for:
 #### C. Itemized Reporting Logic
 In `PrintReportModal.tsx`, electrical items are itemized line-by-line. The aggregator bypasses generic category rollups for the Electrical division to ensure that different panel tiers and device types are clearly visible in the final contract document.
 
-### 4.6 Division 22 — Plumbing & Civil Infrastructure
+### 4.7 Division 22 — Plumbing & Civil Infrastructure
 
 #### A. 4-Tier Water Heater Takeoff Engine
 The system supports itemized equipment takeoffs for water heating units via a dedicated CAD stamp:

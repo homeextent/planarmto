@@ -35,7 +35,7 @@ interface RateCustomizerModalProps {
 }
 
 interface RateFieldConfig {
-  key: keyof UnitCostRates;
+  key: Exclude<keyof UnitCostRates, 'categoryLastUpdated'>;
   label: string;
   unit: string;
   category: string;
@@ -50,6 +50,15 @@ const RATE_FIELDS: RateFieldConfig[] = [
   { key: 'paintPerSf', label: 'Interior Paint (Primer + 2 Coats)', unit: '$/SF', category: 'Board & Finishes', description: 'Wall & ceiling latex paint coverage' },
   { key: 'flooringPerSf', label: 'Flooring Package (Average)', unit: '$/SF', category: 'Board & Finishes', description: 'Hardwood, LVP, or porcelain tile installation & materials' },
   { key: 'extInsulationPerSf', label: 'Exterior Wall Insulation (R-20+)', unit: '$/SF', category: 'Board & Finishes', description: 'Friction-fit mineral wool or fiberglass batts' },
+  { key: 'insulationFiberglassBattPerSf', label: 'Fiberglass Batt Insulation (R-20)', unit: '$/SF', category: 'Board & Finishes', description: 'Friction-fit fiberglass batts for exterior 2x6 walls' },
+  { key: 'insulationMineralWoolBattPerSf', label: 'Mineral Wool Batt Insulation (R-22)', unit: '$/SF', category: 'Board & Finishes', description: 'High-density mineral wool insulation for thermal & fire performance' },
+  { key: 'insulationClosedCellWallPerBf', label: 'Closed-Cell Spray Foam Wall (R-22 @ 3.67")', unit: '$/BF', category: 'Board & Finishes', description: '2.0 lb/cu.ft closed-cell polyurethane foam wall barrier ($/BF)' },
+  { key: 'insulationClosedCellFloorPerBf', label: 'Closed-Cell Spray Foam Floor (R-31 @ 5.17")', unit: '$/BF', category: 'Board & Finishes', description: 'Underfloor / rim joist closed-cell polyurethane foam ($/BF)' },
+  { key: 'insulationClosedCellRoofPerBf', label: 'Closed-Cell Spray Foam Roof (R-60 @ 10.00")', unit: '$/BF', category: 'Board & Finishes', description: 'Unvented cathedral roof / attic closed-cell foam ($/BF)' },
+  { key: 'insulationOpenCellFoamPerBf', label: 'Open-Cell Spray Foam', unit: '$/BF', category: 'Board & Finishes', description: '0.5 lb/cu.ft light-density polyurethane spray foam ($/BF)' },
+  { key: 'insulationBlownCellulosePerSf', label: 'Blown-In Cellulose Insulation (R-60)', unit: '$/SF', category: 'Board & Finishes', description: 'Pneumatic loose-fill cellulose for flat attic ceilings' },
+  { key: 'insulationSoundBattPerSf', label: 'Sound Batt Acoustic Insulation (R-14)', unit: '$/SF', category: 'Board & Finishes', description: 'Acoustic sound dampening batts for interior partition walls' },
+  { key: 'insulationFiberglassFloorBattPerSf', label: 'Fiberglass Floor Batt Insulation (R-30)', unit: '$/SF', category: 'Board & Finishes', description: 'Underfloor / crawlspace friction-fit fiberglass floor batts' },
   { key: 'resilientChannelPerLf', label: 'Resilient Channel (RC-1)', unit: '$/LF', category: 'Board & Finishes', description: 'Sound attenuation channels for ceiling drywall' },
 
   // 2. Carpentry & Framing
@@ -148,7 +157,7 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
   const categories = ['All Categories', ...Array.from(new Set(RATE_FIELDS.map((f) => f.category)))];
 
   const handleRateChange = (
-    fieldKey: keyof UnitCostRates,
+    fieldKey: Exclude<keyof UnitCostRates, 'categoryLastUpdated'>,
     type: 'material' | 'labor',
     value: number
   ) => {
@@ -156,7 +165,7 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
     const category = field?.category || 'Unknown';
     
     setLocalRates((prev) => {
-      const currentRate = prev[fieldKey] || DEFAULT_UNIT_COST_RATES[fieldKey];
+      const currentRate = (prev[fieldKey] as CostRateItem) || DEFAULT_UNIT_COST_RATES[fieldKey];
       return {
         ...prev,
         [fieldKey]: {
@@ -185,7 +194,7 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
     for (const field of RATE_FIELDS) {
       if (selectedCategory !== 'All Categories' && field.category !== selectedCategory) continue;
       
-      const current = updated[field.key] || DEFAULT_UNIT_COST_RATES[field.key];
+      const current = updated[field.key] as CostRateItem | undefined;
       const mat = current?.material ?? DEFAULT_UNIT_COST_RATES[field.key].material;
       const lab = current?.labor ?? DEFAULT_UNIT_COST_RATES[field.key].labor;
       updated[field.key] = {
@@ -247,9 +256,10 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
   const handleExportCSV = () => {
     const headers = ['Category', 'Item', 'Unit', 'Material Rate', 'Labor Rate', 'Total Rate'];
     const rows = filteredFields.map((field) => {
-      const rateItem = localRates[field.key] || DEFAULT_UNIT_COST_RATES[field.key];
-      const material = rateItem?.material ?? DEFAULT_UNIT_COST_RATES[field.key].material;
-      const labor = rateItem?.labor ?? DEFAULT_UNIT_COST_RATES[field.key].labor;
+      const defaultRate = DEFAULT_UNIT_COST_RATES[field.key];
+      const rateItem = (localRates[field.key] as CostRateItem) || defaultRate;
+      const material = rateItem?.material ?? defaultRate.material;
+      const labor = rateItem?.labor ?? defaultRate.labor;
       const total = material + labor;
       return [
         field.category,
@@ -287,7 +297,7 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
     const rows = filteredFields
       .map((field) => {
         const defaultRate = DEFAULT_UNIT_COST_RATES[field.key];
-        const rateItem = localRates[field.key] || defaultRate;
+        const rateItem = (localRates[field.key] as CostRateItem) || defaultRate;
         const material = rateItem?.material ?? defaultRate.material;
         const labor = rateItem?.labor ?? defaultRate.labor;
         const total = material + labor;

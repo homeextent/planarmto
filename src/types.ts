@@ -135,6 +135,8 @@ export interface CadWall {
   customStudSpacing?: 16 | 24; // inches on center (default 16)
   finishExterior?: 'vinyl_siding' | 'brick_veneer' | 'stucco' | 'none';
   soundInsulated?: boolean;
+  insulationType?: string;
+  insulationDepthInches?: number;
   foundationDetails?: {
     wallHeight?: number; // ft
     footingWidth?: number; // inches
@@ -142,6 +144,8 @@ export interface CadWall {
     slabThickness?: number; // inches
   };
 }
+
+export type WallSegment = CadWall;
 
 export type FloorFinish =
   | 'hardwood'
@@ -181,6 +185,8 @@ export interface RoomPolygon {
   slabThickness?: number;
   wallDrywallType?: 'drywall_12' | 'drywall_58' | 'drywall_greenboard_12';
   ceilingDrywallType?: 'drywall_12' | 'drywall_58';
+  floorInsulationType?: string; // 'none' | 'closed_cell_foam_floor_r31' | 'fiberglass_floor_batt_r30' | 'mineral_wool_batt_r22'
+  floorInsulationDepthInches?: number;
 }
 
 export interface DeckArea {
@@ -210,6 +216,15 @@ export interface UnitCostRates {
   paintPerSf: CostRateItem;
   flooringPerSf: CostRateItem;
   extInsulationPerSf: CostRateItem;
+  insulationFiberglassBattPerSf: CostRateItem;
+  insulationMineralWoolBattPerSf: CostRateItem;
+  insulationClosedCellWallPerBf: CostRateItem;
+  insulationClosedCellFloorPerBf: CostRateItem;
+  insulationClosedCellRoofPerBf: CostRateItem;
+  insulationOpenCellFoamPerBf: CostRateItem;
+  insulationBlownCellulosePerSf: CostRateItem;
+  insulationSoundBattPerSf: CostRateItem;
+  insulationFiberglassFloorBattPerSf: CostRateItem;
   studFramingPerLf: CostRateItem;
   osbSubfloorPerSf: CostRateItem;
   beamPerLf: CostRateItem;
@@ -311,6 +326,8 @@ export interface ItemInclusions {
   paintCoverage?: boolean;
   flooringPackage?: boolean;
   extWallInsulation?: boolean;
+  atticRoofInsulation?: boolean;
+  floorInsulation?: boolean;
 
   // Carpentry & Framing
   wallStudFraming?: boolean;
@@ -378,6 +395,8 @@ export const DEFAULT_ITEM_INCLUSIONS: ItemInclusions = {
   paintCoverage: true,
   flooringPackage: true,
   extWallInsulation: true,
+  atticRoofInsulation: true,
+  floorInsulation: true,
   wallStudFraming: true,
   osbSubfloorDecking: true,
   structuralBeams: true,
@@ -445,6 +464,9 @@ export interface ProjectSettings {
   defaultWallHeight: number; // e.g. 9.0 ft
   defaultCeilingHeight: number; // e.g. 9.0 ft
   defaultWallThickness: number; // e.g. 0.375 ft (4.5")
+  defaultWallInsulationType?: string; // default 'fiberglass_batt_r20'
+  defaultAtticInsulationType?: string; // default 'blown_cellulose_r60'
+  defaultFloorInsulationType?: string; // default 'none'
   slabThicknessInches: number; // e.g. 4 inches (concrete CY calculation)
   roofPitchScale: number; // e.g. 4 (for 4:12 pitch -> sqrt(1 + (4/12)^2) = 1.054)
   roofOverhangInches: number; // e.g. 18 inches
@@ -520,6 +542,24 @@ export interface SelectionState {
   ids?: string[];
 }
 
+export interface InsulationTakeoffItem {
+  id: string;
+  category: 'wall' | 'attic' | 'floor' | 'sound';
+  label: string;
+  insulationType: string;
+  isVolumeBased: boolean;
+  depthInches?: number;
+  areaSf: number;
+  boardFeet?: number;
+  unit: 'SF' | 'BF';
+  qty: number;
+  matRate: number;
+  labRate: number;
+  matCost: number;
+  labCost: number;
+  totalCost: number;
+}
+
 export interface MTOReport {
   // Global Floor Area Metrics
   grossFootprintSf: number;
@@ -533,6 +573,10 @@ export interface MTOReport {
   paintCoverageSf: number;
   flooringPackageSf: number;
   extWallInsulationSf: number;
+  atticInsulationSf: number;
+  floorInsulationSf: number;
+  floorInsulationBf: number;
+  insulationTakeoffs: InsulationTakeoffItem[];
   resilientChannelLf: number;
   resilientChannelCost: number;
 
@@ -627,6 +671,10 @@ export interface MTOReport {
     classification: 'exterior' | 'shared_interior' | 'partition';
     adjacentRoomsCount: number;
     studsCalculated: number;
+    insulationType?: string;
+    insulationDepthInches?: number;
+    extNetArea?: number;
+    soundInsulated?: boolean;
   }>;
   roomDetails: Array<{
     roomId: string;

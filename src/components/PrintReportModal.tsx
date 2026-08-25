@@ -816,7 +816,26 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
             <td class="num"><strong>$${(mto.flooringPackageSf * (r.flooringPerSf.material + r.flooringPerSf.labor) * waste).toFixed(2)}</strong></td>
           </tr>`);
         }
-        if (!shouldSkip(mto.extWallInsulationSf, r.extInsulationPerSf.material, r.extInsulationPerSf.labor, waste)) {
+        if (mto.insulationTakeoffs && mto.insulationTakeoffs.length > 0) {
+          mto.insulationTakeoffs
+            .filter((item) => item.qty > 0 && item.totalCost > 0)
+            .forEach((item) => {
+              const labelWithDetail = item.isVolumeBased
+                ? `${item.label} (${item.areaSf.toFixed(1)} SF @ ${item.depthInches?.toFixed(2) ?? '3.67'}")`
+                : `${item.label}`;
+              rows.push(`
+              <tr>
+                <td style="padding-left: 18px;">${labelWithDetail}</td>
+                <td class="num">${item.qty}</td>
+                <td class="num">${item.unit}</td>
+                <td class="num">$${item.matRate.toFixed(2)}</td>
+                <td class="num">$${item.labRate.toFixed(2)}</td>
+                <td class="num">$${item.matCost.toFixed(2)}</td>
+                <td class="num">$${item.labCost.toFixed(2)}</td>
+                <td class="num"><strong>$${item.totalCost.toFixed(2)}</strong></td>
+              </tr>`);
+            });
+        } else if (!shouldSkip(mto.extWallInsulationSf, r.extInsulationPerSf.material, r.extInsulationPerSf.labor, waste)) {
           rows.push(`
           <tr>
             <td style="padding-left: 18px;">Exterior Envelope Batt Insulation</td>
@@ -1225,18 +1244,39 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
         (mto.flooringPackageSf * r.flooringPerSf.labor * waste).toFixed(2),
         (mto.flooringPackageSf * (r.flooringPerSf.material + r.flooringPerSf.labor) * waste).toFixed(2),
       ]] : []),
-      ...(!shouldSkip(mto.extWallInsulationSf, r.extInsulationPerSf.material, r.extInsulationPerSf.labor, waste) ? [[
-        '1. Board & Finishes',
-        'Exterior Wall Insulation (R-20)',
-        mto.extWallInsulationSf,
-        'SF',
-        r.extInsulationPerSf.material,
-        r.extInsulationPerSf.labor,
-        (r.extInsulationPerSf.material + r.extInsulationPerSf.labor).toFixed(2),
-        (mto.extWallInsulationSf * r.extInsulationPerSf.material * waste).toFixed(2),
-        (mto.extWallInsulationSf * r.extInsulationPerSf.labor * waste).toFixed(2),
-        (mto.extWallInsulationSf * (r.extInsulationPerSf.material + r.extInsulationPerSf.labor) * waste).toFixed(2),
-      ]] : []),
+      ...(mto.insulationTakeoffs && mto.insulationTakeoffs.length > 0
+        ? mto.insulationTakeoffs
+            .filter((item) => item.qty > 0 && item.totalCost > 0)
+            .map((item) => [
+              '1. Board & Finishes',
+              item.isVolumeBased
+                ? `${item.label} (${item.areaSf.toFixed(1)} SF @ ${item.depthInches?.toFixed(2) ?? '3.67'}")`
+                : item.label,
+              item.qty,
+              item.unit,
+              item.matRate.toFixed(2),
+              item.labRate.toFixed(2),
+              (item.matRate + item.labRate).toFixed(2),
+              item.matCost.toFixed(2),
+              item.labCost.toFixed(2),
+              item.totalCost.toFixed(2),
+            ])
+        : !shouldSkip(mto.extWallInsulationSf, r.extInsulationPerSf.material, r.extInsulationPerSf.labor, waste)
+        ? [
+            [
+              '1. Board & Finishes',
+              'Exterior Wall Insulation (R-20)',
+              mto.extWallInsulationSf,
+              'SF',
+              r.extInsulationPerSf.material,
+              r.extInsulationPerSf.labor,
+              (r.extInsulationPerSf.material + r.extInsulationPerSf.labor).toFixed(2),
+              (mto.extWallInsulationSf * r.extInsulationPerSf.material * waste).toFixed(2),
+              (mto.extWallInsulationSf * r.extInsulationPerSf.labor * waste).toFixed(2),
+              (mto.extWallInsulationSf * (r.extInsulationPerSf.material + r.extInsulationPerSf.labor) * waste).toFixed(2),
+            ],
+          ]
+        : []),
       ...(!shouldSkip(mto.resilientChannelLf, r.resilientChannelPerLf.material, r.resilientChannelPerLf.labor, waste) ? [[
         '1. Board & Finishes',
         'Resilient Channel (RC-1) Ceiling Grid',
@@ -1744,7 +1784,31 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
                           </tr>
                         );
                       }
-                      if (!shouldSkip(mto.extWallInsulationSf, activeRates.extInsulationPerSf.material, activeRates.extInsulationPerSf.labor, waste)) {
+                      if (mto.insulationTakeoffs && mto.insulationTakeoffs.length > 0) {
+                        mto.insulationTakeoffs
+                          .filter((item) => item.qty > 0 && item.totalCost > 0)
+                          .forEach((item) => {
+                            rows.push(
+                              <tr key={item.id}>
+                                <td className="p-2 pl-4 text-slate-300">
+                                  {item.label}
+                                  {item.isVolumeBased && (
+                                    <span className="text-[10px] text-slate-400 block font-sans">
+                                      {item.areaSf.toFixed(1)} SF @ {item.depthInches?.toFixed(2) ?? '3.67'}" depth
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="p-2 text-right font-mono">{item.qty}</td>
+                                <td className="p-2 text-slate-400">{item.unit}</td>
+                                <td className="p-2 text-right font-mono text-slate-400">${item.matRate.toFixed(2)}</td>
+                                <td className="p-2 text-right font-mono text-slate-400">${item.labRate.toFixed(2)}</td>
+                                <td className="p-2 text-right font-mono">${item.matCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td className="p-2 text-right font-mono">${item.labCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td className="p-2 text-right font-mono font-semibold">${item.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              </tr>
+                            );
+                          });
+                      } else if (!shouldSkip(mto.extWallInsulationSf, activeRates.extInsulationPerSf.material, activeRates.extInsulationPerSf.labor, waste)) {
                         rows.push(
                           <tr key="insulation">
                             <td className="p-2 pl-4 text-slate-300">Exterior Wall Batt Insulation</td>

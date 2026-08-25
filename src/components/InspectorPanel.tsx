@@ -71,7 +71,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             finishExterior = 'none';
           } else {
             // Default thickness logic for other types
-            thickness = type.includes('2x6') ? 0.5417 : 0.375;
+            thickness = (type as string).includes('2x6') ? 0.5417 : 0.375;
           }
 
           return {
@@ -236,6 +236,65 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               <option value="none">None (Interior wall)</option>
             </select>
           </div>
+
+          {wall.wallType !== 'foundation_wall' && (
+            <div className="space-y-2 pt-2 border-t border-slate-800">
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                  Insulation Cavity Type
+                </label>
+                <select
+                  value={wall.insulationType ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? undefined : e.target.value;
+                    const updatedWalls = state.walls.map((w: any) =>
+                      w.id === wall.id ? { ...w, insulationType: val } : w
+                    );
+                    onChange({ ...state, walls: updatedWalls });
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500 [&>option]:bg-slate-900 [&>option]:text-slate-100"
+                >
+                  <option value="">Global Default</option>
+                  <option value="fiberglass_batt_r20">Fiberglass Batt R-20</option>
+                  <option value="mineral_wool_batt_r22">Mineral Wool R-23</option>
+                  <option value="closed_cell_foam_wall_r22">Closed-Cell Spray Foam R-22</option>
+                  <option value="open_cell_foam">Open-Cell Spray Foam</option>
+                  <option value="none">Uninsulated</option>
+                </select>
+              </div>
+
+              {(((wall.insulationType || state.settings.defaultWallInsulationType || '').includes('foam') ||
+                (wall.insulationType || state.settings.defaultWallInsulationType || '').includes('cell')) &&
+                wall.insulationType !== 'none' &&
+                wall.insulationType !== 'uninsulated') && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] uppercase font-bold text-slate-400">
+                      Insulation Depth (Inches)
+                    </label>
+                    <span className="text-xs font-mono font-bold text-sky-400">
+                      {(wall.insulationDepthInches ?? ((wall.insulationType || state.settings.defaultWallInsulationType || '').includes('open') ? 3.5 : 3.67)).toFixed(2)}"
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="12"
+                    step="0.25"
+                    value={wall.insulationDepthInches ?? ((wall.insulationType || state.settings.defaultWallInsulationType || '').includes('open') ? 3.5 : 3.67)}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      const updatedWalls = state.walls.map((w: any) =>
+                        w.id === wall.id ? { ...w, insulationDepthInches: val } : w
+                      );
+                      onChange({ ...state, walls: updatedWalls });
+                    }}
+                    className="w-full accent-sky-500 cursor-pointer"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {wall.wallType === 'foundation_wall' && (
             <div className="p-3 bg-sky-950/30 border border-sky-500/30 rounded-xl space-y-3">
@@ -553,6 +612,62 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               <option value="osb_subfloor_only">OSB Subfloor Only (Unfinished)</option>
             </select>
           </div>
+
+          {!isFoundationRoom && (
+            <div className="pt-2 border-t border-slate-800 space-y-2">
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                  Floor / Subfloor Insulation
+                </label>
+                <select
+                  value={room.floorInsulationType || state.settings.defaultFloorInsulationType || 'none'}
+                  onChange={(e) => {
+                    const updatedRooms = state.rooms.map((r) =>
+                      r.id === room.id ? { ...r, floorInsulationType: e.target.value } : r
+                    );
+                    onChange({ ...state, rooms: updatedRooms });
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500 [&>option]:bg-slate-900 [&>option]:text-slate-100"
+                >
+                  <option value="none">Uninsulated / None (Standard Baseline)</option>
+                  <option value="closed_cell_foam_floor_r31">Closed-Cell Spray Foam R-31 ($/BF)</option>
+                  <option value="fiberglass_floor_batt_r30">Fiberglass Floor Batt R-30 ($/SF)</option>
+                  <option value="mineral_wool_batt_r22">Mineral Wool Batt R-22 ($/SF)</option>
+                </select>
+              </div>
+
+              {((room.floorInsulationType || state.settings.defaultFloorInsulationType || '').includes('foam') ||
+                (room.floorInsulationType || state.settings.defaultFloorInsulationType || '').includes('cell')) &&
+                (room.floorInsulationType || state.settings.defaultFloorInsulationType || 'none') !== 'none' &&
+                (room.floorInsulationType || state.settings.defaultFloorInsulationType || 'none') !== 'uninsulated' && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] uppercase font-bold text-slate-400">
+                      Floor Spray Foam Depth
+                    </label>
+                    <span className="text-xs font-mono font-bold text-sky-400">
+                      {(room.floorInsulationDepthInches ?? 5.17).toFixed(2)}"
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1.0"
+                    max="12.0"
+                    step="0.25"
+                    value={room.floorInsulationDepthInches ?? 5.17}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      const updatedRooms = state.rooms.map((r) =>
+                        r.id === room.id ? { ...r, floorInsulationDepthInches: val } : r
+                      );
+                      onChange({ ...state, rooms: updatedRooms });
+                    }}
+                    className="w-full accent-sky-500 cursor-pointer"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="pt-2 border-t border-slate-800">
             <div className="text-[10px] uppercase font-bold text-sky-400 mb-2">Wall Options</div>

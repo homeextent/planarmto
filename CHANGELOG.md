@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.11.0] - 2026-08-25
+
+### Added
+- **Thermal Envelope & Insulation Engine**: Multi-tier insulation system covering exterior walls, cathedral hot roofs, blown attic spaces, sound partitions, and elevated floor assemblies.
+- **Board Foot Volume Engine**: Real-time board foot calculations ($\text{BF} = \text{SF} \times \text{Depth}_{\text{in}}$) for open and closed-cell spray foam assemblies with custom depth sliders.
+- **Southern Ontario Defaults**: Set default exterior wall insulation to Fiberglass Batt R-20 and default floor insulation to Uninsulated (`'none'`).
+- **Global Settings & Local Inspector Overrides**: Central configuration in Global Settings with segment-level overrides on individual Wall and Room Inspector cards.
+
+### Fixed
+- **MTO Matrix & PDF Report Itemization**: Dynamic itemization of active $/SF$ and $/BF$ insulation line items with non-zero filtering to hide uninsulated assemblies.
+
 ## [2.10.0] - 2026-08-24
 
 ### Added

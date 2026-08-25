@@ -156,18 +156,37 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         (mto.flooringPackageSf * (r.flooringPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.flooringPerSf.labor)).toFixed(2),
         (mto.flooringPackageSf * ((r.flooringPerSf?.material ?? DEFAULT_UNIT_COST_RATES.flooringPerSf.material) + (r.flooringPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.flooringPerSf.labor))).toFixed(2),
       ],
-      [
-        '1. Board & Finishes',
-        'Ext. Wall Insulation (R-20)',
-        mto.extWallInsulationSf,
-        'SF',
-        r.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material,
-        r.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor,
-        ((r.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material) + (r.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor)).toFixed(2),
-        (mto.extWallInsulationSf * (r.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material)).toFixed(2),
-        (mto.extWallInsulationSf * (r.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor)).toFixed(2),
-        (mto.extWallInsulationSf * ((r.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material) + (r.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor))).toFixed(2),
-      ],
+      ...(mto.insulationTakeoffs && mto.insulationTakeoffs.length > 0
+        ? mto.insulationTakeoffs
+            .filter((item) => item.qty > 0 && item.totalCost > 0)
+            .map((item) => [
+              '1. Board & Finishes',
+              item.label,
+              item.qty,
+              item.unit,
+              item.matRate.toFixed(2),
+              item.labRate.toFixed(2),
+              (item.matRate + item.labRate).toFixed(2),
+              item.matCost.toFixed(2),
+              item.labCost.toFixed(2),
+              item.totalCost.toFixed(2),
+            ])
+        : mto.extWallInsulationSf > 0
+        ? [
+            [
+              '1. Board & Finishes',
+              'Ext. Wall Insulation (R-20)',
+              mto.extWallInsulationSf,
+              'SF',
+              r.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material,
+              r.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor,
+              ((r.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material) + (r.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor)).toFixed(2),
+              (mto.extWallInsulationSf * (r.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material)).toFixed(2),
+              (mto.extWallInsulationSf * (r.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor)).toFixed(2),
+              (mto.extWallInsulationSf * ((r.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material) + (r.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor))).toFixed(2),
+            ],
+          ]
+        : []),
       [
         '1. Board & Finishes',
         'Resilient Channel (RC-1)',
@@ -938,21 +957,59 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 isItemExcluded={!isItemIncluded('flooringPackage')}
                 onToggleItem={onToggleItemInclusion}
               />
-              <MetricRow
-                label="Ext. Wall Insulation"
-                value={mto.extWallInsulationSf}
-                unit="SF"
-                subtext="R-20 batts"
-                cost={
-                  isIncluded('finishes') && isItemIncluded('extWallInsulation')
-                    ? mto.extWallInsulationSf * ((activeRates.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material) + (activeRates.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor))
-                    : 0
-                }
-                isCategoryExcluded={!isIncluded('finishes')}
-                itemKey="extWallInsulation"
-                isItemExcluded={!isItemIncluded('extWallInsulation')}
-                onToggleItem={onToggleItemInclusion}
-              />
+              {mto.insulationTakeoffs && mto.insulationTakeoffs.length > 0 ? (
+                mto.insulationTakeoffs
+                  .filter((item) => item.qty > 0 && item.totalCost > 0)
+                  .map((item) => {
+                    const itemKey =
+                      item.category === 'attic'
+                        ? 'atticRoofInsulation'
+                        : item.category === 'floor'
+                        ? 'floorInsulation'
+                        : 'extWallInsulation';
+                    const isItemActive = isItemIncluded(itemKey as any);
+                    return (
+                      <MetricRow
+                        key={item.id}
+                        label={item.label}
+                        value={item.qty}
+                        unit={item.unit}
+                        subtext={
+                          item.isVolumeBased
+                            ? `${item.areaSf.toFixed(1)} SF @ ${item.depthInches?.toFixed(2) ?? '3.67'}"`
+                            : `${item.areaSf.toFixed(1)} SF Net Area`
+                        }
+                        cost={
+                          isIncluded('finishes') && isItemActive
+                            ? item.totalCost
+                            : 0
+                        }
+                        isCategoryExcluded={!isIncluded('finishes')}
+                        itemKey={itemKey}
+                        isItemExcluded={!isItemActive}
+                        onToggleItem={onToggleItemInclusion}
+                      />
+                    );
+                  })
+              ) : mto.extWallInsulationSf > 0 ? (
+                <MetricRow
+                  label="Ext. Wall Insulation"
+                  value={mto.extWallInsulationSf}
+                  unit="SF"
+                  subtext="R-20 batts"
+                  cost={
+                    isIncluded('finishes') && isItemIncluded('extWallInsulation')
+                      ? mto.extWallInsulationSf *
+                        ((activeRates.extInsulationPerSf?.material ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.material) +
+                          (activeRates.extInsulationPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.extInsulationPerSf.labor))
+                      : 0
+                  }
+                  isCategoryExcluded={!isIncluded('finishes')}
+                  itemKey="extWallInsulation"
+                  isItemExcluded={!isItemIncluded('extWallInsulation')}
+                  onToggleItem={onToggleItemInclusion}
+                />
+              ) : null}
               {mto.resilientChannelLf > 0 && (
                 <MetricRow
                   label="Resilient Channel (RC-1)"

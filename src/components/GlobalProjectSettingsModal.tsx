@@ -454,6 +454,77 @@ export const GlobalProjectSettingsModal: React.FC<GlobalProjectSettingsModalProp
                     <option value={12}>12/12 45-degree High Pitch (Multiplier: 1.41x)</option>
                   </select>
                 </div>
+
+                {/* Default Wall Insulation */}
+                <div className="p-3.5 rounded-xl bg-slate-800/30 border border-slate-700/50 space-y-2">
+                  <label className="text-xs font-semibold text-slate-300 block">
+                    Exterior Wall Insulation Assembly
+                  </label>
+                  <select
+                    id="select-default-wall-insulation"
+                    value={formSettings.defaultWallInsulationType || 'fiberglass_batt_r20'}
+                    onChange={(e) =>
+                      setFormSettings({
+                        ...formSettings,
+                        defaultWallInsulationType: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs font-medium text-slate-200 focus:outline-none focus:border-sky-500"
+                  >
+                    <option value="fiberglass_batt_r20">Fiberglass Batt R-20</option>
+                    <option value="mineral_wool_batt_r22">Mineral Wool R-23 / R-22</option>
+                    <option value="closed_cell_foam_wall_r22">Closed-Cell Spray Foam R-22</option>
+                    <option value="open_cell_foam">Open-Cell Spray Foam</option>
+                    <option value="none">None / Uninsulated</option>
+                  </select>
+                </div>
+
+                {/* Default Attic / Roof Insulation */}
+                <div className="p-3.5 rounded-xl bg-slate-800/30 border border-slate-700/50 space-y-2">
+                  <label className="text-xs font-semibold text-slate-300 block">
+                    Attic / Roof Assembly Insulation
+                  </label>
+                  <select
+                    id="select-default-attic-insulation"
+                    value={formSettings.defaultAtticInsulationType || 'blown_cellulose_r60'}
+                    onChange={(e) =>
+                      setFormSettings({
+                        ...formSettings,
+                        defaultAtticInsulationType: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs font-medium text-slate-200 focus:outline-none focus:border-sky-500"
+                  >
+                    <option value="blown_cellulose_r60">Blown-In Cellulose R-60</option>
+                    <option value="closed_cell_foam_roof_r60">Closed-Cell Spray Foam R-60</option>
+                    <option value="fiberglass_batt_r20">Fiberglass Batt R-20</option>
+                    <option value="mineral_wool_batt_r22">Mineral Wool Batt R-22</option>
+                    <option value="none">None / Uninsulated</option>
+                  </select>
+                </div>
+
+                {/* Default Floor / Substructure Insulation */}
+                <div className="p-3.5 rounded-xl bg-slate-800/30 border border-slate-700/50 space-y-2">
+                  <label className="text-xs font-semibold text-slate-300 block">
+                    Elevated Floor Assembly Insulation
+                  </label>
+                  <select
+                    id="select-default-floor-insulation"
+                    value={formSettings.defaultFloorInsulationType || 'none'}
+                    onChange={(e) =>
+                      setFormSettings({
+                        ...formSettings,
+                        defaultFloorInsulationType: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs font-medium text-slate-200 focus:outline-none focus:border-sky-500"
+                  >
+                    <option value="none">None / Uninsulated (Standard Slab)</option>
+                    <option value="closed_cell_foam_floor_r31">Closed-Cell Spray Foam R-31</option>
+                    <option value="fiberglass_floor_batt_r30">Fiberglass Floor Batt R-30</option>
+                    <option value="mineral_wool_batt_r22">Mineral Wool Batt R-22</option>
+                  </select>
+                </div>
               </div>
             </div>
           )}
