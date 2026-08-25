@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.10.0] - 2026-08-24
+
+### Added
+- **OSNAP Sticky Node Locking & Hysteresis**: Implemented a sticky node capture ($15\text{px}$) and breakout ($30\text{px}$) hysteresis mechanism for drawing tools, keeping endpoints bound to target vertices until explicitly pulled beyond the threshold.
+- **Visual Node Lock Indicators**: Rendered bright green glowing target rings and a "LOCKED" indicator on canvas whenever an endpoint actively captures a vertex.
+
+### Fixed
+- **Decoupled Grid and Object Snapping (OSNAP)**: Separated background grid snap (1', 6", 1") from OSNAP node/endpoint snapping. Turning off grid snap now allows free-form wall lengths while retaining vertex-to-vertex snapping.
+- **Tooltip Clarification**: Updated canvas snap banner tooltip to explicitly reflect `Grid Snap: ON/OFF (Node snap remains active)`.
+
 ## [2.9.0] - 2026-08-24
 
 ### Added

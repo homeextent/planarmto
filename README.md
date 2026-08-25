@@ -8,6 +8,8 @@
 
 ### 1. Interactive 2D Vector CAD Canvas
 - **Planar Graph Drafting**: Automatic node snapping, collinear vertex intersection, orthogonal locking (90° Ortho), and live dimension overlays.
+- **Decoupled Grid & Object Snapping (OSNAP)**: Separated background grid snapping (1', 6", 1") from object vertex snapping (OSNAP). Disabling grid snap allows drafting free-form wall lengths and precise fractional dimensions while retaining magnetic node-to-node snapping.
+- **OSNAP Sticky Node Locking & Hysteresis**: Implemented a sticky node capture ($15\text{px}$) and breakout ($30\text{px}$) hysteresis mechanism for drafting tools. Endpoints stay firmly bound to target vertices until intentionally pulled beyond the breakout threshold, accompanied by bright green glowing target rings and a "LOCKED" visual indicator on the canvas.
 - **2D Blueprint Underlay & Scale Calibration**: Import floor plan images (`.png`, `.jpg`, `.webp`, `.svg`) with 2-point reference calibration for pixel-to-foot mapping. Includes **360° free-floating reference selection** (default) or **Shift-key Ortho locking** for exact 90° axes. Features **automatic grid snap bypass** during calibration, opacity controls, canvas position locking, and full rehydration of image URLs and settings across save cycles.
 - **Streamlined Underlay Inspector Card**: Replaced complex numeric fields with 5 mistake-proof controls: Opacity Slider, Visibility Toggle, Lock Toggle, Re-Calibrate Scale, and Remove Image.
 - **Multi-Corner Drag Anchoring & Magnetic Snapping**: Enhanced room movement via specific corner nodes with multi-corner magnetic snapping and visual snap indicators.

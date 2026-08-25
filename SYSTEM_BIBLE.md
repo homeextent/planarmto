@@ -8,19 +8,29 @@ PlanarMTO models an architectural floorplan as an embedded **Planar Straight Lin
 - **Vertices (Nodes) $V$**: Set of points $v_i = (x_i, y_i) \in \mathbb{R}^2$ representing wall intersections, corners, and free endpoints.
 - **Edges (Walls) $E$**: Set of line segments $e_{ij} = (v_i, v_j)$ with assigned geometric thickness $T_w$, height $H_w$, and framing specifications.
 
-### 1.1 Collinear Snapping & Node Merging
+### 1.1 Collinear Snapping, OSNAP & Node Merging
 When drafting or moving a node $v_{\text{new}}$ within a threshold radius $\epsilon_{\text{snap}} = 0.5\text{ ft}$ of an existing node $v_k$, $v_{\text{new}}$ is merged into $v_k$. 
 
-#### 1.1.0 Automatic Snap Bypass
-To ensure pixel-perfect blueprint calibration, all snapping logic ($\epsilon_{\text{snap}}$ and grid-based alignment) is automatically bypassed when:
-1. The **Scale Calibration Tool** is active.
-2. Grid snap is explicitly toggled off (`state.settings.isSnapEnabled === false`).
+#### 1.1.0 Decoupled Grid vs. Object Snapping (OSNAP) Hierarchy
+PlanarMTO decouples background grid quantization from geometric object snapping (OSNAP), executing in a strict priority pipeline:
+1. **Calibration Bypass**: All snapping logic (grid and OSNAP) is bypassed entirely during 2-Point Reference Scale Calibration to ensure pixel-perfect alignment against blueprint underlays.
+2. **OSNAP (Node & Wall Centerline)**: Always active during drawing tools (`wall_pen`, `wall_rect`, `room_box`, apertures, stamps, measurements) regardless of background grid snap setting. Turning off grid snap allows free-form wall lengths while retaining vertex-to-vertex magnetic snapping.
+3. **Background Grid Snapping**: When `state.settings.gridSnap` is active (`true`), coordinates quantize to the configured `gridSnapSize` ($1'$, $6"$, or $1"$).
+4. **Free-Floating Fallback**: When grid snap is disabled and no OSNAP target is captured, the cursor operates with raw, unconstrained floating-point coordinates.
 
+#### 1.1.1 Sticky Node Locking & Hysteresis Mechanics
+To eliminate cursor jitter and accidental snap detachment during drafting, vertex OSNAP employs a stateful hysteresis loop:
+- **Capture Threshold ($R_{\text{capture}} = 15\text{px}$)**: In world space, $\epsilon_{\text{capture}} = \frac{15}{\text{scale}}\text{ ft}$. When the cursor falls within $R_{\text{capture}}$ of node $v_k$, the system captures and locks onto $v_k$ (`lockedSnapNodeRef.current = v_k`).
+- **Breakout Threshold ($R_{\text{breakout}} = 30\text{px}$)**: Once locked to $v_k$, the endpoint remains rigidly bound to $v_k$ as long as the screen-space displacement satisfies:
+  $$d_{\text{px}} = \|p_{\text{cursor}} - v_k\| \times \text{scale} \le R_{\text{breakout}}$$
+- **Hysteresis State Transition**: The lock is only severed when the user deliberately moves the cursor beyond $30\text{px}$ ($d_{\text{px}} > 30\text{px}$), resetting the locked node reference to `null`.
+- **Visual Feedback**: The canvas renders glowing concentric green target rings and a "LOCKED" badge over the anchored vertex whenever active.
+
+#### 1.1.2 Collinear Wall Partitioning & Topology Cleanup
 When a node falls within $\epsilon_{\text{snap}}$ of a wall segment $(v_a, v_b)$, the wall is partitioned at the orthogonal projection point:
 $$t = \frac{(v_{\text{new}} - v_a) \cdot (v_b - v_a)}{\|v_b - v_a\|^2}, \quad t \in [0, 1]$$
 The original edge $(v_a, v_b)$ is replaced by two sub-edges $(v_a, v_{\text{new}})$ and $(v_{\text{new}}, v_b)$.
 
-#### 1.1.1 Two-Phase Topology Cleanup
 To maintain graph integrity during complex room merges:
 1. **`mergeCoincidentNodes`**: Unifies disparate node IDs within spatial threshold $\epsilon_{\text{snap}}$.
 2. **`deduplicateWalls`**: Merges shared wall segments and remaps room `wallIds` references, ensuring topological consistency (e.g., collapsing 8 walls to 7 when merging $10'\times10'$ rooms).

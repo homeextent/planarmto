@@ -166,6 +166,10 @@ function splitWallAtPoint(
   };
 }
 
+// Define constants for sticky OSNAP hysteresis
+const SNAP_CAPTURE_RADIUS_PX = 15;
+const SNAP_BREAKOUT_RADIUS_PX = 30;
+
 export const CadCanvas: React.FC<CadCanvasProps> = ({
   state,
   onChange,
@@ -179,6 +183,9 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Sticky lock for OSNAP with hysteresis
+  const lockedSnapNodeRef = useRef<{ id: string; x: number; y: number } | null>(null);
 
   // Viewport transformation: scale (pixels per foot) and offset (in pixels)
   const [transform, setTransform] = useState<{ scale: number; x: number; y: number }>({
@@ -305,17 +312,37 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   // Find nearest snap point (node snap has highest priority, then grid snap)
   const getSmartSnapPoint = useCallback(
     (rawWorld: Point2D, excludeNodeId?: string | null) => {
-      const isSnapEnabled = state.settings.gridSnap;
-      const shouldSnap = isSnapEnabled && activeTool !== 'calibrate_scale';
-
-      if (!shouldSnap) {
+      // Step 3: Calibration Mode Override
+      if (activeTool === 'calibrate_scale') {
         return {
           point: { x: rawWorld.x, y: rawWorld.y },
-          type: 'grid' as const, // Default to grid type but with raw coordinates
+          type: 'grid' as const,
         };
       }
 
-      const snapRadius = 1.0; // 1 ft snap radius
+      const isSnapEnabled = state.settings.gridSnap;
+      const isDrawingTool = activeTool === 'wall_pen' || activeTool === 'wall_rect' || activeTool === 'room_box' || activeTool.startsWith('aperture_') || activeTool.startsWith('stamp_') || activeTool === 'alarm_smoke_co' || activeTool === 'ruler_measure';
+      
+      // Step 1: Check Node / Endpoint Snap (OSNAP) with Sticky Hysteresis
+      // Case A: Currently Locked to a Node
+      if (lockedSnapNodeRef.current && isDrawingTool) {
+        const locked = lockedSnapNodeRef.current;
+        const distPx = distance(rawWorld, locked) * transform.scale;
+        if (distPx <= SNAP_BREAKOUT_RADIUS_PX) {
+          return {
+            point: { x: locked.x, y: locked.y },
+            type: 'node' as const,
+            nodeId: locked.id,
+          };
+        } else {
+          // Break breakout lock
+          lockedSnapNodeRef.current = null;
+        }
+      }
+
+      // Tolerance: SNAP_CAPTURE_RADIUS_PX converted to feet based on current zoom scale
+      const snapRadius = SNAP_CAPTURE_RADIUS_PX / transform.scale;
+      
       let nearestNode: CadNode | null = null;
       let minNodeDist = snapRadius;
 
@@ -330,6 +357,10 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
       if (nearestNode) {
         const n = nearestNode as CadNode;
+        // Case B: Not Currently Locked -> Capture
+        if (isDrawingTool) {
+          lockedSnapNodeRef.current = { id: n.id, x: n.x, y: n.y };
+        }
         return {
           point: { x: n.x, y: n.y },
           type: 'node' as const,
@@ -337,13 +368,12 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         };
       }
 
-      // Check wall centerline snap
+      // Check wall centerline snap (OSNAP variant)
       const nodeMap = new Map<string, CadNode>();
       state.nodes.forEach((n: CadNode) => nodeMap.set(n.id, n));
 
       let nearestWallProj: { point: Point2D; wallId: string } | null = null;
-      const snapInc = state.settings.gridSnapSize || 0.5;
-      let minWallDist = Math.max(0.2, snapInc / 2);
+      let minWallDist = snapRadius * 0.75; 
 
       state.walls.forEach((w: CadWall) => {
         const n1 = nodeMap.get(w.startNodeId);
@@ -365,14 +395,22 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         };
       }
 
-      // Grid snap fallback
-      const gridSnapped = snapPointToGrid(rawWorld, state.settings.gridSnapSize);
+      // Step 2: Check Grid Snap
+      if (isSnapEnabled) {
+        const gridSnapped = snapPointToGrid(rawWorld, state.settings.gridSnapSize);
+        return {
+          point: gridSnapped,
+          type: 'grid' as const,
+        };
+      }
+
+      // Fallback: No grid snap, and no OSNAP found
       return {
-        point: gridSnapped,
+        point: { x: rawWorld.x, y: rawWorld.y },
         type: 'grid' as const,
       };
     },
-    [state.nodes, state.walls, state.settings.gridSnapSize, state.settings.gridSnap, activeTool]
+    [state.nodes, state.walls, state.settings.gridSnapSize, state.settings.gridSnap, activeTool, transform.scale]
   );
 
   // Zoom controls
@@ -540,6 +578,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         setRoomBoxStart(null);
         setRulerStart(null);
         setRulerEnd(null);
+        lockedSnapNodeRef.current = null;
         onSelect({ type: 'none' });
         onToolChange('select');
       }
@@ -1726,6 +1765,30 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     }
 
     // D. Magnetic Snap Indicator Ring & Dynamic Wall Offset Dimension Callouts
+    // Draw Sticky Lock Indicator first if active
+    if (lockedSnapNodeRef.current) {
+      const locked = lockedSnapNodeRef.current;
+      const sp = worldToScreen(locked.x, locked.y);
+      ctx.save();
+      // Glowing green ring
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, 10, 0, Math.PI * 2);
+      ctx.stroke();
+      // Green fill
+      ctx.fillStyle = '#22c55e';
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = '#22c55e';
+      ctx.font = 'bold 10px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('LOCKED', sp.x, sp.y - 14);
+      ctx.restore();
+    }
+
     if (snapCandidate) {
       const sp = worldToScreen(snapCandidate.point.x, snapCandidate.point.y);
       ctx.save();
@@ -2155,18 +2218,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     }
 
     const snapInc = state.settings.gridSnapSize || 0.5;
-    let worldPoint = (activeTool === 'wall_rect' || activeTool === 'room_box')
-      ? (shouldSnap ? snapPointToGrid(rawWorld, snapInc) : rawWorld)
-      : snap.point;
-
-    if (activeTool === 'wall_rect' || activeTool === 'room_box') {
-      if (shouldSnap) {
-        worldPoint = {
-          x: Math.round(worldPoint.x / snapInc) * snapInc,
-          y: Math.round(worldPoint.y / snapInc) * snapInc
-        };
-      }
-    }
+    let worldPoint = snap.point;
 
     if (activeTool === 'ruler_measure') {
       const rulerSnap = getSmartSnapPoint(rawWorld);
@@ -2199,7 +2251,9 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           const detectedRooms = detectRoomFaces(finalNodes, finalWalls, state.rooms, state.settings.defaultWallHeight);
           onChange({ ...state, nodes: finalNodes, walls: finalWalls, rooms: detectedRooms });
         }
-        setRoomBoxStart(null); onToolChange('select');
+        setRoomBoxStart(null);
+        lockedSnapNodeRef.current = null;
+        onToolChange('select');
       }
       return;
     }
@@ -2412,7 +2466,6 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       }
     }
 
-    if (activeTool === 'wall_rect' || activeTool === 'room_box') { currentPoint = { x: Math.round(currentPoint.x * 12) / 12, y: Math.round(currentPoint.y * 12) / 12 }; }
     if (activeTool === 'wall_pen' && activeWallStartNodeId) {
       const startNode = state.nodes.find((n) => n.id === activeWallStartNodeId);
       if (startNode) {
@@ -2554,6 +2607,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     setIsPanning(false); setIsDraggingElement(false); setActiveDragAnchorNodeId(null); setRoomSnapFeedback(null);
     if (!hasMovedDuringDrag && pendingSelectionOnMouseUp) onSelect(pendingSelectionOnMouseUp);
     setPendingSelectionOnMouseUp(null); setHasMovedDuringDrag(false);
+    lockedSnapNodeRef.current = null;
 
     if (marqueeStart && marqueeEnd && distance(marqueeStart, marqueeEnd) > 0.1) {
       const x1 = Math.min(marqueeStart.x, marqueeEnd.x), y1 = Math.min(marqueeStart.y, marqueeEnd.y), x2 = Math.max(marqueeStart.x, marqueeEnd.x), y2 = Math.max(marqueeStart.y, marqueeEnd.y);
@@ -2609,6 +2663,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     if (activeTool === 'wall_pen') {
       setActiveWallStartNodeId(null);
       setDraftMousePos(null);
+      lockedSnapNodeRef.current = null;
       onToolChange('select');
     }
   };
@@ -2680,7 +2735,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
                 ? 'text-sky-400 bg-sky-500/20'
                 : 'text-slate-500 hover:text-slate-300'
             }`}
-            title={state.settings.gridSnap ? 'Grid Snap: ON' : 'Grid Snap: OFF'}
+            title={state.settings.gridSnap ? 'Grid Snap: ON (Node snap remains active)' : 'Grid Snap: OFF (Node snap remains active)'}
           >
             <Magnet className="w-3.5 h-3.5" />
           </button>
