@@ -156,17 +156,17 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       const src = event.target?.result as string;
       const img = new Image();
       img.onload = () => {
+        // ONLY run when user uploads a new file from file picker:
+        const defaultFpp = 50 / img.naturalWidth;
         onChange({
           ...state,
           underlay: {
-            id: `underlay-${Date.now()}`,
             src,
-            width: img.width,
-            height: img.height,
-            x: - (img.width / 2) / 24,
-            y: - (img.height / 2) / 24,
-            scale: 24,
-            opacity: 0.5,
+            url: src,
+            worldX: 0,
+            worldY: 0,
+            feetPerPixel: defaultFpp,
+            opacity: 0.7,
             isLocked: false,
             isVisible: true,
           },

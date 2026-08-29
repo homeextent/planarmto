@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.12.0] - 2026-08-29
+
+### Added
+- **CAD Origin Axis Rendering**: Visualized red horizontal ($X$-axis, $Y=0$) and green vertical ($Y$-axis, $X=0$) CAD origin crosshairs with explicit $(0,0)$ labeling on canvas.
+- **Interactive Blueprint Alignment**: Added real-time drag-and-move canvas positioning for unlocked blueprints and a one-click "Center on Screen" action in the Inspector Panel.
+
+### Fixed
+- **Blueprint World Axis Alignment & Scale Persistence**: Anchored underlay raster images strictly to CAD World Coordinates (`worldX`, `worldY`, `feetPerPixel`). Isolated auto-scaling to initial file uploads, eliminating post-calibration image inflation and misalignment upon project reload.
+- **Dual-Write Storage Engine & "Save As" Directory Registration**: Refactored project storage architecture to separate master project metadata (`PLANAR_MTO_PROJECTS_LIST`) from full payload storage (`PLANAR_MTO_PROJECT_<id>`). Fixed "Save As" project directory index registration, persistence, and modal rehydration.
+
 ## [2.11.0] - 2026-08-25
 
 ### Added

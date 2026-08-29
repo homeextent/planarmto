@@ -393,12 +393,13 @@ function AppContent() {
   const handleSaveProjectAs = useCallback(async () => {
     const newName = prompt('Enter project name:', state.activeProjectName || 'New Project');
     if (newName) {
-      const newId = `proj_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const newId = `proj_${Date.now()}`;
       const newState = {
         ...state,
         activeProjectId: newId,
         activeProjectName: newName,
       };
+      // Immediately commit to storage
       await saveProjectToDirectory(newName, newState, { id: newId });
       setState(newState);
       setIsDirty(false);
@@ -624,7 +625,7 @@ function AppContent() {
         onOpenPrintModal={() => setIsPrintModalOpen(true)}
         onOpenProjectDirectoryModal={() => setIsProjectDirectoryOpen(true)}
         onNewProject={handleNewBlankProject}
-        onSelectUnderlay={() => setSelection({ type: 'underlay', id: state.underlay?.id })}
+        onSelectUnderlay={() => setSelection({ type: 'underlay', id: 'underlay_main' })}
         selection={selection}
       />
 

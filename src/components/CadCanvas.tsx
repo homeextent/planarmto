@@ -230,28 +230,35 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   const [marqueeStart, setMarqueeStart] = useState<Point2D | null>(null);
   const [marqueeEnd, setMarqueeEnd] = useState<Point2D | null>(null);
 
+  // Underlay interaction state
+  const [isHoveringUnderlay, setIsHoveringUnderlay] = useState(false);
+
   // Calibration tool state
   const [calibrationPoints, setCalibrationPoints] = useState<Point2D[]>([]);
 
   // Track last project and underlay to detect "Load" or "Import" events
   const lastProjectId = useRef<string | undefined>(undefined);
   const lastUnderlayId = useRef<string | undefined>(state.underlay?.id);
+  const lastUnderlayCenterTrigger = useRef<number | undefined>(state.underlay?.lastCenteredAt);
 
-    // Underlay image cache
-  const [underlayImage, setUnderlayImage] = useState<HTMLImageElement | null>(null);
+  // Underlay image cache ref
+  const underlayImageRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
-    const src = state.underlay?.blueprintUrl || state.underlay?.src;
-    if (src) {
-      const img = new Image();
-      img.onload = () => {
-        setUnderlayImage(img);
-      };
-      img.src = src;
-    } else {
-      setUnderlayImage(null);
+    const imageSrc = state.underlay?.src || state.underlay?.url;
+    if (!imageSrc) {
+      underlayImageRef.current = null;
+      return;
     }
-  }, [state.underlay?.blueprintUrl, state.underlay?.src]);
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = imageSrc;
+    img.onload = () => {
+      underlayImageRef.current = img;
+      // Force canvas re-render frame
+      requestAnimationFrame(renderCanvas);
+    };
+  }, [state.underlay?.src, state.underlay?.url]);
 
   // Measurement ruler drafting
   const [rulerPoints, setRulerPoints] = useState<Point2D[]>([]);
@@ -449,13 +456,13 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     }
 
     // Include underlay in bounding box if it exists and is visible
-    if (state.underlay && state.underlay.isVisible) {
-      const uw = state.underlay.width / state.underlay.scale;
-      const uh = state.underlay.height / state.underlay.scale;
-      minX = Math.min(minX, state.underlay.x);
-      maxX = Math.max(maxX, state.underlay.x + uw);
-      minY = Math.min(minY, state.underlay.y);
-      maxY = Math.max(maxY, state.underlay.y + uh);
+    if (state.underlay && state.underlay.isVisible && underlayImageRef.current) {
+      const uw = underlayImageRef.current.naturalWidth * state.underlay.feetPerPixel;
+      const uh = underlayImageRef.current.naturalHeight * state.underlay.feetPerPixel;
+      minX = Math.min(minX, state.underlay.worldX);
+      maxX = Math.max(maxX, state.underlay.worldX + uw);
+      minY = Math.min(minY, state.underlay.worldY);
+      maxY = Math.max(maxY, state.underlay.worldY + uh);
     }
 
     // If still nothing found, use default view
@@ -498,40 +505,14 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     }
   }, [state.activeProjectId]);
 
-  // 2. Auto-Center & Fit on Blueprint Import
+  // 2. Auto-Zoom-Fit on new underlay import (WITHOUT overwriting feetPerPixel)
   useEffect(() => {
-    if (state.underlay?.id && state.underlay.id !== lastUnderlayId.current) {
-      lastUnderlayId.current = state.underlay.id;
-      
-      const canvas = canvasRef.current;
-      if (canvas) {
-        // Calculate viewport center in world coordinates
-        const centerWorld = screenToWorld(canvas.clientWidth / 2, canvas.clientHeight / 2);
-        
-        // Calculate centered x, y for the underlay
-        const uw = state.underlay.width / state.underlay.scale;
-        const uh = state.underlay.height / state.underlay.scale;
-        
-        const newX = centerWorld.x - uw / 2;
-        const newY = centerWorld.y - uh / 2;
-        
-        // Update state with centered coordinates
-        onChange({
-          ...state,
-          underlay: {
-            ...state.underlay,
-            x: newX,
-            y: newY,
-          }
-        });
-        
-        // Trigger zoom fit after state propagates
-        setTimeout(handleZoomFit, 100);
-      }
-    } else if (!state.underlay?.id) {
-      lastUnderlayId.current = undefined;
+    const underlay = state.underlay;
+    if (underlay?.url && (underlay.url !== lastUnderlayId.current)) {
+      lastUnderlayId.current = underlay.url;
+      setTimeout(handleZoomFit, 100);
     }
-  }, [state.underlay?.id, state, onChange, screenToWorld]);
+  }, [state.underlay?.url]);
 
   // Prevent default for wheel and touchmove events (passive event listener fix)
   useEffect(() => {
@@ -588,8 +569,8 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selection, onDeleteSelected, onSelect]);
 
-  // Main rendering loop
-  useEffect(() => {
+  // Main rendering function
+  const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -652,27 +633,25 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     // --- DRAW UNDERLAY IMAGE (BLUEPRINT) ---
     const underlay = state.underlay;
-    const isVisible = underlay?.isVisible;
-    const opacity = underlay?.opacity;
-    const uX = underlay?.x;
-    const uY = underlay?.y;
-    const uScale = underlay?.scale;
-
-    if (underlay && isVisible && underlayImage) {
+    const img = underlayImageRef.current;
+    if (underlay && underlay.isVisible && img && img.complete && img.naturalWidth !== 0) {
       ctx.save();
-      ctx.globalAlpha = opacity !== undefined ? opacity : 0.5;
-      const isSelected = isEntitySelected('underlay', underlay.id);
-      const drawX = (uX || 0) * scale + panX;
-      const drawY = (uY || 0) * scale + panY;
-      const drawW = (underlay.width / (uScale || 1)) * scale;
-      const drawH = (underlay.height / (uScale || 1)) * scale;
-      ctx.drawImage(underlayImage, drawX, drawY, drawW, drawH);
-      
-      if (isSelected) {
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([10, 5]);
-        ctx.strokeRect(drawX, drawY, drawW, drawH);
+      const feetPerPixel = underlay.feetPerPixel || 0.05;
+      const screenPos = worldToScreen(underlay.worldX || 0, underlay.worldY || 0);
+      const renderWidth = img.naturalWidth * feetPerPixel * scale;
+      const renderHeight = img.naturalHeight * feetPerPixel * scale;
+
+      // Draw Image
+      ctx.globalAlpha = underlay.opacity ?? 0.7;
+      ctx.drawImage(img, screenPos.x, screenPos.y, renderWidth, renderHeight);
+      ctx.globalAlpha = 1.0;
+
+      // Draw subtle bounding box when selected/unlocked so user can always see location
+      if (!underlay.isLocked || isEntitySelected('underlay', 'underlay_main')) {
+        ctx.strokeStyle = '#3b82f6';
+        ctx.setLineDash([6, 4]);
+        ctx.lineWidth = isEntitySelected('underlay', 'underlay_main') ? 3 : 1.5;
+        ctx.strokeRect(screenPos.x, screenPos.y, renderWidth, renderHeight);
         ctx.setLineDash([]);
       }
       ctx.restore();
@@ -720,16 +699,31 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       }
       ctx.stroke();
 
-      // Origin (0,0) axis indicator
+      // CAD Origin Axes Rendering
       const originScreen = worldToScreen(0, 0);
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+      
+      // X-Axis (Red horizontal line along Y=0)
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)'; // red-500 with opacity
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(originScreen.x - 20, originScreen.y);
-      ctx.lineTo(originScreen.x + 20, originScreen.y);
-      ctx.moveTo(originScreen.x, originScreen.y - 20);
-      ctx.lineTo(originScreen.x, originScreen.y + 20);
+      ctx.moveTo(0, originScreen.y);
+      ctx.lineTo(width, originScreen.y);
       ctx.stroke();
+
+      // Y-Axis (Green vertical line along X=0)
+      ctx.strokeStyle = 'rgba(34, 197, 94, 0.5)'; // green-500 with opacity
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(originScreen.x, 0);
+      ctx.lineTo(originScreen.x, height);
+      ctx.stroke();
+
+      // Label origin point cleanly as (0, 0)
+      ctx.fillStyle = textDimCol;
+      ctx.font = '600 10px font-mono';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText('(0, 0)', originScreen.x + 4, originScreen.y + 4);
     }
 
     const nodeMap = new Map<string, CadNode>();
@@ -2098,7 +2092,15 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     rulerEnd,
     formatLength,
     worldToScreen,
+    isHoveringUnderlay,
+    roomSnapFeedback,
+    marqueeStart,
+    marqueeEnd,
   ]);
+
+  useEffect(() => {
+    renderCanvas();
+  }, [renderCanvas]);
 
   // Handle Mouse Down
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -2193,7 +2195,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         const distWorld = distance(p1, p2);
         
         const actualDist = prompt("Enter actual distance for this segment (e.g. 12' 6\" or 12.5):", "10");
-        if (actualDist && state.underlay) {
+        if (actualDist && state.underlay && underlayImageRef.current) {
           let feet = parseFloat(actualDist);
           if (actualDist.includes("'")) {
             const parts = actualDist.split("'");
@@ -2206,9 +2208,24 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           }
 
           if (!isNaN(feet) && feet > 0) {
-            const currentPixelDist = distWorld * state.underlay.scale;
-            const newScale = currentPixelDist / feet;
-            onChange({ ...state, underlay: { ...state.underlay, scale: newScale } });
+            // Convert canvas screen click coordinates to Image Native Pixels
+            const imgX1 = (p1.x - state.underlay.worldX) / state.underlay.feetPerPixel;
+            const imgY1 = (p1.y - state.underlay.worldY) / state.underlay.feetPerPixel;
+            const imgX2 = (p2.x - state.underlay.worldX) / state.underlay.feetPerPixel;
+            const imgY2 = (p2.y - state.underlay.worldY) / state.underlay.feetPerPixel;
+            
+            // Calculate raw native pixel distance
+            const nativePixelDist = Math.hypot(imgX2 - imgX1, imgY2 - imgY1);
+            
+            // Calculate new scale (World Feet per native image pixel)
+            const newFeetPerPixel = feet / nativePixelDist;
+            
+            const updatedUnderlay = {
+              ...state.underlay,
+              feetPerPixel: newFeetPerPixel,
+            };
+            
+            onChange({ ...state, underlay: updatedUnderlay });
           }
         }
         setCalibrationPoints([]);
@@ -2419,11 +2436,12 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       if (hitDeck) { toggleSelection('deck', hitDeck.id, e); setIsDraggingElement(true); setDragStartPoint(worldPoint); setHasMovedDuringDrag(false); return; }
       const hitHardscape = state.hardscapes.find((h) => isPointInPolygon(rawWorld, h.points));
       if (hitHardscape) { toggleSelection('hardscape', hitHardscape.id, e); setIsDraggingElement(true); setDragStartPoint(worldPoint); setHasMovedDuringDrag(false); return; }
-      if (state.underlay && state.underlay.isVisible) {
-        const uw = state.underlay.width / state.underlay.scale, uh = state.underlay.height / state.underlay.scale;
-        if (rawWorld.x >= state.underlay.x && rawWorld.x <= state.underlay.x + uw && rawWorld.y >= state.underlay.y && rawWorld.y <= state.underlay.y + uh) {
+      if (state.underlay && state.underlay.isVisible && underlayImageRef.current) {
+        const uw = underlayImageRef.current.naturalWidth * state.underlay.feetPerPixel;
+        const uh = underlayImageRef.current.naturalHeight * state.underlay.feetPerPixel;
+        if (rawWorld.x >= state.underlay.worldX && rawWorld.x <= state.underlay.worldX + uw && rawWorld.y >= state.underlay.worldY && rawWorld.y <= state.underlay.worldY + uh) {
           if (!state.underlay.isLocked) {
-            toggleSelection('underlay', state.underlay.id, e); 
+            toggleSelection('underlay', 'underlay_main', e); 
             setIsDraggingElement(true); 
             setDragStartPoint(rawWorld); 
             setHasMovedDuringDrag(false); 
@@ -2446,6 +2464,18 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       setPanStart({ x: clientX, y: clientY }); return;
     }
     const rawWorld = screenToWorld(clientX, clientY);
+    
+    // Check for underlay hover
+    if (state.underlay && state.underlay.isVisible && !state.underlay.isLocked && underlayImageRef.current) {
+      const uw = underlayImageRef.current.naturalWidth * state.underlay.feetPerPixel;
+      const uh = underlayImageRef.current.naturalHeight * state.underlay.feetPerPixel;
+      const isOver = rawWorld.x >= state.underlay.worldX && rawWorld.x <= state.underlay.worldX + uw &&
+                     rawWorld.y >= state.underlay.worldY && rawWorld.y <= state.underlay.worldY + uh;
+      setIsHoveringUnderlay(isOver);
+    } else {
+      setIsHoveringUnderlay(false);
+    }
+
     const snap = getSmartSnapPoint(rawWorld, activeWallStartNodeId);
     setSnapCandidate(snap);
     let currentPoint = snap.point;
@@ -2501,7 +2531,14 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           const nextAnnotations = (state.annotations || []).map(ann => selectionIds.includes(ann.id) ? { ...ann, x: Math.round((ann.x + dx) * 100) / 100, y: Math.round((ann.y + dy) * 100) / 100 } : ann);
           const nextDecks = state.decks.map(d => selectionIds.includes(d.id) ? { ...d, points: d.points.map(pt => ({ x: Math.round((pt.x + dx) * 100) / 100, y: Math.round((pt.y + dy) * 100) / 100 })) } : d);
           const nextHardscapes = state.hardscapes.map(h => selectionIds.includes(h.id) ? { ...h, points: h.points.map(pt => ({ x: Math.round((pt.x + dx) * 100) / 100, y: Math.round((pt.y + dy) * 100) / 100 })) } : h);
-          let nextUnderlay = state.underlay; if (state.underlay && selectionIds.includes(state.underlay.id)) nextUnderlay = { ...state.underlay, x: state.underlay.x + dx, y: state.underlay.y + dy };
+          let nextUnderlay = state.underlay; 
+          if (state.underlay && (selectionIds.includes(state.underlay.url) || selectionIds.includes('underlay_main'))) {
+            nextUnderlay = { 
+              ...state.underlay, 
+              worldX: (state.underlay.worldX || 0) + dx, 
+              worldY: (state.underlay.worldY || 0) + dy,
+            };
+          }
           const nextRooms = detectRoomFaces(nextNodes, state.walls, state.rooms, state.settings.defaultWallHeight);
           onChange({ ...state, nodes: nextNodes, stamps: nextStamps, annotations: nextAnnotations, rooms: nextRooms, decks: nextDecks, hardscapes: nextHardscapes, underlay: nextUnderlay });
           setDragStartPoint(currentPointSnapped); return;
@@ -2668,10 +2705,16 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     }
   };
 
+  const cursorClass = isPanning 
+    ? 'cursor-grabbing' 
+    : (isHoveringUnderlay && !state.underlay?.isLocked) 
+      ? 'cursor-move' 
+      : 'cursor-crosshair';
+
   return (
     <div
       ref={containerRef}
-      className="relative flex-1 w-full h-full bg-slate-950 overflow-hidden select-none cursor-crosshair"
+      className={`relative flex-1 w-full h-full bg-slate-950 overflow-hidden select-none ${cursorClass}`}
     >
       <canvas
         ref={canvasRef}

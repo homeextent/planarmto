@@ -1731,7 +1731,6 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
         underlay: { 
           ...underlay, 
           opacity,
-          blueprintOpacity: opacity 
         }
       });
     };
@@ -1742,7 +1741,6 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
         underlay: { 
           ...underlay, 
           isLocked,
-          blueprintLocked: isLocked 
         }
       });
     };
@@ -1753,31 +1751,27 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
         underlay: { 
           ...underlay, 
           isVisible,
-          blueprintVisible: isVisible 
         }
       });
     };
 
-    const handlePositionChange = (x: number, y: number) => {
+    const handlePositionChange = (worldX: number, worldY: number) => {
       onChange({
         ...state,
         underlay: { 
           ...underlay, 
-          x, 
-          y,
-          blueprintOffsetX: x,
-          blueprintOffsetY: y
+          worldX, 
+          worldY,
         }
       });
     };
 
-    const handleScaleChange = (scale: number) => {
+    const handleScaleChange = (feetPerPixel: number) => {
       onChange({
         ...state,
         underlay: { 
           ...underlay, 
-          scale,
-          blueprintScale: scale
+          feetPerPixel,
         }
       });
     };
@@ -1852,6 +1846,22 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
           </div>
 
           <div className="pt-2 border-t border-slate-800 space-y-2">
+            <button
+              onClick={() => {
+                onChange({
+                  ...state,
+                  underlay: {
+                    ...underlay,
+                    lastCenteredAt: Date.now()
+                  }
+                });
+              }}
+              className="w-full px-3 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg flex items-center justify-center gap-2 border border-sky-500 shadow-sm transition-colors cursor-pointer"
+            >
+              <Box className="w-4 h-4" />
+              Center on Screen
+            </button>
+
             <button
               onClick={() => {
                 saveSnapSetting({ enabled: state.settings.gridSnap, size: state.settings.gridSnapSize });

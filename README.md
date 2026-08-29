@@ -10,7 +10,9 @@
 - **Planar Graph Drafting**: Automatic node snapping, collinear vertex intersection, orthogonal locking (90° Ortho), and live dimension overlays.
 - **Decoupled Grid & Object Snapping (OSNAP)**: Separated background grid snapping (1', 6", 1") from object vertex snapping (OSNAP). Disabling grid snap allows drafting free-form wall lengths and precise fractional dimensions while retaining magnetic node-to-node snapping.
 - **OSNAP Sticky Node Locking & Hysteresis**: Implemented a sticky node capture ($15\text{px}$) and breakout ($30\text{px}$) hysteresis mechanism for drafting tools. Endpoints stay firmly bound to target vertices until intentionally pulled beyond the breakout threshold, accompanied by bright green glowing target rings and a "LOCKED" visual indicator on the canvas.
-- **2D Blueprint Underlay & Scale Calibration**: Import floor plan images (`.png`, `.jpg`, `.webp`, `.svg`) with 2-point reference calibration for pixel-to-foot mapping. Includes **360° free-floating reference selection** (default) or **Shift-key Ortho locking** for exact 90° axes. Features **automatic grid snap bypass** during calibration, opacity controls, canvas position locking, and full rehydration of image URLs and settings across save cycles.
+- **2D Blueprint Underlay & World Coordinate Alignment**: Import floor plan images (`.png`, `.jpg`, `.webp`, `.svg`) with **World Coordinate Bounding Box** anchoring. Underlays are strictly bound to CAD world coordinates (`worldX`, `worldY`, `feetPerPixel`), ensuring they remain perfectly aligned with drafted walls regardless of canvas zoom or pan.
+- **Native Pixel Scale Calibration Pipeline**: Establish a precise pixel-to-foot mapping using a 2-point reference scale tool. Features **360° free-floating reference selection** (default) or **Shift-key Ortho locking** for exact 90° axes. Includes **automatic grid snap bypass** during calibration. Auto-scaling is isolated to initial file uploads, preventing post-calibration image inflation during project reloads.
+- **Interactive Blueprint Alignment**: Support for real-time drag-and-move canvas positioning for unlocked blueprints and a one-click "Center on Screen" action in the Inspector Panel.
 - **Streamlined Underlay Inspector Card**: Replaced complex numeric fields with 5 mistake-proof controls: Opacity Slider, Visibility Toggle, Lock Toggle, Re-Calibrate Scale, and Remove Image.
 - **Multi-Corner Drag Anchoring & Magnetic Snapping**: Enhanced room movement via specific corner nodes with multi-corner magnetic snapping and visual snap indicators.
 - **Orthogonal Rectangular Corner Resizing**: Constrained corner dragging on 4-node rectangular rooms to automatically adjust adjacent nodes, preserving 90° wall joins.
@@ -68,8 +70,9 @@
   - **Persistent Company Branding**: Multi-tenant company profile storage mapped to WordPress user metadata, ensuring branding and custom rates follow the user across devices.
   - **Master Rate Customizer Integration**: Direct editing of material and labor rates for all assemblies, including new 4-tier water heaters and exterior trim capping options.
 
-### 5. Multi-Tenant WordPress Persistence
+### 5. Multi-Tenant WordPress Persistence & Dual-Write Storage
 - **Secure Data Isolation**: Project data is strictly scoped by WordPress `user_id` (`tenant_id`), ensuring estimators only see and manage their own floor plans and project metrics.
+- **Dual-Write Storage Architecture**: Refactored storage engine to separate high-frequency project directory metadata (`PLANAR_MTO_PROJECTS_LIST`) from the heavy project payload (`PLANAR_MTO_PROJECT_<id>`). This ensures rapid directory loading and reliable "Save As" registration while maintaining database integrity.
 - **MySQL Storage Engine**: Replaces fragile local storage with a robust `wp_planarmto_projects` table for long-term project persistence and cross-device accessibility.
 - **REST API Pipeline**: Leverages the `planarmto/v1` namespace for authenticated CRUD operations, secured via `X-WP-Nonce` to prevent unauthorized cross-tenant data access.
 

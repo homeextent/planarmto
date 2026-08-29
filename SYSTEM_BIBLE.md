@@ -352,11 +352,14 @@ interface SavedProjectEntry {
 
 To support professional enterprise usage, PlanarMTO implements a multi-tenant storage architecture that transitions from client-side `localStorage` to a centralized WordPress MySQL backend.
 
-### 10.1 Persistence Layers
-PlanarMTO utilizes a multi-layered storage strategy to balance project-level integrity with tenant-wide preferences:
+### 10.1 Persistence Layers & Dual-Write Architecture
+PlanarMTO utilizes a multi-layered storage strategy to balance project-level integrity with tenant-wide preferences. The system implements a **Dual-Write Storage Engine** to optimize performance:
 
-1. **`wp_planarmto_projects` Table**: Stores serialized project states, metrics, and UUIDs strictly scoped by `tenant_id`.
-2. **`wp_usermeta` (Global Metadata)**: Stores tenant-wide configuration independent of specific projects:
+1. **`PLANAR_MTO_PROJECTS_LIST` (Metadata Index)**: A lightweight index stored in `wp_usermeta` or `localStorage` containing project headers (IDs, names, timestamps). This allows for rapid population of the Project Directory without loading heavy geometric payloads.
+2. **`PLANAR_MTO_PROJECT_<id>` (Full Payload)**: The complete serialized project state JSON blob.
+3. **"Save As" Directory Registration**: When forking a project, the system ensures atomic registration in both the metadata index and the payload store, fixing historical issues with directory index desynchronization.
+4. **`wp_planarmto_projects` Table**: (WordPress Mode) Stores serialized project states, metrics, and UUIDs strictly scoped by `tenant_id`.
+5. **`wp_usermeta` (Global Metadata)**: Stores tenant-wide configuration independent of specific projects:
    - **`planarmto_company_branding`**: Persists company identity (name, logo, contact info) across all projects.
    - **`planarmto_global_rates` (Master Rates)**: Stores the single-source-of-truth unit price template for materials and labor.
    - **Per-Category Timestamps**: Tracks `categoryLastUpdated` for each trade division (e.g., Electrical, Framing) within the master rate object, enabling granular tracking of pricing expiration.
@@ -416,23 +419,29 @@ Aggressive caching layers (SiteGround Optimizer, Nginx, Varnish) can often cache
 
 ## 8. Blueprint Underlay & Scale Calibration Pipeline
 
-### 8.1 Image Rehydration & Persistence
-Blueprint underlays are persisted within the `FloorplanState.underlay` object. To ensure seamless session restoration, the pipeline preserves:
+### 8.1 World Coordinate Bounding Box & Alignment
+Blueprint underlays are anchored strictly to **CAD World Coordinates** (`worldX`, `worldY`, `feetPerPixel`) within the `FloorplanState.underlay` object. This ensures that the underlay remains stationary relative to the architectural geometry even when the canvas is panned or zoomed. 
+
+To ensure seamless session restoration, the pipeline preserves:
 - **`url`**: The absolute or relative source of the image.
+- **`worldX`, `worldY`**: The top-left anchor point of the image in CAD feet.
+- **`feetPerPixel`**: The native scale factor derived from calibration.
 - **`opacity` & `isVisible`**: Rendering state properties.
 - **`isLocked`**: Interaction state preventing accidental dragging.
-- **`scale`**: Calculated pixel-to-foot multiplier.
-- **`offset`**: Vector displacement from canvas origin.
 
-### 8.2 Two-Point Calibration with Ortho-Locking
+### 8.2 Native Pixel Scale Calibration Pipeline
 The calibration tool establishes a mapping $M: \text{pixel} \to \text{foot}$ by measuring a reference segment of known length $L_{\text{ref}}$.
+- **Auto-Scaling Isolation**: Image auto-scaling logic is strictly isolated to initial file uploads. Post-calibration, the `feetPerPixel` property becomes the single source of truth, eliminating image inflation or misalignment during project reloads.
 - **Free-Floating Selection**: By default, the tool allows 360° rotation for the reference line to accommodate skewed scans.
 - **Shift-Key Ortho Lock**: Holding `Shift` constrains the calibration vector to the nearest 90° cardinal axis ($0^\circ, 90^\circ, 180^\circ, 270^\circ$).
 - **Calibration Formula**:
   $$\text{scale} = \frac{L_{\text{ref}}}{\|P_2 - P_1\|_{\text{pixel}}}$$
 
 ### 8.3 Interaction & Hit-Testing
-Rehydrated underlays maintain full interactivity. Hit-testing is reconnected on project load, allowing for selection and transformation of the blueprint image until `isLocked` is enabled.
+Rehydrated underlays maintain full interactivity.
+- **Interactive Alignment**: Unlocked blueprints support real-time drag-and-move positioning on the canvas.
+- **Center on Screen**: A dedicated action in the Inspector Panel calculates the viewport centroid and translates the underlay `worldX/worldY` to align the image center with the current view.
+- **Hit-Testing**: Hit-testing is reconnected on project load, allowing for selection and transformation of the blueprint image until `isLocked` is enabled.
 
 ---
 

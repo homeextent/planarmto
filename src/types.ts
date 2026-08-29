@@ -688,25 +688,14 @@ export interface MTOReport {
 }
 
 export interface UnderlayImage {
-  id: string;
-  src: string; // Base64 data URL or Object URL
-  width: number; // Native image pixel width
-  height: number; // Native image pixel height
-  x: number; // Canvas origin offset X
-  y: number; // Canvas origin offset Y
-  scale: number; // Pixels per foot scaling factor
-  opacity: number; // 0.1 to 1.0 (default: 0.5)
-  isLocked: boolean; // Prevent dragging when tracing
-  isVisible: boolean; // Show/hide toggle
-  // Keeping backward compatible naming for clarity if requested by internal components
-  blueprintUrl?: string; 
+  src: string;
   url?: string;
-  blueprintOpacity?: number;
-  blueprintScale?: number;
-  blueprintOffsetX?: number;
-  blueprintOffsetY?: number;
-  blueprintVisible?: boolean;
-  blueprintLocked?: boolean;
+  worldX: number; // Top-left corner X in World Feet relative to CAD (0,0)
+  worldY: number; // Top-left corner Y in World Feet relative to CAD (0,0)
+  feetPerPixel: number; // Single scale factor: World Feet per native image pixel
+  opacity: number;
+  isVisible: boolean;
+  isLocked: boolean;
 }
 
 export interface ClipboardState {

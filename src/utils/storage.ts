@@ -3,7 +3,34 @@ import { calculateMTO, calculateEstimatedCost, safeMergeRates } from '../engine/
 import { DEFAULT_UNIT_COST_RATES } from '../constants/rates';
 
 const BRANDING_STORAGE_KEY = 'planarmto_company_branding_v1';
-const PROJECTS_DIRECTORY_KEY = 'planarmto_saved_projects_v1';
+const PROJECTS_DIRECTORY_KEY = 'PLANAR_MTO_PROJECTS_LIST';
+const PROJECT_PREFIX = 'PLANAR_MTO_PROJECT_';
+
+/**
+ * Persists an individual project payload.
+ */
+async function saveProjectPayload(id: string | number, entry: SavedProjectEntry): Promise<void> {
+  if (isWP()) return; // WP handles its own persistence
+  try {
+    localStorage.setItem(`${PROJECT_PREFIX}${id}`, JSON.stringify(entry));
+  } catch (err) {
+    console.warn('Unable to persist project payload to localStorage:', err);
+  }
+}
+
+/**
+ * Retrieves a single project payload.
+ */
+export async function getProjectPayload(id: string | number): Promise<SavedProjectEntry | null> {
+  if (isWP()) return null; 
+  try {
+    const raw = localStorage.getItem(`${PROJECT_PREFIX}${id}`);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (err) {
+    return null;
+  }
+}
 const AUTOSAVE_STORAGE_KEY = 'planarmto_autosave_state_v1';
 const GLOBAL_RATES_STORAGE_KEY = 'planarmto_global_rates';
 
@@ -189,22 +216,38 @@ export async function getSavedProjects(): Promise<SavedProjectEntry[]> {
             // Rehydrate blueprint data for backward compatibility and completeness
             if (parsedState?.underlay) {
               const u = parsedState.underlay;
-              u.src = u.src || u.blueprintUrl || '';
-              u.url = u.src; // Ensure both src and url are present
-              u.blueprintUrl = u.src;
-              u.opacity = u.opacity !== undefined ? u.opacity : (u.blueprintOpacity !== undefined ? u.blueprintOpacity : 0.5);
-              u.blueprintOpacity = u.opacity;
-              u.scale = u.scale !== undefined ? u.scale : (u.blueprintScale !== undefined ? u.blueprintScale : 1.0);
-              u.blueprintScale = u.scale;
-              u.x = u.x !== undefined ? u.x : (u.blueprintOffsetX !== undefined ? u.blueprintOffsetX : 0);
-              u.blueprintOffsetX = u.x;
-              u.y = u.y !== undefined ? u.y : (u.blueprintOffsetY !== undefined ? u.blueprintOffsetY : 0);
-              u.blueprintOffsetY = u.y;
-              u.isVisible = u.isVisible !== undefined ? u.isVisible : (u.blueprintVisible !== undefined ? u.blueprintVisible : true);
-              u.blueprintVisible = u.isVisible;
-              u.isLocked = u.isLocked !== undefined ? u.isLocked : (u.blueprintLocked !== undefined ? u.blueprintLocked : false);
-              u.blueprintLocked = u.isLocked;
-              u.id = u.id || 'blueprint_main';
+              u.src = u.src || u.url || u.blueprintUrl || '';
+              u.url = u.url || u.src;
+              u.isVisible = u.isVisible !== undefined ? u.isVisible : true;
+              u.isLocked = u.isLocked !== undefined ? u.isLocked : false;
+              u.opacity = u.opacity !== undefined ? u.opacity : 0.5;
+              
+              // Map World Coordinates
+              u.worldX = u.worldX !== undefined ? u.worldX : (u.x !== undefined ? u.x : 0);
+              u.worldY = u.worldY !== undefined ? u.worldY : (u.y !== undefined ? u.y : 0);
+              
+              // Map Scale Factor
+              const savedFpp = u.feetPerPixel ?? u.scaleFactor;
+              u.feetPerPixel = typeof savedFpp === 'number' && savedFpp > 0 
+                ? savedFpp 
+                : (u.scale !== undefined ? (1 / u.scale) : 0.05);
+              
+              // Final fallback to ensure feetPerPixel is NEVER invalid
+              if (!Number.isFinite(u.feetPerPixel) || u.feetPerPixel <= 0) {
+                u.feetPerPixel = 0.05;
+              }
+
+              // Cleanup legacy fields if they exist
+              delete u.id;
+              delete u.width;
+              delete u.height;
+              delete u.scaleFactor;
+              delete u.rotation;
+              delete u.lastCenteredAt;
+              delete u.blueprintUrl;
+              delete u.x;
+              delete u.y;
+              delete u.scale;
             }
 
             if (parsedState?.settings?.costRates) {
@@ -224,12 +267,21 @@ export async function getSavedProjects(): Promise<SavedProjectEntry[]> {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed.map(p => {
+      const entries = await Promise.all(parsed.map(async (p) => {
+        // If it's a lightweight index entry, try to fetch the full payload if needed
+        // For the directory list, we usually don't need the full state, but getSavedProjects
+        // currently returns SavedProjectEntry which includes state.
+        if (!p.state) {
+          const full = await getProjectPayload(p.id);
+          if (full) return full;
+        }
+
         if (p.state?.settings?.costRates) {
           p.state.settings.costRates = safeMergeRates(p.state.settings.costRates);
         }
         return p;
-      }).sort((a, b) => b.updatedAt - a.updatedAt);
+      }));
+      return entries.sort((a, b) => b.updatedAt - a.updatedAt);
     }
     return [];
   } catch (err) {
@@ -272,15 +324,6 @@ export async function saveProjectToDirectory(
       ...state,
       underlay: state.underlay ? {
         ...state.underlay,
-        // Sync properties before saving to ensure both naming conventions are preserved
-        blueprintUrl: state.underlay.src,
-        blueprintOpacity: state.underlay.opacity,
-        blueprintScale: state.underlay.scale,
-        blueprintOffsetX: state.underlay.x,
-        blueprintOffsetY: state.underlay.y,
-        blueprintVisible: state.underlay.isVisible,
-        blueprintLocked: state.underlay.isLocked,
-        url: state.underlay.src
       } : undefined,
       settings: {
         ...state.settings,
@@ -311,8 +354,9 @@ export async function saveProjectToDirectory(
   const projects = await getSavedProjects();
   const now = Date.now();
   const targetId = payload.id;
-  const existingIndex = targetId ? projects.findIndex((p) => p.id === targetId) : -1;
   const entryId = targetId || `proj_${now}_${Math.random().toString(36).substr(2, 6)}`;
+  
+  const existingIndex = projects.findIndex((p) => p.id === entryId);
   const entryCreatedAt = existingIndex >= 0 ? projects[existingIndex].createdAt : now;
 
   const newEntry: SavedProjectEntry = {
@@ -322,10 +366,17 @@ export async function saveProjectToDirectory(
     updatedAt: now,
   };
 
+  // 1. Save the full payload
+  await saveProjectPayload(entryId, newEntry);
+
+  // 2. Update the master index (strip state for the index list to keep it light)
+  const indexEntry = { ...newEntry };
+  delete (indexEntry as any).state;
+
   if (existingIndex >= 0) {
-    projects[existingIndex] = newEntry;
+    projects[existingIndex] = indexEntry as any;
   } else {
-    projects.unshift(newEntry);
+    projects.unshift(indexEntry as any);
   }
 
   try {
@@ -352,6 +403,7 @@ export async function deleteProjectFromDirectory(id: string | number): Promise<S
   const projects = (await getSavedProjects()).filter((p) => p.id !== id);
   try {
     localStorage.setItem(PROJECTS_DIRECTORY_KEY, JSON.stringify(projects));
+    localStorage.removeItem(`${PROJECT_PREFIX}${id}`);
   } catch (err) {
     console.warn('Unable to update project directory after delete:', err);
   }
@@ -381,8 +433,18 @@ export async function renameProjectInDirectory(id: string | number, newName: str
   const projects = await getSavedProjects();
   const index = projects.findIndex((p) => p.id === id);
   if (index >= 0) {
-    projects[index].name = newName.trim() || 'Untitled Project';
-    projects[index].updatedAt = Date.now();
+    const project = projects[index];
+    project.name = newName.trim() || 'Untitled Project';
+    project.updatedAt = Date.now();
+    
+    // Update individual payload as well if it exists
+    const fullProject = await getProjectPayload(id);
+    if (fullProject) {
+      fullProject.name = project.name;
+      fullProject.updatedAt = project.updatedAt;
+      await saveProjectPayload(id, fullProject);
+    }
+
     try {
       localStorage.setItem(PROJECTS_DIRECTORY_KEY, JSON.stringify(projects));
     } catch (err) {
