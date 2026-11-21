@@ -21,13 +21,15 @@
 - **Sub-Pixel Precision**: Enforces true interior clear-space drafting capabilities via a synchronized dual-geometry pipeline.
 - **Active Wall Type Presets**: Pre-selection of wall framing assemblies (Interior 2x4, Exterior 2x6, Foundation 10") prior to drafting, ensuring new segments inherit correct thickness and cladding properties instantly.
 - **Universal Aperture Type Switcher & Inch Presets**: Integrated an Aperture Type switcher allowing instant conversion between door and window types, with inch-based dimension inputs (width/height in inches) and common architectural quick size presets.
-- **Parametric Apertures**:
+- **Parametric Apertures & Smart Boundary Clamping**:
   - Doors: Passage, Exterior, Pocket (with slide direction toggle), Bifold Single (30"), Bifold Double (60"), Patio Sliders, and Overhead Garage. Features an **Expanded 8-Tier Door Rate Model** with unique rate keys for each subtype.
   - Windows: Standard, Picture, Slider with dynamic style multipliers (Slider 1.0x, Fixed Picture 0.85x, Casement Crank 1.25x) and exterior color finish scaling (White Vinyl 1.0x, Black Exterior 1.175x). Standard window stamp initial placement defaults to 36" W × 48" H.
   - Openings: Cased wall openings / archways that preserve room topology for flooring and ceiling take-offs.
+  - **Boundary Clamping & Overlap Prevention**: Enforces a minimum 1" jamb allowance from corners/ends during placement and property adjustments; automatically pushes overlapping apertures along the wall to maintain physical realism.
+  - **Structural Header Framing Take-Off**: Automatically calculates doubled 2x header lumber linear footage (`apertureHeadersLf`) for every window and door rough opening.
 - **Exterior Trim & Capping Engine**: Dynamic linear foot (LF) exterior opening trim calculations for Windows and Exterior Doors, supporting Standard Nailing Fin, 2" Vinyl Brickmold, Aluminum Site-Brake Capping, and Vinyl Brickmold + Sub-Sill Nose.
 - **Architectural Stamps**: Placed fixtures with automatic clearance envelope visualization (toilets, sinks, bathtubs, kitchen islands, appliances, LED potlights, GFCI receptacles, 240V EV chargers, subpanels, HVAC condensing units). Includes **4-Tier Water Heater Spec Engine** (40-Gal Tank, 50-Gal Tank, Tankless Gas/Electric, Hybrid Heat Pump Tank).
-- **Hardscapes & Decks**: Outer structural zones including composite decks with ledger boards, footings, framing, concrete driveways, and paver patios.
+- **Hardscapes & Decks (Ledger vs. Freestanding Railing)**: Outer structural zones including composite decks with automatic house ledger edge detection (`computeDeckLedger`), separating structural ledger board attachment LF from open perimeter railing LF.
 - **Dimensioning & Annotations**: Aligned dimension strings and leader text callouts. Canvas aperture labels are formatted in rounded whole inches (e.g., `D32"x80"`, `W36"x48"`) for professional clarity.
 
 ### 2. Computational Geometry & Automatic Room Face Detection

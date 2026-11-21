@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.13.0] - 2026-11-21
+
+### Added
+- **Planar Graph Crossing Wall Partitioning**: Automatic intersection and splitting of crossing walls into continuous Planar Straight Line Graph (PSLG) sub-edges via `partitionCrossingWalls()`, ensuring accurate half-edge face cycle and room polygon detection.
+- **Aperture Smart Boundary Clamping & Overlap Prevention**: Implemented geometric clamping to guarantee a minimum 1" jamb allowance from wall corners/ends during canvas click placement and InspectorPanel offset/preset adjustments. Added automatic overlap detection to prevent stacked apertures.
+- **Structural Header Framing Take-Off**: Integrated doubled 2x structural header lumber linear footage (`apertureHeadersLf`) for all rough openings into Carpentry & Framing take-off metrics, live MTO matrix, and contractor bid exports.
+- **Deck Ledger Edge-Detection Engine**: Added `computeDeckLedger()` to detect deck polygon edges parallel to and within $0.75\text{ ft}$ of exterior building walls, automatically separating structural ledger board attachment linear footage from open, freestanding perimeter guardrailing (`deckPerimeterRailingLf`).
+- **Deck Inspector Metrics**: Added real-time House Ledger LF and Open Railing LF status cards to the Timber Deck inspector panel.
+
+### Fixed
+- **OSNAP Loop Closure & Termination**: Ending a wall chain back onto the starting vertex commits the wall cycle and terminates the drafting pen cleanly without trailing rubber-band micro-segments.
+- **Drag History Stack Debouncing**: Repaired undo/redo stack flushing during canvas element dragging; drag frames update without polluting the undo stack, committing a single transaction on mouse-up.
+- **Universal Aperture Offset Controls**: Unlocked wall position and offset slider controls for all aperture types, allowing fine-tuned placement of windows and doors alike.
+
 ## [2.12.0] - 2026-08-29
 
 ### Added

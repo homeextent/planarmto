@@ -884,7 +884,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
     const hostWall = state.walls.find((w) => w.id === ap.wallId);
     const hostGeom = hostWall ? getWallGeometry(hostWall, nodeMap) : null;
     const wallLength = hostGeom ? hostGeom.length : 10;
-    const maxOffset = Math.max(0, wallLength - ap.width);
+    const minJamb = 1 / 12; // 1" minimum jamb from wall ends
+    const maxSafeWidth = Math.max(minJamb, wallLength - 2 * minJamb);
+    const maxOffset = Math.max(minJamb, wallLength - ap.width - minJamb);
 
     const isWindow = ap.type.startsWith('window_');
     const isDoor = !isWindow;
@@ -909,7 +911,12 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
     };
 
     const handleWidthChange = (width: number) => {
-      handleUpdateAperture({ width: Math.max(1.0 / 12, width) });
+      const safeWidth = Math.min(maxSafeWidth, Math.max(1.0 / 12, width));
+      const clampedOffset = Math.max(minJamb, Math.min(wallLength - safeWidth - minJamb, ap.offset));
+      handleUpdateAperture({
+        width: Math.round(safeWidth * 100) / 100,
+        offset: Math.round(clampedOffset * 100) / 100,
+      });
     };
 
     const handleHeightChange = (height: number) => {
@@ -917,8 +924,20 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
     };
 
     const handleOffsetChange = (offset: number) => {
-      const clampedOffset = Math.max(0, Math.min(maxOffset, offset));
+      const clampedOffset = Math.max(minJamb, Math.min(maxOffset, offset));
       handleUpdateAperture({ offset: Math.round(clampedOffset * 100) / 100 });
+    };
+
+    const handlePresetOrTypeChange = (w: number, h: number, type?: ApertureType) => {
+      const safeWidth = Math.min(maxSafeWidth, Math.max(1.0 / 12, w));
+      const clampedOffset = Math.max(minJamb, Math.min(wallLength - safeWidth - minJamb, ap.offset));
+      const updates: Partial<typeof ap> = {
+        width: Math.round(safeWidth * 100) / 100,
+        height: Math.round(h * 100) / 100,
+        offset: Math.round(clampedOffset * 100) / 100,
+      };
+      if (type) updates.type = type;
+      handleUpdateAperture(updates);
     };
 
     const handleWindowFinishChange = (windowFinish: 'white' | 'black') => {
@@ -961,11 +980,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               onChange={(e) => {
                 const selected = apertureOptions.find(opt => opt.type === e.target.value);
                 if (selected) {
-                  handleUpdateAperture({ 
-                    type: selected.type as ApertureType,
-                    width: selected.w,
-                    height: selected.h
-                  });
+                  handlePresetOrTypeChange(selected.w, selected.h, selected.type as ApertureType);
                 }
               }}
               className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
@@ -1104,7 +1119,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                 ].map((preset) => (
                   <button
                     key={preset.label}
-                    onClick={() => handleUpdateAperture({ width: preset.w / 12, height: preset.h / 12 })}
+                    onClick={() => handlePresetOrTypeChange(preset.w / 12, preset.h / 12)}
                     className="py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] rounded border border-slate-700 font-mono"
                   >
                     {preset.label}
@@ -1115,53 +1130,55 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
           )}
 
           {isDoor && (
+            <div className="space-y-2">
+              <div className="text-[9px] uppercase font-bold text-slate-500">Door Quick Presets (IN)</div>
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { w: 30, h: 80, label: '30"x80"' },
+                  { w: 32, h: 80, label: '32"x80"' },
+                  { w: 36, h: 80, label: '36"x80"' },
+                  { w: 60, h: 80, label: '60"x80"' },
+                  { w: 72, h: 80, label: '72"x80"' },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    onClick={() => handlePresetOrTypeChange(preset.w / 12, preset.h / 12)}
+                    className="py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] rounded border border-slate-700 font-mono"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Wall Position & Offset Callout (Doors & Windows) */}
+          <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold text-slate-400">
+                Wall Offset Position
+              </span>
+              <span className="text-[11px] font-mono text-sky-400 font-bold">
+                {ap.offset.toFixed(2)} ft
+              </span>
+            </div>
+            <input
+              type="range"
+              min={minJamb}
+              max={maxOffset}
+              step="0.25"
+              value={ap.offset}
+              onChange={(e) => handleOffsetChange(parseFloat(e.target.value) || 0)}
+              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-400"
+            />
+            <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+              <span>⟵ Start: {distFromStart.toFixed(2)}'</span>
+              <span>End: {distFromEnd.toFixed(2)}' ⟶</span>
+            </div>
+          </div>
+
+          {isDoor && (
             <>
-              <div className="space-y-2">
-                <div className="text-[9px] uppercase font-bold text-slate-500">Door Quick Presets (IN)</div>
-                <div className="grid grid-cols-3 gap-1">
-                  {[
-                    { w: 30, h: 80, label: '30"x80"' },
-                    { w: 32, h: 80, label: '32"x80"' },
-                    { w: 36, h: 80, label: '36"x80"' },
-                    { w: 60, h: 80, label: '60"x80"' },
-                    { w: 72, h: 80, label: '72"x80"' },
-                  ].map((preset) => (
-                    <button
-                      key={preset.label}
-                      onClick={() => handleUpdateAperture({ width: preset.w / 12, height: preset.h / 12 })}
-                      className="py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] rounded border border-slate-700 font-mono"
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Wall Position & Offset Callout */}
-              <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">
-                    Wall Offset Position
-                  </span>
-                  <span className="text-[11px] font-mono text-sky-400 font-bold">
-                    {ap.offset.toFixed(2)} ft
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max={maxOffset}
-                  step="0.25"
-                  value={ap.offset}
-                  onChange={(e) => handleOffsetChange(parseFloat(e.target.value) || 0)}
-                  className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                />
-                <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                  <span>⟵ Start: {distFromStart.toFixed(2)}'</span>
-                  <span>End: {distFromEnd.toFixed(2)}' ⟶</span>
-                </div>
-              </div>
-
               {/* Swing, Hinge & Inversion Actions */}
               <div className="pt-2 border-t border-slate-800 space-y-2">
                 <label className="text-[10px] uppercase font-bold text-slate-400 block">
@@ -1497,8 +1514,16 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               <div className="text-sm font-bold text-amber-400 font-mono">{deck.area} SF</div>
             </div>
             <div>
-              <div className="text-[10px] text-slate-400 uppercase font-medium">Guardrail Perim</div>
+              <div className="text-[10px] text-slate-400 uppercase font-medium">Total Perimeter</div>
               <div className="text-sm font-bold text-sky-400 font-mono">{deck.perimeter} LF</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-medium">House Ledger</div>
+              <div className="text-sm font-bold text-emerald-400 font-mono">{deck.ledgerLengthLf ?? 0} LF</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-medium">Open Railing</div>
+              <div className="text-sm font-bold text-teal-400 font-mono">{Math.max(0, Math.round((deck.perimeter - (deck.ledgerLengthLf ?? 0)) * 100) / 100)} LF</div>
             </div>
           </div>
 

@@ -1001,3 +1001,49 @@ export function partitionCrossingWalls(
 
   return { nodes: nextNodes, walls: nextWalls, apertures: nextApertures };
 }
+
+/**
+ * Computes how much of a deck polygon perimeter is adjacent to (and thus "ledgered" against)
+ * exterior building walls. Each deck edge is tested; if its midpoint lies within `snapThresholdFt`
+ * of an exterior wall segment and the two are parallel (angle diff < 5°), that edge length
+ * is counted as ledger board. Returns the total ledger LF.
+ */
+export function computeDeckLedger(
+  deckPoints: Array<Point2D>,
+  walls: CadWall[],
+  nodeMap: Map<string, CadNode>,
+  snapThresholdFt = 0.75
+): number {
+  let ledgerLf = 0;
+
+  for (let i = 0; i < deckPoints.length; i++) {
+    const p1 = deckPoints[i];
+    const p2 = deckPoints[(i + 1) % deckPoints.length];
+    const edgeMid: Point2D = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+    const edgeLen = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+    if (edgeLen < 0.01) continue;
+    const edgeDirX = (p2.x - p1.x) / edgeLen;
+    const edgeDirY = (p2.y - p1.y) / edgeLen;
+
+    for (const wall of walls) {
+      const wn1 = nodeMap.get(wall.startNodeId);
+      const wn2 = nodeMap.get(wall.endNodeId);
+      if (!wn1 || !wn2) continue;
+      const proj = projectPointOntoSegment(edgeMid, wn1, wn2);
+      if (proj.distance > snapThresholdFt) continue;
+
+      // Parallel check: dot product of unit direction vectors close to ±1
+      const wallLen = Math.sqrt((wn2.x - wn1.x) ** 2 + (wn2.y - wn1.y) ** 2);
+      if (wallLen < 0.01) continue;
+      const wallDirX = (wn2.x - wn1.x) / wallLen;
+      const wallDirY = (wn2.y - wn1.y) / wallLen;
+      const dot = Math.abs(edgeDirX * wallDirX + edgeDirY * wallDirY);
+      if (dot < 0.985) continue; // > ~10° divergence → not parallel
+
+      ledgerLf += edgeLen;
+      break; // matched a wall for this edge
+    }
+  }
+
+  return Math.round(ledgerLf * 100) / 100;
+}

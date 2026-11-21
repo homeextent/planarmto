@@ -913,6 +913,19 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
             <td class="num"><strong>$${(((mto.baseboardTrimsLf + mto.apertureCasingLf) * (r.baseboardPerLf.material + r.baseboardPerLf.labor) * waste)).toFixed(2)}</strong></td>
           </tr>`);
         }
+        if (mto.apertureHeadersLf > 0) {
+          rows.push(`
+          <tr>
+            <td style="padding-left: 18px;">Structural Headers (Openings)</td>
+            <td class="num">${mto.apertureHeadersLf}</td>
+            <td class="num">LF</td>
+            <td class="num">-</td>
+            <td class="num">-</td>
+            <td class="num">-</td>
+            <td class="num">-</td>
+            <td class="num"><strong>-</strong></td>
+          </tr>`);
+        }
 
         if (rows.length === 0) return '';
         return `
@@ -1009,6 +1022,45 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
             <td class="num">$${(mto.roofingAreaSq * r.roofingPerSq.material * waste).toFixed(2)}</td>
             <td class="num">$${(mto.roofingAreaSq * r.roofingPerSq.labor * waste).toFixed(2)}</td>
             <td class="num"><strong>$${(mto.roofingAreaSq * (r.roofingPerSq.material + r.roofingPerSq.labor) * waste).toFixed(2)}</strong></td>
+          </tr>`);
+        }
+        if (mto.timberDeckingSf > 0) {
+          rows.push(`
+          <tr>
+            <td style="padding-left: 18px;">Timber Decking</td>
+            <td class="num">${mto.timberDeckingSf}</td>
+            <td class="num">SF</td>
+            <td class="num">$${r.deckingPerSf.material.toFixed(2)}</td>
+            <td class="num">$${r.deckingPerSf.labor.toFixed(2)}</td>
+            <td class="num">$${(mto.timberDeckingSf * r.deckingPerSf.material * waste).toFixed(2)}</td>
+            <td class="num">$${(mto.timberDeckingSf * r.deckingPerSf.labor * waste).toFixed(2)}</td>
+            <td class="num"><strong>$${(mto.timberDeckingSf * (r.deckingPerSf.material + r.deckingPerSf.labor) * waste).toFixed(2)}</strong></td>
+          </tr>`);
+        }
+        if (mto.deckLedgerLf > 0) {
+          rows.push(`
+          <tr>
+            <td style="padding-left: 18px;">Deck Ledger Board (Bolted to Framing)</td>
+            <td class="num">${mto.deckLedgerLf}</td>
+            <td class="num">LF</td>
+            <td class="num">-</td>
+            <td class="num">-</td>
+            <td class="num">-</td>
+            <td class="num">-</td>
+            <td class="num"><strong>-</strong></td>
+          </tr>`);
+        }
+        if (mto.deckPerimeterRailingLf > 0) {
+          rows.push(`
+          <tr>
+            <td style="padding-left: 18px;">Deck Perimeter Railing (Freestanding)</td>
+            <td class="num">${mto.deckPerimeterRailingLf}</td>
+            <td class="num">LF</td>
+            <td class="num">-</td>
+            <td class="num">-</td>
+            <td class="num">-</td>
+            <td class="num">-</td>
+            <td class="num"><strong>-</strong></td>
           </tr>`);
         }
 
@@ -1325,6 +1377,18 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
         ((mto.baseboardTrimsLf + mto.apertureCasingLf) * r.baseboardPerLf.labor * waste).toFixed(2),
         (((mto.baseboardTrimsLf + mto.apertureCasingLf) * (r.baseboardPerLf.material + r.baseboardPerLf.labor) * waste)).toFixed(2),
       ]] : []),
+      ...(mto.apertureHeadersLf > 0 ? [[
+        '2. Framing & Carpentry',
+        'Structural Headers (Openings)',
+        mto.apertureHeadersLf,
+        'LF',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+      ]] : []),
       ...fenestrationRows.map(row => [
         '3. Fenestration',
         row.name,
@@ -1372,6 +1436,30 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
         (mto.roofingAreaSq * r.roofingPerSq.material * waste).toFixed(2),
         (mto.roofingAreaSq * r.roofingPerSq.labor * waste).toFixed(2),
         (mto.roofingAreaSq * (r.roofingPerSq.material + r.roofingPerSq.labor) * waste).toFixed(2),
+      ]] : []),
+      ...(mto.deckLedgerLf > 0 ? [[
+        '7. Roofing & Envelope',
+        'Deck Ledger Board',
+        mto.deckLedgerLf,
+        'LF',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+      ]] : []),
+      ...(mto.deckPerimeterRailingLf > 0 ? [[
+        '7. Roofing & Envelope',
+        'Deck Perimeter Railing (Freestanding)',
+        mto.deckPerimeterRailingLf,
+        'LF',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
       ]] : []),
       ['', 'MATERIAL SUBTOTAL', '', '', '', '', '', `$${costAnalysis.materialSubtotal.toFixed(2)}`, '', ''],
       ['', 'LABOR SUBTOTAL', '', '', '', '', '', '', `$${costAnalysis.laborSubtotal.toFixed(2)}`, ''],
@@ -1893,6 +1981,20 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
                           </tr>
                         );
                       }
+                      if (mto.apertureHeadersLf > 0) {
+                        rows.push(
+                          <tr key="headers">
+                            <td className="p-2 pl-4 text-slate-300">Structural Headers (Openings)</td>
+                            <td className="p-2 text-right font-mono">{mto.apertureHeadersLf}</td>
+                            <td className="p-2 text-slate-400">LF</td>
+                            <td className="p-2 text-right font-mono text-slate-400">-</td>
+                            <td className="p-2 text-right font-mono text-slate-400">-</td>
+                            <td className="p-2 text-right font-mono text-slate-400">-</td>
+                            <td className="p-2 text-right font-mono text-slate-400">-</td>
+                            <td className="p-2 text-right font-mono font-semibold text-slate-400">-</td>
+                          </tr>
+                        );
+                      }
 
                       if (rows.length === 0) return null;
                       return (
@@ -1990,6 +2092,48 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
                             <td className="p-2 text-right font-mono">${(mto.roofingAreaSq * activeRates.roofingPerSq.material * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             <td className="p-2 text-right font-mono">${(mto.roofingAreaSq * activeRates.roofingPerSq.labor * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             <td className="p-2 text-right font-mono font-semibold">${(mto.roofingAreaSq * (activeRates.roofingPerSq.material + activeRates.roofingPerSq.labor) * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          </tr>
+                        );
+                      }
+                      if (mto.timberDeckingSf > 0) {
+                        rows.push(
+                          <tr key="decking">
+                            <td className="p-2 pl-4 text-slate-300">Timber Decking</td>
+                            <td className="p-2 text-right font-mono">{mto.timberDeckingSf.toLocaleString()}</td>
+                            <td className="p-2 text-slate-400">SF</td>
+                            <td className="p-2 text-right font-mono text-slate-400">${activeRates.deckingPerSf.material.toFixed(2)}</td>
+                            <td className="p-2 text-right font-mono text-slate-400">${activeRates.deckingPerSf.labor.toFixed(2)}</td>
+                            <td className="p-2 text-right font-mono">${(mto.timberDeckingSf * activeRates.deckingPerSf.material * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="p-2 text-right font-mono">${(mto.timberDeckingSf * activeRates.deckingPerSf.labor * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="p-2 text-right font-mono font-semibold">${(mto.timberDeckingSf * (activeRates.deckingPerSf.material + activeRates.deckingPerSf.labor) * waste).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          </tr>
+                        );
+                      }
+                      if (mto.deckLedgerLf > 0) {
+                        rows.push(
+                          <tr key="deckLedger">
+                            <td className="p-2 pl-4 text-slate-300">Deck Ledger Board (Bolted to Framing)</td>
+                            <td className="p-2 text-right font-mono">{mto.deckLedgerLf}</td>
+                            <td className="p-2 text-slate-400">LF</td>
+                            <td className="p-2 text-right font-mono text-slate-400">-</td>
+                            <td className="p-2 text-right font-mono text-slate-400">-</td>
+                            <td className="p-2 text-right font-mono text-slate-400">-</td>
+                            <td className="p-2 text-right font-mono text-slate-400">-</td>
+                            <td className="p-2 text-right font-mono font-semibold text-slate-400">-</td>
+                          </tr>
+                        );
+                      }
+                      if (mto.deckPerimeterRailingLf > 0) {
+                        rows.push(
+                          <tr key="deckRailing">
+                            <td className="p-2 pl-4 text-slate-300">Deck Perimeter Railing (Freestanding)</td>
+                            <td className="p-2 text-right font-mono">{mto.deckPerimeterRailingLf}</td>
+                            <td className="p-2 text-slate-400">LF</td>
+                            <td className="p-2 text-right font-mono text-slate-400">-</td>
+                            <td className="p-2 text-right font-mono text-slate-400">-</td>
+                            <td className="p-2 text-right font-mono text-slate-400">-</td>
+                            <td className="p-2 text-right font-mono text-slate-400">-</td>
+                            <td className="p-2 text-right font-mono font-semibold text-slate-400">-</td>
                           </tr>
                         );
                       }

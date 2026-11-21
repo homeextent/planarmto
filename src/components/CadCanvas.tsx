@@ -32,6 +32,7 @@ import {
   mergeCoincidentNodes,
   deduplicateWalls,
   partitionCrossingWalls,
+  computeDeckLedger,
 } from '../engine/cadMath';
 import { getRoomCategory } from '../engine/roomCategories';
 import { DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT } from '../constants/stamps';
@@ -2435,7 +2436,36 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         else if (activeTool === 'aperture_bifold_single') { apType = 'door_bifold_single'; width = 2.5; }
         else if (activeTool === 'aperture_bifold_double') { apType = 'door_bifold_double'; width = 5.0; }
         else if (activeTool === 'aperture_cased_opening') { apType = 'cased_opening'; width = 3.0; }
-        const newAperture: Aperture = { id: `ap_${Date.now()}`, wallId: hitWall.id, offset: Math.round(hitOffset * 10) / 10, width, height, type: apType, swingSide: 'inward' };
+
+        // Boundary clamp: keep aperture fully within wall (min 1" jamb from each end)
+        const wallGeom = getWallGeometry(hitWall, nodeMap);
+        const wallLen = wallGeom ? wallGeom.length : width + 2;
+        const minJamb = 1 / 12; // 1 inch minimum from wall end
+        const halfW = width / 2;
+        let clampedOffset = Math.max(minJamb, Math.min(wallLen - width - minJamb, hitOffset - halfW));
+
+        // Overlap prevention: push new aperture away from existing apertures on this wall
+        const existingOnWall = state.apertures.filter((a) => a.wallId === (hitWall as CadWall).id);
+        existingOnWall.sort((a, b) => a.offset - b.offset);
+        for (const existing of existingOnWall) {
+          const existEnd = existing.offset + existing.width;
+          const newEnd = clampedOffset + width;
+          // Overlap: push right past existing
+          if (clampedOffset < existEnd && newEnd > existing.offset) {
+            if (clampedOffset + halfW < existing.offset + existing.width / 2) {
+              // Cursor is left of existing center → push left
+              clampedOffset = Math.max(minJamb, existing.offset - width - minJamb / 2);
+            } else {
+              // Cursor is right of existing center → push right
+              clampedOffset = Math.min(wallLen - width - minJamb, existEnd + minJamb / 2);
+            }
+          }
+        }
+
+        // Final clamp after overlap resolution
+        clampedOffset = Math.max(minJamb, Math.min(wallLen - width - minJamb, clampedOffset));
+
+        const newAperture: Aperture = { id: `ap_${Date.now()}`, wallId: (hitWall as CadWall).id, offset: Math.round(clampedOffset * 100) / 100, width, height, type: apType, swingSide: 'inward' };
         onChange({ ...state, apertures: [...state.apertures, newAperture] });
         onSelect({ type: 'aperture', id: newAperture.id });
         if (!isStickyMode) { onToolChange('select'); }
@@ -2772,12 +2802,20 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       const partitioned = partitionCrossingWalls(mergedNodes, finalWalls, finalApertures);
       const reDetectedRooms = detectRoomFaces(partitioned.nodes, partitioned.walls, finalRooms, state.settings.defaultWallHeight);
 
+      const nodeMap = new Map<string, CadNode>();
+      partitioned.nodes.forEach((n) => nodeMap.set(n.id, n));
+      const nextDecks = state.decks.map((deck) => ({
+        ...deck,
+        ledgerLengthLf: computeDeckLedger(deck.points, partitioned.walls, nodeMap),
+      }));
+
       const finalState: FloorplanState = {
         ...state,
         nodes: partitioned.nodes,
         walls: partitioned.walls,
         rooms: reDetectedRooms,
         apertures: partitioned.apertures,
+        decks: nextDecks,
       };
 
       onChange(finalState, true, dragInitialStateRef.current);
@@ -2790,8 +2828,14 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     const { walls: finalWalls, rooms: finalRooms, apertures: finalApertures } = deduplicateWalls(mergedWalls, mergedRooms, state.apertures, mergedNodes);
     const partitioned = partitionCrossingWalls(mergedNodes, finalWalls, finalApertures);
     const reDetectedRooms = detectRoomFaces(partitioned.nodes, partitioned.walls, finalRooms, state.settings.defaultWallHeight);
+    const nodeMap = new Map<string, CadNode>();
+    partitioned.nodes.forEach((n) => nodeMap.set(n.id, n));
+    const nextDecks = state.decks.map((deck) => ({
+      ...deck,
+      ledgerLengthLf: computeDeckLedger(deck.points, partitioned.walls, nodeMap),
+    }));
     if (finalWalls.length !== state.walls.length || mergedNodes.length !== state.nodes.length || finalApertures.length !== state.apertures.length || reDetectedRooms.length !== state.rooms.length) {
-      onChange({ ...state, nodes: partitioned.nodes, walls: partitioned.walls, rooms: reDetectedRooms, apertures: partitioned.apertures });
+      onChange({ ...state, nodes: partitioned.nodes, walls: partitioned.walls, rooms: reDetectedRooms, apertures: partitioned.apertures, decks: nextDecks });
     }
     dragInitialStateRef.current = null;
     setHasMovedDuringDrag(false);

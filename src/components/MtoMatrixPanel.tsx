@@ -239,6 +239,18 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
       ],
       [
         '2. Carpentry & Framing',
+        'Structural Headers (Openings)',
+        mto.apertureHeadersLf,
+        'LF',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+      ],
+      [
+        '2. Carpentry & Framing',
         'Support Columns / Posts',
         mto.supportColumnsPosts,
         'POSTS',
@@ -660,6 +672,30 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
         (mto.timberDeckingSf * (r.deckingPerSf?.material ?? DEFAULT_UNIT_COST_RATES.deckingPerSf.material)).toFixed(2),
         (mto.timberDeckingSf * (r.deckingPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.deckingPerSf.labor)).toFixed(2),
         (mto.timberDeckingSf * ((r.deckingPerSf?.material ?? DEFAULT_UNIT_COST_RATES.deckingPerSf.material) + (r.deckingPerSf?.labor ?? DEFAULT_UNIT_COST_RATES.deckingPerSf.labor))).toFixed(2),
+      ],
+      [
+        '7. Roofing & Envelope',
+        'Deck Ledger Board',
+        mto.deckLedgerLf,
+        'LF',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+      ],
+      [
+        '7. Roofing & Envelope',
+        'Deck Perimeter Railing (Freestanding)',
+        mto.deckPerimeterRailingLf,
+        'LF',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
       ],
 
       // Rollups
@@ -1135,6 +1171,12 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 itemKey="structuralBeams"
                 isItemExcluded={!isItemIncluded('structuralBeams')}
                 onToggleItem={onToggleItemInclusion}
+              />
+              <MetricRow
+                label="Structural Headers (Openings)"
+                value={mto.apertureHeadersLf}
+                unit="LF"
+                subtext="Doubled 2x header lumber"
               />
               <MetricRow
                 label="Support Columns"
@@ -2182,9 +2224,16 @@ export const MtoMatrixPanel: React.FC<MtoMatrixPanelProps> = ({
                 onToggleItem={onToggleItemInclusion}
               />
               <MetricRow
+                label="Deck Ledger Board"
+                value={mto.deckLedgerLf}
+                unit="LF"
+                subtext="Bolted to house framing"
+              />
+              <MetricRow
                 label="Deck Perimeter Railing"
                 value={mto.deckPerimeterRailingLf}
                 unit="LF"
+                subtext="Open / freestanding edges"
                 cost={0}
                 isCategoryExcluded={!isIncluded('roofingEnvelope')}
                 itemKey="deckRailing"

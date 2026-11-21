@@ -586,6 +586,7 @@ export interface MTOReport {
   wallStudCount: number;
   osbSubfloorDeckingSf: number;
   structuralBeamsLf: number;
+  apertureHeadersLf: number; // LF of structural header lumber (king+jack studs, header beam) for all openings
   supportColumnsPosts: number;
   baseboardTrimsLf: number;
   apertureCasingLf: number;
@@ -658,7 +659,8 @@ export interface MTOReport {
   fasciaTotalLf: number;
   eavestroughsLf: number;
   timberDeckingSf: number;
-  deckPerimeterRailingLf: number;
+  deckPerimeterRailingLf: number; // Freestanding (non-ledger) edges that need railing
+  deckLedgerLf: number; // LF of deck edges bolted to building ledger board
   siteHardscapingSf: number;
 
   // Detailed breakdowns for inspector / itemization

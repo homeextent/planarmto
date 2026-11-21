@@ -24,6 +24,7 @@ import {
   getWallThickness,
   getVariableOffsetPolygon,
   getCoreThickness,
+  computeDeckLedger,
 } from './cadMath';
 
 /**
@@ -213,6 +214,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
 
   let totalWallStudFramingLf = 0;
   let totalStudCount = 0;
+  let totalApertureHeadersLf = 0;
   let totalDrywall12Sf = 0;
   let totalDrywall58Sf = 0;
   let totalDrywallGreenboard12Sf = 0;
@@ -244,10 +246,15 @@ export function calculateMTO(state: FloorplanState): MTOReport {
 
     // Studs calculation
     const studSpacingFt = (wall.customStudSpacing || settings.studSpacingInches) / 12;
+    // Each aperture adds 2 king studs + 2 jack studs in the stud count
     const studsInWall = wall.wallType === 'foundation_wall' ? 0 : (Math.ceil(wallLength / studSpacingFt) + 2 + wallAps.length * 2);
     totalStudCount += studsInWall;
     if (wall.wallType !== 'foundation_wall') {
       totalWallStudFramingLf += wallLength;
+      // Aperture header framing: each opening needs a doubled 2x header = 2 × (width + 0.5ft jack allowance)
+      wallAps.forEach((ap) => {
+        totalApertureHeadersLf += 2 * (ap.width + 0.5);
+      });
     }
 
     let extNetArea = 0;
@@ -752,9 +759,13 @@ export function calculateMTO(state: FloorplanState): MTOReport {
   // Deck & Hardscape
   let timberDeckingSf = 0;
   let deckPerimeterRailingLf = 0;
+  let deckLedgerLf = 0;
   decks.forEach((deck) => {
     timberDeckingSf += deck.area;
-    deckPerimeterRailingLf += deck.perimeter;
+    // ledgerLengthLf is the portion attached to building — excluded from open railing
+    const ledger = deck.ledgerLengthLf !== undefined ? deck.ledgerLengthLf : computeDeckLedger(deck.points, walls, nodeMap);
+    deckLedgerLf += ledger;
+    deckPerimeterRailingLf += Math.max(0, deck.perimeter - ledger);
   });
 
   let siteHardscapingSf = 0;
@@ -922,6 +933,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     wallStudCount: totalStudCount,
     osbSubfloorDeckingSf: Math.round(totalOsbSubfloorDeckingSf * 100) / 100,
     structuralBeamsLf: Math.round(structuralBeamsLf * 100) / 100,
+    apertureHeadersLf: Math.round(totalApertureHeadersLf * 100) / 100,
     supportColumnsPosts,
     baseboardTrimsLf: Math.round(totalBaseboardTrimsLf * 100) / 100,
     apertureCasingLf: Math.round(totalApertureCasingLf * 100) / 100,
@@ -983,6 +995,7 @@ export function calculateMTO(state: FloorplanState): MTOReport {
     eavestroughsLf: Math.round(eavestroughsLf * 100) / 100,
     timberDeckingSf: Math.round(timberDeckingSf * 100) / 100,
     deckPerimeterRailingLf: Math.round(deckPerimeterRailingLf * 100) / 100,
+    deckLedgerLf: Math.round(deckLedgerLf * 100) / 100,
     siteHardscapingSf: Math.round(siteHardscapingSf * 100) / 100,
 
     wallDetails,

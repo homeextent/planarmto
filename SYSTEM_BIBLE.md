@@ -88,6 +88,17 @@ $$A_{\text{deduct}} = W_a \times H_a$$
 - **Universal Aperture Type Switcher & Inch Presets**: Integrated switcher allowing instant conversion between door and window types. Supports inch-based dimension inputs (Width/Height) with automated architectural quick size presets. Standard window stamp initial placement defaults to 36" W × 48" H.
 - **Canvas Label Formatting**: Professional CAD labels are formatted in rounded whole inches (e.g., `D32"x80"`, `W36"x48"`) derived from floating-point feet coordinates.
 
+### 2.4 Aperture Boundary Clamping & Overlap Prevention
+To prevent impossible architectural geometry (such as openings floating off wall corners or overlapping each other):
+- **Jamb Clearance Clamp**: Enforces a minimum clearance $\epsilon_{\text{jamb}} = 1" = \frac{1}{12}\text{ ft}$ from wall endpoints $v_a$ and $v_b$:
+  $$\text{Offset}_{\text{min}} = \epsilon_{\text{jamb}}, \quad \text{Offset}_{\text{max}} = L_{\text{wall}} - W_a - \epsilon_{\text{jamb}}$$
+- **Dynamic Overlap Avoidance**: When placing an aperture along an edge with existing openings $[O_i, O_i + W_i]$, interval intersection is resolved by shifting the candidate opening to the nearest collision-free interval.
+
+### 2.5 Structural Header Framing Take-Off
+Every wall rough opening requires a doubled dimensional lumber header ($2\times10$ or $2\times12$) supported by jack studs on either jamb. The structural header lumber linear footage is modeled as:
+$$L_{\text{header}} = 2 \times (W_a + 2 \times T_{\text{jack}}) = 2 \times (W_a + 0.5\text{ ft})$$
+where $0.5\text{ ft} = 6"$ accounts for $2 \times 1.5"$ jack stud bearings plus end allowances.
+
 ---
 
 ## 3. Dual-Geometry Pipeline & Wall Justification
@@ -289,6 +300,20 @@ The system supports itemized equipment takeoffs for water heating units via a de
 - **Hybrid Heat Pump Tank**
 
 Each tier maps to independent material and labor unit rates in the Master Rate Customizer.
+
+### 4.8 Division 07/32 — Decks, Ledger Boards & Guardrails
+
+#### A. Automated Deck Ledger Edge Detection
+Decks attached to exterior residential walls are fastened via pressure-treated ledger boards with flashing and structural lag screws, eliminating the need for freestanding guardrails along those sides.
+- **Edge-Wall Proximity & Orientation Filter (`computeDeckLedger`)**:
+  For each edge $(p_i, p_{i+1})$ of a deck polygon with midpoint $m$ and unit direction $\vec{u}_{\text{deck}}$:
+  1. The edge midpoint $m$ must project orthogonally onto an exterior wall segment within proximity threshold $d_{\text{ledger}} \le 0.75\text{ ft} = 9"$.
+  2. The deck edge and wall segment must be collinear/parallel within angular divergence $\le 10^\circ$:
+     $$|\vec{u}_{\text{deck}} \cdot \vec{u}_{\text{wall}}| \ge 0.985$$
+  3. Matched edges contribute their linear footage directly to Ledger Board linear footage ($L_{\text{ledger}}$).
+- **Freestanding Guardrail Perimeter**:
+  $$L_{\text{railing, open}} = \max(0, P_{\text{deck}} - L_{\text{ledger}})$$
+  ensuring open-air guardrail costs are never billed along building facade attachments.
 
 ---
 
