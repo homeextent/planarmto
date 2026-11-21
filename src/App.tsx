@@ -120,16 +120,20 @@ function AppContent() {
 
   // Auto-save project state to localStorage on state changes
   useEffect(() => {
+    if (!isDirty && state.nodes.length === 0 && state.walls.length === 0) {
+      return;
+    }
     const timer = setTimeout(() => {
       saveAutoSaveState(state);
     }, 1000);
     return () => clearTimeout(timer);
-  }, [state]);
+  }, [state, isDirty]);
 
   // Update State with Undo history tracking
-  const handleStateChange = useCallback((newState: FloorplanState, pushHistory = true) => {
+  const handleStateChange = useCallback((newState: FloorplanState, pushHistory = true, historicalSnapshot?: FloorplanState) => {
     if (pushHistory) {
-      setHistory((prev) => [...prev.slice(-30), state]);
+      const snap = historicalSnapshot || state;
+      setHistory((prev) => [...prev.slice(-30), snap]);
       setRedoStack([]);
       setIsDirty(true);
     }
@@ -188,10 +192,16 @@ function AppContent() {
     // Handle room deletion specifically if selected
     const selectedRoomIds = state.rooms.filter(r => idSet.has(r.id)).map(r => r.id);
     if (selectedRoomIds.length > 0) {
+      // Find all walls belonging to rooms that are NOT being deleted
+      const otherRooms = state.rooms.filter(r => !idSet.has(r.id));
+      const preservedWallIds = new Set<string>();
+      otherRooms.forEach(or => or.wallIds.forEach(wid => preservedWallIds.add(wid)));
+
       selectedRoomIds.forEach(roomId => {
         const room = state.rooms.find(r => r.id === roomId);
         if (room) {
-          const wallIdSet = new Set(room.wallIds);
+          const wallsToDelete = room.wallIds.filter(wid => !preservedWallIds.has(wid));
+          const wallIdSet = new Set(wallsToDelete);
           nextWalls = nextWalls.filter((w) => !wallIdSet.has(w.id));
           nextApertures = nextApertures.filter((ap) => !wallIdSet.has(ap.wallId));
           nextStamps = nextStamps.filter((st) => !isPointInPolygon({ x: st.x, y: st.y }, room.points));

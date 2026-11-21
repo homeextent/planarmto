@@ -412,7 +412,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
       return w ? getWallThickness(w) : (state.settings.defaultWallThickness || 0.375);
     });
     const netPolygon = getNetInteriorPolygon(room.points, wallThicknesses);
-    const netArea = calculateSignedPolygonArea(netPolygon);
+    const netArea = Math.abs(calculateSignedPolygonArea(netPolygon));
     const netPerimeter = calculatePolygonPerimeter(netPolygon);
 
     const isFoundationRoom = room.roomType === 'Basement / Foundation Space' || room.wallIds.some(wid => {

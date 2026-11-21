@@ -195,6 +195,7 @@ export interface DeckArea {
   points: Array<{ x: number; y: number }>;
   area: number; // SF
   perimeter: number; // LF
+  ledgerLengthLf?: number; // LF of edges attached to exterior building walls
 }
 
 export interface HardscapeArea {

@@ -31,6 +31,7 @@ import {
   calculateMultiCornerSnap,
   mergeCoincidentNodes,
   deduplicateWalls,
+  partitionCrossingWalls,
 } from '../engine/cadMath';
 import { getRoomCategory } from '../engine/roomCategories';
 import { DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT } from '../constants/stamps';
@@ -53,7 +54,7 @@ import { useProject } from '../context/ProjectContext';
 
 interface CadCanvasProps {
   state: FloorplanState;
-  onChange: (newState: FloorplanState) => void;
+  onChange: (newState: FloorplanState, pushHistory?: boolean, historicalSnapshot?: FloorplanState) => void;
   activeTool: ActiveTool;
   onToolChange: (tool: ActiveTool) => void;
   selection: SelectionState;
@@ -215,6 +216,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
   // Dragging selected elements
   const [isDraggingElement, setIsDraggingElement] = useState(false);
+  const dragInitialStateRef = useRef<FloorplanState | null>(null);
   const [dragStartPoint, setDragStartPoint] = useState<Point2D>({ x: 0, y: 0 });
   const [activeDragAnchorNodeId, setActiveDragAnchorNodeId] = useState<string | null>(null);
   const [roomSnapFeedback, setRoomSnapFeedback] = useState<{
@@ -334,16 +336,20 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       // Case A: Currently Locked to a Node
       if (lockedSnapNodeRef.current && isDrawingTool) {
         const locked = lockedSnapNodeRef.current;
-        const distPx = distance(rawWorld, locked) * transform.scale;
-        if (distPx <= SNAP_BREAKOUT_RADIUS_PX) {
-          return {
-            point: { x: locked.x, y: locked.y },
-            type: 'node' as const,
-            nodeId: locked.id,
-          };
-        } else {
-          // Break breakout lock
+        if (excludeNodeId && locked.id === excludeNodeId) {
           lockedSnapNodeRef.current = null;
+        } else {
+          const distPx = distance(rawWorld, locked) * transform.scale;
+          if (distPx <= SNAP_BREAKOUT_RADIUS_PX) {
+            return {
+              point: { x: locked.x, y: locked.y },
+              type: 'node' as const,
+              nodeId: locked.id,
+            };
+          } else {
+            // Break breakout lock
+            lockedSnapNodeRef.current = null;
+          }
         }
       }
 
@@ -418,6 +424,54 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       };
     },
     [state.nodes, state.walls, state.settings.gridSnapSize, state.settings.gridSnap, activeTool, transform.scale]
+  );
+
+  // Unified drafting point computation: harmonizes angle constraints and OSNAP for mousemove & mousedown
+  const computeDraftPoint = useCallback(
+    (rawWorld: Point2D, startNodeId: string | null) => {
+      const startNode = startNodeId ? state.nodes.find((n) => n.id === startNodeId) : null;
+      let angleConstrained = rawWorld;
+      if (startNode) {
+        angleConstrained = snapAngle(startNode, rawWorld, state.settings.angleSnapIncrement, state.settings.orthoMode);
+        if (state.settings.orthoMode) {
+          if (Math.abs(angleConstrained.x - startNode.x) >= Math.abs(angleConstrained.y - startNode.y)) {
+            angleConstrained.y = startNode.y;
+          } else {
+            angleConstrained.x = startNode.x;
+          }
+        }
+      }
+
+      const snapResult = getSmartSnapPoint(angleConstrained, startNodeId);
+      if (snapResult.type === 'node') {
+        return snapResult;
+      }
+
+      if (startNode && state.settings.orthoMode) {
+        if (snapResult.type === 'wall') {
+          return snapResult;
+        }
+        const snapInc = state.settings.gridSnapSize || 0.5;
+        const isSnapEnabled = state.settings.gridSnap;
+        let orthoPoint = { ...angleConstrained };
+        if (isSnapEnabled) {
+          if (Math.abs(orthoPoint.y - startNode.y) < 0.001) {
+            orthoPoint.x = Math.round(orthoPoint.x / snapInc) * snapInc;
+            orthoPoint.y = startNode.y;
+          } else {
+            orthoPoint.x = startNode.x;
+            orthoPoint.y = Math.round(orthoPoint.y / snapInc) * snapInc;
+          }
+        }
+        return {
+          point: orthoPoint,
+          type: isSnapEnabled ? ('grid' as const) : ('none' as const),
+        };
+      }
+
+      return snapResult;
+    },
+    [state.nodes, state.settings.angleSnapIncrement, state.settings.orthoMode, state.settings.gridSnapSize, state.settings.gridSnap, getSmartSnapPoint]
   );
 
   // Zoom controls
@@ -969,9 +1023,17 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         let displayLength = geom.length;
         const fullThickness = getWallThickness(wall);
         if (state.settings.wallJustification === 'interior_face') {
-          displayLength -= fullThickness;
+          const startWallCount = state.walls.filter(w => w.startNodeId === wall.startNodeId || w.endNodeId === wall.startNodeId).length;
+          const endWallCount = state.walls.filter(w => w.startNodeId === wall.endNodeId || w.endNodeId === wall.endNodeId).length;
+          const startDeduct = startWallCount >= 2 ? fullThickness / 2 : 0;
+          const endDeduct = endWallCount >= 2 ? fullThickness / 2 : 0;
+          displayLength = Math.max(0.5, geom.length - startDeduct - endDeduct);
         } else if (state.settings.wallJustification === 'exterior_face') {
-          displayLength += fullThickness;
+          const startWallCount = state.walls.filter(w => w.startNodeId === wall.startNodeId || w.endNodeId === wall.startNodeId).length;
+          const endWallCount = state.walls.filter(w => w.startNodeId === wall.endNodeId || w.endNodeId === wall.endNodeId).length;
+          const startAdd = startWallCount >= 2 ? fullThickness / 2 : 0;
+          const endAdd = endWallCount >= 2 ? fullThickness / 2 : 0;
+          displayLength = geom.length + startAdd + endAdd;
         }
 
         ctx.fillText(formatLength(displayLength), 0, 0);
@@ -2264,9 +2326,13 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           const w4: CadWall = { id: `w_${idPrefix}_4`, startNodeId: n4.id, endNodeId: n1.id, ...presetProps, height: state.settings.defaultWallHeight };
           const newNodes = [n1, n2, n3, n4];
           const newWalls = [w1, w2, w3, w4];
-          const finalNodes = [...state.nodes, ...newNodes], finalWalls = [...state.walls, ...newWalls];
-          const detectedRooms = detectRoomFaces(finalNodes, finalWalls, state.rooms, state.settings.defaultWallHeight);
-          onChange({ ...state, nodes: finalNodes, walls: finalWalls, rooms: detectedRooms });
+
+          // Auto-merge with existing topology and deduplicate overlapping walls
+          const { nodes: mergedNodes, walls: mergedWalls, rooms: mergedRooms } = mergeCoincidentNodes([...state.nodes, ...newNodes], [...state.walls, ...newWalls], state.rooms, 0.4);
+          const { walls: dedupWalls, rooms: dedupRooms, apertures: dedupApertures } = deduplicateWalls(mergedWalls, mergedRooms, state.apertures, mergedNodes);
+          const partitioned = partitionCrossingWalls(mergedNodes, dedupWalls, dedupApertures);
+          const detectedRooms = detectRoomFaces(partitioned.nodes, partitioned.walls, dedupRooms, state.settings.defaultWallHeight);
+          onChange({ ...state, nodes: partitioned.nodes, walls: partitioned.walls, rooms: detectedRooms, apertures: partitioned.apertures });
         }
         setRoomBoxStart(null);
         lockedSnapNodeRef.current = null;
@@ -2276,6 +2342,14 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     }
 
     if (activeTool === 'wall_pen') {
+      if (e.detail >= 2) {
+        setActiveWallStartNodeId(null);
+        setDraftMousePos(null);
+        lockedSnapNodeRef.current = null;
+        onToolChange('select');
+        return;
+      }
+
       if (!activeWallStartNodeId) {
         let startNodeId = snap.nodeId;
         let nextNodes = [...state.nodes], nextWalls = [...state.walls], nextApertures = [...state.apertures];
@@ -2288,38 +2362,43 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           const newNode: CadNode = { id: `node_${Date.now()}`, x: worldPoint.x, y: worldPoint.y };
           nextNodes.push(newNode); startNodeId = newNode.id; onChange({ ...state, nodes: nextNodes });
         }
+        lockedSnapNodeRef.current = null;
         setActiveWallStartNodeId(startNodeId);
       } else {
-        let targetPoint = worldPoint;
-        const startNode = state.nodes.find((n) => n.id === activeWallStartNodeId);
-        if (startNode) {
-          targetPoint = snapAngle(startNode, targetPoint, state.settings.angleSnapIncrement, state.settings.orthoMode);
-          if (state.settings.orthoMode) {
-            if (Math.abs(targetPoint.x - startNode.x) >= Math.abs(targetPoint.y - startNode.y)) { targetPoint.y = startNode.y; }
-            else { targetPoint.x = startNode.x; }
-          }
-        }
-        const angleSnapResult = getSmartSnapPoint(targetPoint, activeWallStartNodeId);
-        if (state.settings.orthoMode && startNode && angleSnapResult.nodeId) {
-          const candNode = state.nodes.find((n) => n.id === angleSnapResult.nodeId);
-          if (candNode && (Math.abs(candNode.x - startNode.x) < 0.2 || Math.abs(candNode.y - startNode.y) < 0.2)) { targetPoint = angleSnapResult.point; }
-        } else { targetPoint = angleSnapResult.point; }
-        let endNodeId = angleSnapResult.nodeId;
+        const draftResult = computeDraftPoint(rawWorld, activeWallStartNodeId);
+        let targetPoint = draftResult.point;
+        let endNodeId = draftResult.nodeId;
         let updatedNodes = [...state.nodes], updatedWalls = [...state.walls], updatedApertures = [...state.apertures];
-        if (angleSnapResult.type === 'wall' && angleSnapResult.wallId) {
-          const splitRes = splitWallAtPoint(angleSnapResult.wallId, angleSnapResult.point, updatedNodes, updatedWalls, updatedApertures);
+
+        if (draftResult.type === 'wall' && draftResult.wallId) {
+          const splitRes = splitWallAtPoint(draftResult.wallId, draftResult.point, updatedNodes, updatedWalls, updatedApertures);
           updatedNodes = splitRes.nodes; updatedWalls = splitRes.walls; updatedApertures = splitRes.apertures; endNodeId = splitRes.splitNodeId;
         } else if (!endNodeId) {
           const newNode: CadNode = { id: `node_${Date.now()}`, x: targetPoint.x, y: targetPoint.y };
           updatedNodes.push(newNode); endNodeId = newNode.id;
         }
+
         if (endNodeId && endNodeId !== activeWallStartNodeId) {
           const presetProps = getWallPropertiesFromPreset(activeWallPreset);
           const newWall: CadWall = { id: `wall_${Date.now()}`, startNodeId: activeWallStartNodeId, endNodeId, ...presetProps, height: state.settings.defaultWallHeight };
           const finalWalls = [...updatedWalls, newWall];
-          const detectedRooms = detectRoomFaces(updatedNodes, finalWalls, state.rooms, state.settings.defaultWallHeight);
-          onChange({ ...state, nodes: updatedNodes, walls: finalWalls, apertures: updatedApertures, rooms: detectedRooms });
-          setActiveWallStartNodeId(endNodeId);
+
+          const partitioned = partitionCrossingWalls(updatedNodes, finalWalls, updatedApertures);
+          const detectedRooms = detectRoomFaces(partitioned.nodes, partitioned.walls, state.rooms, state.settings.defaultWallHeight);
+          onChange({ ...state, nodes: partitioned.nodes, walls: partitioned.walls, apertures: partitioned.apertures, rooms: detectedRooms });
+
+          const targetNodeAlreadyExisted = state.nodes.some(n => n.id === endNodeId);
+          const existingConnectedWalls = state.walls.filter(w => w.startNodeId === endNodeId || w.endNodeId === endNodeId).length;
+
+          if (targetNodeAlreadyExisted && existingConnectedWalls >= 1) {
+            setActiveWallStartNodeId(null);
+            setDraftMousePos(null);
+            lockedSnapNodeRef.current = null;
+            onToolChange('select');
+          } else {
+            setActiveWallStartNodeId(endNodeId);
+            lockedSnapNodeRef.current = null;
+          }
         }
       }
       return;
@@ -2396,6 +2475,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     }
 
     if (activeTool === 'select') {
+      dragInitialStateRef.current = state;
       const hitNode = state.nodes.find((n) => distance(rawWorld, n) < 0.8);
       if (hitNode) { toggleSelection('node', hitNode.id, e); setIsDraggingElement(true); setDragStartPoint(worldPoint); setHasMovedDuringDrag(false); return; }
       const hitAnnotation = (state.annotations || []).find((ann) => distance(rawWorld, { x: ann.x, y: ann.y }) < 2.5);
@@ -2497,11 +2577,9 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     }
 
     if (activeTool === 'wall_pen' && activeWallStartNodeId) {
-      const startNode = state.nodes.find((n) => n.id === activeWallStartNodeId);
-      if (startNode) {
-        currentPoint = snapAngle(startNode, currentPoint, state.settings.angleSnapIncrement, state.settings.orthoMode);
-        if (state.settings.orthoMode) { if (Math.abs(currentPoint.x - startNode.x) >= Math.abs(currentPoint.y - startNode.y)) currentPoint.y = startNode.y; else currentPoint.x = startNode.x; }
-      }
+      const draftResult = computeDraftPoint(rawWorld, activeWallStartNodeId);
+      currentPoint = draftResult.point;
+      setSnapCandidate(draftResult);
     }
     setDraftMousePos(currentPoint);
     if (marqueeStart && !isDraggingElement) { setMarqueeEnd(rawWorld); return; }
@@ -2540,7 +2618,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
             };
           }
           const nextRooms = detectRoomFaces(nextNodes, state.walls, state.rooms, state.settings.defaultWallHeight);
-          onChange({ ...state, nodes: nextNodes, stamps: nextStamps, annotations: nextAnnotations, rooms: nextRooms, decks: nextDecks, hardscapes: nextHardscapes, underlay: nextUnderlay });
+          onChange({ ...state, nodes: nextNodes, stamps: nextStamps, annotations: nextAnnotations, rooms: nextRooms, decks: nextDecks, hardscapes: nextHardscapes, underlay: nextUnderlay }, false);
           setDragStartPoint(currentPointSnapped); return;
         }
         if (selection.type === 'node' && selection.id) {
@@ -2562,7 +2640,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
               }
             }
             const updatedRooms = detectRoomFaces(updatedNodes, state.walls, state.rooms, state.settings.defaultWallHeight);
-            onChange({ ...state, nodes: updatedNodes, rooms: updatedRooms });
+            onChange({ ...state, nodes: updatedNodes, rooms: updatedRooms }, false);
           } else if (selection.type === 'wall') {
           const wall = state.walls.find((w) => w.id === selection.id);
           if (wall) {
@@ -2595,7 +2673,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
                 const finalDx = effectiveDx + snapDelta.x, finalDy = effectiveDy + snapDelta.y;
                 const updatedNodes = state.nodes.map((n) => (n.id === wall.startNodeId || n.id === wall.endNodeId) ? { ...n, x: Math.round((n.x + finalDx) * 100) / 100, y: Math.round((n.y + finalDy) * 100) / 100 } : n);
                 const updatedRooms = detectRoomFaces(updatedNodes, state.walls, state.rooms, state.settings.defaultWallHeight);
-                onChange({ ...state, nodes: updatedNodes, rooms: updatedRooms });
+                onChange({ ...state, nodes: updatedNodes, rooms: updatedRooms }, false);
               }
             }
           }
@@ -2609,7 +2687,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
                 const wallLen = distance(n1, n2), proj = projectPointOntoSegment(rawWorld, n1, n2), snapInc = state.settings.gridSnapSize || 0.5;
                 let newOffset = Math.round((proj.t * wallLen - ap.width / 2) / snapInc) * snapInc;
                 newOffset = Math.max(0, Math.min(Math.max(0, wallLen - ap.width), newOffset));
-                onChange({ ...state, apertures: state.apertures.map((a) => a.id === ap.id ? { ...a, offset: Math.round(newOffset * 100) / 100 } : a) });
+                onChange({ ...state, apertures: state.apertures.map((a) => a.id === ap.id ? { ...a, offset: Math.round(newOffset * 100) / 100 } : a) }, false);
               }
             }
           }
@@ -2631,7 +2709,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
             const updatedNodes = state.nodes.map((n) => roomNodeSet.has(n.id) ? { ...n, x: Math.round((n.x + finalDx) * 1000) / 1000, y: Math.round((n.y + finalDy) * 1000) / 1000 } : n);
             const updatedStamps = state.stamps.map((st) => isPointInPolygon({ x: st.x, y: st.y }, room.points) ? { ...st, x: Math.round((st.x + finalDx) * 1000) / 1000, y: Math.round((st.y + finalDy) * 1000) / 1000 } : st);
             const updatedRooms = detectRoomFaces(updatedNodes, state.walls, state.rooms, state.settings.defaultWallHeight);
-            onChange({ ...state, nodes: updatedNodes, stamps: updatedStamps, rooms: updatedRooms });
+            onChange({ ...state, nodes: updatedNodes, stamps: updatedStamps, rooms: updatedRooms }, false);
           }
         }
         setDragStartPoint(currentPointSnapped);
@@ -2687,12 +2765,36 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       setMarqueeStart(null); setMarqueeEnd(null); return;
     }
     setMarqueeStart(null); setMarqueeEnd(null);
-    const { nodes: mergedNodes, walls: mergedWalls, rooms: mergedRooms } = mergeCoincidentNodes(state.nodes, state.walls, state.rooms);
-    const { walls: finalWalls, rooms: finalRooms, apertures: finalApertures } = deduplicateWalls(mergedWalls, mergedRooms, state.apertures, mergedNodes);
-    const reDetectedRooms = detectRoomFaces(mergedNodes, finalWalls, finalRooms, state.settings.defaultWallHeight);
-    if (finalWalls.length !== state.walls.length || mergedNodes.length !== state.nodes.length || finalApertures.length !== state.apertures.length || reDetectedRooms.length !== state.rooms.length) {
-      onChange({ ...state, nodes: mergedNodes, walls: finalWalls, rooms: reDetectedRooms, apertures: finalApertures });
+
+    if (hasMovedDuringDrag && dragInitialStateRef.current) {
+      const { nodes: mergedNodes, walls: mergedWalls, rooms: mergedRooms } = mergeCoincidentNodes(state.nodes, state.walls, state.rooms, 0.4);
+      const { walls: finalWalls, rooms: finalRooms, apertures: finalApertures } = deduplicateWalls(mergedWalls, mergedRooms, state.apertures, mergedNodes);
+      const partitioned = partitionCrossingWalls(mergedNodes, finalWalls, finalApertures);
+      const reDetectedRooms = detectRoomFaces(partitioned.nodes, partitioned.walls, finalRooms, state.settings.defaultWallHeight);
+
+      const finalState: FloorplanState = {
+        ...state,
+        nodes: partitioned.nodes,
+        walls: partitioned.walls,
+        rooms: reDetectedRooms,
+        apertures: partitioned.apertures,
+      };
+
+      onChange(finalState, true, dragInitialStateRef.current);
+      dragInitialStateRef.current = null;
+      setHasMovedDuringDrag(false);
+      return;
     }
+
+    const { nodes: mergedNodes, walls: mergedWalls, rooms: mergedRooms } = mergeCoincidentNodes(state.nodes, state.walls, state.rooms, 0.4);
+    const { walls: finalWalls, rooms: finalRooms, apertures: finalApertures } = deduplicateWalls(mergedWalls, mergedRooms, state.apertures, mergedNodes);
+    const partitioned = partitionCrossingWalls(mergedNodes, finalWalls, finalApertures);
+    const reDetectedRooms = detectRoomFaces(partitioned.nodes, partitioned.walls, finalRooms, state.settings.defaultWallHeight);
+    if (finalWalls.length !== state.walls.length || mergedNodes.length !== state.nodes.length || finalApertures.length !== state.apertures.length || reDetectedRooms.length !== state.rooms.length) {
+      onChange({ ...state, nodes: partitioned.nodes, walls: partitioned.walls, rooms: reDetectedRooms, apertures: partitioned.apertures });
+    }
+    dragInitialStateRef.current = null;
+    setHasMovedDuringDrag(false);
   };
 
   // Handle Double Click to finish wall drawing chain

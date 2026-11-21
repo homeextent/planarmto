@@ -858,3 +858,146 @@ export function deduplicateWalls(
 
   return { walls: finalWalls, rooms: finalRooms, apertures: finalApertures };
 }
+
+/**
+ * Partitions intersecting walls at crossing points and T-junctions.
+ * Ensures the planar graph maintains valid PSLG topology for face detection.
+ */
+export function partitionCrossingWalls(
+  nodes: CadNode[],
+  walls: CadWall[],
+  apertures: Aperture[] = []
+): { nodes: CadNode[]; walls: CadWall[]; apertures: Aperture[] } {
+  let nextNodes = [...nodes];
+  let nextWalls = [...walls];
+  let nextApertures = [...apertures];
+
+  let changed = true;
+  let iterations = 0;
+  const maxIterations = 60;
+
+  while (changed && iterations < maxIterations) {
+    changed = false;
+    iterations++;
+    const nodeMap = new Map<string, CadNode>();
+    nextNodes.forEach((n) => nodeMap.set(n.id, n));
+
+    // 1. Check for intersecting wall pairs (crossings)
+    outerCrossing:
+    for (let i = 0; i < nextWalls.length; i++) {
+      for (let j = i + 1; j < nextWalls.length; j++) {
+        const w1 = nextWalls[i];
+        const w2 = nextWalls[j];
+
+        if (
+          w1.startNodeId === w2.startNodeId ||
+          w1.startNodeId === w2.endNodeId ||
+          w1.endNodeId === w2.startNodeId ||
+          w1.endNodeId === w2.endNodeId
+        ) {
+          continue;
+        }
+
+        const p1 = nodeMap.get(w1.startNodeId);
+        const p2 = nodeMap.get(w1.endNodeId);
+        const p3 = nodeMap.get(w2.startNodeId);
+        const p4 = nodeMap.get(w2.endNodeId);
+        if (!p1 || !p2 || !p3 || !p4) continue;
+
+        const d = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x);
+        if (Math.abs(d) < 1e-6) continue;
+
+        const u = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / d;
+        const v = ((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / d;
+
+        if (u > 0.01 && u < 0.99 && v > 0.01 && v < 0.99) {
+          const crossPt: Point2D = {
+            x: Math.round((p1.x + u * (p2.x - p1.x)) * 100) / 100,
+            y: Math.round((p1.y + u * (p2.y - p1.y)) * 100) / 100,
+          };
+
+          let crossNode = nextNodes.find((n) => distance(n, crossPt) < 0.05);
+          if (!crossNode) {
+            crossNode = {
+              id: `node_cross_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+              x: crossPt.x,
+              y: crossPt.y,
+            };
+            nextNodes.push(crossNode);
+            nodeMap.set(crossNode.id, crossNode);
+          }
+
+          const crossNodeId = crossNode.id;
+          const w1a: CadWall = { ...w1, id: `${w1.id}_a_${iterations}`, endNodeId: crossNodeId };
+          const w1b: CadWall = { ...w1, id: `${w1.id}_b_${iterations}`, startNodeId: crossNodeId };
+          const w2a: CadWall = { ...w2, id: `${w2.id}_a_${iterations}`, endNodeId: crossNodeId };
+          const w2b: CadWall = { ...w2, id: `${w2.id}_b_${iterations}`, startNodeId: crossNodeId };
+
+          const dist1 = distance(p1, crossPt);
+          const dist2 = distance(p3, crossPt);
+
+          nextApertures = nextApertures.map((ap) => {
+            if (ap.wallId === w1.id) {
+              if (ap.offset + ap.width / 2 < dist1) {
+                return { ...ap, wallId: w1a.id };
+              } else {
+                return { ...ap, wallId: w1b.id, offset: Math.max(0, Math.round((ap.offset - dist1) * 100) / 100) };
+              }
+            }
+            if (ap.wallId === w2.id) {
+              if (ap.offset + ap.width / 2 < dist2) {
+                return { ...ap, wallId: w2a.id };
+              } else {
+                return { ...ap, wallId: w2b.id, offset: Math.max(0, Math.round((ap.offset - dist2) * 100) / 100) };
+              }
+            }
+            return ap;
+          });
+
+          nextWalls = nextWalls.filter((_, idx) => idx !== i && idx !== j).concat([w1a, w1b, w2a, w2b]);
+          changed = true;
+          break outerCrossing;
+        }
+      }
+    }
+
+    if (changed) continue;
+
+    // 2. Check for nodes lying on wall segments (T-junctions)
+    outerTJunction:
+    for (let i = 0; i < nextWalls.length; i++) {
+      const w = nextWalls[i];
+      const p1 = nodeMap.get(w.startNodeId);
+      const p2 = nodeMap.get(w.endNodeId);
+      if (!p1 || !p2) continue;
+
+      for (let j = 0; j < nextNodes.length; j++) {
+        const n = nextNodes[j];
+        if (n.id === w.startNodeId || n.id === w.endNodeId) continue;
+        const proj = projectPointOntoSegment(n, p1, p2);
+        if (proj.distance < 0.08 && proj.t > 0.02 && proj.t < 0.98) {
+          const wA: CadWall = { ...w, id: `${w.id}_t1_${iterations}`, endNodeId: n.id };
+          const wB: CadWall = { ...w, id: `${w.id}_t2_${iterations}`, startNodeId: n.id };
+
+          const splitDist = distance(p1, n);
+          nextApertures = nextApertures.map((ap) => {
+            if (ap.wallId === w.id) {
+              if (ap.offset + ap.width / 2 < splitDist) {
+                return { ...ap, wallId: wA.id };
+              } else {
+                return { ...ap, wallId: wB.id, offset: Math.max(0, Math.round((ap.offset - splitDist) * 100) / 100) };
+              }
+            }
+            return ap;
+          });
+
+          nextWalls = nextWalls.filter((_, idx) => idx !== i).concat([wA, wB]);
+          changed = true;
+          break outerTJunction;
+        }
+      }
+    }
+  }
+
+  return { nodes: nextNodes, walls: nextWalls, apertures: nextApertures };
+}

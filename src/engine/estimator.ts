@@ -439,14 +439,9 @@ export function calculateMTO(state: FloorplanState): MTOReport {
       const wall = walls.find((w) => w.id === wid);
       const classification = wallClassification.get(wid)?.classification;
 
-      if (isInteriorFinishMode) {
-        const t = wall ? getWallThickness(wall) : (settings.defaultWallThickness || 0.375);
-        return t / 2; // Inward offset from centerline
-      }
-
-      if (classification === 'exterior' || settings.calculationMode === 'exterior_framing') {
+      if (classification === 'exterior') {
         const coreT = getCoreThickness({ thickness: wall?.thickness || settings.defaultWallThickness || 0.375 });
-        return -(coreT / 2); // negative = outward expansion from centerline
+        return -(coreT / 2); // negative = outward expansion to outer rim face
       }
       return 0; // centerline for partition/shared walls
     });
@@ -743,16 +738,16 @@ export function calculateMTO(state: FloorplanState): MTOReport {
 
   const pitchMultiplier = Math.sqrt(1 + Math.pow(settings.roofPitchScale / 12, 2));
   const overhangFt = settings.roofOverhangInches / 12;
-  const roofOverhangAreaSf = (isInteriorFinishMode || totalExteriorWallLf === 0)
+  const roofOverhangAreaSf = totalExteriorWallLf === 0
     ? 0
     : (totalExteriorWallLf * overhangFt + 4 * Math.pow(overhangFt, 2));
   
   const grossRoofingAreaSf = (roofingFootprintSf + roofOverhangAreaSf) * pitchMultiplier;
   const roofingAreaSq = Math.round((grossRoofingAreaSf / 100) * 10) / 10;
   
-  const soffitTotalLf = isInteriorFinishMode ? 0 : Math.round(totalExteriorWallLf * 10) / 10;
-  const fasciaTotalLf = isInteriorFinishMode ? 0 : Math.round(totalExteriorWallLf * (1 + (settings.roofPitchScale / 12) * 0.15) * 10) / 10;
-  const eavestroughsLf = isInteriorFinishMode ? 0 : Math.round(totalExteriorWallLf * 0.9 * 10) / 10;
+  const soffitTotalLf = Math.round(totalExteriorWallLf * 10) / 10;
+  const fasciaTotalLf = Math.round(totalExteriorWallLf * (1 + (settings.roofPitchScale / 12) * 0.15) * 10) / 10;
+  const eavestroughsLf = Math.round(totalExteriorWallLf * 0.9 * 10) / 10;
 
   // Deck & Hardscape
   let timberDeckingSf = 0;
