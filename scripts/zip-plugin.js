@@ -8,7 +8,8 @@ const __dirname = path.dirname(__filename);
 
 const projectRoot = path.resolve(__dirname, '..');
 const tempDir = path.join(projectRoot, 'planar-mto');
-const zipFile = path.resolve(projectRoot, '..', 'planar-mto.zip');
+const zipFile = path.resolve(projectRoot, '..', '..', 'builds', 'planar-mto.zip');
+fs.mkdirSync(path.dirname(zipFile), { recursive: true });
 
 async function main() {
   try {

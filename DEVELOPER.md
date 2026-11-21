@@ -16,7 +16,7 @@ git push
 ## Production Release Loop (`staging` → `main` → WordPress ZIP)
 
 1. Verify all changes locally in `npm run dev` (http://localhost:3000/) and run `npm run lint` (`tsc --noEmit`).
-2. Merge `staging` into `main`, tag the release, build the WordPress plugin archive (`../planar-mto.zip`), and immediately switch back to `staging`:
+2. Merge `staging` into `main`, tag the release, build the WordPress plugin archive (`../../builds/planar-mto.zip`), and immediately switch back to `staging`:
 
 ```bash
 git checkout main
@@ -34,7 +34,7 @@ git checkout staging
 - Type-check TypeScript without emitting files: `npm run lint`
 - Install new package: `npm install <package-name>`
 - Run build check: `npm run build`
-- Build WP Plugin Package (from `main` only): `npm run build:zip` (Compiles React assets and exports `planar-mto.zip` to parent directory `../`)
+- Build WP Plugin Package (from `main` only): `npm run build:zip` (Compiles React assets and exports `planar-mto.zip` to builds directory `../../builds/`)
 - Deploy WP Plugin: Upload `planar-mto.zip` via WP Admin > Plugins > Add New > Upload Plugin > Replace current with uploaded
 - Flush WP Permalinks: Go to Settings > Permalinks and click Save Changes (required if `/planarmto` endpoint returns 404)
 
@@ -79,7 +79,7 @@ git clean -fd
 - Reload VS Code extension host: `Ctrl + Shift + P` -> Developer: Reload Window
 - Toggle Developer Console: Help > Toggle Developer Tools
 - Force kill VS Code (run in Linux terminal `Ctrl + Alt + T`): `pkill -9 -f code`
-- Reopen project from terminal: `code /media/jeremy/MEDIA/GITHUB/planarmto`
+- Reopen project from terminal: `code /media/jeremy/MEDIA/dev/repos/planarmto`
 - Verify Ripgrep installation: `rg --version`
 
 ## Roo Code Workflow
