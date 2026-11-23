@@ -396,22 +396,29 @@ The system maintains a strict separation between global templates and project-sp
 - **Matrix Inclusion Toggles**: Individual line items can be dynamically toggled (eye icon) to include/exclude them from cost rollups. This state is persisted within the `project_state`.
 - **Synchronization Pipeline**: Users can manually "Sync Master" to pull current global pricing into an old project, or "Save as Master" to push a project's custom rates to the global template.
 
-### 10.3 REST API Endpoint Specification
+### 10.3 Live Google Sheets Rate Sync Pipeline & CORS-Safe Fetch
+To pull live Home Depot Canada material & labor unit rates directly without downloading or uploading CSV files:
+- **Endpoint**: Google Apps Script Web App URL (`DEFAULT_GSHEET_WEBAPP_URL` with optional `VITE_GSHEET_WEBAPP_URL` override) querying `?sheet=CSV_EXPORT` and returning `{ ok: true, values: string[][] }`.
+- **CORS Preflight Bypass**: Direct browser `fetch()` is dispatched without custom request headers (`Content-Type`, `Authorization`, etc.), allowing Google Apps Script's 302 HTTP redirect chain to `script.googleusercontent.com` to succeed cleanly in the browser without triggering CORS preflight `OPTIONS` errors.
+- **Quote-Normalized Fallback Matching**: Normalizes quotes (stripping `"` characters) and trims whitespace on both sides when comparing spreadsheet item labels against internal `RATE_FIELDS` (e.g., mapping `1/2 Standard Drywall Board"` reliably to `1/2" Standard Drywall Board`).
+- **Timestamp Tracking**: Automatically stamps `categoryLastUpdated` with the current ISO timestamp across all updated trade divisions upon sync.
+- **CSV Export/Import Utility**: `RateCustomizerModal` additionally implements a CSV serialization layer for exporting trade-specific price sheets (e.g., for RFQ distribution to subcontractors) and re-importing updated unit rates.
+
+### 10.4 REST API Endpoint Specification
 The system exposes a custom namespace `planarmto/v1` for authenticated communication:
 - **`GET /projects`**: Retrieves all projects belonging to the current `tenant_id`.
 - **`POST /projects`**: Upserts a project entry (creates new or updates existing based on ID).
 - **`DELETE /projects/{id}`**: Permanently removes a project record.
 - **`GET /rates`**: Retrieves the global master rate template from user metadata.
 - **`POST /rates`**: Updates the global master rate template.
-- **CSV Export/Import Utility**: `RateCustomizerModal` implements a CSV serialization layer for exporting trade-specific price sheets (e.g., for RFQ distribution to subcontractors) and re-importing updated unit rates.
 
-### 10.3 Authorization & X-WP-Nonce
+### 10.5 Authorization & X-WP-Nonce
 To prevent Cross-Site Request Forgery (CSRF) and ensure tenant isolation:
 1. **Nonce Verification**: Every request must include an `X-WP-Nonce` header generated via `wp_create_nonce('wp_rest')`.
 2. **REST Authentication**: The API utilizes the built-in WordPress cookie authentication (`is_user_logged_in()`).
 3. **Tenant Enforcement**: The backend controller explicitly retrieves the current user's ID via `get_current_user_id()` and injects it into all SQL `WHERE` clauses, preventing users from accessing projects belonging to other IDs even if the project UUID is known.
 
-### 10.4 Async Storage Abstraction Layer
+### 10.6 Async Storage Abstraction Layer
 The frontend `storage.ts` utility implements an isomorphic interface:
 - **`isWP()` Check**: Detects if the app is running within the WordPress environment (checks for `wpApiSettings`).
 - **`wpFetch` Wrapper**: Standardizes error handling and nonce injection for all REST calls.

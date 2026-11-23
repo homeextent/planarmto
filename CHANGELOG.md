@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.14.0] - 2026-11-23
+
+### Added
+- **Live Google Sheets Ontario Rate Sync**: Integrated a one-click "Sync Live Ontario Rates" feature into `RateCustomizerModal` (`src/components/RateCustomizerModal.tsx`), directly querying live Home Depot Canada material & labor pricing via a Google Apps Script Web App endpoint (`CSV_EXPORT`).
+- **CORS-Safe Browser Fetch Pipeline**: Utilized standard headerless browser `fetch()` to handle Google Apps Script 302 redirects to `script.googleusercontent.com` seamlessly without triggering CORS preflight `OPTIONS` rejections.
+- **Quote-Normalized Robust Item Matching**: Implemented dual-sided quote stripping fallback to reliably match 100% of rows between Google Sheets item names and internal `RATE_FIELDS` labels (e.g., matching `1/2 Standard Drywall Board"` with `1/2" Standard Drywall Board`).
+- **Automated Timestamp Tracking & Interactive UI States**: Automatic updating of `categoryLastUpdated` timestamps across all modified trade categories upon sync, complete with `isSyncing` loading state (`Loader2` animation) and instant feedback banners.
+
+---
+
 ## [2.13.0] - 2026-11-21
 
 ### Added

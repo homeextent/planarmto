@@ -6,6 +6,15 @@ declare global {
       currentUserId: number;
     };
   }
+
+  interface ImportMetaEnv {
+    readonly VITE_GSHEET_WEBAPP_URL?: string;
+    [key: string]: any;
+  }
+
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
 }
 
 export type UnitSystem = 'imperial' | 'metric'; // imperial: feet/inches & SF, metric: meters & m²

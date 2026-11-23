@@ -21,6 +21,7 @@ import {
   Download,
   Printer,
   Upload,
+  Loader2,
 } from 'lucide-react';
 
 import { getPersistedRateProfile, savePersistedRateProfile } from '../utils/storage';
@@ -131,6 +132,10 @@ const RATE_FIELDS: RateFieldConfig[] = [
   { key: 'hardscapePerSf', label: 'Site Hardscape Pavers / Concrete', unit: '$/SF', category: 'Roofing & Exterior Envelope', description: 'Compacted base aggregate, bedding sand, and pavers' },
 ];
 
+const DEFAULT_GSHEET_WEBAPP_URL =
+  import.meta.env.VITE_GSHEET_WEBAPP_URL ||
+  'https://script.google.com/macros/s/AKfycbwsWbGwYzRFR_k9ZJc9K7FHyOs-kA-C6a6KLaGJ_H0KVOMT_X2M-5kkjWwKrvhbRHQfZg/exec';
+
 export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
   isOpen,
   onClose,
@@ -145,6 +150,7 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
   const [globalLaborMultiplier, setGlobalLaborMultiplier] = useState<string>('0');
   const [globalMaterialMultiplier, setGlobalMaterialMultiplier] = useState<string>('0');
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   useEffect(() => {
     if (rates && isOpen) {
@@ -353,6 +359,91 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
     printWindow.close();
   };
 
+  const handleLiveSync = async () => {
+    setIsSyncing(true);
+    setSyncStatus('Fetching live Ontario rates...');
+    try {
+      // Direct browser fetch without custom request headers to prevent CORS preflight OPTIONS failures on Google 302 redirect
+      const response = await fetch(`${DEFAULT_GSHEET_WEBAPP_URL}?sheet=CSV_EXPORT`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} (${response.statusText || 'Fetch failed'})`);
+      }
+
+      const data = await response.json();
+      if (!data || !data.ok || !Array.isArray(data.values) || data.values.length < 2) {
+        throw new Error('Invalid or empty response payload from live rate service');
+      }
+
+      const rows: string[][] = data.values;
+      const headers = rows[0].map((h) => (h || '').trim().toLowerCase());
+      const categoryIdx = headers.indexOf('category');
+      const itemIdx = headers.indexOf('item');
+      const materialIdx = headers.indexOf('material rate');
+      const laborIdx = headers.indexOf('labor rate');
+
+      if (itemIdx === -1 || materialIdx === -1 || laborIdx === -1) {
+        throw new Error('Required columns missing from rate sheet');
+      }
+
+      const normalizeQuotes = (str: string) => str.replace(/"/g, '').trim().toLowerCase();
+
+      const updated = { ...localRates };
+      let updatedCount = 0;
+      const updatedCategories = new Set<string>();
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0) continue;
+
+        const categoryName = categoryIdx !== -1 ? (row[categoryIdx] || '').trim() : '';
+        const itemName = (row[itemIdx] || '').trim();
+        const materialStr = (row[materialIdx] || '').trim().replace(/[$,]/g, '') || '0';
+        const laborStr = (row[laborIdx] || '').trim().replace(/[$,]/g, '') || '0';
+
+        const materialVal = parseFloat(materialStr) || 0;
+        const laborVal = parseFloat(laborStr) || 0;
+
+        // Match against RATE_FIELDS by Category and Item, with quote-normalized fallback comparison
+        const field = RATE_FIELDS.find((f) => {
+          const categoryMatches =
+            categoryIdx === -1 ||
+            !categoryName ||
+            f.category.toLowerCase() === categoryName.toLowerCase();
+          if (!categoryMatches) return false;
+
+          if (f.label === itemName) return true;
+          return normalizeQuotes(f.label) === normalizeQuotes(itemName);
+        });
+
+        if (field) {
+          updated[field.key] = {
+            material: materialVal,
+            labor: laborVal,
+          };
+          updatedCount++;
+          updatedCategories.add(field.category);
+        }
+      }
+
+      const newCategoryLastUpdated = { ...(updated.categoryLastUpdated || {}) };
+      const now = new Date().toISOString();
+      updatedCategories.forEach((cat) => {
+        newCategoryLastUpdated[cat] = now;
+      });
+      updated.categoryLastUpdated = newCategoryLastUpdated;
+
+      setLocalRates(updated);
+      setSyncStatus(`Synced ${updatedCount} live Ontario rates! Click 'Apply to Project' or 'Save as Master' to persist.`);
+      setTimeout(() => setSyncStatus(null), 6000);
+    } catch (err) {
+      console.error('Failed to sync live Ontario rates:', err);
+      setSyncStatus(`Live sync failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setTimeout(() => setSyncStatus(null), 5000);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -401,6 +492,8 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
         return;
       }
 
+      const normalizeQuotes = (str: string) => str.replace(/"/g, '').trim().toLowerCase();
+
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
@@ -414,10 +507,13 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
         const materialVal = parseFloat(materialStr) || 0;
         const laborVal = parseFloat(laborStr) || 0;
 
-        // Find matching field
-        const field = RATE_FIELDS.find(f => 
-          f.label === itemName && (categoryIdx === -1 || f.category === categoryName)
-        );
+        // Find matching field with quote-normalized fallback comparison
+        const field = RATE_FIELDS.find(f => {
+          const categoryMatches = categoryIdx === -1 || !categoryName || f.category.toLowerCase() === categoryName.toLowerCase();
+          if (!categoryMatches) return false;
+          if (f.label === itemName) return true;
+          return normalizeQuotes(f.label) === normalizeQuotes(itemName);
+        });
 
         if (field) {
           updated[field.key] = {
@@ -534,6 +630,19 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleLiveSync}
+              disabled={isSyncing}
+              className="px-2.5 py-1.5 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-emerald-600/50 cursor-pointer transition-colors shadow-sm"
+              title="Sync live Ontario rates from Google Sheets Web App (Home Depot Canada)"
+            >
+              {isSyncing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3.5 h-3.5" />
+              )}
+              <span>{isSyncing ? 'Syncing...' : 'Sync Live Ontario Rates'}</span>
+            </button>
             <button
               onClick={() => fileInputRef.current?.click()}
               className="px-2.5 py-1.5 bg-slate-800/50 hover:bg-slate-700 text-sky-400 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-700 cursor-pointer transition-colors"
