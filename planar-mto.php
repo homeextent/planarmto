@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: PlanarMTO
- * Version: 2.14.2
+ * Version: 2.14.3
  * Description: A full-page PlanarMTO tool integrated into WordPress.
  */
 
@@ -80,7 +80,8 @@ function planarmto_template_redirect() {
               window.planarMTOConfig = {
                 restUrl: "' . esc_url_raw(rest_url('planarmto/v1/')) . '",
                 nonce: "' . wp_create_nonce('wp_rest') . '",
-                currentUserId: ' . get_current_user_id() . '
+                currentUserId: ' . get_current_user_id() . ',
+                loginUrl: "' . esc_url_raw(wp_login_url(home_url('/planarmto/'))) . '"
               };
             </script>';
             $html = str_replace('</head>', $config_script . '</head>', $html);
@@ -115,12 +116,31 @@ function planarmto_serve_passcode_form($error = '') {
     </head>
     <body class="flex items-center justify-center min-h-screen p-4">
         <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden p-8">
-            <div class="text-center mb-8">
+            <div class="text-center mb-6">
                 <div class="w-16 h-16 bg-sky-500/10 border border-sky-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 text-sky-400">
                     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 </div>
                 <h1 class="text-2xl font-bold text-white mb-2">PlanarMTO Beta</h1>
-                <p class="text-slate-400 text-sm">Access to the architectural estimator is currently restricted. Please enter your beta access code to continue.</p>
+                <p class="text-slate-400 text-sm">Access to the architectural estimator is currently restricted. Sign in with your WordPress account or enter an access code.</p>
+            </div>
+
+            <div class="mb-6">
+                <a 
+                    href="<?php echo esc_url(wp_login_url(home_url('/planarmto/'))); ?>" 
+                    class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-sky-600/20 transition-all flex items-center justify-center gap-2 group"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
+                    <span>Sign in with WordPress</span>
+                </a>
+                <p class="text-[11px] text-slate-400 mt-2 text-center leading-relaxed">
+                    Signing in with a WordPress account enables cloud MySQL project and master-rate syncing, while the Beta Access Code opens local guest mode.
+                </p>
+            </div>
+
+            <div class="relative flex py-2 items-center mb-6">
+                <div class="flex-grow border-t border-slate-800"></div>
+                <span class="flex-shrink mx-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">or guest access</span>
+                <div class="flex-grow border-t border-slate-800"></div>
             </div>
 
             <form method="POST" class="space-y-4">

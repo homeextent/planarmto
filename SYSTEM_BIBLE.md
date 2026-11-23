@@ -434,8 +434,11 @@ To protect beta deployments from unauthorized public access while allowing a san
 ### 11.1 Passcode Verification Pipeline
 The gate is enforced within the `template_redirect` hook in `planar-mto.php` before any React assets are served:
 1. **Unauthenticated Check**: If a visitor is not a logged-in WordPress user, the system checks for a valid `planarmto_guest_access` cookie.
-2. **Passcode Challenge**: If no cookie is present, the visitor is served the `planarmto_serve_passcode_form()` instead of the CAD application.
+2. **Passcode Challenge & WordPress Authentication**: If no cookie is present, the visitor is served the `planarmto_serve_passcode_form()` gate instead of the CAD application. The gate presents two clear entry paths:
+   - **Direct WordPress Sign-In**: A prominent "Sign in with WordPress" action linking directly to `wp_login_url(home_url('/planarmto/'))`. Authenticating redirects users immediately back to the PlanarMTO frontend without ever exposing `/wp-admin/`, automatically enabling cloud MySQL project directory persistence and master-rate syncing (`currentUserId > 0`).
+   - **Beta Passcode Entry**: Allows local guest access via `PLANARMTO_BETA_PASSCODE`. Submitting the code creates a 30-day `planarmto_guest_access` cookie for sandboxed local storage operation (`currentUserId = 0`).
 3. **Instant Hydration**: Upon submitting the correct passcode (matching `PLANARMTO_BETA_PASSCODE`), the server instantly sets the root cookie and hydrates `$has_access = true`, allowing the app to render in the same request lifecycle.
+4. **Guest Mode Indicator & One-Click Cloud Upgrade**: When running in guest mode (`currentUserId === 0`), `planar-mto.php` provides `loginUrl` inside `window.planarMTOConfig`. The client `HeaderBar` displays a compact **"Guest Mode • Sign In"** link badge so estimators can switch to their authenticated WordPress account in one click.
 
 ### 11.2 Cookie Persistence & Security
 - **Cookie Name**: `planarmto_guest_access`

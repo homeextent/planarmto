@@ -9,7 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.14.2] - 2026-11-23
+## [2.14.3] - 2026-11-23
+
+### Added
+- **Direct Front-End WordPress Authentication Gate**: Added a prominent "Sign in with WordPress" action to `planarmto_serve_passcode_form()` in `planar-mto.php` routing through `wp_login_url(home_url('/planarmto/'))`, allowing users to authenticate and return directly to the full-page CAD app without ever navigating through `/wp-admin/`.
+- **Guest vs. Cloud Sync Clarity**: Added helper text explaining that signing in enables persistent MySQL cloud project directory storage and master-rate syncing, whereas entering a Beta Access Code provides local sandbox guest access.
+- **One-Click Guest Mode Sign-In Badge**: Exposed `loginUrl` via `window.planarMTOConfig` and added a compact, interactive "Guest Mode • Sign In" badge in `HeaderBar` (`src/components/HeaderBar.tsx`) when `currentUserId === 0`, enabling estimators to upgrade to their WordPress account in a single click.
+
+---
 
 ### Added
 - **Automated SiteGround CI/CD Deployment Pipeline**: Added `.github/workflows/deploy.yml` to automatically type-check, build, `rsync` `planar-mto.php` + `dist/` over SSH (`port 18765`), and flush SiteGround Dynamic Cache on every push to `main` or manual `workflow_dispatch`.

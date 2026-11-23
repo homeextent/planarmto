@@ -28,6 +28,7 @@ import {
   Image as ImageIcon,
   FileCode,
   Plus,
+  LogIn,
 } from 'lucide-react';
 
 interface HeaderBarProps {
@@ -386,6 +387,17 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
       {/* Right Controls (Undo/Redo, JSON Save/Load, Print, Help) */}
       <div className="flex items-center gap-1.5 text-xs">
+        {typeof window !== 'undefined' && window.planarMTOConfig && window.planarMTOConfig.currentUserId === 0 && window.planarMTOConfig.loginUrl && (
+          <a
+            href={window.planarMTOConfig.loginUrl}
+            className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:text-amber-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer mr-1"
+            title="Sign in with your WordPress account to enable Cloud sync"
+          >
+            <LogIn className="w-3.5 h-3.5 text-amber-400" />
+            <span>Guest Mode &bull; Sign In</span>
+          </a>
+        )}
+
         {onOpenProjectDirectoryModal && (
           <button
             onClick={onOpenProjectDirectoryModal}
