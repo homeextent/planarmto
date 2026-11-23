@@ -22,6 +22,7 @@ import {
   Printer,
   Upload,
   Loader2,
+  ExternalLink,
 } from 'lucide-react';
 
 import { getPersistedRateProfile, savePersistedRateProfile } from '../utils/storage';
@@ -135,6 +136,10 @@ const RATE_FIELDS: RateFieldConfig[] = [
 const DEFAULT_GSHEET_WEBAPP_URL =
   import.meta.env.VITE_GSHEET_WEBAPP_URL ||
   'https://script.google.com/macros/s/AKfycbwsWbGwYzRFR_k9ZJc9K7FHyOs-kA-C6a6KLaGJ_H0KVOMT_X2M-5kkjWwKrvhbRHQfZg/exec';
+
+const DEFAULT_TAKEOFF_SYNC_APP_URL =
+  import.meta.env.VITE_TAKEOFF_SYNC_APP_URL ||
+  'https://planarmto-takeoff-sync.ai.studio/';
 
 export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
   isOpen,
@@ -643,6 +648,16 @@ export const RateCustomizerModal: React.FC<RateCustomizerModalProps> = ({
               )}
               <span>{isSyncing ? 'Syncing...' : 'Sync Live Ontario Rates'}</span>
             </button>
+            <a
+              href={DEFAULT_TAKEOFF_SYNC_APP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/40 rounded-lg px-2.5 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              title="Open Ontario Retail Takeoff Sync in a new tab to refresh Home Depot Canada prices into Google Sheets"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Open HD Price Scraper</span>
+            </a>
             <button
               onClick={() => fileInputRef.current?.click()}
               className="px-2.5 py-1.5 bg-slate-800/50 hover:bg-slate-700 text-sky-400 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-700 cursor-pointer transition-colors"

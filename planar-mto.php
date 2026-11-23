@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: PlanarMTO
- * Version: 2.14.0
+ * Version: 2.14.1
  * Description: A full-page PlanarMTO tool integrated into WordPress.
  */
 

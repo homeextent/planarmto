@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.14.1] - 2026-11-23
+
+### Added
+- **Direct Cloud Retail Scraper Quick-Launch**: Added an external link button ("Open HD Price Scraper") directly beside the "Sync Live Ontario Rates" button in `RateCustomizerModal` (`src/components/RateCustomizerModal.tsx`), allowing estimators to quickly launch the cloud retail scraper (`https://planarmto-takeoff-sync.ai.studio/`) in a new browser tab to refresh Home Depot Canada prices before pulling updated rates into PlanarMTO.
+- **Environment-Configurable Takeoff Sync URL**: Added `VITE_TAKEOFF_SYNC_APP_URL` to `ImportMetaEnv` in `src/types.ts` with fallback to `https://planarmto-takeoff-sync.ai.studio/`.
+
+---
+
 ## [2.14.0] - 2026-11-23
 
 ### Added

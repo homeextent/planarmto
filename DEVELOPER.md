@@ -22,7 +22,7 @@ git push
 git checkout main
 git pull origin main
 git merge staging
-git tag v2.14.0
+git tag v2.14.1
 git push origin main --tags
 npm run build:zip
 git checkout staging

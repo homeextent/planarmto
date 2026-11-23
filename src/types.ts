@@ -9,6 +9,7 @@ declare global {
 
   interface ImportMetaEnv {
     readonly VITE_GSHEET_WEBAPP_URL?: string;
+    readonly VITE_TAKEOFF_SYNC_APP_URL?: string;
     [key: string]: any;
   }
 

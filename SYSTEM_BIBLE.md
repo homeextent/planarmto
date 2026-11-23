@@ -398,6 +398,7 @@ The system maintains a strict separation between global templates and project-sp
 
 ### 10.3 Live Google Sheets Rate Sync Pipeline & CORS-Safe Fetch
 To pull live Home Depot Canada material & labor unit rates directly without downloading or uploading CSV files:
+- **Cloud Retail Scraper Quick-Launch**: An environment-configurable external launcher button (`DEFAULT_TAKEOFF_SYNC_APP_URL` with optional `VITE_TAKEOFF_SYNC_APP_URL` override, defaulting to `https://planarmto-takeoff-sync.ai.studio/`) directly beside the sync action in `RateCustomizerModal` opens the Ontario Retail Takeoff Sync web app in a separate browser tab to refresh Home Depot Canada pricing into Google Sheets prior to initiating rate synchronization.
 - **Endpoint**: Google Apps Script Web App URL (`DEFAULT_GSHEET_WEBAPP_URL` with optional `VITE_GSHEET_WEBAPP_URL` override) querying `?sheet=CSV_EXPORT` and returning `{ ok: true, values: string[][] }`.
 - **CORS Preflight Bypass**: Direct browser `fetch()` is dispatched without custom request headers (`Content-Type`, `Authorization`, etc.), allowing Google Apps Script's 302 HTTP redirect chain to `script.googleusercontent.com` to succeed cleanly in the browser without triggering CORS preflight `OPTIONS` errors.
 - **Quote-Normalized Fallback Matching**: Normalizes quotes (stripping `"` characters) and trims whitespace on both sides when comparing spreadsheet item labels against internal `RATE_FIELDS` (e.g., mapping `1/2 Standard Drywall Board"` reliably to `1/2" Standard Drywall Board`).
