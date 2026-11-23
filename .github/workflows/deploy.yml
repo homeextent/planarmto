@@ -1,0 +1,44 @@
+name: Deploy Production Plugin
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-planarmto-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install & Verify
+        run: |
+          npm ci
+          npm run lint
+          npm run build
+
+      - name: Load SSH Key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SG_SSH_PRIVATE_KEY }}
+
+      - name: Deploy Plugin Files via rsync
+        run: |
+          ssh -p 18765 -o StrictHostKeyChecking=accept-new "${{ secrets.SG_SSH_USER }}@${{ secrets.SG_SSH_HOST }}" "mkdir -p '${{ secrets.SG_PLUGIN_PATH }}'"
+          rsync -avz --delete -e "ssh -p 18765 -o StrictHostKeyChecking=accept-new" planar-mto.php dist "${{ secrets.SG_SSH_USER }}@${{ secrets.SG_SSH_HOST }}:${{ secrets.SG_PLUGIN_PATH }}/"
+
+      - name: Flush SiteGround Dynamic Cache
+        run: |
+          ssh -p 18765 -o StrictHostKeyChecking=accept-new "${{ secrets.SG_SSH_USER }}@${{ secrets.SG_SSH_HOST }}" "site-tools-client domain update id=1 flush_cache=1 || true"

@@ -2,8 +2,10 @@
 
 ## Branch & Release Workflow (`staging` → `main`)
 - **Active Development Branch (`staging`):** All feature work, bug fixes, refactors, and AI agent sessions (**Antigravity** and **Roo Code**) MUST run on the **`staging`** branch.
-- **Protected Production Branch (`main`):** Never commit experimental or unverified edits directly to `main`. `main` represents the verified WordPress production release (`planar-mto.zip`).
-- **AI Agent Pre-Flight Rule:** Before modifying any files, Antigravity and Roo Code must verify `git branch --show-current` is `staging` (if on `main`, run `git checkout staging` first) and must never run `npm run build:zip` on `main` without explicit user sign-off after testing on `staging`.
+- **Protected Production Branch (`main`):** Never commit experimental or unverified edits directly to `main`. `main` represents verified production releases deployed to WordPress.
+- **Automated CI/CD Deployment:** Merging `staging` into `main` and pushing to GitHub triggers automated deployment via GitHub Actions (`.github/workflows/deploy.yml`). The workflow builds the production assets and deploys `planar-mto.php` + `dist/` directly to SiteGround (`/wp-content/plugins/planar-mto/`) at `https://theinnovativegroup.ca/planarmto/`, then flushes the SiteGround Dynamic Cache.
+- **Manual Offline Backup:** `npm run build:zip` remains available at any time as a manual offline backup generator.
+- **AI Agent Pre-Flight Rule:** Before modifying any files, Antigravity and Roo Code must verify `git branch --show-current` is `staging` (if on `main`, run `git checkout staging` first).
 
 **Standard Development Loop (on `staging`)**
 ```bash
@@ -13,10 +15,10 @@ git commit -m "feat: description of work"
 git push
 ```
 
-## Production Release Loop (`staging` → `main` → WordPress ZIP)
+## Production Release Loop (`staging` → `main` → SiteGround Production)
 
 1. Verify all changes locally in `npm run dev` (http://localhost:3000/) and run `npm run lint` (`tsc --noEmit`).
-2. Merge `staging` into `main`, tag the release, build the WordPress plugin archive (`../../builds/planar-mto.zip`), and immediately switch back to `staging`:
+2. Merge `staging` into `main`, tag the release, and push to GitHub:
 
 ```bash
 git checkout main
@@ -24,9 +26,16 @@ git pull origin main
 git merge staging
 git tag v2.14.1
 git push origin main --tags
-npm run build:zip
 git checkout staging
 ```
+
+Pushing to `main` automatically triggers GitHub Actions (`deploy.yml`):
+- Runs `npm ci`, `npm run lint` (`tsc --noEmit`), and `npm run build` (`vite build`).
+- Deploys `planar-mto.php` and `dist/` directly to `/wp-content/plugins/planar-mto/` over SiteGround SSH.
+- Flushes the SiteGround dynamic cache.
+- Can also be triggered manually via `workflow_dispatch` in GitHub Actions.
+
+*Note: For an offline backup archive, run `npm run build:zip` from `main` to generate `../../builds/planar-mto.zip`.*
 
 ## Local Development
 - Start local dev server: `npm run dev`
@@ -34,8 +43,8 @@ git checkout staging
 - Type-check TypeScript without emitting files: `npm run lint`
 - Install new package: `npm install <package-name>`
 - Run build check: `npm run build`
-- Build WP Plugin Package (from `main` only): `npm run build:zip` (Compiles React assets and exports `planar-mto.zip` to builds directory `../../builds/`)
-- Deploy WP Plugin: Upload `planar-mto.zip` via WP Admin > Plugins > Add New > Upload Plugin > Replace current with uploaded
+- Build WP Plugin Package (Offline Backup): `npm run build:zip` (Compiles React assets and exports `planar-mto.zip` to builds directory `../../builds/`)
+- Deploy WP Plugin: Automated via GitHub Actions on push to `main` (manual upload via WP Admin remains available using `planar-mto.zip` backup if ever needed)
 - Flush WP Permalinks: Go to Settings > Permalinks and click Save Changes (required if `/planarmto` endpoint returns 404)
 
 ## Multi-Tenant Development & API (v2.1.0+)
