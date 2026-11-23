@@ -448,6 +448,14 @@ Aggressive caching layers (SiteGround Optimizer, Nginx, Varnish) can often cache
 - **`DONOTCACHEPAGE`**: The constant `define('DONOTCACHEPAGE', true)` is set globally within the plugin to signal to most WordPress caching plugins to skip the PlanarMTO endpoint.
 - **`nocache_headers()`**: WordPress native `nocache_headers()` are issued to send standard HTTP headers (`Cache-Control: no-cache, must-revalidate, max-age=0`) to the browser and edge CDN layers.
 
+### 11.4 Automated CI/CD Deployment & Cache Invalidation Pipeline
+Production deployments are automated via GitHub Actions (`.github/workflows/deploy.yml`):
+- **Staging to Main Promotion Trigger**: Pushing commits or merging pull requests from `staging` into `main` (or triggering manual `workflow_dispatch`) initiates the production deployment pipeline.
+- **Concurrency Serialization**: Employs `group: deploy-planarmto-prod` with `cancel-in-progress: false` to ensure all production deployments queue and execute deterministically in sequential order without canceling ongoing transfers.
+- **Verification & Build**: Executes clean dependency installation (`npm ci`), TypeScript type verification (`npm run lint`), and production compilation (`npm run build`).
+- **Atomic Asset Synchronization**: Utilizes `rsync -avz --delete` over SSH port `18765` to atomically synchronize `planar-mto.php` and the compiled `dist/` bundle directly into the active WordPress plugin directory (`/wp-content/plugins/planar-mto/`) on SiteGround.
+- **Automated Dynamic Cache Invalidation**: Following asset transfer, triggers SiteGround's server CLI (`site-tools-client domain update id=1 flush_cache=1`) over SSH to invalidate the SiteGround Dynamic Cache, guaranteeing immediate availability of the updated release without manual server administration.
+
 ---
 
 ## 8. Blueprint Underlay & Scale Calibration Pipeline

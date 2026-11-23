@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.14.2] - 2026-11-23
+
+### Added
+- **Automated SiteGround CI/CD Deployment Pipeline**: Added `.github/workflows/deploy.yml` to automatically type-check, build, `rsync` `planar-mto.php` + `dist/` over SSH (`port 18765`), and flush SiteGround Dynamic Cache on every push to `main` or manual `workflow_dispatch`.
+- **Documentation Synchronization**: Updated `README.md`, `SYSTEM_BIBLE.md`, and `DEVELOPER.md` with the `staging` → `main` release workflow and CI/CD architecture.
+
+---
+
 ## [2.14.1] - 2026-11-23
 
 ### Added

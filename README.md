@@ -86,24 +86,14 @@
 ### WordPress Plugin Deployment (Recommended)
 PlanarMTO is optimized to run as a dedicated WordPress plugin, providing a full-page application experience independent of your WordPress theme.
 
-1. **Build & Package**:
-   ```bash
-   # Compile production assets and bundle the plugin zip
-   npm run build:zip
-   ```
-   This generates `planar-mto.zip` in the parent directory.
+1. **Automated CI/CD Deployment (`staging` → `main`)**:
+   Active development happens on `staging`. Merging `staging` into `main` and pushing to GitHub triggers `.github/workflows/deploy.yml`, which runs `npm ci`, `npm run lint`, and `npm run build`, syncs `planar-mto.php` and `dist/` directly into `/wp-content/plugins/planar-mto/` on SiteGround over SSH (`port 18765`), and flushes the SiteGround Dynamic Cache automatically.
 
-2. **Install**:
-   - Upload `planar-mto.zip` via **WP Admin > Plugins > Add New**.
-   - Activate the plugin.
+2. **First-Time Plugin Activation & Permalinks**:
+   The initial `planar-mto` plugin folder must remain installed and active in WordPress. Navigating to **WP Admin > Settings > Permalinks** and clicking **Save Changes** is only required once on initial setup to register the custom rewrite rule for `/planarmto`.
 
-3. **Configure Permalinks**:
-   - Go to **WP Admin > Settings > Permalinks**.
-   - Click **Save Changes** once to flush the rewrite rules.
-
-4. **Launch**:
-   - Click the **PlanarMTO** menu item in the WordPress sidebar and click "Launch PlanarMTO".
-   - Alternatively, navigate directly to `yourdomain.com/planarmto`.
+3. **Manual Offline Backup (`npm run build:zip`)**:
+   `npm run build:zip` remains available as an offline backup generator (`../../builds/planar-mto.zip`) for manual upload via **WP Admin > Plugins > Add New** if needed.
 
 ### Manual / Standard Deployment
 For standalone web hosting or local development:
