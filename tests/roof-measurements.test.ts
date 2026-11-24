@@ -16,3 +16,38 @@ test('shared ridge once, duplicate edge rejected',()=>{const a=plane('a',rect(0,
 test('openings containment overlap and pending treatment',()=>{const p=plane('p');const o:RoofEntity={...base('o'),kind:'roofOpening',polygon:rect(2,2,4,5),planeId:'p'};assert.equal(measureRoof('roof',[p,o]).rows.find(r=>r.code==='roof.covering')?.status,'unquantified');assert.throws(()=>validateRoofTopology([p,{...o,polygon:rect(39,29,4,5)}]));assert.throws(()=>validateRoofTopology([p,o,{...o,...base('q'),polygon:rect(3,3,4,5)}]));});
 test('independent insulation and soffit surface quantities',()=>{const i:RoofEntity={...base('i'),kind:'roofSurface',polygon:rect(0,0,40,25),purpose:'insulation',surfaceBasis:'horizontal',pitchRise:0,insulationType:'closed cell foam',depthFt:0.5};near(value([i],'roof.insulation.horizontal'),1000);near(value([i],'roof.insulation.horizontal.volume'),6000);const s:RoofEntity={...base('s'),kind:'roofSurface',polygon:rect(0,0,10,2),purpose:'soffit',surfaceBasis:'sloped',pitchRise:6};near(value([s],'roof.soffit.area'),20*slopeFactor(6))});
 test('snapping and immutable vertex movement',()=>{const p=plane('p');assert.deepEqual(snapRoofPoint({x:0.05,y:0.02},[p],0.1,1),{x:0,y:0});const n=moveRoofVertex([p],'p',1,{x:42,y:0});assert.equal(p.polygon[1].x,40);assert.equal((n[0] as typeof p).polygon[1].x,42)});
+
+import {createProjectDocument,workspaceRenderView,serializeProjectDocument,deserializeProjectDocument} from '../src/engine/projectDocument';
+import {createBlankProject} from '../src/engine/samplePlans';
+import {addWorkspace,replaceSpecialistEntities,restoreWorkspaceSnapshot,selectWorkspace,canReportProjectEstimate} from '../src/engine/workspaceController';
+test('partial shared boundaries split at ownership transition',()=>{
+ const a=plane('a',rect(0,0,40,15),6,270),b=plane('b',rect(10,15,20,15),6,90);
+ const hit=boundaryAt({x:20,y:15},[a,b],.1)!;
+ assert.equal(hit.planeIds.length,2);near(Math.abs(hit.end.x-hit.start.x),20);
+ const edge:RoofEntity={...base('edge'),kind:'roofEdge',start:{x:0,y:15},end:{x:40,y:15},planeIds:['a'],edgeType:'eave'};
+ assert.throws(()=>validateRoofTopology([a,b,edge]),/ownership/);
+});
+test('unclassified perimeter remains explicitly incomplete',()=>{
+ assert.ok(measureRoof('roof',[plane('p')]).warnings.some(w=>w.includes('boundary classification incomplete')));
+});
+test('canonical round trip and history retain specialist geometry and shared settings',()=>{
+ const blank=createProjectDocument(createBlankProject(),'floor');
+ const doc=addWorkspace(blank,'roof','Roof','roof');
+ const snap={view:workspaceRenderView(doc),measurements:[]};
+ const p=plane('p');
+ const edit=replaceSpecialistEntities(doc,'roof',[p]);
+ const saved=deserializeProjectDocument(serializeProjectDocument(edit));
+ assert.deepEqual(saved.workspaces[1].measurements,[p]);
+ assert.deepEqual(saved.workspaces[0],blank.workspaces[0]);
+ const redo={view:workspaceRenderView(saved),measurements:[p]};
+ const changed={...saved,settings:{...saved.settings,gridSnap:false}};
+ const undo=restoreWorkspaceSnapshot(changed,'roof',snap);
+ assert.equal(undo.workspaces[1].measurements.length,0);assert.equal(undo.settings.gridSnap,false);
+ const restored=restoreWorkspaceSnapshot(undo,'roof',redo);
+ assert.deepEqual(restored.workspaces[1].measurements,[p]);
+ assert.equal(restored.settings.gridSnap,false);
+ assert.throws(()=>restoreWorkspaceSnapshot(selectWorkspace(restored,'floor'),'roof',redo),/Inactive/);
+ assert.equal(canReportProjectEstimate(restored),false);
+ const invalid={...restored,workspaces:restored.workspaces.map(w=>w.id==='roof'?{...w,measurements:[p,plane('overlap',rect(1,1,5,5))]}:w)};
+ assert.throws(()=>serializeProjectDocument(invalid),/Overlapping/);
+});
