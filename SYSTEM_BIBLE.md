@@ -2,6 +2,10 @@
 
 ---
 
+## Typed project architecture — Increment B
+
+Canonical `ProjectDocument` schema v2 separates project identity/settings/rates from typed workspace geometry. Optional floor, roof, foundation and site workspaces own independent CAD entities, underlay calibration and per-workspace undo/redo. Legacy single-floor ownership preserves the existing calculation path. Explicit or expanded projects remain unquantified (not zero or excluded) until C implements specialist measurement and consolidated reporting. Internal CAD render adapter uses immutable structural sharing and targeted commit validation; full document validation at import/persistence. Complete-document recovery is offered at startup without dirtying a blank project. Provisional 850,000-character underlay and 4,000,000-character project caps are not browser or hosting capacity guarantees. B.2 acceptance evidence and outstanding performance caveat: [B.2 specification](docs/b2-workspace-management.md). Production v2.15.1 unchanged; B/C production release separately gated.
+
 ## 1. Graph Data Model & Planar Topology
 
 PlanarMTO models an architectural floorplan as an embedded **Planar Straight Line Graph (PSLG)** $G = (V, E)$, where:
