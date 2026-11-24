@@ -154,6 +154,7 @@ export function readProjectDocument(value: unknown): ProjectDocument {
     for(const kind of scopeKinds) {
       const a=value.scope.assignments[kind];
       requireValue(record(a),'invalid v2 scope');
+      requireValue(a.status==='measured'||!('workspaceIds' in a),'invalid v2 scope owners');
       requireValue(a.status==='unquantified'||a.status==='excluded'||a.status==='measured','invalid v2 scope status');
       assignments[kind]=a.status==='measured'?{status:'assigned',workspaceIds:a.workspaceIds}:a.status==='excluded'?{status:'unquantified'}:{status:'unquantified'};
     }
@@ -170,7 +171,7 @@ export function createProjectDocument(blank: FloorplanState, workspaceId: string
   requireValue(geometryKeys.every(key => blank[key].length === 0)
     && !(blank.annotations?.length) && !blank.underlay, 'new project must be blank');
   const document: ProjectDocument = {
-    schemaVersion: 2, activeProjectId: blank.activeProjectId, activeProjectName: blank.activeProjectName,
+    schemaVersion: 3, activeProjectId: blank.activeProjectId, activeProjectName: blank.activeProjectName,
     settings: clone(blank.settings), activeWorkspaceId: workspaceId,
     workspaces: [{ id: workspaceId, name: 'Level 1', type: 'floor', geometry: geometryOf(blank), measurements: [] }],
     scope: { mode: 'explicit', assignments: {
