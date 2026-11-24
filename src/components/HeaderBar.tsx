@@ -97,9 +97,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       const result = await renderBlueprintPage(pdf, page, edge, 850_000, () => token === request.current);
       if (token !== request.current) return;
       if (latestState.current !== origin) throw new Error('Project changed during import. Cancel and import again.');
-      // Preserve legacy dual-source compatibility until the full persistence migration is validated.
+      // PDF underlays store the raster once; legacy image imports remain unchanged.
       const next: FloorplanState = { ...origin, underlay: {
-        src: result.src, url: result.src, worldX: 0, worldY: 0,
+        src: result.src, worldX: 0, worldY: 0,
         feetPerPixel: 50 / result.width, opacity: .7, isLocked: false, isVisible: true,
         pdfSource: { filename, page, width: result.width, height: result.height },
       }};
