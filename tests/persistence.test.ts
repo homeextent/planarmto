@@ -186,3 +186,26 @@ test('authenticated directory read failure does not fall back to guest data', as
   globalThis.fetch = async () => new Response(JSON.stringify({message:'Denied'}),{status:403});
   await assert.rejects(getSavedProjects(),/Unable to read authenticated projects/);
 });
+
+test('typed recovery rejects invalid geometry without replacing previous valid draft', async () => {
+  const { normalizeProjectInput, addWorkspace } = await import('../src/engine/workspaceController');
+  const { workspaceRenderView, commitWorkspaceRenderView } = await import('../src/engine/projectDocument');
+  const doc = addWorkspace(normalizeProjectInput(fixture()),'roof','Roof','roof');
+  saveAutoSaveState(doc);
+  const previous = values.get(autoKey);
+  const view = workspaceRenderView(doc);
+  const invalid = commitWorkspaceRenderView(doc,'roof',{...view,nodes:[{id:'bad',x:NaN,y:0}]},false);
+  assert.throws(()=>saveAutoSaveState(invalid),/Automatic recovery/);
+  assert.equal(values.get(autoKey),previous);
+  assert.deepEqual(getAutoSaveState()?.state,doc);
+});
+test('typed recovery quota failure preserves previous complete multi-workspace document', async () => {
+  const { normalizeProjectInput, addWorkspace } = await import('../src/engine/workspaceController');
+  const doc = addWorkspace(normalizeProjectInput(fixture()),'roof','Roof','roof');
+  saveAutoSaveState(doc);
+  const previous = values.get(autoKey);
+  failKey = autoKey;
+  assert.throws(()=>saveAutoSaveState({...doc,activeProjectName:'Changed'}),/Automatic recovery/);
+  assert.equal(values.get(autoKey),previous);
+  assert.deepEqual(getAutoSaveState()?.state,doc);
+});
