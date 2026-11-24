@@ -4,6 +4,10 @@
 
 ---
 
+## Development status — Increment B (staging integration candidate)
+
+B.1 typed project architecture and B.2 workspace management use schema v2 with independent floor, roof, foundation and site geometry, blueprint calibration and undo/redo, and shared project settings/rates. B.2 includes complete-project persistence, recovery prompt and immutable CAD update optimization. Existing single-floor legacy estimates remain supported; new/expanded typed projects are explicitly unquantified until Increment C. See [B.2 specification and acceptance record](docs/b2-workspace-management.md). Production remains v2.15.1; combined B/C release v2.16.0 is separately gated.
+
 ## Key Features
 
 ### 1. Interactive 2D Vector CAD Canvas
