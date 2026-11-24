@@ -56,7 +56,7 @@ curl -fsS -b "$tmp/cookies" "$base/?planarmto_route=1" > "$tmp/app.html"
 nonce=$(python3 -c 'import re,sys; print(re.search("nonce: "+chr(34)+"([^"+chr(34)+"]+)"+chr(34),open(sys.argv[1]).read()).group(1))' "$tmp/app.html")
 grep -Eq 'currentUserId: [1-9][0-9]*' "$tmp/app.html"
 grep -F "$base/wp-content/plugins/planarmto/dist/assets/" "$tmp/app.html" >/dev/null
-worker=$(find dist/assets -type f -name 'pdf.worker*.mjs' -print -quit)
+worker=$(find dist/assets -type f -name 'pdf.worker*.js' -print -quit)
 test -n "$worker"
 curl -fsS -D "$tmp/headers" "$base/wp-content/plugins/planarmto/$worker" -o "$tmp/worker"
 grep -Ei '^content-type: (application|text)/(javascript|ecmascript)' "$tmp/headers"
