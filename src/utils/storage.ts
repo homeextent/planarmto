@@ -301,11 +301,12 @@ export async function saveProjectToDirectory(
   }
 
   // Fallback to LocalStorage
+  const originalIndex = JSON.parse(localStorage.getItem(PROJECTS_DIRECTORY_KEY) || '[]') as SavedProjectEntry[];
   const now = Date.now();
   const targetId = payload.id;
   const entryId = targetId || `proj_${now}_${Math.random().toString(36).substr(2, 6)}`;
   
-  const existingIndex = projects.findIndex((p) => p.id === entryId);
+  const existingIndex = projects.findIndex((p) => String(p.id) === String(entryId));
   const entryCreatedAt = existingIndex >= 0 ? projects[existingIndex].createdAt : now;
 
   const newEntry: SavedProjectEntry = {
@@ -331,7 +332,7 @@ export async function saveProjectToDirectory(
   }
 
   try {
-    localStorage.setItem(PROJECTS_DIRECTORY_KEY, JSON.stringify(projects.map(p => { const { state, ...index } = p; return localStorage.getItem(PROJECT_PREFIX + p.id) !== null ? index : p; })));
+    localStorage.setItem(PROJECTS_DIRECTORY_KEY, JSON.stringify(projects.map(p => String(p.id) === String(entryId) ? indexEntry : originalIndex.find(old => String(old.id) === String(p.id)) ?? p)));
   } catch (err) {
     if (previousPayload === null) localStorage.removeItem(payloadKey);
     else localStorage.setItem(payloadKey, previousPayload);
@@ -350,14 +351,11 @@ export async function deleteProjectFromDirectory(id: string | number): Promise<S
     return getSavedProjects();
   }
 
-  const projects = (await getSavedProjects()).filter((p) => p.id !== id);
-  try {
-    localStorage.setItem(PROJECTS_DIRECTORY_KEY, JSON.stringify(projects));
-    localStorage.removeItem(`${PROJECT_PREFIX}${id}`);
-  } catch (err) {
-    console.warn('Unable to update project directory after delete:', err);
-  }
-  return projects;
+  await getSavedProjects(); // Validate directory before changing it.
+  const index = JSON.parse(localStorage.getItem(PROJECTS_DIRECTORY_KEY) || '[]') as SavedProjectEntry[];
+  localStorage.setItem(PROJECTS_DIRECTORY_KEY, JSON.stringify(index.filter(p => String(p.id) !== String(id))));
+  localStorage.removeItem(`${PROJECT_PREFIX}${id}`);
+  return getSavedProjects();
 }
 
 /**
