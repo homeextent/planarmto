@@ -20,6 +20,7 @@ test('invalid dimensions, duplicate IDs, degenerate polygons and missing referen
  assert.throws(()=>validateSpecialistEntities('roof',[{...plane,pitchRise:-1}]),/roof plane/);
  assert.throws(()=>validateSpecialistEntities('roof',[{...plane,pitchRise:NaN}]),/roof plane/);
  assert.throws(()=>validateSpecialistEntities('roof',[plane,plane]),/duplicate entity/);
+ assert.throws(()=>validateSpecialistEntities('roof',[plane,{...plane,id:'other'}]),/duplicate specialist physical/);
  assert.throws(()=>validateSpecialistEntities('roof',[{...plane,polygon:[{x:0,y:0},{x:1,y:1},{x:2,y:2}]}]),/roof plane/);
  assert.throws(()=>validateSpecialistEntities('roof',[{...plane,kind:'roofOpening',planeId:'missing'}]),/missing opening plane/);
 });
