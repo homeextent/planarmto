@@ -1,0 +1,39 @@
+name: Validate PlanarMTO
+
+on:
+  pull_request:
+    branches: [staging, main]
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: TypeScript validation
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+      - name: PHP syntax validation
+        run: php -l planar-mto.php
+      - name: Verify bundled PDF worker
+        run: |
+          test -n "$(find dist/assets -type f -name 'pdf.worker*.mjs' -print -quit)"
