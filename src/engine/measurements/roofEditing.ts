@@ -1,5 +1,5 @@
 import type {Point,RoofEntity} from './measurementTypes';
-import {validateRoofTopology} from './roofMeasurements';
+import {validateRoofTopology,boundaryIntervals,roofBoundaryOwners} from './roofMeasurements';
 export const roofPoints=(e:RoofEntity):Point[]=>'polygon' in e?e.polygon:[e.start,e.end];
 export const segmentDistance=(p:Point,a:Point,b:Point)=>{
  const dx=b.x-a.x,dy=b.y-a.y,l=dx*dx+dy*dy;
@@ -22,8 +22,14 @@ export function boundaryAt(p:Point,entities:RoofEntity[],tolerance:number){
  }
  if(!best)return null;
  const {start,end}=best;
- const planeIds=entities.filter(e=>e.kind==='roofPlane'&&segments(e.polygon).some(([a,b])=>segmentDistance(start,a,b).distance<1e-6&&segmentDistance(end,a,b).distance<1e-6)).map(e=>e.id);
- return {start:{...start},end:{...end},planeIds};
+ const planes=entities.filter((e):e is Extract<RoofEntity,{kind:'roofPlane'}>=>e.kind==='roofPlane');
+ const ts=boundaryIntervals(start,end,planes.map(e=>e.polygon));
+ const dx=end.x-start.x,dy=end.y-start.y;
+ const t=Math.max(0,Math.min(1,((p.x-start.x)*dx+(p.y-start.y)*dy)/(dx*dx+dy*dy)));
+ const i=Math.max(0,Math.min(ts.length-2,ts.findIndex((v,j)=>j>0&&v>=t)-1));
+ const point=(t:number)=>({x:start.x+dx*t,y:start.y+dy*t});
+ const a=point(ts[i]),b=point(ts[i+1]);
+ return {start:a,end:b,planeIds:roofBoundaryOwners(a,b,planes)};
 }
 export function moveRoofVertex(entities:RoofEntity[],id:string,index:number,next:Point):RoofEntity[]{
  const e=entities.find(e=>e.id===id);if(!e||!('polygon' in e)||!e.polygon[index])throw Error('Select a polygon vertex');
