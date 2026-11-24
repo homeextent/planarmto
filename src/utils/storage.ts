@@ -217,7 +217,8 @@ export async function getSavedProjects(): Promise<SavedProjectEntry[]> {
             if (parsedState?.underlay) {
               const u = parsedState.underlay;
               u.src = u.src || u.url || u.blueprintUrl || '';
-              u.url = u.url || u.src;
+              if (u.pdfSource && (!u.url || u.url === u.src)) delete u.url;
+              else u.url = u.url || u.src;
               u.isVisible = u.isVisible !== undefined ? u.isVisible : true;
               u.isLocked = u.isLocked !== undefined ? u.isLocked : false;
               u.opacity = u.opacity !== undefined ? u.opacity : 0.5;
