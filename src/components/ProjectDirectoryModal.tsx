@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { normalizeProjectInput, canReportLegacyEstimate } from '../engine/workspaceController';
+import { normalizeProjectInput } from '../engine/workspaceController';
 import type { StoredProjectState } from '../utils/storage';
 import {
   SavedProjectEntry,
@@ -515,13 +515,13 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
                           <div className="text-[10px] uppercase font-bold text-slate-500">Area</div>
                           <div className="font-mono font-bold text-slate-200 flex items-center gap-1 mt-0.5">
                             <Ruler className="w-3 h-3 text-emerald-400" />
-                            {'schemaVersion' in project.state && !canReportLegacyEstimate(project.state) ? 'Pending C' : project.grossSf + ' SF'}
+                            {true ? 'Pending C' : project.grossSf + ' SF'}
                           </div>
                         </div>
                         <div>
                           <div className="text-[10px] uppercase font-bold text-slate-500">Total Est.</div>
                           <div className="font-mono font-bold text-emerald-400 truncate mt-0.5">
-                            {'schemaVersion' in project.state && !canReportLegacyEstimate(project.state) ? 'Not quantified' : '$' + project.estimatedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            {true ? 'Not quantified' : '$' + project.estimatedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                           </div>
                         </div>
                       </div>
