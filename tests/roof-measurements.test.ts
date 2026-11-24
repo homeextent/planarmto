@@ -62,3 +62,65 @@ test('geometric opening area survives unspecified deduction',()=>{
  near(value([p,o],'roof.opening.projected'),20);
  assert.equal(measureRoof('roof',[p,o]).rows.find(r=>r.code==='roof.covering')?.status,'unquantified');
 });
+
+import {parseDimension,exactEndpoint,exactRectangleCorner,rectanglePoints,resizeRectangle} from '../src/engine/precisionDrafting';
+import {generateRectangularRoof,type RoofConfig} from '../src/engine/measurements/roofGenerator';
+import {roofSnap,resizeRoofRectangle} from '../src/engine/measurements/roofEditing';
+import {resizeWallSegment} from '../src/engine/floorPrecision';
+const generated=(w:number,h:number,config:Partial<RoofConfig>={})=>{let n=0;return generateRectangularRoof({x:0,y:0},{x:w,y:h},{type:'hip',pitch:6,direction:90,ridge:'horizontal',...config},()=> 'generated-'+ ++n)};
+test('precision input parses explicit and active units; invalid lengths rejected',()=>{
+ near(parseDimension('40')!,40);near(parseDimension("20' 6 1/2\"")!,20+6.5/12);near(parseDimension('12m')!,12/.3048);near(parseDimension('600mm')!,.6/.3048);near(parseDimension('2',true)!,2/.3048);
+ for(const x of ['','0','-1','Infinity','1e99','20 feet extra',"2' 13\"","1' 1/0\""])assert.equal(parseDimension(x),null,x);
+});
+test('exact line, Ortho and rectangle retain requested geometry',()=>{
+ const a={x:2,y:3};assert.deepEqual(exactEndpoint(a,{x:9,y:4},40,true),{x:42,y:3});const b=exactEndpoint(a,{x:5,y:7},40);near(Math.hypot(b.x-a.x,b.y-a.y),40);
+ const c=exactRectangleCorner(a,{x:-2,y:10},40,20);assert.deepEqual(c,{x:-38,y:23});near(projectedArea(rectanglePoints(a,c)),800);
+ assert.throws(()=>exactEndpoint(a,a,40));assert.throws(()=>exactRectangleCorner(a,{x:2,y:6},20,40));
+});
+test('rectangle resize retains anchor and winding, rejects irregular polygons',()=>{
+ const original=rect(2,3,10,20);const next=resizeRectangle(original,40,20);assert.deepEqual(next[0],original[0]);near(projectedArea(next),800);near(projectedArea(original),200);
+ assert.throws(()=>resizeRectangle([{x:0,y:0},{x:4,y:0},{x:3,y:3},{x:0,y:3}],4,4));
+});
+test('sticky node capture respects breakout and eligibility',()=>{
+ const p=plane('p');const lock=roofSnap({x:.1,y:.1},[p],.2,null);assert.equal(lock.type,'node');
+ assert.deepEqual(roofSnap({x:.3,y:0},[p],.2,null,lock,.4),lock);
+ assert.equal(roofSnap({x:1,y:0},[p],.2,null,lock,.4).type,'edge');
+ assert.notEqual(roofSnap({x:.1,y:.1},[p],.2,null,lock,.4,()=>false).type,'node');
+});
+test('rectangular hip: 40 by 30 analytical coverage and unique actual hips/ridge',()=>{
+ const e=generated(40,30);assert.equal(e.filter(q=>q.kind==='roofPlane').length,4);
+ near(value(e,'roof.projected'),1200);near(value(e,'roof.gross'),1200*Math.sqrt(1.25));near(value(e,'roof.edge.eave'),140);near(value(e,'roof.edge.ridge'),10);near(value(e,'roof.edge.hip'),90);
+ assert.equal(e.filter(q=>q.kind==='roofEdge'&&q.planeIds.length===2).length,5);
+ assert.ok(e.filter(q=>q.kind==='roofEdge').every(q=>q.applicability?.gutter==='unspecified'));
+});
+test('vertical rectangular hip and square apex conserve area',()=>{
+ const e=generated(30,40);near(value(e,'roof.edge.ridge'),10);near(value(e,'roof.edge.hip'),90);
+ const s=generated(30,30);near(value(s,'roof.projected'),900);near(value(s,'roof.edge.hip'),90);assert.equal(s.filter(q=>q.kind==='roofEdge'&&q.edgeType==='ridge').length,0);
+});
+test('gable orientations preserve projected and sloped area; rake lengths analytical',()=>{
+ for(const ridge of ['horizontal','vertical'] as const){const e=generated(40,30,{type:'gable',ridge});near(value(e,'roof.projected'),1200);near(value(e,'roof.gross'),1200*Math.sqrt(1.25));near(value(e,'roof.edge.ridge'),ridge==='horizontal'?40:30);near(value(e,'roof.edge.rake'),(ridge==='horizontal'?60:80)*Math.sqrt(1.25));}
+});
+test('shed directions and flat roof never infer assembly applicability',()=>{
+ for(const direction of [0,90,180,270] as const){const e=generated(40,30,{type:'shed',direction});near(value(e,'roof.gross'),1200*Math.sqrt(1.25));near(value(e,'roof.edge.eave'),direction===0||direction===180?30:40);}
+ const f=generated(40,30,{type:'flat',pitch:0});near(value(f,'roof.gross'),1200);assert.ok(f.filter(e=>e.kind==='roofEdge').every(e=>e.edgeType==='unclassified'));
+});
+test('generator invalid geometry and duplicate application rejected',()=>{
+ assert.throws(()=>generated(0,30));assert.throws(()=>generated(40,30,{pitch:0}));assert.throws(()=>generated(40,30,{pitch:49}));const e=generated(40,30);assert.throws(()=>validateRoofTopology([...e,plane('existing')]),/Overlapping/);
+});
+test('generated roof survives canonical persistence and one specialist undo',()=>{
+ const blank=createProjectDocument(createBlankProject(),'floor');const doc=addWorkspace(blank,'roof','Roof','roof');const snap={view:workspaceRenderView(doc),measurements:[]};const e=generated(40,30);
+ const edit=replaceSpecialistEntities(doc,'roof',e);const saved=deserializeProjectDocument(serializeProjectDocument(edit));assert.deepEqual(saved.workspaces[1].measurements,e);
+ assert.deepEqual(restoreWorkspaceSnapshot(saved,'roof',snap).workspaces[1].measurements,[]);assert.deepEqual(saved.workspaces[0],blank.workspaces[0]);assert.equal(canReportProjectEstimate(saved),false);
+});
+test('roof rectangle resize rejects dependent plane and preserves opening containment',()=>{
+ const p=plane('p');const o:RoofEntity={...base('o'),kind:'roofOpening',polygon:rect(2,2,4,5),planeId:'p',deduction:'included'};
+ assert.throws(()=>resizeRoofRectangle([p,o],'p',30,20),/dependent/);
+ const next=resizeRoofRectangle([p,o],'o',6,8);near(value(next,'roof.opening.projected'),48);assert.throws(()=>resizeRoofRectangle([p,o],'o',50,8),/outside|consume/);
+});
+test('free wall length edit preserves anchor and rejects connected endpoint or opening conflict',()=>{
+ const blank=createBlankProject();const w={id:'w',startNodeId:'a',endNodeId:'b',height:9,thickness:.375,wallType:'partition_2x4' as const};
+ const state={...blank,nodes:[{id:'a',x:0,y:0},{id:'b',x:10,y:0}],walls:[w]};
+ const next=resizeWallSegment(state,'w',40);assert.equal(next.nodes[1].x,40);assert.equal(state.nodes[1].x,10);
+ assert.throws(()=>resizeWallSegment({...state,nodes:[...state.nodes,{id:'c',x:10,y:10}],walls:[w,{...w,id:'w2',startNodeId:'b',endNodeId:'c'}]},'w',40),/Connected/);
+ assert.throws(()=>resizeWallSegment({...state,apertures:[{id:'o',wallId:'w',offset:5,width:3,height:7,type:'door_passage'}]},'w',6),/opening/);
+});
