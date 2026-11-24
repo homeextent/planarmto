@@ -502,7 +502,7 @@ export interface ProjectSettings {
 }
 
 export type ActiveTool =
-  | 'roof_plane' | 'roof_edge' | 'roof_opening' | 'roof_soffit' | 'roof_insulation' | 'roof_vertex'
+  | 'roof_generate' | 'roof_plane' | 'roof_edge' | 'roof_opening' | 'roof_soffit' | 'roof_insulation' | 'roof_vertex'
   | 'select'
   | 'wall_pen'
   | 'wall_rect'
