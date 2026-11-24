@@ -1,9 +1,7 @@
 import { CompanyBranding, FloorplanState, ProjectSettings, UnitCostRates } from '../types';
-import { calculateMTO, calculateEstimatedCost, safeMergeRates } from '../engine/estimator';
-import { DEFAULT_UNIT_COST_RATES } from '../constants/rates';
+import { safeMergeRates } from '../engine/estimator';
 import type { ProjectDocument } from '../engine/projectDocument';
-import { workspaceFloorplan } from '../engine/projectDocument';
-import { normalizeProjectInput, canReportLegacyEstimate, validateProjectBudget } from '../engine/workspaceController';
+import { normalizeProjectInput, validateProjectBudget } from '../engine/workspaceController';
 export type StoredProjectState = FloorplanState | ProjectDocument;
 
 const BRANDING_STORAGE_KEY = 'planarmto_company_branding_v1';
@@ -35,7 +33,8 @@ export async function getProjectPayload(id: string | number): Promise<SavedProje
     return null;
   }
 }
-const AUTOSAVE_STORAGE_KEY = 'planarmto_autosave_state_v1';
+const AUTOSAVE_STORAGE_KEY = 'planarmto_autosave_state_v3';
+const HISTORICAL_AUTOSAVE_KEY = 'planarmto_autosave_state_v1';
 const GLOBAL_RATES_STORAGE_KEY = 'planarmto_global_rates';
 
 export interface SavedProjectEntry {
@@ -217,47 +216,6 @@ export async function getSavedProjects(): Promise<SavedProjectEntry[]> {
           state: (() => {
             const parsedState = typeof p.state === 'string' ? JSON.parse(p.state) : p.state || (p.project_state ? (typeof p.project_state === 'string' ? JSON.parse(p.project_state) : p.project_state) : {});
             
-            // Rehydrate blueprint data for backward compatibility and completeness
-            if (parsedState?.underlay) {
-              const u = parsedState.underlay;
-              u.src = u.src || u.url || u.blueprintUrl || '';
-              if (u.pdfSource && (!u.url || u.url === u.src)) delete u.url;
-              else u.url = u.url || u.src;
-              u.isVisible = u.isVisible !== undefined ? u.isVisible : true;
-              u.isLocked = u.isLocked !== undefined ? u.isLocked : false;
-              u.opacity = u.opacity !== undefined ? u.opacity : 0.5;
-              
-              // Map World Coordinates
-              u.worldX = u.worldX !== undefined ? u.worldX : (u.x !== undefined ? u.x : 0);
-              u.worldY = u.worldY !== undefined ? u.worldY : (u.y !== undefined ? u.y : 0);
-              
-              // Map Scale Factor
-              const savedFpp = u.feetPerPixel ?? u.scaleFactor;
-              u.feetPerPixel = typeof savedFpp === 'number' && savedFpp > 0 
-                ? savedFpp 
-                : (u.scale !== undefined ? (1 / u.scale) : 0.05);
-              
-              // Final fallback to ensure feetPerPixel is NEVER invalid
-              if (!Number.isFinite(u.feetPerPixel) || u.feetPerPixel <= 0) {
-                u.feetPerPixel = 0.05;
-              }
-
-              // Cleanup legacy fields if they exist
-              delete u.id;
-              delete u.width;
-              delete u.height;
-              delete u.scaleFactor;
-              delete u.rotation;
-              delete u.lastCenteredAt;
-              delete u.blueprintUrl;
-              delete u.x;
-              delete u.y;
-              delete u.scale;
-            }
-
-            if (parsedState?.settings?.costRates) {
-              parsedState.settings.costRates = safeMergeRates(parsedState.settings.costRates);
-            }
             return parsedState;
           })(),
         }))
@@ -282,9 +240,6 @@ export async function getSavedProjects(): Promise<SavedProjectEntry[]> {
           throw new Error('Missing project payload: ' + p.id);
         }
 
-        if (p.state?.settings?.costRates) {
-          p.state.settings.costRates = safeMergeRates(p.state.settings.costRates);
-        }
         return p;
       }));
       return entries.sort((a, b) => b.updatedAt - a.updatedAt);
@@ -307,31 +262,27 @@ export async function saveProjectToDirectory(
     projectNumber?: string;
   }
 ): Promise<SavedProjectEntry> {
-  // Preserve legacy summaries; never price incomplete typed projects.
-  const doc = 'schemaVersion' in state ? normalizeProjectInput(state) : null;
-  const view = doc ? workspaceFloorplan(doc) : state as FloorplanState;
-  const reportable = !doc || canReportLegacyEstimate(doc);
-  const mto = calculateMTO(view);
-  const cost = calculateEstimatedCost(
-    mto,
-    state.settings.costRates || DEFAULT_UNIT_COST_RATES,
-    state.settings.categoryInclusions,
-    state.settings.itemInclusions
-  );
-
-  const id = options?.id || state.activeProjectId || `proj_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const doc = normalizeProjectInput(state);
+  const id = options?.id || doc.activeProjectId || crypto.randomUUID();
   const nameToSave = name.trim() || 'Untitled Architectural Project';
-  const persistedState = doc ? { ...doc, activeProjectId: String(id), activeProjectName: nameToSave } : state;
-  if (doc) validateProjectBudget(persistedState as ProjectDocument);
+  const persistedState = { ...doc, activeProjectId: String(id), activeProjectName: nameToSave };
+  validateProjectBudget(persistedState);
+  // Reject replacing a retired record, even if a caller supplied its ID explicitly.
+  const projects = await getSavedProjects();
+  const existing = projects.find(p => String(p.id) === String(id));
+  if (existing) {
+    try { normalizeProjectInput(existing.state); }
+    catch { throw new Error('Historical project is retained for export only. Save as a new project.'); }
+  }
   const payload = {
     id,
     name: name.trim() || 'Untitled Architectural Project',
-    projectNumber: options?.projectNumber || state.settings.companyBranding?.projectNumber || `PRJ-${new Date().getFullYear()}-MTO`,
+    projectNumber: options?.projectNumber || doc.settings.companyBranding?.projectNumber || `PRJ-${new Date().getFullYear()}-MTO`,
     description: options?.description || '',
-    roomCount: doc ? doc.workspaces.filter(w => w.type === 'floor').reduce((n,w) => n + w.geometry.rooms.length, 0) : mto.roomDetails.length,
-    grossSf: reportable ? mto.grossFootprintSf || mto.flooringPackageSf || 0 : 0,
-    netSf: reportable ? mto.netFloorAreaSf || mto.flooringPackageSf || 0 : 0,
-    estimatedTotal: reportable ? cost.totalCost : 0,
+    roomCount: doc.workspaces.filter(w => w.type === 'floor').reduce((n,w) => n + w.geometry.rooms.length, 0),
+    grossSf: 0,
+    netSf: 0,
+    estimatedTotal: 0,
     state: persistedState,
   };
 
@@ -350,7 +301,6 @@ export async function saveProjectToDirectory(
   }
 
   // Fallback to LocalStorage
-  const projects = await getSavedProjects();
   const now = Date.now();
   const targetId = payload.id;
   const entryId = targetId || `proj_${now}_${Math.random().toString(36).substr(2, 6)}`;
@@ -381,7 +331,7 @@ export async function saveProjectToDirectory(
   }
 
   try {
-    localStorage.setItem(PROJECTS_DIRECTORY_KEY, JSON.stringify(projects.map(p => { const { state, ...index } = p; return index; })));
+    localStorage.setItem(PROJECTS_DIRECTORY_KEY, JSON.stringify(projects.map(p => { const { state, ...index } = p; return localStorage.getItem(PROJECT_PREFIX + p.id) !== null ? index : p; })));
   } catch (err) {
     if (previousPayload === null) localStorage.removeItem(payloadKey);
     else localStorage.setItem(payloadKey, previousPayload);
@@ -450,10 +400,11 @@ export async function hydrateSettingsWithBranding(
  */
 export function saveAutoSaveState(state: StoredProjectState): void {
   try {
-    if ('schemaVersion' in state) validateProjectBudget(state);
+    const document = normalizeProjectInput(state);
+    validateProjectBudget(document);
     const payload = {
       timestamp: Date.now(),
-      state,
+      state: document,
     };
     localStorage.setItem(AUTOSAVE_STORAGE_KEY, JSON.stringify(payload));
   } catch (err) {
@@ -483,4 +434,9 @@ export function clearAutoSaveState(): void {
   } catch (err) {
     // Ignore
   }
+}
+
+/** Historical recovery is deliberately separate from the new active recovery slot. */
+export function getHistoricalAutoSaveRaw(): string | null {
+  try { return localStorage.getItem(HISTORICAL_AUTOSAVE_KEY); } catch { return null; }
 }
