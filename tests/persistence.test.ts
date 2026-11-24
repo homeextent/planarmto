@@ -2,7 +2,7 @@ import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createProjectDocument, workspaceFloorplan } from '../src/engine/projectDocument';
 import { createBlankProject } from '../src/engine/samplePlans';
-import { getSavedProjects, saveProjectToDirectory, saveAutoSaveState, getAutoSaveState, getHistoricalAutoSaveRaw } from '../src/utils/storage';
+import { getSavedProjects, saveProjectToDirectory, saveAutoSaveState, getAutoSaveState, getHistoricalAutoSaveRaw, deleteProjectFromDirectory } from '../src/utils/storage';
 
 const directoryKey = 'PLANAR_MTO_PROJECTS_LIST';
 const payloadKey = 'PLANAR_MTO_PROJECT_test-pdf';
@@ -235,4 +235,18 @@ test('historical recovery survives active v3 recovery writes', () => {
   saveAutoSaveState(fixture());
   assert.equal(getHistoricalAutoSaveRaw(),raw);
   assert.equal(getAutoSaveState()?.state.activeProjectId,'test-pdf');
+});
+
+test('saving and deleting other projects preserves raw historical index even with stale separate payload', async () => {
+ const old={id:'old',name:'Archived',state:historicalFixture(),createdAt:1,updatedAt:1};
+ values.set(directoryKey,JSON.stringify([old]));
+ values.set('PLANAR_MTO_PROJECT_old',JSON.stringify({...old,name:'Stale payload'}));
+ await saveProjectToDirectory('New',fixture());
+ assert.deepEqual(JSON.parse(values.get(directoryKey)!).find((p:any)=>p.id==='old'),old);
+ failKey=directoryKey;
+ await assert.rejects(deleteProjectFromDirectory('test-pdf'));
+ assert.ok(values.has(payloadKey));
+ failKey=null;
+ await deleteProjectFromDirectory('test-pdf');
+ assert.deepEqual(JSON.parse(values.get(directoryKey)!),[old]);
 });
