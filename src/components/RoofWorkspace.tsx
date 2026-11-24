@@ -1,6 +1,8 @@
 import React,{useMemo,useState} from 'react';
 import type {ActiveTool,SelectionState} from '../types';
 import type {RoofEntity,Applicability} from '../engine/measurements/measurementTypes';
+import {resizeRoofRectangle} from '../engine/measurements/roofEditing';
+import {resizeRectangle} from '../engine/precisionDrafting';
 import {measureRoof,projectedArea} from '../engine/measurements/roofMeasurements';
 const tools:[ActiveTool,string][]=[['select','Select'],['roof_generate','Generate roof skeleton'],['roof_plane','Roof plane'],['roof_edge','Classify edge'],['roof_opening','Roof opening'],['roof_soffit','Soffit area'],['roof_insulation','Insulation area'],['roof_vertex','Edit vertex'],['ruler_measure','Measure'],['calibrate_scale','Calibrate scale'],['text_label','Annotation']];
 export function RoofToolbar({activeTool,onSelectTool}:{activeTool:ActiveTool;onSelectTool:(t:ActiveTool)=>void}){
@@ -14,6 +16,8 @@ function Numeric({label,value,onCommit,min,max}:{label:string;value:number|null;
 const options:Applicability[]=['unspecified','included','excluded'];
 export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,onDelete}:{workspaceId:string;entities:RoofEntity[];selection:SelectionState;onChange:(e:RoofEntity[])=>boolean;onSelect:(s:SelectionState)=>void;onDelete:()=>void}){
  const e=selection.type==='roof'?entities.find(e=>e.id===selection.id):undefined;
+ const rectangle=(()=>{if(!e||!('polygon' in e)||e.polygon.length!==4)return null;const a=e.polygon[0],b=e.polygon[2],width=Math.abs(b.x-a.x),depth=Math.abs(b.y-a.y);try{resizeRectangle(e.polygon,width,depth);return {width,depth}}catch{return null}})();
+ const resize=(w:number,d:number)=>{try{return !!e&&onChange(resizeRoofRectangle(entities,e.id,w,d))}catch(err){alert(err instanceof Error?err.message:String(err));return false}};
  const names=new Map(entities.map((q,i)=>[q.id,(q.kind==='roofPlane'?'Roof plane':q.kind==='roofEdge'?'Roof edge':q.kind==='roofOpening'?'Roof opening':q.purpose==='soffit'?'Soffit area':'Insulation area')+' '+(i+1)]));
  const result=useMemo(()=>{try{return measureRoof(workspaceId,entities)}catch(err){return {rows:[],warnings:[err instanceof Error?err.message:String(err)]}}},[workspaceId,entities]);
  const update=(patch:Partial<RoofEntity>)=>{if(e)return onChange(entities.map(q=>q.id===e.id?{...q,...patch} as RoofEntity:q))};
@@ -26,6 +30,7 @@ export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,
  {e&&<div key={JSON.stringify(e)} className="space-y-2">
  <label className="block text-xs">Source reference<input className={field} defaultValue={e.source.reference} onBlur={ev=>{if(!ev.target.value.trim()||(ev.target.value!==e.source.reference&&!update({source:{...e.source,reference:ev.target.value.trim()}})))ev.target.value=e.source.reference}}/></label>
  {'polygon' in e&&<div className="text-xs">Projected polygon: {projectedArea(e.polygon).toFixed(2)} SF</div>}
+ {rectangle&&<><Numeric label="Projected width (ft)" value={rectangle.width} min={0.000001} onCommit={v=>v!==null&&resize(v,rectangle.depth)}/><Numeric label="Projected depth (ft)" value={rectangle.depth} min={0.000001} onCommit={v=>v!==null&&resize(rectangle.width,v)}/><p className="text-xs text-slate-400">First corner fixed; dependent geometry protected.</p></>}
  {e.kind==='roofPlane'&&<>
  <div className="flex flex-wrap gap-1">{[0,3,4,6,8,10,12].map(p=><button key={p} type="button" className="rounded bg-slate-800 px-2 py-1 text-xs" onClick={()=>update({pitchRise:p})}>{p}:12</button>)}</div>
  <Numeric label="Pitch rise per 12" value={e.pitchRise} min={0} onCommit={pitchRise=>update({pitchRise})}/>
