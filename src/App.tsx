@@ -36,6 +36,10 @@ import { RateCustomizerModal } from './components/RateCustomizerModal';
 import { GlobalProjectSettingsModal } from './components/GlobalProjectSettingsModal';
 import { ProjectDirectoryModal } from './components/ProjectDirectoryModal';
 
+import { RoofToolbar, RoofInspector } from './components/RoofWorkspace';
+import type { RoofEntity, SpecialistEntity } from './engine/measurements/measurementTypes';
+import { validateRoofTopology } from './engine/measurements/roofMeasurements';
+import { replaceSpecialistEntities } from './engine/workspaceController';
 import { WorkspaceBar } from './components/WorkspaceBar';
 import { createProjectDocument, workspaceRenderView, commitWorkspaceRenderView, serializeProjectDocument } from './engine/projectDocument';
 import type { ProjectDocument, WorkspaceType } from './engine/projectDocument';
@@ -50,6 +54,7 @@ export default function App() {
   );
 }
 
+type WorkspaceSnapshot = { view: FloorplanState; measurements: SpecialistEntity[] };
 function AppContent() {
   const { saveSnapSetting, previousSnapSetting, clearSnapSetting } = useProject();
   // Project State initialized with a clean blank canvas
@@ -60,6 +65,8 @@ function AppContent() {
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
   const state = useMemo(() => workspaceRenderView(document), [document]);
   const [recovery, setRecovery] = useState(() => getAutoSaveState());
+  const activeWorkspace = document.workspaces.find(w => w.id === document.activeWorkspaceId)!;
+  const roofEntities = activeWorkspace.type === 'roof' ? activeWorkspace.measurements as RoofEntity[] : undefined;
   const reportable = canReportProjectEstimate(document);
   // Internal CAD views use immutable shared references; persisted documents remain canonical.
   const setState = useCallback((change: FloorplanState | ((prev: FloorplanState) => FloorplanState)) => {
@@ -115,9 +122,9 @@ function AppContent() {
   }, [state.settings.costRates]);
 
   // History stack for Undo / Redo
-  const [history, setHistory] = useState<FloorplanState[]>([]);
-  const [redoStack, setRedoStack] = useState<FloorplanState[]>([]);
-  const histories = useRef(new Map<string, { history: FloorplanState[]; redo: FloorplanState[] }>());
+  const [history, setHistory] = useState<WorkspaceSnapshot[]>([]);
+  const [redoStack, setRedoStack] = useState<WorkspaceSnapshot[]>([]);
+  const histories = useRef(new Map<string, { history: WorkspaceSnapshot[]; redo: WorkspaceSnapshot[] }>());
 
   // Active drafting tool
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
@@ -163,36 +170,50 @@ function AppContent() {
     try {
       const updated = commitWorkspaceRenderView(document, document.activeWorkspaceId, newState, pushHistory);
       if (pushHistory) {
-        const snap = historicalSnapshot || state;
+        const snap = {view: historicalSnapshot || state, measurements: activeWorkspace.measurements};
         setHistory(prev => [...prev.slice(-30), snap]);
         setRedoStack([]);
       }
       currentDocument.current = updated; setDocument(updated); setIsDirty(true);
     } catch (err) { setStorageWarning(err instanceof Error ? err.message : String(err)); }
-  }, [state, document, setState]);
+  }, [state, document, setState, activeWorkspace.measurements]);
 
+  const handleRoofChange = useCallback((entities: RoofEntity[]): boolean => {
+    if(currentDocument.current!==document || activeWorkspace.type!=='roof')return false;
+    try {
+      validateRoofTopology(entities);
+      const updated=replaceSpecialistEntities(document,activeWorkspace.id,entities);
+      setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements}]);setRedoStack([]);
+      currentDocument.current=updated;setDocument(updated);setIsDirty(true);setStorageWarning('');return true;
+    }catch(err){setStorageWarning(err instanceof Error?err.message:String(err));return false;}
+  },[document,activeWorkspace,state]);
+  const restoreSnapshot = (snapshot:WorkspaceSnapshot) => {
+    const doc=currentDocument.current;
+    const updated=commitWorkspaceRenderView(doc,doc.activeWorkspaceId,{...snapshot.view,settings:doc.settings,activeProjectId:doc.activeProjectId,activeProjectName:doc.activeProjectName});
+    const next=replaceSpecialistEntities(updated,doc.activeWorkspaceId,snapshot.measurements);
+    currentDocument.current=next;setDocument(next);setIsDirty(true);setSelection({type:'none'});
+  };
   const handleUndo = useCallback(() => {
-    if (history.length === 0) return;
-    const previous = history[history.length - 1];
-    setRedoStack((prev) => [state, ...prev]);
-    setHistory((prev) => prev.slice(0, prev.length - 1));
-    setState({ ...previous, settings: state.settings, activeProjectId: state.activeProjectId, activeProjectName: state.activeProjectName });
-    setSelection({ type: 'none' });
-    setIsDirty(true);
-  }, [history, state]);
-
+    if (!history.length || currentDocument.current!==document) return;
+    try{
+      restoreSnapshot(history[history.length-1]);
+      setRedoStack(prev=>[{view:state,measurements:activeWorkspace.measurements},...prev]);setHistory(prev=>prev.slice(0,-1));
+    }catch(err){setStorageWarning(err instanceof Error?err.message:String(err))}
+  },[history,state,document,activeWorkspace]);
   const handleRedo = useCallback(() => {
-    if (redoStack.length === 0) return;
-    const next = redoStack[0];
-    setHistory((prev) => [...prev, state]);
-    setRedoStack((prev) => prev.slice(1));
-    setState({ ...next, settings: state.settings, activeProjectId: state.activeProjectId, activeProjectName: state.activeProjectName });
-    setSelection({ type: 'none' });
-    setIsDirty(true);
-  }, [redoStack, state]);
+    if (!redoStack.length || currentDocument.current!==document) return;
+    try{
+      restoreSnapshot(redoStack[0]);
+      setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements}]);setRedoStack(prev=>prev.slice(1));
+    }catch(err){setStorageWarning(err instanceof Error?err.message:String(err))}
+  },[redoStack,state,document,activeWorkspace]);
 
   // Handle Deleting Selected CAD Element
   const handleDeleteSelected = useCallback(() => {
+    if(selection.type==='roof'&&roofEntities){
+      if(roofEntities.some(e=>(e.kind==='roofEdge'&&e.planeIds.includes(selection.id||''))||(e.kind==='roofOpening'&&e.planeId===selection.id))){setStorageWarning('Remove dependent roof edges and openings before deleting the plane.');return;}
+      if(handleRoofChange(roofEntities.filter(e=>e.id!==selection.id)))setSelection({type:'none'});return;
+    }
     const idsToDelete = selection.type === 'multiple' && selection.ids ? selection.ids : (selection.id ? [selection.id] : []);
     if (idsToDelete.length === 0) return;
 
@@ -263,7 +284,7 @@ function AppContent() {
     });
 
     setSelection({ type: 'none' });
-  }, [selection, state, handleStateChange]);
+  }, [selection, state, handleStateChange, roofEntities, handleRoofChange]);
 
   // Clipboard Operations
   const handleCopy = useCallback(() => {
@@ -490,11 +511,12 @@ function AppContent() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (recovery) return;
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement || (e.target instanceof HTMLElement && e.target.isContentEditable)) {
         return;
       }
 
       if (e.ctrlKey || e.metaKey) {
+        if(roofEntities && ['c','x','v','d'].includes(e.key.toLowerCase()))return;
         switch (e.key.toLowerCase()) {
           case 'c':
             e.preventDefault();
@@ -532,7 +554,7 @@ function AppContent() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleCopy, handleCut, handlePaste, handleDuplicate, handleDeleteSelected, handleUndo, handleRedo, recovery]);
+  }, [handleCopy, handleCut, handlePaste, handleDuplicate, handleDeleteSelected, handleUndo, handleRedo, recovery, roofEntities]);
 
   const handleNewBlankProject = async () => {
     if (isDirty && !window.confirm('Replace the current unsaved project?')) return;
@@ -629,7 +651,7 @@ function AppContent() {
       }
     }
     setActiveTool(tool);
-    if (tool !== 'select') {
+    if (tool !== 'select' && tool !== 'roof_opening' && tool !== 'roof_vertex') {
       setSelection({ type: 'none' });
     }
   }, [activeTool, state.settings, handleUpdateSettings, previousSnapSetting, saveSnapSetting, clearSnapSetting]);
@@ -676,20 +698,22 @@ function AppContent() {
         onRename={(id, name) => changeWorkspace(doc => renameWorkspace(doc, id, name))}
         onMove={(id, direction) => changeWorkspace(doc => moveWorkspace(doc, id, direction))}
         onDelete={id => changeWorkspace(doc => removeWorkspace(doc, id))}/>
-      {!reportable && <div role="status" className="bg-amber-950 text-amber-100 px-3 py-1.5 text-xs">Workspace editing preview — project quantities and costs not quantified until Increment C. Specialist tools are not yet available.</div>}
+      {!reportable && <div role="status" className="bg-amber-950 text-amber-100 px-3 py-1.5 text-xs">{roofEntities?'Roof measurement preview — raw quantities only. Consolidated pricing and reporting unavailable until C.2.':'Workspace editing preview — consolidated project quantities and costs unavailable until C.2.'}</div>}
       {/* 2. MAIN 3-PANEL WORKSPACE */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left CAD Tool Palette */}
-        <Toolbar
+        {roofEntities ? <RoofToolbar activeTool={activeTool} onSelectTool={handleToolChange}/> : <Toolbar
           activeTool={activeTool}
           onSelectTool={handleToolChange}
           activeWallPreset={activeWallPreset}
           onSelectWallPreset={setActiveWallPreset}
-        />
+        />}
 
         {/* Center Interactive 2D CAD Canvas */}
         <CadCanvas
           key={workspaceEpoch}
+          roofEntities={roofEntities}
+          onRoofChange={handleRoofChange}
           state={state}
           onChange={handleStateChange}
           activeTool={activeTool}
@@ -698,7 +722,7 @@ function AppContent() {
           onSelect={setSelection}
           onDeleteSelected={handleDeleteSelected}
           activeWallPreset={activeWallPreset}
-          onContextMenu={(e, worldPos) => {
+          onContextMenu={roofEntities ? undefined : (e, worldPos) => {
             setContextMenu({
               x: e.clientX,
               y: e.clientY,
@@ -708,6 +732,7 @@ function AppContent() {
           }}
         />
 
+        {roofEntities && <RoofInspector workspaceId={activeWorkspace.id} entities={roofEntities} selection={selection} onChange={handleRoofChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
         {/* Right Real-time MTO Take-Off Matrix */}
         {reportable && <MtoMatrixPanel
           state={state}
@@ -722,14 +747,14 @@ function AppContent() {
         />}
 
         {/* Floating Context Inspector for selected item */}
-          <InspectorPanel
+          {selection.type!=='roof' && <InspectorPanel
             state={state}
             onChange={handleStateChange}
             selection={selection}
             onClose={() => setSelection({ type: 'none' })}
             onDelete={handleDeleteSelected}
             onToolChange={handleToolChange}
-          />
+          />}
       </div>
 
       {/* Global Project & Engine Settings Modal */}
