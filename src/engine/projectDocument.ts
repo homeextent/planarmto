@@ -113,6 +113,7 @@ function validateDocument(value: unknown): asserts value is ProjectDocument {
     ids.set(w.id, w.type as WorkspaceType);
     validateGeometry(w.geometry);
     validateSpecialistEntities(w.type as string, w.measurements);
+    requireValue(!('measurements' in w.geometry), 'specialist entities must be workspace-owned');
     requireValue(!('settings' in w.geometry) && !('activeProjectId' in w.geometry)
       && !('activeProjectName' in w.geometry), 'workspace contains project-owned fields');
   }
@@ -148,6 +149,7 @@ export function readProjectDocument(value: unknown): ProjectDocument {
       validateGeometry(w.geometry);
       const geometry = w.geometry;
       if(w.type !== 'floor') requireValue(geometryKeys.every(k=>geometry[k].length===0), 'v2 specialist drafting requires manual recreation; export original record');
+      requireValue(!('measurements' in w), 'unexpected specialist data in v2 preview');
       return {...w, measurements: []};
     });
     const assignments: Record<string, unknown> = {};
