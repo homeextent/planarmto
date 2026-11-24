@@ -53,9 +53,13 @@ export function validateSpecialistEntities(type: string, entities: unknown): ass
   if(type==='floor') { check(entities.length===0,'floor cannot own specialist entities'); return; }
   check(specialistKinds.includes(type as SpecialistKind),'unknown workspace type');
   const ids=new Set<string>();
+  const physicalKeys=new Set<string>();
   for(const e of entities) {
     check(obj(e) && str(e.id) && str(e.physicalId) && str(e.assemblyId) && obj(e.source) && str(e.source.reference),'invalid identity/source');
     check(!ids.has(e.id),'duplicate entity ID'); ids.add(e.id);
+    const key=JSON.stringify([e.physicalId,e.assemblyId,e.kind]);
+    check(!physicalKeys.has(key),'duplicate specialist physical identity'); physicalKeys.add(key);
+    check(e.source.note===undefined||typeof e.source.note==='string','invalid source note');
     check(allowed[type as SpecialistKind].includes(e.kind),'entity incompatible with workspace');
     switch(e.kind) {
       case 'roofPlane': check(polygon(e.polygon)&&pitch(e.pitchRise)&&finiteOrMissing(e.elevationFt)&&(e.slopeDegrees===null||(num(e.slopeDegrees)&&e.slopeDegrees>=0&&e.slopeDegrees<360)),'roof plane'); break;
