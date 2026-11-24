@@ -54,6 +54,7 @@ function AppContent() {
   const [document, setDocument] = useState<ProjectDocument>(() => createProjectDocument(createBlankProject(), uuidv4()));
   const currentDocument = useRef(document);
   const generation = useRef(0);
+  const initialDocument = useRef(document);
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
   const state = useMemo(() => workspaceFloorplan(document), [document]);
   const reportable = canReportLegacyEstimate(document);
@@ -78,7 +79,7 @@ function AppContent() {
         getPersistedRateProfile()
       ]);
       
-      if (generation.current !== 0) return;
+      if (generation.current !== 0 || currentDocument.current !== initialDocument.current) return;
       setState(prev => {
         const nextSettings = { ...hydratedSettings };
         
@@ -144,7 +145,7 @@ function AppContent() {
 
   // Auto-save project state to localStorage on state changes
   useEffect(() => {
-    if (!isDirty && document.workspaces.every(w => !w.geometry.nodes.length && !w.geometry.underlay)) {
+    if (!isDirty) {
       return;
     }
     const timer = setTimeout(() => {
@@ -289,8 +290,9 @@ function AppContent() {
     handleDeleteSelected();
   }, [handleCopy, handleDeleteSelected]);
 
-  const handlePaste = useCallback((position?: { x: number, y: number }) => {
-    if (!clipboard) return;
+  const handlePaste = useCallback((position?: { x: number, y: number }, supplied?: ClipboardState) => {
+    const source = supplied || clipboard;
+    if (!source) return;
 
     const idMap = new Map<string, string>();
     const getNewId = (oldId: string) => {
@@ -307,9 +309,9 @@ function AppContent() {
       let count = 0;
       let sumX = 0;
       let sumY = 0;
-      clipboard.nodes.forEach(n => { sumX += n.x; sumY += n.y; count++; });
-      clipboard.stamps.forEach(s => { sumX += s.x; sumY += s.y; count++; });
-      clipboard.annotations.forEach(a => { sumX += a.x; sumY += a.y; count++; });
+      source.nodes.forEach(n => { sumX += n.x; sumY += n.y; count++; });
+      source.stamps.forEach(s => { sumX += s.x; sumY += s.y; count++; });
+      source.annotations.forEach(a => { sumX += a.x; sumY += a.y; count++; });
       
       if (count > 0) {
         dx = position.x - (sumX / count);
@@ -317,27 +319,27 @@ function AppContent() {
       }
     }
 
-    const newNodes = clipboard.nodes.map(n => ({
+    const newNodes = source.nodes.map(n => ({
       ...n,
       id: getNewId(n.id),
       x: n.x + dx,
       y: n.y + dy,
     }));
 
-    const newWalls = clipboard.walls.map(w => ({
+    const newWalls = source.walls.map(w => ({
       ...w,
       id: getNewId(w.id),
       startNodeId: getNewId(w.startNodeId),
       endNodeId: getNewId(w.endNodeId),
     }));
 
-    const newApertures = clipboard.apertures.map(a => ({
+    const newApertures = source.apertures.map(a => ({
       ...a,
       id: getNewId(a.id),
       wallId: getNewId(a.wallId),
     }));
 
-    const newStamps = clipboard.stamps.map(s => ({
+    const newStamps = source.stamps.map(s => ({
       ...s,
       id: getNewId(s.id),
       x: s.x + dx,
@@ -345,14 +347,14 @@ function AppContent() {
       parentId: s.parentId ? getNewId(s.parentId) : undefined,
     }));
 
-    const newAnnotations = clipboard.annotations.map(a => ({
+    const newAnnotations = source.annotations.map(a => ({
       ...a,
       id: getNewId(a.id),
       x: a.x + dx,
       y: a.y + dy,
     }));
 
-    const newRooms = clipboard.rooms.map(r => ({
+    const newRooms = source.rooms.map(r => ({
       ...r,
       id: getNewId(r.id),
       nodeIds: r.nodeIds.map(id => getNewId(id)),
@@ -389,11 +391,15 @@ function AppContent() {
   }, [clipboard, state, handleStateChange]);
 
   const handleDuplicate = useCallback(() => {
-    handleCopy();
-    setTimeout(() => {
-        handlePaste();
-    }, 0);
-  }, [handleCopy, handlePaste]);
+    const ids = new Set(selection.type === 'multiple' ? selection.ids || [] : selection.id ? [selection.id] : []);
+    if (!ids.size) return;
+    const walls = state.walls.filter(w => ids.has(w.id));
+    const nodeIds = new Set(walls.flatMap(w => [w.startNodeId, w.endNodeId]));
+    handlePaste(undefined, { nodes: state.nodes.filter(n => ids.has(n.id) || nodeIds.has(n.id)), walls,
+      apertures: state.apertures.filter(a => walls.some(w => w.id === a.wallId)),
+      stamps: state.stamps.filter(s => ids.has(s.id)), annotations: (state.annotations || []).filter(a => ids.has(a.id)),
+      rooms: state.rooms.filter(r => ids.has(r.id) && r.wallIds.every(id => walls.some(w => w.id === id))) });
+  }, [selection, state, handlePaste]);
 
   function resetWorkspaceInteraction() {
     generation.current++;
