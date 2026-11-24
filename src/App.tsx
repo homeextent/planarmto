@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {
   FloorplanState,
@@ -34,6 +34,10 @@ import { RateCustomizerModal } from './components/RateCustomizerModal';
 import { GlobalProjectSettingsModal } from './components/GlobalProjectSettingsModal';
 import { ProjectDirectoryModal } from './components/ProjectDirectoryModal';
 
+import { WorkspaceBar } from './components/WorkspaceBar';
+import { createProjectDocument, workspaceFloorplan, serializeProjectDocument } from './engine/projectDocument';
+import type { ProjectDocument, WorkspaceType } from './engine/projectDocument';
+import { normalizeProjectInput, updateWorkspaceView, selectWorkspace, addWorkspace, renameWorkspace, moveWorkspace, removeWorkspace, canReportLegacyEstimate, validateBlueprintBudget } from './engine/workspaceController';
 import { ProjectProvider, useProject } from './context/ProjectContext';
 
 export default function App() {
@@ -47,7 +51,24 @@ export default function App() {
 function AppContent() {
   const { saveSnapSetting, previousSnapSetting, clearSnapSetting } = useProject();
   // Project State initialized with a clean blank canvas
-  const [state, setState] = useState<FloorplanState>(createBlankProject());
+  const [document, setDocument] = useState<ProjectDocument>(() => createProjectDocument(createBlankProject(), uuidv4()));
+  const currentDocument = useRef(document);
+  currentDocument.current = document;
+  const generation = useRef(0);
+  const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
+  const state = useMemo(() => workspaceFloorplan(document), [document]);
+  const reportable = canReportLegacyEstimate(document);
+  // Existing CAD callbacks use a detached view; only the canonical document is stored.
+  const setState = useCallback((change: FloorplanState | ((prev: FloorplanState) => FloorplanState)) => {
+    const doc = currentDocument.current;
+    const prev = workspaceFloorplan(doc);
+    const next = typeof change === 'function' ? change(prev) : change;
+    try {
+      const updated = updateWorkspaceView(doc, doc.activeWorkspaceId, next);
+      currentDocument.current = updated;
+      setDocument(updated);
+    } catch (err) { setStorageWarning(err instanceof Error ? err.message : String(err)); }
+  }, []);
 
   // Hydrate branding and master rates on mount
   useEffect(() => {
@@ -57,6 +78,7 @@ function AppContent() {
         getPersistedRateProfile()
       ]);
       
+      if (generation.current !== 0) return;
       setState(prev => {
         const nextSettings = { ...hydratedSettings };
         
@@ -92,6 +114,7 @@ function AppContent() {
   // History stack for Undo / Redo
   const [history, setHistory] = useState<FloorplanState[]>([]);
   const [redoStack, setRedoStack] = useState<FloorplanState[]>([]);
+  const histories = useRef(new Map<string, { history: FloorplanState[]; redo: FloorplanState[] }>());
 
   // Active drafting tool
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
@@ -121,18 +144,19 @@ function AppContent() {
 
   // Auto-save project state to localStorage on state changes
   useEffect(() => {
-    if (!isDirty && state.nodes.length === 0 && state.walls.length === 0) {
+    if (!isDirty && document.workspaces.every(w => !w.geometry.nodes.length && !w.geometry.underlay)) {
       return;
     }
     const timer = setTimeout(() => {
-      try { saveAutoSaveState(state); setStorageWarning(''); }
+      try { saveAutoSaveState(document); setStorageWarning(''); }
       catch (err) { setStorageWarning(err instanceof Error ? err.message : 'Automatic recovery failed.'); }
     }, 1000);
     return () => clearTimeout(timer);
-  }, [state, isDirty]);
+  }, [document, isDirty]);
 
   // Update State with Undo history tracking
   const handleStateChange = useCallback((newState: FloorplanState, pushHistory = true, historicalSnapshot?: FloorplanState) => {
+    if (currentDocument.current.activeWorkspaceId !== document.activeWorkspaceId || currentDocument.current !== document) return;
     if (pushHistory) {
       const snap = historicalSnapshot || state;
       setHistory((prev) => [...prev.slice(-30), snap]);
@@ -140,14 +164,14 @@ function AppContent() {
       setIsDirty(true);
     }
     setState(newState);
-  }, [state]);
+  }, [state, document, setState]);
 
   const handleUndo = useCallback(() => {
     if (history.length === 0) return;
     const previous = history[history.length - 1];
     setRedoStack((prev) => [state, ...prev]);
     setHistory((prev) => prev.slice(0, prev.length - 1));
-    setState(previous);
+    setState({ ...previous, settings: state.settings, activeProjectId: state.activeProjectId, activeProjectName: state.activeProjectName });
     setSelection({ type: 'none' });
     setIsDirty(true);
   }, [history, state]);
@@ -157,7 +181,7 @@ function AppContent() {
     const next = redoStack[0];
     setHistory((prev) => [...prev, state]);
     setRedoStack((prev) => prev.slice(1));
-    setState(next);
+    setState({ ...next, settings: state.settings, activeProjectId: state.activeProjectId, activeProjectName: state.activeProjectName });
     setSelection({ type: 'none' });
     setIsDirty(true);
   }, [redoStack, state]);
@@ -371,56 +395,66 @@ function AppContent() {
     }, 0);
   }, [handleCopy, handlePaste]);
 
-  // Load project from directory
-  const handleLoadProjectFromDirectory = useCallback(async (loadedState: FloorplanState) => {
-    setHistory([]);
-    setRedoStack([]);
-    setSelection({ type: 'none' });
-    setContextMenu(null);
-    
-    const hydratedSettings = await hydrateSettingsWithBranding(loadedState.settings);
-    if (hydratedSettings.costRates) {
-      hydratedSettings.costRates = safeMergeRates(hydratedSettings.costRates);
+  function resetWorkspaceInteraction() {
+    generation.current++;
+    setWorkspaceEpoch(n => n + 1);
+    setSelection({ type: 'none' }); setContextMenu(null); setClipboard(null);
+    setActiveTool('select'); clearSnapSetting();
+    setIsPrintModalOpen(false); setIsSettingsModalOpen(false); setIsRateModalOpen(false);
+  }
+  function installDocument(next: ProjectDocument, dirty: boolean, reset = true) {
+    if (reset) {
+      histories.current.clear(); setHistory([]); setRedoStack([]); resetWorkspaceInteraction();
     }
-    
-    setState({
-      ...loadedState,
-      settings: hydratedSettings,
-    });
-    setIsDirty(false);
+    currentDocument.current = next; setDocument(next); setIsDirty(dirty);
+  }
+  function changeWorkspace(operation: (doc: ProjectDocument) => ProjectDocument) {
+    try {
+      const before = currentDocument.current;
+      let next = operation(before);
+      if (next === before) return;
+      if (next.activeWorkspaceId !== before.activeWorkspaceId) {
+        histories.current.set(before.activeWorkspaceId, { history, redo: redoStack });
+        const h = histories.current.get(next.activeWorkspaceId);
+        setHistory(h?.history || []); setRedoStack(h?.redo || []);
+        if (activeTool === 'calibrate_scale' && previousSnapSetting) {
+          next = { ...next, settings: { ...next.settings, gridSnap: previousSnapSetting.enabled, gridSnapSize: previousSnapSetting.size } };
+        }
+        resetWorkspaceInteraction();
+      }
+      for (const id of histories.current.keys()) if (!next.workspaces.some(w => w.id === id)) histories.current.delete(id);
+      installDocument(next, true, false);
+    } catch (err) { alert(err instanceof Error ? err.message : String(err)); }
+  }
+  function loadDocument(value: unknown, dirty = true) {
+    const next = normalizeProjectInput(value);
+    if (isDirty && !window.confirm('Replace the current unsaved project? Save or export it first if needed.')) return;
+    installDocument(next, dirty);
     setIsProjectDirectoryOpen(false);
-  }, []);
+  }
+  const handleLoadProjectFromDirectory = (value: unknown) => {
+    try { loadDocument(value, false); } catch (err) { alert('Unable to open project: ' + (err instanceof Error ? err.message : String(err))); }
+  };
 
-  // Save/Overwrite active project
-  const handleSaveProject = useCallback(async () => {
-    const { activeProjectId, activeProjectName } = state;
-    if (activeProjectId) {
-      try {
-        await saveProjectToDirectory(activeProjectName, state, { id: activeProjectId });
-        setIsDirty(false);
-      } catch (err) { alert('Project not saved: ' + (err instanceof Error ? err.message : String(err))); }
-    } else {
-      handleSaveProjectAs();
-    }
-  }, [state]);
-
-  const handleSaveProjectAs = useCallback(async () => {
-    const newName = prompt('Enter project name:', state.activeProjectName || 'New Project');
-    if (newName) {
-      const newId = `proj_${Date.now()}`;
-      const newState = {
-        ...state,
-        activeProjectId: newId,
-        activeProjectName: newName,
-      };
-      // Immediately commit to storage
-      try {
-        await saveProjectToDirectory(newName, newState, { id: newId });
-        setState(newState);
-        setIsDirty(false);
-      } catch (err) { alert('Project not saved: ' + (err instanceof Error ? err.message : String(err))); }
-    }
-  }, [state]);
+  const saveSnapshot = async (name: string, id: string) => {
+    const origin = currentDocument.current;
+    const token = generation.current;
+    const snapshot = { ...origin, activeProjectId: id, activeProjectName: name };
+    try {
+      await saveProjectToDirectory(name, snapshot, { id });
+      if (generation.current === token && currentDocument.current === origin) installDocument(snapshot, false, false);
+      else setStorageWarning('A snapshot was saved, but the current project changed. Save again to persist newer edits.');
+    } catch (err) { alert('Project not saved: ' + (err instanceof Error ? err.message : String(err))); }
+  };
+  const handleSaveProjectAs = async () => {
+    const name = prompt('Enter project name:', currentDocument.current.activeProjectName);
+    if (name?.trim()) await saveSnapshot(name.trim(), uuidv4());
+  };
+  const handleSaveProject = async () => {
+    const doc = currentDocument.current;
+    if (doc.activeProjectId) await saveSnapshot(doc.activeProjectName, doc.activeProjectId);
+    else await handleSaveProjectAs();
+  };
 
   // Global Keyboard Shortcuts
   useEffect(() => {
@@ -488,33 +522,17 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleCopy, handleCut, handlePaste, handleDuplicate, handleDeleteSelected, handleUndo, handleRedo]);
 
-  // New Blank Project with persisted branding
-  const handleNewBlankProject = useCallback(async () => {
+  const handleNewBlankProject = async () => {
+    if (isDirty && !window.confirm('Replace the current unsaved project?')) return;
+    const origin = currentDocument.current;
+    const token = generation.current;
     const blank = createBlankProject();
-    setHistory([]);
-    setRedoStack([]);
-    setSelection({ type: 'none' });
-
-    const [hydratedSettings, persistedMasterRates] = await Promise.all([
-      hydrateSettingsWithBranding(
-        blank.settings,
-        `PRJ-${new Date().getFullYear()}-MTO-${Math.floor(100 + Math.random() * 900)}`
-      ),
-      getPersistedRateProfile()
-    ]);
-
-    const finalSettings = { ...hydratedSettings };
-    if (persistedMasterRates) {
-      finalSettings.costRates = persistedMasterRates;
-      setMasterRates(persistedMasterRates);
-    }
-
-    setState({
-      ...blank,
-      settings: finalSettings,
-    });
+    const [settings, rates] = await Promise.all([hydrateSettingsWithBranding(blank.settings), getPersistedRateProfile()]);
+    if (token !== generation.current || currentDocument.current !== origin) return;
+    if (rates) { settings.costRates = rates; setMasterRates(rates); }
+    installDocument(createProjectDocument({ ...blank, settings }, uuidv4()), false);
     setIsProjectDirectoryOpen(false);
-  }, []);
+  };
 
   // Toggle single trade category inclusion in real-time
   const handleToggleCategoryInclusion = useCallback((key: keyof CategoryInclusions) => {
@@ -627,7 +645,11 @@ function AppContent() {
       {/* 1. TOP HEADER BAR */}
       {storageWarning && <div role="alert" className="bg-amber-950 text-amber-100 px-3 py-2 text-sm">{storageWarning}</div>}
       <HeaderBar
+        key={workspaceEpoch}
         state={state}
+        projectJson={() => serializeProjectDocument(document)}
+        onLoadDocument={loadDocument}
+        validateBlueprint={next => validateBlueprintBudget(document, document.activeWorkspaceId, next)}
         onChange={handleStateChange}
         canUndo={history.length > 0}
         canRedo={redoStack.length > 0}
@@ -639,13 +661,20 @@ function AppContent() {
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
         onOpenRateModal={() => setIsRateModalOpen(true)}
         onOpenHelpModal={() => setIsHelpOpen(true)}
-        onOpenPrintModal={() => setIsPrintModalOpen(true)}
+        onOpenPrintModal={() => reportable ? setIsPrintModalOpen(true) : alert('Project estimate and print reporting are unavailable until Increment C.')}
         onOpenProjectDirectoryModal={() => setIsProjectDirectoryOpen(true)}
         onNewProject={handleNewBlankProject}
         onSelectUnderlay={() => setSelection({ type: 'underlay', id: 'underlay_main' })}
         selection={selection}
       />
 
+      <WorkspaceBar document={document}
+        onSelect={id => changeWorkspace(doc => selectWorkspace(doc, id))}
+        onAdd={(name, type) => changeWorkspace(doc => addWorkspace(doc, uuidv4(), name, type))}
+        onRename={(id, name) => changeWorkspace(doc => renameWorkspace(doc, id, name))}
+        onMove={(id, direction) => changeWorkspace(doc => moveWorkspace(doc, id, direction))}
+        onDelete={id => changeWorkspace(doc => removeWorkspace(doc, id))}/>
+      {!reportable && <div role="status" className="bg-amber-950 text-amber-100 px-3 py-1.5 text-xs">Workspace editing preview — project quantities and costs not quantified until Increment C. Specialist tools are not yet available.</div>}
       {/* 2. MAIN 3-PANEL WORKSPACE */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left CAD Tool Palette */}
@@ -658,6 +687,7 @@ function AppContent() {
 
         {/* Center Interactive 2D CAD Canvas */}
         <CadCanvas
+          key={workspaceEpoch}
           state={state}
           onChange={handleStateChange}
           activeTool={activeTool}
@@ -677,7 +707,7 @@ function AppContent() {
         />
 
         {/* Right Real-time MTO Take-Off Matrix */}
-        <MtoMatrixPanel
+        {reportable && <MtoMatrixPanel
           state={state}
           mto={mtoReport}
           costRates={costRates}
@@ -687,7 +717,7 @@ function AppContent() {
           onToggleCategoryInclusion={handleToggleCategoryInclusion}
           onToggleItemInclusion={handleToggleItemInclusion}
           onToggleCalculationMode={handleToggleCalculationMode}
-        />
+        />}
 
         {/* Floating Context Inspector for selected item */}
           <InspectorPanel
@@ -717,7 +747,7 @@ function AppContent() {
 
       {/* Formatted Print & Export Take-Off Report Modal */}
       <PrintReportModal
-        isOpen={isPrintModalOpen}
+        isOpen={reportable && isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
         state={state}
         mto={mtoReport}
@@ -747,7 +777,7 @@ function AppContent() {
       <ProjectDirectoryModal
         isOpen={isProjectDirectoryOpen}
         onClose={() => setIsProjectDirectoryOpen(false)}
-        currentState={state}
+        currentState={document}
         onLoadProject={handleLoadProjectFromDirectory}
         onNewBlankProject={handleNewBlankProject}
       />
