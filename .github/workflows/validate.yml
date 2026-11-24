@@ -36,6 +36,8 @@ jobs:
         run: npx --no-install tsx --test tests/workspace-controller.test.ts
       - name: Specialist measurement contract tests
         run: npx --no-install tsx --test tests/measurement-contracts.test.ts
+      - name: Roof measurement regression tests
+        run: npx --no-install tsx --test tests/roof-measurements.test.ts
       - name: Production build
         run: npm run build
       - name: Dependency audit
