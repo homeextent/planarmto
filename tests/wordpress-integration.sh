@@ -71,7 +71,7 @@ test "$code" = 401 || test "$code" = 403
 python3 - "$tmp/project.json" <<'PY'
 import json,sys,base64,random
 src='data:image/png;base64,'+base64.b64encode(random.Random(42).randbytes(600000)).decode()
-state={'nodes':[],'walls':[],'settings':{},'underlay':{'src':src,'worldX':7,'worldY':-3,'feetPerPixel':0.0125,'opacity':0.5,'isLocked':True,'isVisible':True,'pdfSource':{'filename':'synthetic.pdf','page':2,'width':5000,'height':3235}}}
+state={'nodes':[],'walls':[],'settings':{'unitSystem':'imperial','theme':'blueprint','gridSnap':True},'underlay':{'src':src,'worldX':7,'worldY':-3,'feetPerPixel':0.0125,'opacity':0.5,'isLocked':True,'isVisible':True,'pdfSource':{'filename':'synthetic.pdf','page':2,'width':5000,'height':3235}}}
 json.dump({'id':'ci-pdf','name':'Synthetic PDF','state':state},open(sys.argv[1],'w'))
 PY
 post() {
@@ -87,7 +87,12 @@ expected=json.load(open(sys.argv[1]))
 rows=json.load(open(sys.argv[2]))
 assert len(rows)==1
 assert rows[0]['id']==expected['id']
-assert rows[0]['state']==expected['state']
+actual=rows[0]['state']
+for key,value in expected['state'].items():
+    assert key in actual, f'Missing project state field: {key}'
+    assert actual[key]==value, f'Project state mismatch in field: {key}'
+assert actual.keys()==expected['state'].keys(), 'Unexpected project state fields'
+print('Project state round trip verified.')
 PY
 # Force a real database write error by renaming the disposable table.
 docker exec "$db" mariadb -uwordpress -pci-db-only wordpress -e 'RENAME TABLE wp_planarmto_projects TO wp_planarmto_projects_disabled'
