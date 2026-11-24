@@ -103,8 +103,9 @@ for i,kind in enumerate(['floor','floor','roof']):
     u=copy.deepcopy(old['underlay'])
     u['feetPerPixel']=0.01*(i+1)
     g={'nodes':[],'walls':[],'apertures':[],'stamps':[],'rooms':[],'decks':[],'hardscapes':[],'underlay':u}
-    workspaces.append({'id':str(i),'name':'Workspace '+str(i),'type':kind,'geometry':g})
-state={'schemaVersion':2,'activeProjectId':'ci-multi','activeProjectName':'Multi','settings':old['settings'],'activeWorkspaceId':'2','workspaces':workspaces,'scope':{'mode':'explicit','assignments':{k:{'status':'unquantified'} for k in ['roof','foundation','site']}}}
+    workspaces.append({'id':str(i),'name':'Workspace '+str(i),'type':kind,'geometry':g,'measurements':[]})
+workspaces[2]['measurements']=[{'id':'plane','physicalId':'roof-plane-1','assemblyId':'asphalt','source':{'reference':'synthetic roof sheet'},'kind':'roofPlane','polygon':[{'x':0,'y':0},{'x':10,'y':0},{'x':10,'y':10},{'x':0,'y':10}],'pitchRise':6,'slopeDegrees':90,'elevationFt':10}]
+state={'schemaVersion':3,'activeProjectId':'ci-multi','activeProjectName':'Multi','settings':old['settings'],'activeWorkspaceId':'2','workspaces':workspaces,'scope':{'mode':'explicit','assignments':{k:{'status':'unquantified'} for k in ['roof','foundation','site']}}}
 json.dump({'id':'ci-multi','name':'Multi','state':state},open(sys.argv[2],'w'))
 PY
 test "$(post "$tmp/multi.json" "$tmp/multi-save.json")" = 200
