@@ -81,6 +81,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   const [pdfImport, setPdfImport] = useState<{ pdf: BlueprintPdf; filename: string; origin: FloorplanState } | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState('');
+  const [pdfNotice, setPdfNotice] = useState('');
   const pdfRef = useRef<BlueprintPdf | null>(null);
   useEffect(() => () => { request.current++; void pdfRef.current?.destroy(); }, []);
   const cancelPdf = () => {
@@ -90,13 +91,13 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     setPdfImport(null); setPdfBusy(false); setPdfError('');
   };
   const importPage = async (pdf: BlueprintPdf, filename: string, origin: FloorplanState, page: number, edge: number, token: number) => {
-    setPdfBusy(true); setPdfError('');
+    setPdfBusy(true); setPdfError(''); setPdfNotice('');
     try {
       const { renderBlueprintPage } = await import('../utils/pdfUnderlayImporter');
-      const result = await renderBlueprintPage(pdf, page, edge);
+      const result = await renderBlueprintPage(pdf, page, edge, 850_000, () => token === request.current);
       if (token !== request.current) return;
       if (latestState.current !== origin) throw new Error('Project changed during import. Cancel and import again.');
-      // Existing canvas uses both src and url; account for duplicated encoded data.
+      // Preserve legacy dual-source compatibility until the full persistence migration is validated.
       const next: FloorplanState = { ...origin, underlay: {
         src: result.src, url: result.src, worldX: 0, worldY: 0,
         feetPerPixel: 50 / result.width, opacity: .7, isLocked: false, isVisible: true,
@@ -109,6 +110,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       finally { localStorage.removeItem(probe); }
       onChange(next);
       cancelPdf();
+      setPdfNotice('PDF page ' + page + ' imported at ' + result.width + ' × ' + result.height + ' px' + (Math.max(result.width, result.height) < edge - 1 ? ' (optimized to fit storage or pixel limits).' : '.'));
     } catch (err) {
       if (token === request.current) setPdfError(err instanceof Error ? err.message : 'Unable to render PDF.');
     } finally { if (token === request.current) setPdfBusy(false); }
@@ -196,6 +198,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     if (!file) return;
     if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
       cancelPdf();
+      setPdfNotice('');
       const token = request.current;
       const origin = latestState.current;
       setPdfBusy(true);
@@ -381,6 +384,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
         </label>
         
         {pdfBusy && !pdfImport && <button onClick={cancelPdf} className="text-xs text-sky-300">Processing PDF… Cancel</button>}
+        {pdfNotice && <div role="status" className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-sky-600 bg-slate-900 text-sky-100 px-4 py-3 text-sm shadow-xl flex items-center gap-4">{pdfNotice}<button onClick={() => setPdfNotice('')} aria-label="Dismiss import notification">Dismiss</button></div>}
         {pdfError && !pdfImport && <span role="alert" className="text-xs text-red-300">{pdfError}</span>}
         {pdfImport && <Suspense fallback={<span>Loading sheet picker…</span>}>
           <PdfSheetPickerModal pdf={pdfImport.pdf} filename={pdfImport.filename} busy={pdfBusy} error={pdfError}
