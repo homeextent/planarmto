@@ -19,6 +19,8 @@ import { detectRoomFaces, isPointInPolygon } from './engine/cadMath';
 import {
   hydrateSettingsWithBranding,
   saveAutoSaveState,
+  getAutoSaveState,
+  clearAutoSaveState,
   saveProjectToDirectory,
   getPersistedRateProfile,
   savePersistedRateProfile,
@@ -35,7 +37,7 @@ import { GlobalProjectSettingsModal } from './components/GlobalProjectSettingsMo
 import { ProjectDirectoryModal } from './components/ProjectDirectoryModal';
 
 import { WorkspaceBar } from './components/WorkspaceBar';
-import { createProjectDocument, workspaceFloorplan, serializeProjectDocument } from './engine/projectDocument';
+import { createProjectDocument, workspaceRenderView, commitWorkspaceRenderView, serializeProjectDocument } from './engine/projectDocument';
 import type { ProjectDocument, WorkspaceType } from './engine/projectDocument';
 import { normalizeProjectInput, updateWorkspaceView, selectWorkspace, addWorkspace, renameWorkspace, moveWorkspace, removeWorkspace, canReportLegacyEstimate, validateBlueprintBudget } from './engine/workspaceController';
 import { ProjectProvider, useProject } from './context/ProjectContext';
@@ -56,15 +58,16 @@ function AppContent() {
   const generation = useRef(0);
   const initialDocument = useRef(document);
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
-  const state = useMemo(() => workspaceFloorplan(document), [document]);
+  const state = useMemo(() => workspaceRenderView(document), [document]);
+  const [recovery, setRecovery] = useState(() => getAutoSaveState());
   const reportable = canReportLegacyEstimate(document);
-  // Existing CAD callbacks use a detached view; only the canonical document is stored.
+  // Internal CAD views use immutable shared references; persisted documents remain canonical.
   const setState = useCallback((change: FloorplanState | ((prev: FloorplanState) => FloorplanState)) => {
     const doc = currentDocument.current;
-    const prev = workspaceFloorplan(doc);
+    const prev = workspaceRenderView(doc);
     const next = typeof change === 'function' ? change(prev) : change;
     try {
-      const updated = updateWorkspaceView(doc, doc.activeWorkspaceId, next);
+      const updated = commitWorkspaceRenderView(doc, doc.activeWorkspaceId, next);
       currentDocument.current = updated;
       setDocument(updated);
       setIsDirty(true);
@@ -80,7 +83,8 @@ function AppContent() {
       ]);
       
       if (generation.current !== 0 || currentDocument.current !== initialDocument.current) return;
-      setState(prev => {
+      {
+        const prev = workspaceRenderView(currentDocument.current);
         const nextSettings = { ...hydratedSettings };
         
         // If it's a blank project without custom rates, we can apply master rates
@@ -91,11 +95,9 @@ function AppContent() {
           nextSettings.costRates = safeMergeRates(nextSettings.costRates);
         }
 
-        return {
-          ...prev,
-          settings: nextSettings
-        };
-      });
+        const updated = commitWorkspaceRenderView(currentDocument.current, currentDocument.current.activeWorkspaceId, { ...prev, settings: nextSettings });
+        currentDocument.current = updated; setDocument(updated);
+      }
 
       if (persistedMasterRates) {
         setMasterRates(safeMergeRates(persistedMasterRates));
@@ -145,7 +147,7 @@ function AppContent() {
 
   // Auto-save project state to localStorage on state changes
   useEffect(() => {
-    if (!isDirty) {
+    if (!isDirty || recovery) {
       return;
     }
     const timer = setTimeout(() => {
@@ -153,18 +155,20 @@ function AppContent() {
       catch (err) { setStorageWarning(err instanceof Error ? err.message : 'Automatic recovery failed.'); }
     }, 1000);
     return () => clearTimeout(timer);
-  }, [document, isDirty]);
+  }, [document, isDirty, recovery]);
 
   // Update State with Undo history tracking
   const handleStateChange = useCallback((newState: FloorplanState, pushHistory = true, historicalSnapshot?: FloorplanState) => {
     if (currentDocument.current.activeWorkspaceId !== document.activeWorkspaceId || currentDocument.current !== document) return;
-    if (pushHistory) {
-      const snap = historicalSnapshot || state;
-      setHistory((prev) => [...prev.slice(-30), snap]);
-      setRedoStack([]);
-      setIsDirty(true);
-    }
-    setState(newState);
+    try {
+      const updated = commitWorkspaceRenderView(document, document.activeWorkspaceId, newState, pushHistory);
+      if (pushHistory) {
+        const snap = historicalSnapshot || state;
+        setHistory(prev => [...prev.slice(-30), snap]);
+        setRedoStack([]);
+      }
+      currentDocument.current = updated; setDocument(updated); setIsDirty(true);
+    } catch (err) { setStorageWarning(err instanceof Error ? err.message : String(err)); }
   }, [state, document, setState]);
 
   const handleUndo = useCallback(() => {
@@ -448,7 +452,7 @@ function AppContent() {
     const snapshot = { ...origin, activeProjectId: id, activeProjectName: name };
     try {
       await saveProjectToDirectory(name, snapshot, { id });
-      if (generation.current === token && currentDocument.current === origin) installDocument(snapshot, false, false);
+      if (generation.current === token && currentDocument.current === origin) { installDocument(snapshot, false, false); clearAutoSaveState(); setRecovery(null); }
       else setStorageWarning('A snapshot was saved, but the current project changed. Save again to persist newer edits.');
     } catch (err) { alert('Project not saved: ' + (err instanceof Error ? err.message : String(err))); }
   };
@@ -647,6 +651,7 @@ function AppContent() {
     <div className="h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans select-none" onClick={() => setContextMenu(null)}>
       <div className="flex flex-col h-full w-full">
       {/* 1. TOP HEADER BAR */}
+      {recovery && <div role="dialog" aria-label="Recover previous session" className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/75 p-4"><div className="max-w-md w-full bg-slate-900 border border-slate-600 rounded-xl p-5 space-y-4"><h2 className="text-lg font-semibold">Recover previous session?</h2><p className="text-sm text-slate-300">An automatically saved project was found from your previous session.</p><div className="bg-slate-800 rounded p-3"><strong>{recovery.state?.activeProjectName || 'Recovered project'}</strong><div className="text-xs text-slate-400">{new Date(recovery.timestamp).toLocaleString()}</div></div><div className="flex flex-wrap gap-2"><button className="bg-sky-700 rounded px-3 py-2 text-sm" onClick={() => { try { const restored = normalizeProjectInput(recovery.state); installDocument(restored, true); setRecovery(null); } catch (err) { alert('Recovery failed: ' + (err instanceof Error ? err.message : String(err))); } }}>Recover project</button><button className="bg-slate-700 rounded px-3 py-2 text-sm" onClick={() => { setRecovery(null); }}>Continue with blank project</button></div><p className="text-xs text-slate-400">Continuing leaves the previous recovery record available in the Project Directory until another draft is autosaved.</p></div></div>}
       {storageWarning && <div role="alert" className="bg-amber-950 text-amber-100 px-3 py-2 text-sm">{storageWarning}</div>}
       <HeaderBar
         key={workspaceEpoch}
