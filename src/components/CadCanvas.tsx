@@ -563,11 +563,12 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   // 2. Auto-Zoom-Fit on new underlay import (WITHOUT overwriting feetPerPixel)
   useEffect(() => {
     const underlay = state.underlay;
-    if (underlay?.url && (underlay.url !== lastUnderlayId.current)) {
-      lastUnderlayId.current = underlay.url;
+    const source = underlay?.src || underlay?.url;
+    if (source && source !== lastUnderlayId.current) {
+      lastUnderlayId.current = source;
       setTimeout(handleZoomFit, 100);
     }
-  }, [state.underlay?.url]);
+  }, [state.underlay?.src, state.underlay?.url]);
 
   // Prevent default for wheel and touchmove events (passive event listener fix)
   useEffect(() => {
@@ -1799,25 +1800,41 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       const sp2 = worldToScreen(draftMousePos.x, draftMousePos.y);
       
       ctx.save();
-      ctx.strokeStyle = '#22d3ee';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = '#111827';
       ctx.beginPath();
       ctx.moveTo(sp1.x, sp1.y);
       ctx.lineTo(sp2.x, sp2.y);
       ctx.stroke();
-      
-      // Points
+      ctx.strokeStyle = '#ffea00';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = '#22d3ee';
-      ctx.beginPath();
-      ctx.arc(sp1.x, sp1.y, 5, 0, Math.PI * 2);
-      ctx.arc(sp2.x, sp2.y, 5, 0, Math.PI * 2);
-      ctx.fill();
-      
+      for (const p of [sp1, sp2]) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+        ctx.moveTo(p.x - 11, p.y);
+        ctx.lineTo(p.x + 11, p.y);
+        ctx.moveTo(p.x, p.y - 11);
+        ctx.lineTo(p.x, p.y + 11);
+        ctx.strokeStyle = '#111827';
+        ctx.lineWidth = 5;
+        ctx.stroke();
+        ctx.strokeStyle = '#ffea00';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
       ctx.font = '700 12px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText("Select Second Point for Calibration", (sp1.x + sp2.x) / 2, (sp1.y + sp2.y) / 2 - 15);
+      const label = 'Select Second Point for Calibration';
+      const lx = (sp1.x + sp2.x) / 2;
+      const ly = (sp1.y + sp2.y) / 2 - 18;
+      ctx.fillStyle = '#111827';
+      const tw = ctx.measureText(label).width;
+      ctx.fillRect(lx - tw / 2 - 5, ly - 13, tw + 10, 18);
+      ctx.fillStyle = '#ffea00';
+      ctx.fillText(label, lx, ly);
       ctx.restore();
     }
 
