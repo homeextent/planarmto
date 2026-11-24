@@ -450,6 +450,7 @@ export async function hydrateSettingsWithBranding(
  */
 export function saveAutoSaveState(state: StoredProjectState): void {
   try {
+    if ('schemaVersion' in state) validateProjectBudget(state);
     const payload = {
       timestamp: Date.now(),
       state,
