@@ -20,6 +20,20 @@ export function simplePolygon(p:Point[]):boolean {
  if(e.some(([a,b],i)=>{const c=p[(i+2)%p.length];return on(c,a,b)||on(a,b,c)}))return false;
  return e.every(([a,b],i)=>dist(a,b)>EPS&&e.every(([c,d],j)=>i===j||Math.abs(i-j)===1||Math.abs(i-j)===e.length-1||!intersects(a,b,c,d)));
 }
+/** Draft diagnostics use the same predicates as committed topology validation. */
+export function polygonDraftError(p:Point[]):string|null {
+ if(p.length<3)return 'Add at least three distinct vertices.';
+ if(p.some(q=>!Number.isFinite(q.x)||!Number.isFinite(q.y)))return 'Polygon contains an invalid coordinate.';
+ for(let i=0;i<p.length;i++)for(let j=i+1;j<p.length;j++)if(dist(p[i],p[j])<=EPS)return 'Vertices '+(i+1)+' and '+(j+1)+' coincide. Remove the repeated point.';
+ const e=segments(p);
+ for(let i=0;i<e.length;i++){
+  const [a,b]=e[i],c=p[(i+2)%p.length];
+  if(on(c,a,b)||on(a,b,c))return 'Edge '+(i+1)+' backtracks over an adjacent edge.';
+  for(let j=i+1;j<e.length;j++)if(j!==i+1&&!(i===0&&j===e.length-1)&&intersects(a,b,e[j][0],e[j][1]))return (j===e.length-1?'Closing edge':'Edge '+(j+1))+' crosses or touches edge '+(i+1)+'. Adjust the draft.';
+ }
+ if(projectedArea(p)<=EPS)return 'Polygon has no measurable enclosed area.';
+ return simplePolygon(p)?null:'Polygon is not a valid simple enclosed area.';
+}
 function inside(p:Point,poly:Point[],boundary=true):boolean {
  if(segments(poly).some(([a,b])=>on(p,a,b)))return boundary;
  let hit=false;for(const [a,b] of segments(poly))if((a.y>p.y)!==(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)hit=!hit;return hit;
