@@ -1,0 +1,105 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createBlankProject, createModernTwoBedroomRancher, createStudioSuite, createGarageWorkshop } from '../src/engine/samplePlans';
+import { calculateMTO, calculateEstimatedCost, DEFAULT_UNIT_COST_RATES } from '../src/engine/estimator';
+import { readProjectDocument, createProjectDocument, workspaceFloorplan, replaceWorkspaceGeometry, serializeProjectDocument, deserializeProjectDocument } from '../src/engine/projectDocument';
+import type { ProjectDocument } from '../src/engine/projectDocument';
+import type { FloorplanState } from '../src/types';
+
+const blueprint = { src: 'data:image/png;base64,fixture', worldX: 12, worldY: -8, feetPerPixel: .0125, opacity: .37, isVisible: true, isLocked: true,
+  pdfSource: { filename: 'plan.pdf', page: 2, width: 5000, height: 3200 } };
+const cost = (state: FloorplanState) => calculateEstimatedCost(calculateMTO(state),
+  state.settings.costRates || DEFAULT_UNIT_COST_RATES, state.settings.categoryInclusions,
+  state.settings.itemInclusions, state.settings, state.stamps, state.apertures, state.walls);
+
+for (const [name, factory] of [
+  ['blank', createBlankProject], ['rancher', createModernTwoBedroomRancher],
+  ['studio', createStudioSuite], ['garage', createGarageWorkshop],
+] as const) {
+  test('legacy migration preserves state, MTO and cost: ' + name, () => {
+    const state = factory();
+    state.activeProjectId = 'project-123';
+    state.activeProjectName = 'Existing project';
+    state.underlay = structuredClone(blueprint);
+    state.settings = { ...state.settings, costRates: structuredClone(DEFAULT_UNIT_COST_RATES), profitPercentage: 17 };
+    const before = structuredClone(state);
+    const doc = readProjectDocument(state);
+    assert.deepEqual(state, before);
+    assert.equal(doc.workspaces[0].name, 'Level 1');
+    assert.deepEqual(doc.scope, { mode: 'legacy', workspaceId: 'legacy-level-1' });
+    const view = workspaceFloorplan(doc);
+    assert.deepEqual(view, before);
+    assert.deepEqual(calculateMTO(view), calculateMTO(before));
+    assert.deepEqual(cost(view), cost(before));
+    assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(doc)), doc);
+  });
+}
+
+function multi(): ProjectDocument {
+  const doc = createProjectDocument(createBlankProject(), 'floor-a');
+  const blank = doc.workspaces[0].geometry;
+  doc.workspaces.push(
+    { id: 'floor-b', name: 'Upper floor', type: 'floor', geometry: structuredClone(blank) },
+    { id: 'roof-a', name: 'Roof', type: 'roof', geometry: structuredClone(blank) },
+    { id: 'foundation-a', name: 'Foundation', type: 'foundation', geometry: structuredClone(blank) },
+    { id: 'site-a', name: 'Site', type: 'site', geometry: structuredClone(blank) },
+  );
+  return doc;
+}
+test('new projects have explicit unquantified scope, not legacy estimates', () => {
+  const doc = createProjectDocument(createBlankProject(), 'floor-a');
+  assert.deepEqual(doc.scope, { mode: 'explicit', assignments: { roof: { status: 'unquantified' }, foundation: { status: 'unquantified' }, site: { status: 'unquantified' } } });
+  assert.throws(() => createProjectDocument(createModernTwoBedroomRancher(), 'floor-a'));
+});
+test('typed workspaces share settings and preserve isolated geometry and calibration', () => {
+  const doc = multi();
+  const a = workspaceFloorplan(doc, 'floor-a');
+  a.nodes.push({ id: 'same-id', x: 1, y: 2 });
+  a.underlay = structuredClone(blueprint);
+  a.settings.profitPercentage = 99; // geometry adapter must not write project settings
+  const first = replaceWorkspaceGeometry(doc, 'floor-a', a);
+  const b = workspaceFloorplan(first, 'floor-b');
+  b.nodes.push({ id: 'same-id', x: 20, y: 30 });
+  b.underlay = { ...blueprint, feetPerPixel: .05 };
+  const next = replaceWorkspaceGeometry(first, 'floor-b', b);
+  assert.equal(doc.workspaces[0].geometry.nodes.length, 0);
+  assert.equal(workspaceFloorplan(next, 'floor-a').nodes[0].x, 1);
+  assert.equal(workspaceFloorplan(next, 'floor-b').nodes[0].x, 20);
+  assert.equal(workspaceFloorplan(next, 'floor-a').underlay?.feetPerPixel, .0125);
+  assert.equal(workspaceFloorplan(next, 'floor-b').underlay?.feetPerPixel, .05);
+  assert.equal(next.settings.profitPercentage, doc.settings.profitPercentage);
+  assert.equal(next.activeWorkspaceId, 'floor-a');
+  assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(next)), next);
+});
+test('explicit ownership supports multiple roof workspaces and distinguishes excluded from unquantified', () => {
+  const doc = multi();
+  doc.workspaces.push({ ...structuredClone(doc.workspaces[2]), id: 'roof-b' });
+  doc.scope = { mode: 'explicit', assignments: {
+    roof: { status: 'measured', workspaceIds: ['roof-a','roof-b'] },
+    foundation: { status: 'unquantified' }, site: { status: 'excluded' },
+  } };
+  assert.deepEqual(readProjectDocument(doc), doc);
+  const wrong = structuredClone(doc);
+  if (wrong.scope.mode === 'explicit') wrong.scope.assignments.roof = { status: 'measured', workspaceIds: ['floor-a'] };
+  assert.throws(() => readProjectDocument(wrong), /invalid measured scope owner/);
+  const duplicate = structuredClone(doc);
+  if (duplicate.scope.mode === 'explicit') duplicate.scope.assignments.roof = { status: 'measured', workspaceIds: ['roof-a','roof-a'] };
+  assert.throws(() => readProjectDocument(duplicate), /invalid measured scope owner/);
+});
+test('malformed documents and future versions are rejected, not blanked', () => {
+  const doc = multi();
+  assert.throws(() => readProjectDocument({ ...doc, schemaVersion: 3 }), /unsupported schema/);
+  assert.throws(() => readProjectDocument({ ...doc, activeWorkspaceId: 'missing' }), /active workspace/);
+  assert.throws(() => readProjectDocument({ ...doc, workspaces: [] }), /at least one/);
+  assert.throws(() => readProjectDocument({ ...doc, workspaces: [doc.workspaces[0], doc.workspaces[0]] }), /duplicate workspace/);
+  assert.throws(() => readProjectDocument({ ...doc, scope: { mode: 'legacy', workspaceId: 'roof-a' } }), /legacy owner/);
+  assert.throws(() => readProjectDocument({ nodes: [], walls: [] }), /Invalid project/);
+  assert.throws(() => deserializeProjectDocument('not JSON'));
+  assert.throws(() => workspaceFloorplan(doc, 'missing'), /workspace not found/);
+  const bad = workspaceFloorplan(doc);
+  bad.underlay = { ...blueprint, feetPerPixel: 0 };
+  assert.throws(() => replaceWorkspaceGeometry(doc, 'floor-a', bad), /invalid blueprint/);
+  const foreign = workspaceFloorplan(doc);
+  foreign.activeProjectId = 'other-project';
+  assert.throws(() => replaceWorkspaceGeometry(doc, 'floor-a', foreign), /different project/);
+});
