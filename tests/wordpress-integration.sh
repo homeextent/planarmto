@@ -52,7 +52,7 @@ curl -fsS -L -b "$tmp/cookies" -c "$tmp/cookies" \
   --data-urlencode "redirect_to=$base/wp-admin/" --data testcookie=1 \
   "$base/wp-login.php" >/dev/null
 curl -fsS -b "$tmp/cookies" "$base/?planarmto_route=1" > "$tmp/app.html"
-nonce=$(python3 -c 'import re,sys; print(re.search(r\x27nonce: "([^"]+)"\x27,open(sys.argv[1]).read()).group(1))' "$tmp/app.html")
+nonce=$(python3 -c 'import re,sys; print(re.search("nonce: "+chr(34)+"([^"+chr(34)+"]+)"+chr(34),open(sys.argv[1]).read()).group(1))' "$tmp/app.html")
 grep -Eq 'currentUserId: [1-9][0-9]*' "$tmp/app.html"
 grep -F "$base/wp-content/plugins/planarmto/dist/assets/" "$tmp/app.html" >/dev/null
 worker=$(find dist/assets -type f -name 'pdf.worker*.mjs' -print -quit)
@@ -61,7 +61,8 @@ curl -fsS -D "$tmp/headers" "$base/wp-content/plugins/planarmto/$worker" -o "$tm
 grep -Ei '^content-type: (application|text)/(javascript|ecmascript)' "$tmp/headers"
 cmp "$worker" "$tmp/worker"
 # Guest app loads, but anonymous REST persistence must be rejected.
-curl -fsS -b 'planarmto_guest_access=1' "$base/?planarmto_route=1" | grep -F 'currentUserId: 0' >/dev/null
+curl -fsS -b 'planarmto_guest_access=1' "$base/?planarmto_route=1" > "$tmp/guest.html"
+grep -F 'currentUserId: 0' "$tmp/guest.html" >/dev/null
 rest="$base/?rest_route=/planarmto/v1/projects"
 code=$(curl -sS -o "$tmp/anonymous.json" -w '%{http_code}' "$rest")
 test "$code" = 401 || test "$code" = 403
@@ -88,8 +89,8 @@ assert rows[0]['id']==expected['id']
 assert rows[0]['state']==expected['state']
 PY
 # Force a real database write error by renaming the disposable table.
-wpcli db query 'RENAME TABLE wp_planarmto_projects TO wp_planarmto_projects_disabled'
+docker exec "$db" mariadb -uwordpress -pci-db-only wordpress -e 'RENAME TABLE wp_planarmto_projects TO wp_planarmto_projects_disabled'
 test "$(post "$tmp/project.json" "$tmp/failure.json")" = 500
 python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["code"]=="planarmto_save_failed"' "$tmp/failure.json"
-wpcli db query 'RENAME TABLE wp_planarmto_projects_disabled TO wp_planarmto_projects'
+docker exec "$db" mariadb -uwordpress -pci-db-only wordpress -e 'RENAME TABLE wp_planarmto_projects_disabled TO wp_planarmto_projects'
 echo 'WordPress REST persistence, database failure, guest isolation and worker delivery passed.'
