@@ -16,17 +16,20 @@ for (const [name, factory] of [
   ['blank', createBlankProject], ['rancher', createModernTwoBedroomRancher],
   ['studio', createStudioSuite], ['garage', createGarageWorkshop],
 ] as const) {
-  test('legacy migration preserves state, MTO and cost: ' + name, () => {
+  test('v3 floor adapter preserves established calculation inputs: ' + name, () => {
     const state = factory();
     state.activeProjectId = 'project-123';
     state.activeProjectName = 'Existing project';
     state.underlay = structuredClone(blueprint);
     state.settings = { ...state.settings, costRates: structuredClone(DEFAULT_UNIT_COST_RATES), profitPercentage: 17 };
     const before = structuredClone(state);
-    const doc = readProjectDocument(state);
+    assert.throws(() => readProjectDocument(state), /historical projects are retired/);
+    const {activeProjectId,activeProjectName,settings,...geometry}=state;
+    const doc=readProjectDocument({...createProjectDocument(createBlankProject(),'floor-a'),activeProjectId,activeProjectName,settings,workspaces:[{id:'floor-a',name:'Level 1',type:'floor',geometry,measurements:[]}]});
     assert.deepEqual(state, before);
     assert.equal(doc.workspaces[0].name, 'Level 1');
-    assert.deepEqual(doc.scope, { mode: 'legacy', workspaceId: 'legacy-level-1' });
+    assert.equal(doc.scope.mode,'explicit');
+    assert.equal(doc.schemaVersion,3);
     const view = workspaceFloorplan(doc);
     assert.deepEqual(view, before);
     assert.deepEqual(calculateMTO(view), calculateMTO(before));
@@ -39,10 +42,10 @@ function multi(): ProjectDocument {
   const doc = createProjectDocument(createBlankProject(), 'floor-a');
   const blank = doc.workspaces[0].geometry;
   doc.workspaces.push(
-    { id: 'floor-b', name: 'Upper floor', type: 'floor', geometry: structuredClone(blank) },
-    { id: 'roof-a', name: 'Roof', type: 'roof', geometry: structuredClone(blank) },
-    { id: 'foundation-a', name: 'Foundation', type: 'foundation', geometry: structuredClone(blank) },
-    { id: 'site-a', name: 'Site', type: 'site', geometry: structuredClone(blank) },
+    { id: 'floor-b', name: 'Upper floor', type: 'floor', geometry: structuredClone(blank), measurements: [] },
+    { id: 'roof-a', name: 'Roof', type: 'roof', geometry: structuredClone(blank), measurements: [] },
+    { id: 'foundation-a', name: 'Foundation', type: 'foundation', geometry: structuredClone(blank), measurements: [] },
+    { id: 'site-a', name: 'Site', type: 'site', geometry: structuredClone(blank), measurements: [] },
   );
   return doc;
 }
@@ -75,24 +78,24 @@ test('explicit ownership supports multiple roof workspaces and distinguishes exc
   const doc = multi();
   doc.workspaces.push({ ...structuredClone(doc.workspaces[2]), id: 'roof-b' });
   doc.scope = { mode: 'explicit', assignments: {
-    roof: { status: 'measured', workspaceIds: ['roof-a','roof-b'] },
-    foundation: { status: 'unquantified' }, site: { status: 'excluded' },
+    roof: { status: 'assigned', workspaceIds: ['roof-a','roof-b'] },
+    foundation: { status: 'unquantified' }, site: { status: 'excluded', reason:'Outside contract' },
   } };
   assert.deepEqual(readProjectDocument(doc), doc);
   const wrong = structuredClone(doc);
-  if (wrong.scope.mode === 'explicit') wrong.scope.assignments.roof = { status: 'measured', workspaceIds: ['floor-a'] };
-  assert.throws(() => readProjectDocument(wrong), /invalid measured scope owner/);
+  if (wrong.scope.mode === 'explicit') wrong.scope.assignments.roof = { status: 'assigned', workspaceIds: ['floor-a'] };
+  assert.throws(() => readProjectDocument(wrong), /invalid scope owner/);
   const duplicate = structuredClone(doc);
-  if (duplicate.scope.mode === 'explicit') duplicate.scope.assignments.roof = { status: 'measured', workspaceIds: ['roof-a','roof-a'] };
-  assert.throws(() => readProjectDocument(duplicate), /invalid measured scope owner/);
+  if (duplicate.scope.mode === 'explicit') duplicate.scope.assignments.roof = { status: 'assigned', workspaceIds: ['roof-a','roof-a'] };
+  assert.throws(() => readProjectDocument(duplicate), /invalid scope owner/);
 });
 test('malformed documents and future versions are rejected, not blanked', () => {
   const doc = multi();
-  assert.throws(() => readProjectDocument({ ...doc, schemaVersion: 3 }), /unsupported schema/);
+  assert.throws(() => readProjectDocument({ ...doc, schemaVersion: 4 }), /unsupported schema/);
   assert.throws(() => readProjectDocument({ ...doc, activeWorkspaceId: 'missing' }), /active workspace/);
   assert.throws(() => readProjectDocument({ ...doc, workspaces: [] }), /at least one/);
   assert.throws(() => readProjectDocument({ ...doc, workspaces: [doc.workspaces[0], doc.workspaces[0]] }), /duplicate workspace/);
-  assert.throws(() => readProjectDocument({ ...doc, scope: { mode: 'legacy', workspaceId: 'roof-a' } }), /legacy owner/);
+  assert.throws(() => readProjectDocument({ ...doc, scope: { mode: 'legacy', workspaceId: 'roof-a' } }), /invalid scope policy/);
   assert.throws(() => readProjectDocument({ nodes: [], walls: [] }), /Invalid project/);
   assert.throws(() => deserializeProjectDocument('not JSON'));
   assert.throws(() => workspaceFloorplan(doc, 'missing'), /workspace not found/);
