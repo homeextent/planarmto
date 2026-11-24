@@ -1,0 +1,29 @@
+# B.2 — Typed workspace management and persistence
+
+Status: implementation candidate; automated and local acceptance pending. Based on accepted B.1 staging commit 0c19c0874350292f6f633ab72f5ae60589f0c758. Production v2.15.1 remains unchanged. B and C are jointly gated for v2.16.0.
+
+## Implemented candidate
+
+- Canonical ProjectDocument schema v2 controls the active workspace. Floor, roof, foundation and site workspaces may be added, named, selected, reordered or deleted. Final workspace and assigned scope owners are protected. Deletion requires confirmation.
+- Existing CAD engine receives an active-workspace view. Workspace switching remounts canvas/header, clears selection, clipboard and transient tool state and restores per-workspace history. Shared settings are centrally stored. Undo/redo restores geometry while retaining current shared settings.
+- Blueprint imports retain per-workspace calibration and source metadata; stale async imports are invalidated by remount/request token and state identity checks. The provisional per-image cap is 850,000 characters; complete project cap is 4,000,000 serialized characters. These caps are not actual browser or SiteGround capacity guarantees.
+- Full typed documents are used for named saves, Save As, directory backup/import, duplication and autosave. Imported JSON opens as an independent unsaved copy. Directory imports and duplication use new identities. Authenticated read failures surface rather than falling back to guest records; unreadable local directory cannot silently become an empty index. Legacy single-workspace compatibility remains.
+- New explicit projects and expanded legacy projects do not display authoritative cost/MTO or print reports until C. Existing single-workspace legacy estimator remains available. Directory placeholders are explicitly labelled pending/not quantified; stored numeric summary placeholders are not measured zero quantities.
+- Roof/foundation/site tool specialization, explicit scope transitions, measurement ownership enforcement and consolidated pricing remain C.1/C.2 tasks. No production deployment or version bump.
+
+## Validation
+
+CI runs existing eight B.1 architecture cases, expanded persistence cases, workspace lifecycle/budget cases, TypeScript, production build, audit, PHP syntax, PDF worker delivery and disposable WordPress/MariaDB integration. The added real HTTP fixture contains three independent approximately 800 KB synthetic rasters; verifies complete typed document round trip. Synthetic bytes are not proof of browser image decoding or actual SiteGround capacity.
+
+Local acceptance must test:
+1. Create all four workspace types; rename, reorder and switch; confirm populated deletion and last/assigned owner protection.
+2. Import distinct PDFs/images; calibrate each differently; switch repeatedly and verify geometry, image, opacity, position and scale.
+3. Draw and edit on two floors; undo/redo each independently; test selection, clipboard, calibration and delayed import cancellation across switches.
+4. Save, reload, Save As, duplicate, export/import complete document; restore autosave; verify names/IDs and all workspaces; no original overwrite.
+5. Open representative historical projects, including alias underlays, and verify single-workspace quantity parity and explicit incomplete-estimate gating when adding a workspace.
+6. Exercise at least three realistic images and storage exhaustion; rejected imports and saves must preserve previous document and saved data. Verify guest and authenticated paths separately where available.
+7. Confirm existing PDF import, drafting and legacy reports remain usable. No specialist takeoff or consolidated MTO is expected in B.2.
+
+## Known limits and next gates
+
+Automated controller tests are not browser-level tests of React event ordering or drag history. Storage limits, async interactions, historical records, and actual browser recovery need local testing. Undo/redo does not undo global settings or workspace management operations. Specialist workspaces currently expose the existing generic CAD tools only. SiteGround production smoke testing remains gated until combined B/C release. No new infrastructure or dependencies.
