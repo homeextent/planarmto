@@ -53,7 +53,6 @@ function AppContent() {
   // Project State initialized with a clean blank canvas
   const [document, setDocument] = useState<ProjectDocument>(() => createProjectDocument(createBlankProject(), uuidv4()));
   const currentDocument = useRef(document);
-  currentDocument.current = document;
   const generation = useRef(0);
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
   const state = useMemo(() => workspaceFloorplan(document), [document]);
@@ -67,6 +66,7 @@ function AppContent() {
       const updated = updateWorkspaceView(doc, doc.activeWorkspaceId, next);
       currentDocument.current = updated;
       setDocument(updated);
+      setIsDirty(true);
     } catch (err) { setStorageWarning(err instanceof Error ? err.message : String(err)); }
   }, []);
 
@@ -432,8 +432,8 @@ function AppContent() {
     installDocument(next, dirty);
     setIsProjectDirectoryOpen(false);
   }
-  const handleLoadProjectFromDirectory = (value: unknown) => {
-    try { loadDocument(value, false); } catch (err) { alert('Unable to open project: ' + (err instanceof Error ? err.message : String(err))); }
+  const handleLoadProjectFromDirectory = (value: unknown, name?: string) => {
+    try { loadDocument(value, name === 'Auto-saved Project'); } catch (err) { alert('Unable to open project: ' + (err instanceof Error ? err.message : String(err))); }
   };
 
   const saveSnapshot = async (name: string, id: string) => {
@@ -623,9 +623,7 @@ function AppContent() {
   }, [activeTool, state.settings, handleUpdateSettings, previousSnapSetting, saveSnapSetting, clearSnapSetting]);
 
   // Real-Time Material Take-Off calculation
-  const mtoReport = useMemo(() => {
-    return calculateMTO(state);
-  }, [state]);
+  const mtoReport = useMemo(() => calculateMTO(reportable ? state : createBlankProject()), [state, reportable]);
 
   const estimatedCost = useMemo(() => {
     return calculateEstimatedCost(
