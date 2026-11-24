@@ -13,6 +13,7 @@ export function normalizeProjectInput(input: unknown): ProjectDocument {
   const raw = structuredClone(input) as any;
   if ('schemaVersion' in raw) return readProjectDocument(raw);
   // Legacy defaults only for absent fields; never replace present invalid geometry.
+  if (raw.settings !== undefined && (!raw.settings || typeof raw.settings !== 'object' || Array.isArray(raw.settings))) throw new Error('Invalid legacy settings.');
   raw.settings = { ...DEFAULT_SETTINGS, ...raw.settings };
   if (raw.activeProjectId === undefined) raw.activeProjectId = null;
   if (raw.activeProjectName === undefined) raw.activeProjectName = 'Imported Project';
@@ -30,11 +31,11 @@ export function normalizeProjectInput(input: unknown): ProjectDocument {
 
 export function updateWorkspaceView(doc: ProjectDocument, id: string, next: FloorplanState): ProjectDocument {
   const updated = replaceWorkspaceGeometry(doc, id, next);
-  return { ...updated, settings: structuredClone(next.settings) };
+  return readProjectDocument({ ...updated, settings: structuredClone(next.settings) });
 }
 export function selectWorkspace(doc: ProjectDocument, id: string): ProjectDocument {
   if (!doc.workspaces.some(w => w.id === id)) throw new Error('Unknown workspace.');
-  return { ...doc, activeWorkspaceId: id };
+  return doc.activeWorkspaceId === id ? doc : { ...doc, activeWorkspaceId: id };
 }
 export function addWorkspace(doc: ProjectDocument, id: string, name: string, type: WorkspaceType): ProjectDocument {
   if (doc.workspaces.some(w => w.id === id)) throw new Error('Duplicate workspace ID.');
