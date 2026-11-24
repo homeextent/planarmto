@@ -313,7 +313,7 @@ export async function saveProjectToDirectory(
   );
 
   const payload = {
-    id: options?.id || state.activeProjectId,
+    id: options?.id || state.activeProjectId || `proj_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     name: name.trim() || 'Untitled Architectural Project',
     projectNumber: options?.projectNumber || state.settings.companyBranding?.projectNumber || `PRJ-${new Date().getFullYear()}-MTO`,
     description: options?.description || '',
@@ -347,7 +347,7 @@ export async function saveProjectToDirectory(
     });
     if (result.success !== true) throw new Error('WordPress did not confirm the project save.');
     // Return the saved entry; the API acknowledges the write rather than returning a project.
-    return { ...payload, id: payload.id || '', createdAt: Date.now(), updatedAt: Date.now() };
+    return { ...payload, id: payload.id, createdAt: Date.now(), updatedAt: Date.now() };
   }
 
   // Fallback to LocalStorage
