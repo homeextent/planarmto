@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clear prior import errors/notices on new PDF or image imports; guard stale asynchronous image callbacks and report image decoding failures.
 - CI verifies emitted worker naming, importer reference, byte integrity and isolated WordPress JavaScript MIME delivery.
 
-Production acceptance of v2.15.0 was suspended after live PDF imports failed. v2.15.1 is a candidate pending staging validation and separately authorized production deployment; live PDF import and persistence smoke tests remain required.
+Production acceptance of v2.15.0 was suspended after live PDF imports failed. v2.15.1 passed seven owner-confirmed local tests, hotfix CI 45402796354, staging CI 45410797506, and production PR CI 45428422202. PR #4 merged at 25cf167. On 2026-11-24 the owner confirmed all nine live production tests passed, including PDF import, error recovery and persistence. Increment A is functionally complete. The separate deployment workflow result and corrected-worker HTTP GET headers were not independently captured.
 
 ## [2.15.0] - 2026-11-24 — PDF blueprint import (Increment A)
 
@@ -32,7 +32,7 @@ Production acceptance of v2.15.0 was suspended after live PDF imports failed. v2
 ### Validation
 - Owner accepted local PDF import, calibration, drafting, persistence, default opacity and unchanged MTO.
 - GitHub Actions run 45398914590 at ce10256 passed all eight persistence regressions, build, audit, PHP syntax and isolated WordPress REST/database/worker delivery tests.
-- Added independent validation CI. Staging merge 7ab225a passed post-merge CI run 45400095850. Owner authorized production release on 2026-11-24. Production deployment and SiteGround browser smoke testing remain pending until the release PR is validated and merged.
+- Added independent validation CI. Staging merge 7ab225a passed post-merge CI run 45400095850. Owner authorized production release on 2026-11-24. PR #2 passed CI 45400883528 and merged at 6aa3734. Live PDF acceptance failed; superseded by v2.15.1 hotfix, which passed owner live acceptance.
 
 ## [2.14.3] - 2026-11-23
 

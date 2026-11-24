@@ -1,6 +1,6 @@
 # PDF blueprint import — Increment A
 
-Status: v2.15.0 merged to production; live PDF acceptance failed. v2.15.1 hotfix candidate pending staging and production validation.
+Status: Increment A functionally complete. v2.15.1 merged to production and accepted by owner on 2026-11-24; deployment workflow and direct corrected-worker GET headers are separate evidence not independently captured.
 
 - Browser-only PDF.js worker, single-page bypass, 12-page thumbnail batches, 3400/5000/6000-pixel targets, 24-million-pixel cap, 80 MiB PDF cap, adaptive PNG/WebP/JPEG encoding and bounded downsampling.
 - 850,000-character encoded image cap and 2,000,000-character serialized project cap. Browser quota probe is only a preflight. Actual imported resolution is displayed. New PDF and image imports default to 50% opacity; stored opacity remains unchanged.
@@ -23,3 +23,27 @@ Status: v2.15.0 merged to production; live PDF acceptance failed. v2.15.1 hotfix
 - v2.15.1 uses Vite asset naming to emit the unchanged module worker bytes with a hashed .js filename. CI requires the new filename, absence of the old .mjs worker, importer URL reference, source byte equality, and real WordPress HTTP JavaScript MIME and byte equality.
 - New PDF/image requests clear previous errors/notices and invalidate stale asynchronous image callbacks. No MTO, database schema, or project model changes.
 - Validate locally with npm ci, npm run lint, npm run build and npm run preview (also test dev mode); try a malformed PDF then a valid PNG and verify the old error clears. Confirm both single/multi-page PDF import and saved-state recovery. Stage before production promotion. On SiteGround verify GET response MIME, browser worker execution and full acceptance checklist using non-sensitive fixtures.
+
+## v2.15.1 final acceptance — 2026-11-24
+
+| Gate | Evidence |
+| --- | --- |
+| Hotfix local acceptance | Owner confirmed all seven tests: emitted .js worker, single/multi-page PDFs, malformed PDF error, subsequent PNG clears error, calibration/default opacity, project save/reload. |
+| Hotfix PR #3 | CI run 45402796354 passed at c9122dc; merged to staging at 490ecf1. |
+| Post-merge staging | CI run 45410797506 passed; local staging synchronized and clean at 490ecf1. |
+| Production PR #4 | CI run 45428422202 passed; merged to main at 25cf1673dfbe2345692d7870324626d856a63667. |
+| Live application | Owner confirmed all nine tests passed (below). |
+
+Owner-reported live acceptance checklist (9/9 passed):
+
+1. Live application loads normally.
+2. Single-page PDF imports successfully.
+3. Multi-page PDF imports successfully.
+4. Invalid PDF generates an appropriate error.
+5. Subsequent valid PNG import clears the PDF error.
+6. Blueprint calibration and MTO calculations remain functional.
+7. Authenticated project save and reload work correctly.
+8. Existing saved projects remain compatible.
+9. Guest project persistence remains functional.
+
+The successful live tests establish owner-reported functional recovery after the v2.15.0 incident. The deployment workflow run ID/conclusion and direct HTTP GET Content-Type for the corrected worker have not been independently captured; do not represent either as separately verified. The malformed PDF test does not establish exhaustive coverage of rotated, corrupt or password-protected documents. Preserve one underlay per project, unchanged MTO formulas and existing project schema as the Increment A baseline. Increment B (independent floor workspaces) and Increment C (level-aware MTO aggregation) are not implemented by this release. No further functional changes are included in the documentation closeout.
