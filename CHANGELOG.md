@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 
+## [2.15.1] - 2026-11-24 — Production compatibility hotfix
+
+### Fixed
+- Publish the unchanged PDF.js module worker bytes under a hashed .js asset name to avoid the missing Content-Type observed for .mjs on SiteGround CDN (HTTP 200).
+- Clear prior import errors/notices on new PDF or image imports; guard stale asynchronous image callbacks and report image decoding failures.
+- CI verifies emitted worker naming, importer reference, byte integrity and isolated WordPress JavaScript MIME delivery.
+
+Production acceptance of v2.15.0 was suspended after live PDF imports failed. v2.15.1 is a candidate pending staging validation and separately authorized production deployment; live PDF import and persistence smoke tests remain required.
+
 ## [2.15.0] - 2026-11-24 — PDF blueprint import (Increment A)
 
 ### Added
