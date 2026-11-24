@@ -522,7 +522,113 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
                         <div>
                           <div className="text-[10px] uppercase font-bold text-slate-500">Total Est.</div>
                           <div className="font-mono font-bold text-emerald-400 truncate mt-0.5">
-                            {'schemaVersion' in project.state && !canReportLegacyEstimate(project.state) ? 'Not quantified' : '
+                            {'schemaVersion' in project.state && !canReportLegacyEstimate(project.state) ? 'Not quantified' : '                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Open Button */}
+                    <button
+                      onClick={() => {
+                        onLoadProject(project.state, project.name);
+                        onClose();
+                      }}
+                      className="w-full py-2 bg-slate-800 hover:bg-sky-600 text-slate-200 hover:text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 hover:border-sky-500 cursor-pointer transition-all shadow-sm"
+                    >
+                      <FolderOpen className="w-3.5 h-3.5" />
+                      <span>Open in CAD Canvas</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs text-slate-500">
+          <div className="flex items-center gap-2">
+            <HardDrive className="w-3.5 h-3.5 text-slate-400" />
+            <span>Saved in browser client storage. Export backup JSON files for cross-device portability.</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-lg cursor-pointer transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+
+      {/* Save As Modal Dialog */}
+      {saveAsModalOpen && (
+        <div className="fixed inset-0 z-60 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-xl p-5 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <Save className="w-4 h-4 text-sky-400" />
+                Save Project to Directory
+              </h3>
+              <button
+                onClick={() => setSaveAsModalOpen(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAsSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Project Title / Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  placeholder="e.g. Modern Two-Bedroom Rancher"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Job Reference / Specification Code
+                </label>
+                <input
+                  type="text"
+                  value={newProjectRef}
+                  onChange={(e) => setNewProjectRef(e.target.value)}
+                  placeholder="e.g. PRJ-2026-MTO-842"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setSaveAsModalOpen(false)}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save Project</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
                           </div>
                         </div>
                       </div>
@@ -630,6 +736,113 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
   );
 };
  + project.estimatedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Open Button */}
+                    <button
+                      onClick={() => {
+                        onLoadProject(project.state, project.name);
+                        onClose();
+                      }}
+                      className="w-full py-2 bg-slate-800 hover:bg-sky-600 text-slate-200 hover:text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 hover:border-sky-500 cursor-pointer transition-all shadow-sm"
+                    >
+                      <FolderOpen className="w-3.5 h-3.5" />
+                      <span>Open in CAD Canvas</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs text-slate-500">
+          <div className="flex items-center gap-2">
+            <HardDrive className="w-3.5 h-3.5 text-slate-400" />
+            <span>Saved in browser client storage. Export backup JSON files for cross-device portability.</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-lg cursor-pointer transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+
+      {/* Save As Modal Dialog */}
+      {saveAsModalOpen && (
+        <div className="fixed inset-0 z-60 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-xl p-5 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <Save className="w-4 h-4 text-sky-400" />
+                Save Project to Directory
+              </h3>
+              <button
+                onClick={() => setSaveAsModalOpen(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAsSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Project Title / Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  placeholder="e.g. Modern Two-Bedroom Rancher"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Job Reference / Specification Code
+                </label>
+                <input
+                  type="text"
+                  value={newProjectRef}
+                  onChange={(e) => setNewProjectRef(e.target.value)}
+                  placeholder="e.g. PRJ-2026-MTO-842"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setSaveAsModalOpen(false)}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save Project</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
                           </div>
                         </div>
                       </div>
