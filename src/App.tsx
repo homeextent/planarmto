@@ -39,7 +39,7 @@ import { ProjectDirectoryModal } from './components/ProjectDirectoryModal';
 import { WorkspaceBar } from './components/WorkspaceBar';
 import { createProjectDocument, workspaceRenderView, commitWorkspaceRenderView, serializeProjectDocument } from './engine/projectDocument';
 import type { ProjectDocument, WorkspaceType } from './engine/projectDocument';
-import { normalizeProjectInput, selectWorkspace, addWorkspace, renameWorkspace, moveWorkspace, removeWorkspace, canReportLegacyEstimate, validateBlueprintBudget } from './engine/workspaceController';
+import { normalizeProjectInput, selectWorkspace, addWorkspace, renameWorkspace, moveWorkspace, removeWorkspace, canReportProjectEstimate, validateBlueprintBudget } from './engine/workspaceController';
 import { ProjectProvider, useProject } from './context/ProjectContext';
 
 export default function App() {
@@ -60,7 +60,7 @@ function AppContent() {
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
   const state = useMemo(() => workspaceRenderView(document), [document]);
   const [recovery, setRecovery] = useState(() => getAutoSaveState());
-  const reportable = canReportLegacyEstimate(document);
+  const reportable = canReportProjectEstimate(document);
   // Internal CAD views use immutable shared references; persisted documents remain canonical.
   const setState = useCallback((change: FloorplanState | ((prev: FloorplanState) => FloorplanState)) => {
     const doc = currentDocument.current;

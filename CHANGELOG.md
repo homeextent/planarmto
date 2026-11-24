@@ -10,7 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 
-## [Unreleased] — Increment B (staging only)
+## [Unreleased] — Increments B and C.1A (staging release train)
+
+### C.1A — Schema v3 and specialist measurement architecture
+- Canonical explicit-only document, typed roof/foundation/site entities, quantity contracts and structural validation; assignment separated from completeness and exclusions require reason.
+- Retire legacy estimating authority without deleting historical records; bounded explicit v2 preview migration, separate v3 recovery slot and preservation of raw historical directory records. Unsupported records cannot be opened, renamed or duplicated; export retained.
+- Preserve floor formulas, CAD workspace isolation and PDF underlays; consolidated pricing/reporting remains gated until C.2. Specialist drafting/measurement engines remain C.1B–D; integrated ownership checks C.1E.
+- Owner accepted candidate `8e4a0e6` on 2026-11-24: 14 local checks passed, zero failed, cursor responsiveness N/A/deferred for independent investigation, two historical export checks waived (obsolete records). CI #38 run 45459637724/job 138678390424: 37/37 tests (17 persistence, 8 architecture, 7 lifecycle, 5 measurement), TypeScript/build/audit (zero vulnerabilities)/PHP/PDF worker and isolated WordPress round trip passed. Nonblocking Node url.parse deprecation warning. Owner authorized documentation-only closeout and staging merge subject to final CI; main remains unchanged.
+
+### Increment B (integrated)
 
 ### Added
 - B.1 canonical schema v2, typed optional workspaces and explicit scope ownership; B.2 workspace management, independent geometry/calibration/history, shared rates, full-document save/export/import and session recovery.

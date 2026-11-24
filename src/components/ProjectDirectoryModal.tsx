@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { normalizeProjectInput, canReportLegacyEstimate } from '../engine/workspaceController';
+import { normalizeProjectInput } from '../engine/workspaceController';
 import type { StoredProjectState } from '../utils/storage';
 import {
   SavedProjectEntry,
@@ -8,6 +8,7 @@ import {
   deleteProjectFromDirectory,
   renameProjectInDirectory,
   getAutoSaveState,
+  getHistoricalAutoSaveRaw,
 } from '../utils/storage';
 import {
   FolderOpen,
@@ -336,6 +337,15 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
           </div>
         </div>
 
+        {getHistoricalAutoSaveRaw() !== null && <div className="px-4 py-2 text-xs text-amber-300 flex justify-between items-center">
+          <span>Historical recovery retained for export only.</span>
+          <button className="underline" onClick={() => {
+            const raw=getHistoricalAutoSaveRaw(); if(raw===null) return;
+            const url=URL.createObjectURL(new Blob([raw],{type:'application/json'}));
+            const link=document.createElement('a'); link.href=url; link.download='PlanarMTO_Historical_Recovery.json';
+            link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+          }}>Export historical recovery</button>
+        </div>}
         {/* Auto-Save recovery notice if available */}
         {autoSaveItem && (
           <div className="bg-amber-950/20 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between text-xs text-amber-300">
@@ -380,7 +390,9 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {filteredProjects.map((project) => {
-                const isEditing = editingId === project.id;
+                let openable = true;
+                try { normalizeProjectInput(project.state); } catch { openable = false; }
+                const isEditing = editingId === project.id && openable;
                 const formattedDate = new Date(project.updatedAt).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -431,7 +443,9 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
                               <h3 className="text-sm font-bold text-slate-100 truncate group-hover:text-sky-300 transition-colors">
                                 {project.name}
                               </h3>
+                              {!openable && <span className="text-amber-300 text-[10px]">Export only</span>}
                               <button
+                                disabled={!openable}
                                 onClick={() => handleStartRename(project)}
                                 className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-500 hover:text-slate-300 transition-opacity"
                                 title="Rename project"
@@ -461,6 +475,7 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
                             <Download className="w-3.5 h-3.5" />
                           </button>
                           <button
+                            disabled={!openable}
                             onClick={() => handleDuplicate(project)}
                             className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
                             title="Duplicate project"
@@ -515,13 +530,13 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
                           <div className="text-[10px] uppercase font-bold text-slate-500">Area</div>
                           <div className="font-mono font-bold text-slate-200 flex items-center gap-1 mt-0.5">
                             <Ruler className="w-3 h-3 text-emerald-400" />
-                            {'schemaVersion' in project.state && !canReportLegacyEstimate(project.state) ? 'Pending C' : project.grossSf + ' SF'}
+                            Pending C
                           </div>
                         </div>
                         <div>
                           <div className="text-[10px] uppercase font-bold text-slate-500">Total Est.</div>
                           <div className="font-mono font-bold text-emerald-400 truncate mt-0.5">
-                            {'schemaVersion' in project.state && !canReportLegacyEstimate(project.state) ? 'Not quantified' : '$' + project.estimatedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            Not quantified
                           </div>
                         </div>
                       </div>
@@ -529,6 +544,7 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
 
                     {/* Open Button */}
                     <button
+                      disabled={!openable}
                       onClick={() => {
                         onLoadProject({ ...project.state, activeProjectId: String(project.id), activeProjectName: project.name }, project.name);
                         onClose();
@@ -536,7 +552,7 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
                       className="w-full py-2 bg-slate-800 hover:bg-sky-600 text-slate-200 hover:text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 hover:border-sky-500 cursor-pointer transition-all shadow-sm"
                     >
                       <FolderOpen className="w-3.5 h-3.5" />
-                      <span>Open in CAD Canvas</span>
+                      <span>{openable ? 'Open in CAD Canvas' : 'Historical or unsupported project — export only'}</span>
                     </button>
                   </div>
                 );

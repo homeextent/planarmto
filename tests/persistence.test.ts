@@ -1,11 +1,12 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { createProjectDocument, workspaceFloorplan } from '../src/engine/projectDocument';
 import { createBlankProject } from '../src/engine/samplePlans';
-import { getSavedProjects, saveProjectToDirectory, saveAutoSaveState, getAutoSaveState } from '../src/utils/storage';
+import { getSavedProjects, saveProjectToDirectory, saveAutoSaveState, getAutoSaveState, getHistoricalAutoSaveRaw, deleteProjectFromDirectory } from '../src/utils/storage';
 
 const directoryKey = 'PLANAR_MTO_PROJECTS_LIST';
 const payloadKey = 'PLANAR_MTO_PROJECT_test-pdf';
-const autoKey = 'planarmto_autosave_state_v1';
+const autoKey = 'planarmto_autosave_state_v3';
 const originalFetch = globalThis.fetch;
 const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
 const storageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
@@ -19,7 +20,7 @@ function configureUser(currentUserId: number) {
     },
   });
 }
-function fixture() {
+function historicalFixture() {
   return {
     ...createBlankProject(),
     activeProjectId: 'test-pdf',
@@ -31,6 +32,14 @@ function fixture() {
       pdfSource: { filename: 'synthetic.pdf', page: 2, width: 5000, height: 3235 },
     },
   };
+}
+function fixture() {
+  const original = historicalFixture();
+  const doc = createProjectDocument(createBlankProject(), 'floor');
+  doc.activeProjectId = original.activeProjectId;
+  doc.activeProjectName = original.activeProjectName;
+  doc.workspaces[0].geometry.underlay = original.underlay;
+  return doc;
 }
 function restore(name: string, descriptor: PropertyDescriptor | undefined) {
   if (descriptor) Object.defineProperty(globalThis, name, descriptor);
@@ -61,7 +70,7 @@ test('guest project round trip preserves PDF calibration and source metadata', a
   await saveProjectToDirectory(state.activeProjectName, state);
   const projects = await getSavedProjects();
   assert.equal(projects.length, 1);
-  assert.deepEqual(('schemaVersion' in projects[0].state ? undefined : projects[0].state.underlay), state.underlay);
+  assert.deepEqual(workspaceFloorplan(projects[0].state as ReturnType<typeof fixture>).underlay, workspaceFloorplan(state).underlay);
   assert.equal(JSON.parse(values.get(directoryKey)!)[0].state, undefined);
 });
 
@@ -101,14 +110,14 @@ test('autosave quota failure is explicit and previous recovery survives', () => 
 
 test('authenticated server failure never falls back to local project storage', async () => {
   configureUser(12);
-  globalThis.fetch = async () => new Response(JSON.stringify({ message: 'Synthetic database failure' }), { status: 500 });
+  globalThis.fetch = async (_url,options) => options?.method === 'POST' ? new Response(JSON.stringify({ message: 'Synthetic database failure' }), { status: 500 }) : new Response('[]');
   await assert.rejects(saveProjectToDirectory('Test', fixture()), /Synthetic database failure/);
   assert.equal(values.size, 0);
 });
 
 test('authenticated save rejects missing acknowledgement', async () => {
   configureUser(12);
-  globalThis.fetch = async () => new Response(JSON.stringify({ success: false }), { status: 200 });
+  globalThis.fetch = async (_url,options) => options?.method === 'POST' ? new Response(JSON.stringify({ success: false }), { status: 200 }) : new Response('[]');
   await assert.rejects(saveProjectToDirectory('Test', fixture()), /did not confirm/);
   assert.equal(values.size, 0);
 });
@@ -122,14 +131,14 @@ test('authenticated save and reload preserve PDF data without duplicate src/url'
     if (options?.method === 'POST') {
       saved = JSON.parse(String(options.body));
       assert.equal(saved.id, state.activeProjectId);
-      assert.deepEqual(('schemaVersion' in saved.state ? undefined : saved.state.underlay), state.underlay);
+      assert.deepEqual(workspaceFloorplan(saved.state).underlay, workspaceFloorplan(state).underlay);
       return new Response(JSON.stringify({ success: true }));
     }
-    return new Response(JSON.stringify([saved]));
+    return new Response(JSON.stringify(saved ? [saved] : []));
   };
   await saveProjectToDirectory('Test', state);
   const [project] = await getSavedProjects();
-  assert.deepEqual(('schemaVersion' in project.state ? undefined : project.state.underlay), state.underlay);
+  assert.deepEqual(workspaceFloorplan(project.state as ReturnType<typeof fixture>).underlay, workspaceFloorplan(state).underlay);
   assert.equal(values.size, 0);
 });
 
@@ -139,7 +148,7 @@ test('typed project persists all workspaces and independent copies', async () =>
   let doc = normalizeProjectInput(fixture());
   doc = addWorkspace(doc,'roof','Roof','roof');
   const view = workspaceFloorplan(doc);
-  view.underlay = { ...fixture().underlay, feetPerPixel: .025 };
+  view.underlay = { ...workspaceFloorplan(fixture()).underlay, feetPerPixel: .025 };
   doc = updateWorkspaceView(doc,'roof',view);
   const saved = await saveProjectToDirectory('Original',doc);
   const copy = await saveProjectToDirectory('Copy',doc,{id:'copy'});
@@ -168,7 +177,7 @@ test('typed authenticated project round trip retains all workspaces', async () =
       saved=JSON.parse(String(options.body));
       return new Response(JSON.stringify({success:true}));
     }
-    return new Response(JSON.stringify([saved]));
+    return new Response(JSON.stringify(saved ? [saved] : []));
   };
   await saveProjectToDirectory('Original',doc);
   const [restored] = await getSavedProjects();
@@ -208,4 +217,36 @@ test('typed recovery quota failure preserves previous complete multi-workspace d
   assert.throws(()=>saveAutoSaveState({...doc,activeProjectName:'Changed'}),/Automatic recovery/);
   assert.equal(values.get(autoKey),previous);
   assert.deepEqual(getAutoSaveState()?.state,doc);
+});
+
+test('retired inline historical records survive new saves without rewriting their contents', async () => {
+  const old = {id:'old',name:'Archived',state:historicalFixture(),updatedAt:1,createdAt:1};
+  values.set(directoryKey,JSON.stringify([old]));
+  await saveProjectToDirectory('New',fixture());
+  const [archived] = (await getSavedProjects()).filter(p=>p.id==='old');
+  assert.deepEqual(archived.state,old.state);
+  assert.deepEqual(JSON.parse(values.get(directoryKey)!).find((p:any)=>p.id==='old'),old);
+  await assert.rejects(saveProjectToDirectory('Overwrite',fixture(),{id:'old'}),/Historical project/);
+  await assert.rejects(saveProjectToDirectory('Old',historicalFixture()),/historical projects are retired/);
+});
+test('historical recovery survives active v3 recovery writes', () => {
+  const raw=JSON.stringify({timestamp:1,state:historicalFixture()});
+  values.set('planarmto_autosave_state_v1',raw);
+  saveAutoSaveState(fixture());
+  assert.equal(getHistoricalAutoSaveRaw(),raw);
+  assert.equal(getAutoSaveState()?.state.activeProjectId,'test-pdf');
+});
+
+test('saving and deleting other projects preserves raw historical index even with stale separate payload', async () => {
+ const old={id:'old',name:'Archived',state:historicalFixture(),createdAt:1,updatedAt:1};
+ values.set(directoryKey,JSON.stringify([old]));
+ values.set('PLANAR_MTO_PROJECT_old',JSON.stringify({...old,name:'Stale payload'}));
+ await saveProjectToDirectory('New',fixture());
+ assert.deepEqual(JSON.parse(values.get(directoryKey)!).find((p:any)=>p.id==='old'),old);
+ failKey=directoryKey;
+ await assert.rejects(deleteProjectFromDirectory('test-pdf'));
+ assert.ok(values.has(payloadKey));
+ failKey=null;
+ await deleteProjectFromDirectory('test-pdf');
+ assert.deepEqual(JSON.parse(values.get(directoryKey)!),[old]);
 });

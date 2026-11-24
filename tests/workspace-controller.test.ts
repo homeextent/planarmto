@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBlankProject } from '../src/engine/samplePlans';
 import { createProjectDocument, workspaceFloorplan, workspaceRenderView, commitWorkspaceRenderView, deserializeProjectDocument, serializeProjectDocument } from '../src/engine/projectDocument';
-import { addWorkspace, selectWorkspace, renameWorkspace, moveWorkspace, removeWorkspace, updateWorkspaceView, normalizeProjectInput, canReportLegacyEstimate, validateProjectBudget, validateBlueprintBudget } from '../src/engine/workspaceController';
+import { addWorkspace, selectWorkspace, renameWorkspace, moveWorkspace, removeWorkspace, updateWorkspaceView, normalizeProjectInput, canReportProjectEstimate, validateProjectBudget, validateBlueprintBudget, setScopeAssignment } from '../src/engine/workspaceController';
 
 const fresh = () => createProjectDocument(createBlankProject(), 'floor');
 const blueprint = (size = 100, scale = .01) => ({ src: 'data:image/png;base64,' + 'a'.repeat(size), worldX: 2, worldY: 3, feetPerPixel: scale, opacity: .5, isVisible: true, isLocked: false });
@@ -35,17 +35,15 @@ test('independent underlays and geometry survive selection and serialization', (
   assert.equal(workspaceFloorplan(restored,'upper').underlay?.feetPerPixel,.05);
   assert.equal(workspaceFloorplan(restored,'floor').settings.profitPercentage,18);
 });
-test('legacy aliases migrate and incomplete estimating modes remain gated', () => {
-  const legacy = {...createBlankProject(),underlay:{url:'data:image/png;base64,test',x:3,y:4,scale:20}};
-  const doc = normalizeProjectInput(legacy);
-  assert.equal(workspaceFloorplan(doc).underlay?.feetPerPixel,.05);
-  assert.equal(workspaceFloorplan(doc).underlay?.worldX,3);
-  assert.equal(canReportLegacyEstimate(doc),true);
-  const expanded = addWorkspace(doc,'roof','Roof','roof');
-  assert.equal(canReportLegacyEstimate(expanded),false);
-  assert.equal(canReportLegacyEstimate(fresh()),false);
-  assert.throws(() => removeWorkspace(expanded,doc.activeWorkspaceId),/Legacy calculation owner/);
-  assert.throws(() => normalizeProjectInput({...legacy,settings:'bad'}),/Invalid legacy settings/);
+test('historical inputs rejected and explicit assignment protects owner without enabling reporting', () => {
+  assert.throws(()=>normalizeProjectInput(createBlankProject()),/historical projects are retired/);
+  const doc=addWorkspace(fresh(),'roof','Roof','roof');
+  const assigned=setScopeAssignment(doc,'roof',{status:'assigned',workspaceIds:['roof']});
+  assert.equal(canReportProjectEstimate(assigned),false);
+  assert.throws(()=>removeWorkspace(assigned,'roof'),/Remove assigned scope/);
+  assert.throws(()=>setScopeAssignment(doc,'roof',{status:'assigned',workspaceIds:['floor']}),/invalid scope owner/);
+  assert.throws(()=>setScopeAssignment(doc,'site',{status:'excluded',reason:''}),/invalid scope status/);
+  assert.equal(canReportProjectEstimate(fresh()),false);
 });
 test('complete-project budget accepts three 800KB rasters and rejects overflow', () => {
   let doc = fresh();
@@ -94,5 +92,5 @@ test('shared settings and rates follow workspace selection while detached views 
   assert.equal(floor.settings.costRates,rates);
   assert.notEqual(workspaceFloorplan(next,'floor').settings,next.settings);
   assert.notEqual(doc.settings,next.settings);
-  assert.equal(canReportLegacyEstimate(next),false);
+  assert.equal(canReportProjectEstimate(next),false);
 });
