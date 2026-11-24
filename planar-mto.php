@@ -391,6 +391,13 @@ function planarmto_save_project($request) {
     }
 
     $params = $request->get_json_params();
+    if (!is_array($params)) {
+        return new WP_Error('planarmto_invalid_project', 'Invalid project payload.', ['status' => 400]);
+    }
+    $project_state = isset($params['state']) ? wp_json_encode($params['state']) : ($params['project_state'] ?? '{}');
+    if (!is_string($project_state) || json_decode($project_state, true) === null || json_last_error() !== JSON_ERROR_NONE) {
+        return new WP_Error('planarmto_invalid_state', 'Project state could not be encoded.', ['status' => 400]);
+    }
 
     $data = [
         'project_uuid'    => $uuid,
@@ -402,7 +409,7 @@ function planarmto_save_project($request) {
         'gross_sf'        => floatval($params['grossSf'] ?? $params['gross_sf'] ?? 0),
         'net_sf'          => floatval($params['netSf'] ?? $params['net_sf'] ?? 0),
         'estimated_total' => floatval($params['estimatedTotal'] ?? $params['estimated_total'] ?? 0),
-        'project_state'   => isset($params['state']) ? json_encode($params['state']) : ($params['project_state'] ?? '{}'),
+        'project_state'   => $project_state,
         'updated_at'      => current_time('mysql'),
     ];
 
@@ -412,12 +419,15 @@ function planarmto_save_project($request) {
     ));
 
     if ($existing) {
-        $wpdb->update($table_name, $data, ['id' => $existing->id]);
+        $result = $wpdb->update($table_name, $data, ['id' => $existing->id, 'tenant_id' => $tenant_id]);
     } else {
         $data['created_at'] = current_time('mysql');
-        $wpdb->insert($table_name, $data);
+        $result = $wpdb->insert($table_name, $data);
     }
 
+    if ($result === false) {
+        return new WP_Error('planarmto_save_failed', 'Project could not be saved to the database. Please export a JSON backup and retry.', ['status' => 500]);
+    }
     return rest_ensure_response(['success' => true]);
 }
 
