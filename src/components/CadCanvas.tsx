@@ -1827,12 +1827,13 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       }
       ctx.font = '700 12px system-ui, sans-serif';
       ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
       const label = 'Select Second Point for Calibration';
       const lx = (sp1.x + sp2.x) / 2;
       const ly = (sp1.y + sp2.y) / 2 - 18;
       ctx.fillStyle = '#111827';
       const tw = ctx.measureText(label).width;
-      ctx.fillRect(lx - tw / 2 - 5, ly - 13, tw + 10, 18);
+      ctx.fillRect(lx - tw / 2 - 5, ly - 9, tw + 10, 18);
       ctx.fillStyle = '#ffea00';
       ctx.fillText(label, lx, ly);
       ctx.restore();
@@ -1863,7 +1864,27 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       ctx.restore();
     }
 
-    if (snapCandidate) {
+    // Calibration uses a high-contrast free-point cursor, not the normal snap ring.
+    if (activeTool === 'calibrate_scale' && calibrationPoints.length === 0 && snapCandidate) {
+      const sp = worldToScreen(snapCandidate.point.x, snapCandidate.point.y);
+      ctx.save();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, 8, 0, Math.PI * 2);
+      ctx.moveTo(sp.x - 11, sp.y);
+      ctx.lineTo(sp.x + 11, sp.y);
+      ctx.moveTo(sp.x, sp.y - 11);
+      ctx.lineTo(sp.x, sp.y + 11);
+      ctx.strokeStyle = '#111827';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      ctx.strokeStyle = '#ffea00';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (snapCandidate && activeTool !== 'calibrate_scale') {
       const sp = worldToScreen(snapCandidate.point.x, snapCandidate.point.y);
       ctx.save();
       ctx.strokeStyle = snapCandidate.type === 'node' ? '#10b981' : snapCandidate.type === 'wall' ? '#f59e0b' : '#38bdf8';
