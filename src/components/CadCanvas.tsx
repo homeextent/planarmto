@@ -1,3 +1,6 @@
+import { v4 as uuidv4 } from 'uuid';
+import type { RoofEntity } from '../engine/measurements/measurementTypes';
+import { roofPoints, snapRoofPoint, boundaryAt, moveRoofVertex, segmentDistance } from '../engine/measurements/roofEditing';
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   FloorplanState,
@@ -54,6 +57,8 @@ import {
 import { useProject } from '../context/ProjectContext';
 
 interface CadCanvasProps {
+  roofEntities?: RoofEntity[];
+  onRoofChange?: (entities: RoofEntity[]) => boolean;
   state: FloorplanState;
   onChange: (newState: FloorplanState, pushHistory?: boolean, historicalSnapshot?: FloorplanState) => void;
   activeTool: ActiveTool;
@@ -182,10 +187,16 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   onDeleteSelected,
   activeWallPreset,
   onContextMenu,
+  roofEntities,
+  onRoofChange,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  const [roofDraft, setRoofDraft] = useState<Point2D[]>([]);
+  const [roofCursor, setRoofCursor] = useState<Point2D | null>(null);
+  const [roofVertex, setRoofVertex] = useState<number | null>(null);
+  useEffect(() => { setRoofDraft([]); setRoofCursor(null); setRoofVertex(null); }, [activeTool, selection.id]);
   // Sticky lock for OSNAP with hysteresis
   const lockedSnapNodeRef = useRef<{ id: string; x: number; y: number } | null>(null);
 
@@ -500,6 +511,9 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     let minY = Infinity;
     let maxY = -Infinity;
 
+    for (const entity of roofEntities || []) for (const p of roofPoints(entity)) {
+      minX = Math.min(minX,p.x); maxX = Math.max(maxX,p.x); minY = Math.min(minY,p.y); maxY = Math.max(maxY,p.y);
+    }
     // Include nodes in bounding box
     if (state.nodes.length > 0) {
       state.nodes.forEach((n) => {
@@ -604,12 +618,15 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   // Keyboard shortcut listener (Delete, Escape, Space)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement || (e.target instanceof HTMLElement && e.target.isContentEditable)) return;
       if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (roofEntities) return; // App owns specialist deletion.
         if (selection.type !== 'none') {
           e.preventDefault();
           onDeleteSelected();
         }
       } else if (e.key === 'Escape') {
+        setRoofDraft([]); setRoofCursor(null); setRoofVertex(null);
         setActiveWallStartNodeId(null);
         setDraftMousePos(null);
         setRoomBoxStart(null);
@@ -623,7 +640,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selection, onDeleteSelected, onSelect]);
+  }, [selection, onDeleteSelected, onSelect, onToolChange, roofEntities]);
 
   // Main rendering function
   const renderCanvas = useCallback(() => {
@@ -2191,6 +2208,32 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       ctx.restore();
     }
 
+    // Specialist entities share the calibrated CAD world transform.
+    if (roofEntities) {
+      ctx.save();
+      for (const e of [...roofEntities].sort((a,b)=>Number(a.kind==='roofEdge')-Number(b.kind==='roofEdge'))) {
+        const points=roofPoints(e).map(p=>worldToScreen(p.x,p.y));
+        const color=e.kind==='roofEdge'?({eave:'#4ade80',rake:'#a3e635',ridge:'#fbbf24',hip:'#38bdf8',valley:'#c084fc',abutment:'#fb923c',parapet:'#f472b6',unclassified:'#94a3b8'}[e.edgeType]):e.kind==='roofOpening'?'#f87171':e.kind==='roofSurface'?(e.purpose==='soffit'?'#2dd4bf':'#c084fc'):'#38bdf8';
+        ctx.strokeStyle=selection.id===e.id?'#ffffff':color;
+        ctx.lineWidth=selection.id===e.id?3:1.8;
+        ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+        if ('polygon' in e) { ctx.closePath();ctx.globalAlpha=.13;ctx.fillStyle=color;ctx.fill();ctx.globalAlpha=1; }
+        ctx.stroke();
+        const center=points.reduce((a,p)=>({x:a.x+p.x/points.length,y:a.y+p.y/points.length}),{x:0,y:0});
+        ctx.fillStyle=color;ctx.font='12px sans-serif';ctx.textAlign='center';
+        ctx.fillText(e.kind==='roofPlane'?(e.pitchRise===null?'Pitch pending':e.pitchRise+':12'):e.kind==='roofEdge'?e.edgeType:e.kind==='roofOpening'?'Opening':e.purpose,center.x,center.y-5);
+        if(e.kind==='roofPlane'&&e.slopeDegrees!==null&&e.pitchRise!==0){
+          const t=e.slopeDegrees*Math.PI/180,dx=Math.cos(t),dy=Math.sin(t),x=center.x+dx*24,y=center.y+dy*24;
+          ctx.beginPath();ctx.moveTo(center.x,center.y);ctx.lineTo(x,y);ctx.lineTo(x-dx*7-dy*5,y-dy*7+dx*5);ctx.moveTo(x,y);ctx.lineTo(x-dx*7+dy*5,y-dy*7-dx*5);ctx.stroke();
+        }
+        if(selection.id===e.id&&'polygon' in e)for(const [i,p] of points.entries()){ctx.fillStyle=roofVertex===i?'#fbbf24':'#fff';ctx.fillRect(p.x-3,p.y-3,6,6);}
+      }
+      if(roofDraft.length){
+        ctx.beginPath();ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;
+        [...roofDraft,...(roofCursor?[roofCursor]:[])].map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();
+      }
+      ctx.restore();
+    }
     // --- DRAW MARQUEE SELECTION BOX ---
     if (marqueeStart && marqueeEnd) {
       const sp1 = worldToScreen(marqueeStart.x, marqueeStart.y);
@@ -2228,12 +2271,26 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     roomSnapFeedback,
     marqueeStart,
     marqueeEnd,
+    roofEntities, roofDraft, roofCursor, roofVertex,
   ]);
 
   useEffect(() => {
     renderCanvas();
   }, [renderCanvas]);
 
+  const finishRoofPolygon = () => {
+    if (!roofEntities || !onRoofChange || roofDraft.length < 3) return;
+    const id=uuidv4(), base={id,physicalId:id,assemblyId:id,source:{reference:'Roof workspace drawing'}};
+    let entity:RoofEntity;
+    if(activeTool==='roof_plane')entity={...base,kind:'roofPlane',polygon:roofDraft,pitchRise:null,slopeDegrees:null,elevationFt:null};
+    else if(activeTool==='roof_opening'){
+      const parent=roofEntities.find(e=>e.id===selection.id&&e.kind==='roofPlane');
+      if(!parent){alert('Select the parent roof plane before drafting an opening.');return;}
+      entity={...base,kind:'roofOpening',polygon:roofDraft,planeId:parent.id,deduction:'unspecified'};
+    }else if(activeTool==='roof_soffit'||activeTool==='roof_insulation')entity={...base,kind:'roofSurface',polygon:roofDraft,purpose:activeTool==='roof_soffit'?'soffit':'insulation',pitchRise:null};
+    else return;
+    if(onRoofChange([...roofEntities,entity])){setRoofDraft([]);setRoofCursor(null);onToolChange('select');onSelect({type:'roof',id});}
+  };
   // Handle Mouse Down
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -2261,6 +2318,35 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     if (e.button !== 0) return; // Only left click for drawing/selecting
 
+    if (roofEntities && onRoofChange && (activeTool.startsWith('roof_') || activeTool==='select')) {
+      const tolerance=10/transform.scale;
+      const snapped=snapRoofPoint(rawWorld,roofEntities,tolerance,state.settings.gridSnap?state.settings.gridSnapSize:null);
+      if(activeTool==='roof_edge'){
+        const boundary=boundaryAt(rawWorld,roofEntities,tolerance);
+        if(!boundary)return;
+        const id=uuidv4(),entity:RoofEntity={id,physicalId:id,assemblyId:id,source:{reference:'Roof workspace drawing'},kind:'roofEdge',...boundary,edgeType:'unclassified'};
+        if(onRoofChange([...roofEntities,entity])){onToolChange('select');onSelect({type:'roof',id});}
+        return;
+      }
+      if(activeTool==='roof_vertex'){
+        const entity=roofEntities.find(q=>q.id===selection.id);
+        if(!entity||!('polygon' in entity)){alert('Select a roof polygon first.');return;}
+        if(roofVertex===null){const i=entity.polygon.findIndex(p=>distance(p,rawWorld)<=tolerance);if(i>=0)setRoofVertex(i);}
+        else {try {const next=moveRoofVertex(roofEntities,entity.id,roofVertex,snapped);if(onRoofChange(next))setRoofVertex(null);}catch(err){alert(err instanceof Error?err.message:String(err));}}
+        return;
+      }
+      if(activeTool==='select'){
+        const hit=[...roofEntities].reverse().find(q=>q.kind==='roofEdge'&&segmentDistance(rawWorld,q.start,q.end).distance<=tolerance)
+          ||[...roofEntities].reverse().find(q=>'polygon' in q&&isPointInPolygon(rawWorld,q.polygon));
+        if(hit){onSelect({type:'roof',id:hit.id});return;}
+        if(selection.type==='roof')onSelect({type:'none'});
+      }else {
+        if(activeTool==='roof_opening'&&!roofEntities.some(q=>q.id===selection.id&&q.kind==='roofPlane')){alert('Select the parent roof plane first.');return;}
+        if(roofDraft.length>=3&&distance(snapped,roofDraft[0])<=tolerance){finishRoofPolygon();return;}
+        if(!roofDraft.length||distance(snapped,roofDraft[roofDraft.length-1])>1e-6)setRoofDraft(prev=>[...prev,snapped]);
+        return;
+      }
+    }
     const snap = getSmartSnapPoint(rawWorld, activeWallStartNodeId);
     const isSnapEnabled = state.settings.gridSnap;
     const shouldSnap = isSnapEnabled && activeTool !== 'calibrate_scale';
@@ -2644,6 +2730,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     }
     const rawWorld = screenToWorld(clientX, clientY);
     
+    if(roofEntities&&activeTool.startsWith('roof_')) {setRoofCursor(snapRoofPoint(rawWorld,roofEntities,10/transform.scale,state.settings.gridSnap?state.settings.gridSnapSize:null));return;}
     // Check for underlay hover
     if (state.underlay && state.underlay.isVisible && !state.underlay.isLocked && underlayImageRef.current) {
       const uw = underlayImageRef.current.naturalWidth * state.underlay.feetPerPixel;
@@ -2912,6 +2999,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
   // Handle Double Click to finish wall drawing chain
   const handleDoubleClick = () => {
+    if(activeTool.startsWith('roof_'))return;
     if (activeTool === 'wall_pen') {
       setActiveWallStartNodeId(null);
       setDraftMousePos(null);
@@ -2957,7 +3045,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-4 py-1.5 rounded-full text-xs text-slate-300 shadow-xl flex items-center gap-3">
         <span className={`flex items-center gap-1.5 font-medium ${activeTool === 'wall_pen' || activeTool === 'wall_rect' || activeTool === 'room_box' ? 'text-amber-200' : 'text-sky-400'}`}>
           <Compass className="w-3.5 h-3.5" />
-          {activeTool === 'wall_pen'
+          {activeTool.startsWith('roof_') ? (activeTool==='roof_edge'?'Click a roof plane boundary':activeTool==='roof_vertex'?'Select vertex, then click new position':'Click polygon vertices, then Finish polygon') : activeTool === 'wall_pen'
             ? activeWallStartNodeId
               ? 'Click to place next wall node (Double-click / ESC to finish)'
               : 'Click to drop start node for wall'
@@ -2976,6 +3064,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
             : 'Select & Move (Click wall, node, room, stamp, or note)'}
         </span>
         <div className="w-[1px] h-3.5 bg-slate-700 mx-1" />
+        {roofDraft.length>=3&&<button className="bg-sky-700 px-2 py-1 rounded" onClick={finishRoofPolygon}>Finish polygon</button>}
         {/* Precision Grid Snapping Selector */}
         <div className="flex items-center gap-1 bg-slate-950/80 border border-slate-800 rounded-lg px-1.5 py-0.5">
           <button
