@@ -14,17 +14,18 @@ export function PdfSheetPickerModal({ pdf, filename, onSelect, onCancel, busy, e
   const end = Math.min(start + 11, pdf.numPages);
   useEffect(() => {
     let stopped = false;
+    if (busy) return;
     setPreviews({});
     void (async () => {
       for (let n = start; n <= end && !stopped; n++) {
         try {
-          const result = await renderBlueprintPage(pdf, n, 320, 120000);
+          const result = await renderBlueprintPage(pdf, n, 320, 120000, () => !stopped);
           if (!stopped) setPreviews(prev => ({ ...prev, [n]: result.src }));
         } catch { if (!stopped) setPreviews(prev => ({ ...prev, [n]: '' })); }
       }
     })();
     return () => { stopped = true; };
-  }, [pdf, start, end]);
+  }, [pdf, start, end, busy]);
   return createPortal(
     <div className="fixed inset-0 z-[100] bg-black/70 flex items-center justify-center p-4">
       <section role="dialog" aria-modal="true" aria-label="Import PDF blueprint" className="bg-slate-900 text-slate-100 rounded-xl border border-slate-700 w-full max-w-3xl p-5 space-y-4 max-h-[90vh] overflow-auto">
@@ -40,15 +41,16 @@ export function PdfSheetPickerModal({ pdf, filename, onSelect, onCancel, busy, e
             </button>)}
         </div>
         <div className="flex items-center justify-between text-sm">
-          <button disabled={busy || batch === 0} onClick={() => setBatch(b => b - 1)}>Previous pages</button>
+          <button disabled={busy || batch === 0} className="text-sky-300 hover:text-white disabled:text-slate-600 disabled:cursor-not-allowed" onClick={() => { setPage((batch - 1) * 12 + 1); setBatch(b => b - 1); }}>Previous pages</button>
           <span>{start}–{end} of {pdf.numPages}</span>
-          <button disabled={busy || end === pdf.numPages} onClick={() => setBatch(b => b + 1)}>Next pages</button>
+          <button disabled={busy || end === pdf.numPages} className="text-sky-300 hover:text-white disabled:text-slate-600 disabled:cursor-not-allowed" onClick={() => { setPage((batch + 1) * 12 + 1); setBatch(b => b + 1); }}>Next pages</button>
         </div>
         <label className="flex gap-3 items-center">Resolution
           <select disabled={busy} value={edge} onChange={e => setEdge(Number(e.target.value))} className="bg-slate-800 p-2 rounded">
             <option value={3400}>Standard — 3400 px</option><option value={5000}>High — 5000 px</option><option value={6000}>Maximum — 6000 px</option>
           </select>
         </label>
+        <p className="text-xs text-slate-400">Resolution is a target. Complex sheets may be optimized to fit storage limits.</p>
         {error && <p role="alert" className="text-red-300">{error}</p>}
         <div className="flex justify-end gap-4">
           <button onClick={onCancel}>Cancel</button>
