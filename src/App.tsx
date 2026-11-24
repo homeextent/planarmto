@@ -652,7 +652,7 @@ function AppContent() {
         key={workspaceEpoch}
         state={state}
         projectJson={() => serializeProjectDocument(document)}
-        onLoadDocument={loadDocument}
+        onLoadDocument={value => { const normalized = normalizeProjectInput(value); loadDocument({ ...normalized, activeProjectId: null }); }}
         validateBlueprint={next => validateBlueprintBudget(document, document.activeWorkspaceId, next)}
         onChange={handleStateChange}
         canUndo={history.length > 0}
