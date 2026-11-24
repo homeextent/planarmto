@@ -14,7 +14,7 @@ async function saveProjectPayload(id: string | number, entry: SavedProjectEntry)
   try {
     localStorage.setItem(`${PROJECT_PREFIX}${id}`, JSON.stringify(entry));
   } catch (err) {
-    console.warn('Unable to persist project payload to localStorage:', err);
+    throw new Error('Unable to save project to browser storage. Storage may be full or unavailable. Export a JSON backup before leaving.');
   }
 }
 
@@ -51,7 +51,7 @@ export interface SavedProjectEntry {
 /**
  * Helper to check if we are in WordPress environment
  */
-const isWP = () => typeof window !== 'undefined' && !!window.planarMTOConfig?.restUrl;
+const isWP = () => typeof window !== 'undefined' && !!window.planarMTOConfig?.restUrl && !!window.planarMTOConfig?.currentUserId;
 
 /**
  * Generic fetcher for WP REST API
@@ -337,18 +337,17 @@ export async function saveProjectToDirectory(
   };
 
   if (isWP()) {
-    try {
-      return await wpFetch<SavedProjectEntry>('projects', {
-        method: 'POST',
-        body: JSON.stringify({
-          ...payload,
-          uuid: payload.id,
-          project_uuid: payload.id,
-        }),
-      });
-    } catch (err) {
-      console.warn('WP Project save failed, falling back to local:', err);
-    }
+    const result = await wpFetch<{ success: boolean }>('projects', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...payload,
+        uuid: payload.id,
+        project_uuid: payload.id,
+      }),
+    });
+    if (result.success !== true) throw new Error('WordPress did not confirm the project save.');
+    // Return the saved entry; the API acknowledges the write rather than returning a project.
+    return { ...payload, id: payload.id || '', createdAt: Date.now(), updatedAt: Date.now() };
   }
 
   // Fallback to LocalStorage
@@ -367,7 +366,9 @@ export async function saveProjectToDirectory(
     updatedAt: now,
   };
 
-  // 1. Save the full payload
+  // 1. Save the full payload, retaining the previous value for rollback if the index write fails.
+  const payloadKey = `${PROJECT_PREFIX}${entryId}`;
+  const previousPayload = localStorage.getItem(payloadKey);
   await saveProjectPayload(entryId, newEntry);
 
   // 2. Update the master index (strip state for the index list to keep it light)
@@ -383,7 +384,9 @@ export async function saveProjectToDirectory(
   try {
     localStorage.setItem(PROJECTS_DIRECTORY_KEY, JSON.stringify(projects));
   } catch (err) {
-    console.warn('Unable to write to project directory in localStorage:', err);
+    if (previousPayload === null) localStorage.removeItem(payloadKey);
+    else localStorage.setItem(payloadKey, previousPayload);
+    throw new Error('Unable to update the project directory. Browser storage may be full. Export a JSON backup.');
   }
 
   return newEntry;
@@ -490,7 +493,7 @@ export function saveAutoSaveState(state: FloorplanState): void {
     };
     localStorage.setItem(AUTOSAVE_STORAGE_KEY, JSON.stringify(payload));
   } catch (err) {
-    // Quota or sandbox restrictions
+    throw new Error('Automatic recovery could not be saved. Browser storage may be full or unavailable. Save or export your project.');
   }
 }
 
