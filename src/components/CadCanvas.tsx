@@ -1705,12 +1705,16 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         const sEnd = worldToScreen(draftMousePos.x, draftMousePos.y);
 
         ctx.save();
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = '#111827';
+        ctx.lineWidth = 5;
+        ctx.setLineDash([]);
         ctx.beginPath();
         ctx.moveTo(sStart.x, sStart.y);
         ctx.lineTo(sEnd.x, sEnd.y);
+        ctx.stroke();
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([6, 4]);
         ctx.stroke();
         ctx.setLineDash([]);
 
@@ -1722,19 +1726,21 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         const midX = (sStart.x + sEnd.x) / 2;
         const midY = (sStart.y + sEnd.y) / 2;
 
+        const label = `${formatLength(dLen)} @ ${deg}°`;
+        ctx.font = '700 12px system-ui, sans-serif';
+        const labelWidth = Math.max(90, ctx.measureText(label).width + 16);
         ctx.fillStyle = '#0f172a';
-        ctx.strokeStyle = '#38bdf8';
+        ctx.strokeStyle = '#fbbf24';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.roundRect(midX - 45, midY - 24, 90, 20, 4);
+        ctx.roundRect(midX - labelWidth / 2, midY - 25, labelWidth, 22, 4);
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = '#38bdf8';
-        ctx.font = '700 11px system-ui, sans-serif';
+        ctx.fillStyle = '#fef3c7';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(`${formatLength(dLen)} @ ${deg}°`, midX, midY - 14);
+        ctx.fillText(label, midX, midY - 14);
         ctx.restore();
       }
     }
@@ -1749,10 +1755,10 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       const area = Math.round(rW * rH);
 
       ctx.save();
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 4]);
-      ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+      ctx.strokeStyle = '#111827';
+      ctx.lineWidth = 4;
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.08)';
       ctx.beginPath();
       ctx.rect(
         Math.min(sp1.x, sp2.x),
@@ -1762,14 +1768,28 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       );
       ctx.fill();
       ctx.stroke();
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
       ctx.setLineDash([]);
 
       const centX = (sp1.x + sp2.x) / 2;
       const centY = (sp1.y + sp2.y) / 2;
-      ctx.fillStyle = '#38bdf8';
+      const label = `${formatLength(rW)} × ${formatLength(rH)} (${area} SF)`;
       ctx.font = '700 12px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`${formatLength(rW)} × ${formatLength(rH)} (${area} SF)`, centX, centY);
+      ctx.textBaseline = 'middle';
+      const labelWidth = ctx.measureText(label).width + 16;
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.roundRect(centX - labelWidth / 2, centY - 11, labelWidth, 22, 4);
+      ctx.fill();
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = '#fef3c7';
+      ctx.fillText(label, centX, centY);
       ctx.restore();
     }
 
@@ -1887,10 +1907,21 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     if (snapCandidate && activeTool !== 'calibrate_scale') {
       const sp = worldToScreen(snapCandidate.point.x, snapCandidate.point.y);
       ctx.save();
-      ctx.strokeStyle = snapCandidate.type === 'node' ? '#10b981' : snapCandidate.type === 'wall' ? '#f59e0b' : '#38bdf8';
-      ctx.lineWidth = 2;
+      const drafting = activeTool === 'wall_pen' || activeTool === 'wall_rect' || activeTool === 'room_box';
+      const snapColor = snapCandidate.type === 'node' ? '#10b981' : snapCandidate.type === 'wall' ? '#f59e0b' : drafting ? '#fbbf24' : '#38bdf8';
       ctx.beginPath();
       ctx.arc(sp.x, sp.y, 7, 0, Math.PI * 2);
+      if (drafting) {
+        ctx.moveTo(sp.x - 10, sp.y);
+        ctx.lineTo(sp.x + 10, sp.y);
+        ctx.moveTo(sp.x, sp.y - 10);
+        ctx.lineTo(sp.x, sp.y + 10);
+        ctx.strokeStyle = '#111827';
+        ctx.lineWidth = 5;
+        ctx.stroke();
+      }
+      ctx.strokeStyle = snapColor;
+      ctx.lineWidth = 2;
       ctx.stroke();
 
       if (snapCandidate.type === 'node') {
@@ -2924,7 +2955,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       {/* Floating Canvas Overlays & Controls */}
       {/* Top Center Tool Info Banner */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-4 py-1.5 rounded-full text-xs text-slate-300 shadow-xl flex items-center gap-3">
-        <span className="flex items-center gap-1.5 font-medium text-sky-400">
+        <span className={`flex items-center gap-1.5 font-medium ${activeTool === 'wall_pen' || activeTool === 'wall_rect' || activeTool === 'room_box' ? 'text-amber-200' : 'text-sky-400'}`}>
           <Compass className="w-3.5 h-3.5" />
           {activeTool === 'wall_pen'
             ? activeWallStartNodeId
