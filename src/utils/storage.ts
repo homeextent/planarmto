@@ -1,6 +1,10 @@
 import { CompanyBranding, FloorplanState, ProjectSettings, UnitCostRates } from '../types';
 import { calculateMTO, calculateEstimatedCost, safeMergeRates } from '../engine/estimator';
 import { DEFAULT_UNIT_COST_RATES } from '../constants/rates';
+import type { ProjectDocument } from '../engine/projectDocument';
+import { workspaceFloorplan } from '../engine/projectDocument';
+import { normalizeProjectInput, canReportLegacyEstimate, validateProjectBudget } from '../engine/workspaceController';
+export type StoredProjectState = FloorplanState | ProjectDocument;
 
 const BRANDING_STORAGE_KEY = 'planarmto_company_branding_v1';
 const PROJECTS_DIRECTORY_KEY = 'PLANAR_MTO_PROJECTS_LIST';
@@ -45,7 +49,7 @@ export interface SavedProjectEntry {
   grossSf: number;
   netSf: number;
   estimatedTotal: number;
-  state: FloorplanState;
+  state: StoredProjectState;
 }
 
 /**
@@ -259,7 +263,7 @@ export async function getSavedProjects(): Promise<SavedProjectEntry[]> {
         }))
         .sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0));
     } catch (err) {
-      console.warn('WP Projects fetch failed, falling back to local:', err);
+      throw new Error('Unable to read authenticated projects. ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
@@ -275,6 +279,7 @@ export async function getSavedProjects(): Promise<SavedProjectEntry[]> {
         if (!p.state) {
           const full = await getProjectPayload(p.id);
           if (full) return full;
+          throw new Error('Missing project payload: ' + p.id);
         }
 
         if (p.state?.settings?.costRates) {
@@ -284,10 +289,9 @@ export async function getSavedProjects(): Promise<SavedProjectEntry[]> {
       }));
       return entries.sort((a, b) => b.updatedAt - a.updatedAt);
     }
-    return [];
+    throw new Error('Invalid directory index.');
   } catch (err) {
-    console.warn('Unable to read saved projects directory:', err);
-    return [];
+    throw new Error('Unable to read saved projects directory. Existing data has not been replaced.');
   }
 }
 
@@ -296,15 +300,18 @@ export async function getSavedProjects(): Promise<SavedProjectEntry[]> {
  */
 export async function saveProjectToDirectory(
   name: string,
-  state: FloorplanState,
+  state: StoredProjectState,
   options?: {
     id?: string | number;
     description?: string;
     projectNumber?: string;
   }
 ): Promise<SavedProjectEntry> {
-  // Compute metrics
-  const mto = calculateMTO(state);
+  // Preserve legacy summaries; never price incomplete typed projects.
+  const doc = 'schemaVersion' in state ? normalizeProjectInput(state) : null;
+  const view = doc ? workspaceFloorplan(doc) : state as FloorplanState;
+  const reportable = !doc || canReportLegacyEstimate(doc);
+  const mto = calculateMTO(view);
   const cost = calculateEstimatedCost(
     mto,
     state.settings.costRates || DEFAULT_UNIT_COST_RATES,
@@ -312,28 +319,20 @@ export async function saveProjectToDirectory(
     state.settings.itemInclusions
   );
 
+  const id = options?.id || state.activeProjectId || `proj_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const nameToSave = name.trim() || 'Untitled Architectural Project';
+  const persistedState = doc ? { ...doc, activeProjectId: String(id), activeProjectName: nameToSave } : state;
+  if (doc) validateProjectBudget(persistedState as ProjectDocument);
   const payload = {
-    id: options?.id || state.activeProjectId || `proj_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id,
     name: name.trim() || 'Untitled Architectural Project',
     projectNumber: options?.projectNumber || state.settings.companyBranding?.projectNumber || `PRJ-${new Date().getFullYear()}-MTO`,
     description: options?.description || '',
-    roomCount: mto.roomDetails.length,
-    grossSf: mto.grossFootprintSf || mto.flooringPackageSf || 0,
-    netSf: mto.netFloorAreaSf || mto.flooringPackageSf || 0,
-    estimatedTotal: cost.totalCost,
-    state: {
-      ...state,
-      underlay: state.underlay ? {
-        ...state.underlay,
-      } : undefined,
-      settings: {
-        ...state.settings,
-        costRates: state.settings.costRates ? {
-          ...state.settings.costRates,
-          // No longer using global lastUpdated
-        } : undefined,
-      },
-    },
+    roomCount: doc ? doc.workspaces.filter(w => w.type === 'floor').reduce((n,w) => n + w.geometry.rooms.length, 0) : mto.roomDetails.length,
+    grossSf: reportable ? mto.grossFootprintSf || mto.flooringPackageSf || 0 : 0,
+    netSf: reportable ? mto.netFloorAreaSf || mto.flooringPackageSf || 0 : 0,
+    estimatedTotal: reportable ? cost.totalCost : 0,
+    state: persistedState,
   };
 
   if (isWP()) {
@@ -382,7 +381,7 @@ export async function saveProjectToDirectory(
   }
 
   try {
-    localStorage.setItem(PROJECTS_DIRECTORY_KEY, JSON.stringify(projects));
+    localStorage.setItem(PROJECTS_DIRECTORY_KEY, JSON.stringify(projects.map(p => { const { state, ...index } = p; return index; })));
   } catch (err) {
     if (previousPayload === null) localStorage.removeItem(payloadKey);
     else localStorage.setItem(payloadKey, previousPayload);
@@ -397,11 +396,8 @@ export async function saveProjectToDirectory(
  */
 export async function deleteProjectFromDirectory(id: string | number): Promise<SavedProjectEntry[]> {
   if (isWP()) {
-    try {
-      await wpFetch(`projects/${id}`, { method: 'DELETE' });
-    } catch (err) {
-      console.warn('WP Project delete failed, falling back to local:', err);
-    }
+    await wpFetch(`projects/${encodeURIComponent(String(id))}`, { method: 'DELETE' });
+    return getSavedProjects();
   }
 
   const projects = (await getSavedProjects()).filter((p) => p.id !== id);
@@ -418,44 +414,11 @@ export async function deleteProjectFromDirectory(id: string | number): Promise<S
  * Renames a project in the directory.
  */
 export async function renameProjectInDirectory(id: string | number, newName: string): Promise<SavedProjectEntry[]> {
-  // If WP, we can just use saveProjectToDirectory with the ID and new name
-  // But for simplicity of this refactor, let's just update local for now or handle WP if ID is number
-  if (isWP() && typeof id === 'number') {
-    try {
-      // Find the project to get its state
-      const projects = await getSavedProjects();
-      const project = projects.find(p => p.id === id);
-      if (project) {
-        await saveProjectToDirectory(newName, project.state, { id });
-        return getSavedProjects();
-      }
-    } catch (err) {
-      console.warn('WP Project rename failed, falling back to local:', err);
-    }
-  }
-
   const projects = await getSavedProjects();
-  const index = projects.findIndex((p) => p.id === id);
-  if (index >= 0) {
-    const project = projects[index];
-    project.name = newName.trim() || 'Untitled Project';
-    project.updatedAt = Date.now();
-    
-    // Update individual payload as well if it exists
-    const fullProject = await getProjectPayload(id);
-    if (fullProject) {
-      fullProject.name = project.name;
-      fullProject.updatedAt = project.updatedAt;
-      await saveProjectPayload(id, fullProject);
-    }
-
-    try {
-      localStorage.setItem(PROJECTS_DIRECTORY_KEY, JSON.stringify(projects));
-    } catch (err) {
-      console.warn('Unable to update project name in localStorage:', err);
-    }
-  }
-  return projects;
+  const project = projects.find(p => String(p.id) === String(id));
+  if (!project) throw new Error('Project not found.');
+  await saveProjectToDirectory(newName, project.state, { id: project.id, projectNumber: project.projectNumber, description: project.description });
+  return getSavedProjects();
 }
 
 /**
@@ -485,7 +448,7 @@ export async function hydrateSettingsWithBranding(
 /**
  * Saves current active draft for auto-recovery.
  */
-export function saveAutoSaveState(state: FloorplanState): void {
+export function saveAutoSaveState(state: StoredProjectState): void {
   try {
     const payload = {
       timestamp: Date.now(),
@@ -500,7 +463,7 @@ export function saveAutoSaveState(state: FloorplanState): void {
 /**
  * Reads the last auto-saved state.
  */
-export function getAutoSaveState(): { timestamp: number; state: FloorplanState } | null {
+export function getAutoSaveState(): { timestamp: number; state: StoredProjectState } | null {
   try {
     const raw = localStorage.getItem(AUTOSAVE_STORAGE_KEY);
     if (!raw) return null;
