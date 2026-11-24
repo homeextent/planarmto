@@ -227,7 +227,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           const p=selected.polygon;
           resizeRectangle(p,Math.abs(p[2]?.x-p[0]?.x),Math.abs(p[2]?.y-p[0]?.y));
           setGenerationOutline(p);setGenerationSource(selected);
-          if(selected.pitchRise!==null&&selected.pitchRise>0)setGenerationConfig(c=>({...c,pitch:selected.pitchRise!}));
+          setGenerationConfig(c=>({...c,pitch:selected.pitchRise??0,type:selected.pitchRise===0?'flat':c.type==='flat'?'hip':c.type}));
         }catch(err){setGenerationError(err instanceof Error?err.message:String(err));}
       }
     }
@@ -2434,12 +2434,12 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     const anchor=state.nodes.find(n=>n.id===activeWallStartNodeId)||pendingWallStart;
     if(!anchor)return;
     if(pendingWallStart&&pendingStartState.current!==state){setDimensionError('Drawing changed. Cancel and restart the wall.');return;}
-    const token=uuidv4(),wallId=uuidv4(),freeEndId=uuidv4();
+    const token=uuidv4(),wallId=uuidv4(),freeEndId=uuidv4(),startWallId=pendingStartWall.current;
     const build=(result:typeof draftResult,correction=false)=>{
       let nodes=[...state.nodes],walls=[...state.walls],apertures=[...state.apertures];
       let startId=anchor.id;
       if(pendingWallStart){
-        if(pendingStartWall.current){const split=splitWallAtPoint(pendingStartWall.current,anchor,nodes,walls,apertures);nodes=split.nodes;walls=split.walls;apertures=split.apertures;startId=split.splitNodeId;}
+        if(startWallId){const split=splitWallAtPoint(startWallId,anchor,nodes,walls,apertures);nodes=split.nodes;walls=split.walls;apertures=split.apertures;startId=split.splitNodeId;}
         else nodes.push(anchor);
       }
       let endId=result.nodeId;
@@ -2459,7 +2459,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       else onChange(placed.next);
       const connected=draftResult.type==='wall'||!!draftResult.nodeId;
       if(commitDraftPlacement)setCorrection({token,start:anchor,toward:draftResult.point,rectangle:false,correct:q=>{
-        if(connected||pendingStartWall.current)throw Error('Connected geometry requires coordinated editing.');
+        if(connected||startWallId)throw Error('Connected geometry requires coordinated editing.');
         if(state.nodes.some(n=>n.id!==anchor.id&&distance(n,q)<=1e-6))throw Error('Exact endpoint coincides with existing geometry.');
         const corrected=build({point:q,type:'none'},true);
         if(!placementHandler.current?.(token,corrected.next,true))throw Error('Correction is no longer available or conflicts with geometry.');
@@ -2487,7 +2487,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       const end=rectangle?exactRectangleCorner(start,toward,a,b!):exactEndpoint(start,toward,a);
       if(last)last.correct(end);
       else if(roofAreaTool)addRoofPoint(end);
-      else if(rectangle){if(commitFloorRectangle(start,end,true)){setRoomBoxStart(null);onToolChange('select');}}
+      else if(rectangle){if(!commitFloorRectangle(start,end,true))return;setRoomBoxStart(null);onToolChange('select');}
       else commitFloorSegment({point:end,type:'none'});
       setDimensionA('');setDimensionError('');draftDirection.current=null;
     }catch(err){setDimensionError(err instanceof Error?err.message:String(err));}
@@ -2514,6 +2514,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     const entities=roofEntities||[];
     if(!generationSource)return entities;
     if(!entities.includes(generationSource))throw Error('Selected roof geometry changed. Cancel and reopen generation.');
+    if(generationSource.kind==='roofPlane'&&generationSource.elevationFt!==null)throw Error('Selected plane has an established elevation datum. Manual reconciliation is required before replacing it with a relative-datum skeleton.');
     if(entities.some(e=>(e.kind==='roofEdge'&&e.planeIds.includes(generationSource.id))||(e.kind==='roofOpening'&&e.planeId===generationSource.id)))throw Error('Selected roof plane has dependent edges or openings. Review those dependencies before replacement.');
     return entities.filter(e=>e.id!==generationSource.id);
   };
@@ -3207,7 +3208,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       />
 
       {(polygonError||(!generationOutline&&generationError))&&<div role="alert" className="absolute top-16 left-1/2 -translate-x-1/2 z-20 bg-slate-900 border border-amber-600 text-amber-300 rounded p-3 text-xs">{polygonError||generationError}</div>}
-      {generationOutline&&<section className="absolute top-20 left-4 z-20 bg-slate-900 border border-sky-600 rounded-lg p-4 text-xs space-y-3 w-64 shadow-xl"><h3 className="font-semibold text-sky-300">Generate Roof Skeleton</h3><p>Rectangular roof perimeter · preview only</p><label className="block">Configuration<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.type} onChange={e=>{setGenerationConfig(c=>({...c,type:e.target.value as RoofConfig['type']}));setGenerationPreview(null)}}>{['hip','gable','shed','flat'].map(t=><option key={t}>{t}</option>)}</select></label>{generationConfig.type!=='flat'&&<label className="block">Pitch rise per 12<input className="block w-full bg-slate-800 p-2 rounded" type="number" min="0.01" max="48" step="any" value={generationConfig.pitch} onChange={e=>{setGenerationConfig(c=>({...c,pitch:Number(e.target.value)}));setGenerationPreview(null)}}/></label>}{generationConfig.type==='gable'&&<label>Ridge orientation<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.ridge} onChange={e=>{setGenerationConfig(c=>({...c,ridge:e.target.value as RoofConfig['ridge']}));setGenerationPreview(null)}}><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>}{generationConfig.type==='shed'&&<label>Downslope direction<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.direction} onChange={e=>{setGenerationConfig(c=>({...c,direction:Number(e.target.value) as RoofConfig['direction']}));setGenerationPreview(null)}}>{[[0,'Right'],[90,'Down'],[180,'Left'],[270,'Up']].map(([v,n])=><option key={v} value={v}>{n}</option>)}</select></label>}<p className="text-slate-400">No automatic overhang or assembly allowances. Review against drawings.</p>{generationError&&<p role="alert" className="text-amber-300">{generationError}</p>}<div className="flex gap-2"><button className="bg-sky-700 rounded p-2" onClick={()=>{try{const next=generateRectangularRoof(generationOutline[0],generationOutline[2],generationConfig,uuidv4);validateRoofTopology([...generationBase(),...next]);setGenerationPreview(next);setGenerationError('');}catch(err){setGenerationPreview(null);setGenerationError(err instanceof Error?err.message:String(err));}}}>Preview</button><button disabled={!generationPreview} className="bg-emerald-700 disabled:opacity-40 rounded p-2" onClick={()=>{try{if(generationPreview){const next=[...generationBase(),...generationPreview];validateRoofTopology(next);if(onRoofChange?.(next)){onSelect({type:'none'});onToolChange('select');}}}catch(err){setGenerationError(err instanceof Error?err.message:String(err));}}}>Apply</button><button className="bg-slate-700 rounded p-2" onClick={()=>onToolChange('select')}>Cancel</button></div></section>}
+      {generationOutline&&<section className="absolute top-20 left-4 z-20 bg-slate-900 border border-sky-600 rounded-lg p-4 text-xs space-y-3 w-64 shadow-xl"><h3 className="font-semibold text-sky-300">Generate Roof Skeleton</h3><p>Rectangular roof perimeter · preview only</p><label className="block">Configuration<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.type} onChange={e=>{setGenerationConfig(c=>({...c,type:e.target.value as RoofConfig['type']}));setGenerationPreview(null)}}>{['hip','gable','shed','flat'].map(t=><option key={t}>{t}</option>)}</select></label>{generationConfig.type!=='flat'&&<label className="block">Pitch rise per 12<input className="block w-full bg-slate-800 p-2 rounded" type="number" min="0.01" max="48" step="any" value={generationConfig.pitch} onChange={e=>{setGenerationConfig(c=>({...c,pitch:Number(e.target.value)}));setGenerationPreview(null)}}/></label>}{generationConfig.type==='gable'&&<label>Ridge orientation<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.ridge} onChange={e=>{setGenerationConfig(c=>({...c,ridge:e.target.value as RoofConfig['ridge']}));setGenerationPreview(null)}}><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>}{generationConfig.type==='shed'&&<label>Downslope direction<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.direction} onChange={e=>{setGenerationConfig(c=>({...c,direction:Number(e.target.value) as RoofConfig['direction']}));setGenerationPreview(null)}}>{[[0,'Right'],[90,'Down'],[180,'Left'],[270,'Up']].map(([v,n])=><option key={v} value={v}>{n}</option>)}</select></label>}<p className="text-slate-400">No automatic overhang or assembly allowances. Review against drawings.</p>{generationError&&<p role="alert" className="text-amber-300">{generationError}</p>}<div className="flex gap-2"><button className="bg-sky-700 rounded p-2" onClick={()=>{try{const next=generateRectangularRoof(generationOutline[0],generationOutline[2],generationConfig,uuidv4);validateRoofTopology([...generationBase(),...next]);setGenerationPreview(next);setGenerationError('');}catch(err){setGenerationPreview(null);setGenerationError(err instanceof Error?err.message:String(err));}}}>Preview</button><button disabled={!generationPreview} className="bg-emerald-700 disabled:opacity-40 rounded p-2" onClick={()=>{try{if(generationPreview){const next=[...generationBase(),...generationPreview];validateRoofTopology(next);if(onRoofChange?.(next)){setCorrection(null);onSelect({type:'none'});onToolChange('select');}}}catch(err){setGenerationError(err instanceof Error?err.message:String(err));}}}>Apply</button><button className="bg-slate-700 rounded p-2" onClick={()=>{setCorrection(null);onToolChange('select')}}>Cancel</button></div></section>}
       <form className="absolute bottom-4 right-4 z-20 bg-slate-900 border border-slate-700 rounded p-2 text-xs shadow-xl" onSubmit={e=>{e.preventDefault();commitDimensions()}}>
         <label className="flex items-center gap-2">Dimensions ({state.settings.unitSystem==='metric'?'m':'ft'})
           <input aria-label="Dimensions" className="w-36 bg-slate-800 border rounded p-1" placeholder={(recent?.rectangle??rectangularDraft)?'Width,depth':'Length'} value={dimensionA} disabled={!recent&&!dimensionStart} onFocus={()=>{if(!draftDirection.current&&dimensionToward)draftDirection.current={...dimensionToward};}} onChange={e=>setDimensionA(e.target.value)}/>
