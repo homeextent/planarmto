@@ -1,6 +1,6 @@
 import type { FloorplanState } from '../types';
 import { createBlankProject } from './samplePlans';
-import { readProjectDocument, replaceWorkspaceGeometry, serializeProjectDocument } from './projectDocument';
+import { commitWorkspaceRenderView, readProjectDocument, replaceWorkspaceGeometry, serializeProjectDocument } from './projectDocument';
 import type { ProjectDocument, WorkspaceType } from './projectDocument';
 
 export const PROJECT_CHARACTER_BUDGET = 4_000_000;
@@ -58,4 +58,11 @@ export function setScopeAssignment(doc: ProjectDocument, kind: import('./project
 export function replaceSpecialistEntities(doc: ProjectDocument, id: string, measurements: import('./measurements/measurementTypes').SpecialistEntity[]): ProjectDocument {
   if(doc.activeWorkspaceId!==id) throw new Error('Inactive specialist workspace edit.');
   return readProjectDocument({...doc,workspaces:doc.workspaces.map(w=>w.id===id?{...w,measurements}:w)});
+}
+
+export type WorkspaceSnapshot={view:FloorplanState;measurements:import('./measurements/measurementTypes').SpecialistEntity[]};
+export function restoreWorkspaceSnapshot(doc:ProjectDocument,id:string,snapshot:WorkspaceSnapshot):ProjectDocument {
+ if(doc.activeWorkspaceId!==id)throw Error('Inactive workspace history edit');
+ const updated=commitWorkspaceRenderView(doc,id,{...snapshot.view,settings:doc.settings,activeProjectId:doc.activeProjectId,activeProjectName:doc.activeProjectName});
+ return replaceSpecialistEntities(updated,id,snapshot.measurements);
 }
