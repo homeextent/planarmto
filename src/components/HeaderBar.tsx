@@ -196,11 +196,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    // A new import supersedes any previous PDF or image request and notification.
+    cancelPdf();
+    setPdfNotice('');
+    const token = request.current;
+    const origin = latestState.current;
     if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
-      cancelPdf();
-      setPdfNotice('');
-      const token = request.current;
-      const origin = latestState.current;
       setPdfBusy(true);
       try {
         const { openBlueprintPdf } = await import('../utils/pdfUnderlayImporter');
@@ -217,15 +218,27 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       return;
     }
 
+    const reportImageError = () => {
+      if (token === request.current) setPdfError('Unable to import image. Choose a valid image file and retry.');
+    };
     const reader = new FileReader();
+    reader.onerror = reportImageError;
     reader.onload = (event) => {
+      if (token !== request.current) return;
       const src = event.target?.result as string;
       const img = new Image();
+      img.onerror = reportImageError;
       img.onload = () => {
-        // ONLY run when user uploads a new file from file picker:
+        if (token !== request.current) return;
+        if (latestState.current !== origin) {
+          setPdfError('Project changed during import. Import again.');
+          return;
+        }
         const defaultFpp = 50 / img.naturalWidth;
+        setPdfError('');
+        setPdfNotice('');
         onChange({
-          ...state,
+          ...origin,
           underlay: {
             src,
             url: src,
