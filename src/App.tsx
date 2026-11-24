@@ -736,6 +736,7 @@ function AppContent() {
           key={workspaceEpoch}
           roofEntities={roofEntities}
           onRoofChange={handleRoofChange}
+          commitDraftPlacement={commitDraftPlacement}
           state={state}
           onChange={handleStateChange}
           activeTool={activeTool}
