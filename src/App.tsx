@@ -37,9 +37,9 @@ import { GlobalProjectSettingsModal } from './components/GlobalProjectSettingsMo
 import { ProjectDirectoryModal } from './components/ProjectDirectoryModal';
 
 import { RoofToolbar, RoofInspector } from './components/RoofWorkspace';
-import type { RoofEntity, SpecialistEntity } from './engine/measurements/measurementTypes';
+import type { RoofEntity } from './engine/measurements/measurementTypes';
 import { validateRoofTopology } from './engine/measurements/roofMeasurements';
-import { replaceSpecialistEntities } from './engine/workspaceController';
+import { replaceSpecialistEntities, restoreWorkspaceSnapshot } from './engine/workspaceController';
 import { WorkspaceBar } from './components/WorkspaceBar';
 import { createProjectDocument, workspaceRenderView, commitWorkspaceRenderView, serializeProjectDocument } from './engine/projectDocument';
 import type { ProjectDocument, WorkspaceType } from './engine/projectDocument';
@@ -54,7 +54,7 @@ export default function App() {
   );
 }
 
-type WorkspaceSnapshot = { view: FloorplanState; measurements: SpecialistEntity[] };
+import type { WorkspaceSnapshot } from './engine/workspaceController';
 function AppContent() {
   const { saveSnapSetting, previousSnapSetting, clearSnapSetting } = useProject();
   // Project State initialized with a clean blank canvas
@@ -189,8 +189,7 @@ function AppContent() {
   },[document,activeWorkspace,state]);
   const restoreSnapshot = (snapshot:WorkspaceSnapshot) => {
     const doc=currentDocument.current;
-    const updated=commitWorkspaceRenderView(doc,doc.activeWorkspaceId,{...snapshot.view,settings:doc.settings,activeProjectId:doc.activeProjectId,activeProjectName:doc.activeProjectName});
-    const next=replaceSpecialistEntities(updated,doc.activeWorkspaceId,snapshot.measurements);
+    const next=restoreWorkspaceSnapshot(doc,doc.activeWorkspaceId,snapshot);
     currentDocument.current=next;setDocument(next);setIsDirty(true);setSelection({type:'none'});
   };
   const handleUndo = useCallback(() => {
