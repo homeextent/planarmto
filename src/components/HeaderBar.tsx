@@ -36,6 +36,9 @@ const PdfSheetPickerModal = lazy(() => import('./PdfSheetPickerModal').then(m =>
 
 interface HeaderBarProps {
   state: FloorplanState;
+  projectJson: () => string;
+  onLoadDocument: (value: unknown) => void;
+  validateBlueprint: (next: FloorplanState) => void;
   onChange: (newState: FloorplanState) => void;
   canUndo: boolean;
   canRedo: boolean;
@@ -56,6 +59,9 @@ interface HeaderBarProps {
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
   state,
+  projectJson,
+  onLoadDocument,
+  validateBlueprint,
   onChange,
   canUndo,
   canRedo,
@@ -103,11 +109,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
         feetPerPixel: 50 / result.width, opacity: .5, isLocked: false, isVisible: true,
         pdfSource: { filename, page, width: result.width, height: result.height },
       }};
-      const encoded = JSON.stringify(next);
-      if (encoded.length > 2_000_000) throw new Error('Project exceeds the conservative import storage budget. Try a lower resolution.');
-      const probe = '__planarmto_pdf_import_probe__';
-      try { localStorage.setItem(probe, encoded); } catch { throw new Error('Insufficient local storage for this blueprint. Free storage or try a lower resolution.'); }
-      finally { localStorage.removeItem(probe); }
+      validateBlueprint(next);
       onChange(next);
       cancelPdf();
       setPdfNotice('PDF page ' + page + ' imported at ' + result.width + ' × ' + result.height + ' px' + (Math.max(result.width, result.height) < edge - 1 ? ' (optimized to fit storage or pixel limits).' : '.'));
@@ -152,6 +154,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       baseState = createBlankProject();
     }
 
+    const token = ++request.current;
+    const origin = latestState.current;
     const hydratedSettings = await hydrateSettingsWithBranding(
       baseState.settings,
       templateName === 'blank'
@@ -159,14 +163,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
         : undefined
     );
 
-    onChange({
-      ...baseState,
-      settings: hydratedSettings,
-    });
+    if (token !== request.current || latestState.current !== origin) return;
+    onLoadDocument({ ...baseState, settings: hydratedSettings });
   };
 
   const handleSaveJson = () => {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(state, null, 2));
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(projectJson());
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
     downloadAnchor.setAttribute('download', `${state.activeProjectName || 'Project'}_${Date.now()}.json`);
@@ -178,15 +180,17 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   const handleLoadJson = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.target.value = '';
+    const token = ++request.current;
+    const origin = latestState.current;
     const reader = new FileReader();
     reader.onload = (event) => {
+      if (token !== request.current || latestState.current !== origin) return;
       try {
         const parsed = JSON.parse(event.target?.result as string);
-        if (parsed.nodes && parsed.walls) {
-          onChange(parsed);
-        }
+        onLoadDocument(parsed);
       } catch (err) {
-        console.error('Failed to parse floorplan JSON', err);
+        alert('Project import failed: ' + (err instanceof Error ? err.message : String(err)));
       }
     };
     reader.readAsText(file);
@@ -237,11 +241,10 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
         const defaultFpp = 50 / img.naturalWidth;
         setPdfError('');
         setPdfNotice('');
-        onChange({
+        const next: FloorplanState = {
           ...origin,
           underlay: {
             src,
-            url: src,
             worldX: 0,
             worldY: 0,
             feetPerPixel: defaultFpp,
@@ -249,7 +252,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             isLocked: false,
             isVisible: true,
           },
-        });
+        };
+        try { validateBlueprint(next); onChange(next); }
+        catch (err) { setPdfError(err instanceof Error ? err.message : String(err)); }
       };
       img.src = src;
     };
