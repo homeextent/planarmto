@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBlankProject } from '../src/engine/samplePlans';
-import { createProjectDocument, workspaceFloorplan, deserializeProjectDocument } from '../src/engine/projectDocument';
+import { createProjectDocument, workspaceFloorplan, workspaceRenderView, commitWorkspaceRenderView, deserializeProjectDocument, serializeProjectDocument } from '../src/engine/projectDocument';
 import { addWorkspace, selectWorkspace, renameWorkspace, moveWorkspace, removeWorkspace, updateWorkspaceView, normalizeProjectInput, canReportLegacyEstimate, validateProjectBudget, validateBlueprintBudget } from '../src/engine/workspaceController';
 
 const fresh = () => createProjectDocument(createBlankProject(), 'floor');
@@ -59,4 +59,40 @@ test('complete-project budget accepts three 800KB rasters and rejects overflow',
   }
   const large=workspaceFloorplan(doc); large.underlay=blueprint(850001);
   assert.throws(()=>validateBlueprintBudget(doc,doc.activeWorkspaceId,large),/Blueprint exceeds/);
+});
+
+test('interactive edits retain inactive workspace and unchanged collection references', () => {
+  const doc = addWorkspace(fresh(), 'upper', 'Upper', 'floor');
+  const view = workspaceRenderView(doc);
+  const next = commitWorkspaceRenderView(doc,'upper',{...view,nodes:[{id:'n',x:2,y:3}]},false);
+  assert.equal(next.workspaces[0],doc.workspaces[0]);
+  assert.equal(next.workspaces[1].geometry.walls,view.walls);
+  assert.equal(next.settings,doc.settings);
+  assert.equal(doc.workspaces[1].geometry.nodes.length,0);
+  assert.equal(next.workspaces[1].geometry.nodes.length,1);
+  const finished = commitWorkspaceRenderView(next,'upper',workspaceRenderView(next));
+  assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(finished)),finished);
+  assert.throws(()=>commitWorkspaceRenderView(next,'floor',view),/inactive workspace/);
+});
+test('transient invalid geometry cannot cross commit or persistence boundary', () => {
+  const doc = fresh();
+  const view = workspaceRenderView(doc);
+  const invalid = {...view,nodes:[{id:'bad',x:NaN,y:0}]};
+  const transient = commitWorkspaceRenderView(doc,'floor',invalid,false);
+  assert.throws(()=>commitWorkspaceRenderView(transient,'floor',invalid),/invalid node coordinates/);
+  assert.throws(()=>serializeProjectDocument(transient),/invalid node coordinates/);
+  assert.throws(()=>commitWorkspaceRenderView(doc,'floor',{...view,settings:{...view.settings,profitPercentage:NaN}}),/invalid setting/);
+  assert.throws(()=>commitWorkspaceRenderView(doc,'floor',{...view,activeProjectId:'other'}),/different project/);
+});
+test('shared settings and rates follow workspace selection while detached views remain isolated', () => {
+  const doc = addWorkspace(fresh(),'roof','Roof','roof');
+  const view = workspaceRenderView(doc);
+  const rates = {...view.settings.costRates, syntheticRate: 42} as NonNullable<typeof view.settings.costRates>;
+  const next = commitWorkspaceRenderView(doc,'roof',{...view,settings:{...view.settings,profitPercentage:19,costRates:rates}});
+  const floor = workspaceRenderView(selectWorkspace(next,'floor'));
+  assert.equal(floor.settings.profitPercentage,19);
+  assert.equal(floor.settings.costRates,rates);
+  assert.notEqual(workspaceFloorplan(next,'floor').settings,next.settings);
+  assert.notEqual(doc.settings,next.settings);
+  assert.equal(canReportLegacyEstimate(next),false);
 });
