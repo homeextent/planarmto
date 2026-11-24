@@ -94,6 +94,29 @@ for key,value in expected['state'].items():
 assert actual.keys()==expected['state'].keys(), 'Unexpected project state fields'
 print('Project state round trip verified.')
 PY
+# Multi-workspace HTTP payload: three independent 800 KB synthetic rasters.
+python3 - "$tmp/project.json" "$tmp/multi.json" <<'PY'
+import json,sys,copy
+old=json.load(open(sys.argv[1]))['state']
+workspaces=[]
+for i,kind in enumerate(['floor','floor','roof']):
+    u=copy.deepcopy(old['underlay'])
+    u['feetPerPixel']=0.01*(i+1)
+    g={'nodes':[],'walls':[],'apertures':[],'stamps':[],'rooms':[],'decks':[],'hardscapes':[],'underlay':u}
+    workspaces.append({'id':str(i),'name':'Workspace '+str(i),'type':kind,'geometry':g})
+state={'schemaVersion':2,'activeProjectId':'ci-multi','activeProjectName':'Multi','settings':old['settings'],'activeWorkspaceId':'2','workspaces':workspaces,'scope':{'mode':'explicit','assignments':{k:{'status':'unquantified'} for k in ['roof','foundation','site']}}}
+json.dump({'id':'ci-multi','name':'Multi','state':state},open(sys.argv[2],'w'))
+PY
+test "$(post "$tmp/multi.json" "$tmp/multi-save.json")" = 200
+python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["success"] is True' "$tmp/multi-save.json"
+curl -fsS -b "$tmp/cookies" -H "X-WP-Nonce: $nonce" "$rest" > "$tmp/multi-projects.json"
+python3 - "$tmp/multi.json" "$tmp/multi-projects.json" <<'PY'
+import json,sys
+expected=json.load(open(sys.argv[1]))
+actual=next(p for p in json.load(open(sys.argv[2])) if p['id']==expected['id'])
+assert actual['state']==expected['state'], 'Typed project state mismatch'
+print('Three-workspace HTTP/database round trip verified.')
+PY
 # Force a real database write error by renaming the disposable table.
 docker exec "$db" mariadb -uwordpress -pci-db-only wordpress -e 'RENAME TABLE wp_planarmto_projects TO wp_planarmto_projects_disabled'
 test "$(post "$tmp/project.json" "$tmp/failure.json")" = 500
