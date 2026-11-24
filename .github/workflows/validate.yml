@@ -38,6 +38,10 @@ jobs:
         run: php -l planar-mto.php
       - name: Verify bundled PDF worker
         run: |
-          test -n "$(find dist/assets -type f -name 'pdf.worker*.mjs' -print -quit)"
+          worker=$(find dist/assets -type f -name 'pdf.worker*.js' -print -quit)
+          test -n "$worker"
+          test -z "$(find dist/assets -type f -name 'pdf.worker*.mjs' -print -quit)"
+          grep -lF "$(basename "$worker")" dist/assets/pdfUnderlayImporter-*.js
+          cmp node_modules/pdfjs-dist/build/pdf.worker.min.mjs "$worker"
       - name: Isolated WordPress integration
         run: bash tests/wordpress-integration.sh
