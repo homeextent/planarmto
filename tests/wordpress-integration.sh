@@ -34,8 +34,9 @@ wpcli() {
   docker run --rm --network "$network" --volumes-from "$wp" \
     -e WORDPRESS_DB_HOST="$db" -e WORDPRESS_DB_NAME=wordpress \
     -e WORDPRESS_DB_USER=wordpress -e WORDPRESS_DB_PASSWORD=ci-db-only \
-    "$cli_image" "$@"
+    "${cli_image}" wp "$@"
 }
+echo 'Initializing disposable WordPress via WP-CLI'
 wpcli core install --url="$base" --title=PlanarMTO-CI --admin_user=ciadmin \
   --admin_password=ci-admin-only-123 --admin_email=ci@example.invalid --skip-email
 docker exec "$wp" mkdir -p /var/www/html/wp-content/plugins/planarmto
