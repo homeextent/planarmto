@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { FloorplanState } from '../types';
+import { normalizeProjectInput, canReportLegacyEstimate } from '../engine/workspaceController';
+import type { StoredProjectState } from '../utils/storage';
 import {
   SavedProjectEntry,
   getSavedProjects,
@@ -34,8 +35,8 @@ import {
 interface ProjectDirectoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentState: FloorplanState;
-  onLoadProject: (state: FloorplanState, projectName?: string) => void;
+  currentState: StoredProjectState;
+  onLoadProject: (state: StoredProjectState, projectName?: string) => void;
   onNewBlankProject: () => void;
 }
 
@@ -55,7 +56,7 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
   const [saveAsModalOpen, setSaveAsModalOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectRef, setNewProjectRef] = useState('');
-  const [autoSaveItem, setAutoSaveItem] = useState<{ timestamp: number; state: FloorplanState } | null>(null);
+  const [autoSaveItem, setAutoSaveItem] = useState<{ timestamp: number; state: StoredProjectState } | null>(null);
 
   // Reload projects list on open
   useEffect(() => {
@@ -72,7 +73,8 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
               : 'Custom Architectural Project'
           );
           setNewProjectRef(currentState.settings.companyBranding?.projectNumber || `PRJ-${new Date().getFullYear()}-MTO`);
-        } finally {
+        } catch (err) { alert('Unable to load project directory: ' + (err instanceof Error ? err.message : String(err))); }
+        finally {
           setIsLoading(false);
         }
       }
@@ -110,7 +112,7 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
 
     setIsLoading(true);
     try {
-      const updatedState: FloorplanState = {
+      const updatedState: StoredProjectState = {
         ...currentState,
         settings: {
           ...currentState.settings,
@@ -122,6 +124,7 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
       };
 
       await saveProjectToDirectory(newProjectName.trim(), updatedState, {
+        id: crypto.randomUUID(),
         projectNumber: newProjectRef.trim(),
       });
 
@@ -151,7 +154,7 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
   const handleDuplicate = async (project: SavedProjectEntry) => {
     setIsLoading(true);
     try {
-      await saveProjectToDirectory(`${project.name} (Copy)`, project.state);
+      await saveProjectToDirectory(`${project.name} (Copy)`, normalizeProjectInput(project.state), { id: crypto.randomUUID() });
       const updated = await getSavedProjects();
       setProjects(updated);
     } catch (err) {
@@ -214,8 +217,8 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
         if (Array.isArray(parsed)) {
           for (const item of parsed) {
             if (item.name && item.state) {
-              await saveProjectToDirectory(item.name, item.state, {
-                id: item.id,
+              await saveProjectToDirectory(item.name, normalizeProjectInput(item.state), {
+                id: crypto.randomUUID(),
                 projectNumber: item.projectNumber,
                 description: item.description,
               });
@@ -223,14 +226,14 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
           }
           const updated = await getSavedProjects();
           setProjects(updated);
-        } else if (parsed.nodes && parsed.walls) {
-          // Single project file
-          await saveProjectToDirectory('Imported Project', parsed);
+        } else {
+          const document = normalizeProjectInput(parsed);
+          await saveProjectToDirectory(document.activeProjectName, document, { id: crypto.randomUUID() });
           const updated = await getSavedProjects();
           setProjects(updated);
         }
       } catch (err) {
-        console.error('Failed to import projects archive:', err);
+        alert('Project import failed: ' + (err instanceof Error ? err.message : String(err)));
       } finally {
         setIsLoading(false);
       }
@@ -512,13 +515,13 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
                           <div className="text-[10px] uppercase font-bold text-slate-500">Area</div>
                           <div className="font-mono font-bold text-slate-200 flex items-center gap-1 mt-0.5">
                             <Ruler className="w-3 h-3 text-emerald-400" />
-                            {project.grossSf} SF
+                            {'schemaVersion' in project.state && !canReportLegacyEstimate(project.state) ? 'Pending C' : project.grossSf + ' SF'}
                           </div>
                         </div>
                         <div>
                           <div className="text-[10px] uppercase font-bold text-slate-500">Total Est.</div>
                           <div className="font-mono font-bold text-emerald-400 truncate mt-0.5">
-                            ${project.estimatedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            {'schemaVersion' in project.state && !canReportLegacyEstimate(project.state) ? 'Not quantified' : '$' + project.estimatedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                           </div>
                         </div>
                       </div>
@@ -527,7 +530,7 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
                     {/* Open Button */}
                     <button
                       onClick={() => {
-                        onLoadProject(project.state, project.name);
+                        onLoadProject({ ...project.state, activeProjectId: String(project.id), activeProjectName: project.name }, project.name);
                         onClose();
                       }}
                       className="w-full py-2 bg-slate-800 hover:bg-sky-600 text-slate-200 hover:text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 hover:border-sky-500 cursor-pointer transition-all shadow-sm"

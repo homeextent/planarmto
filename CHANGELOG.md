@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 
+## [Unreleased] — Increment B (staging only)
+
+### Added
+- B.1 canonical schema v2, typed optional workspaces and explicit scope ownership; B.2 workspace management, independent geometry/calibration/history, shared rates, full-document save/export/import and session recovery.
+### Fixed
+- Clean startup hydration, recovery preservation, structural sharing in CAD updates and removal of unused cost calculations for unquantified typed projects.
+### Validation
+- B.1 PR #6 accepted; B.2 PR #7 candidate `5d821f7` passed CI #29 (run 45447983433), 29/29 tests, audit and three-workspace WordPress round trip. Owner passed 10/10 functional corrective checks; reported no cursor lag after matching displays near 60 Hz. Owner authorized proceeding; sustained and controlled baseline performance measurement not independently established. No production promotion; specialist takeoff and consolidation remain Increment C.
+
 ## [2.15.1] - 2026-11-24 — Production compatibility hotfix
 
 ### Fixed

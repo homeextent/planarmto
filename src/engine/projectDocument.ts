@@ -201,3 +201,25 @@ export function serializeProjectDocument(document: ProjectDocument): string {
 export function deserializeProjectDocument(json: string): ProjectDocument {
   return readProjectDocument(JSON.parse(json));
 }
+
+/** Internal React adapter. CAD callers must treat collections as immutable, just as in the
+ * original single-canvas state. Detached public adapter remains available for external callers. */
+export function workspaceRenderView(document: ProjectDocument): FloorplanState {
+  const w = document.workspaces.find(w => w.id === document.activeWorkspaceId);
+  requireValue(w, 'workspace not found');
+  return { ...w.geometry, activeProjectId: document.activeProjectId,
+    activeProjectName: document.activeProjectName, settings: document.settings };
+}
+
+/** Trusted immutable CAD updates: retain references for untouched collections and workspaces.
+ * Full structural validation remains mandatory at import, committed edit and storage boundaries. */
+export function commitWorkspaceRenderView(document: ProjectDocument, workspaceId: string,
+    state: FloorplanState, validate = true): ProjectDocument {
+  requireValue(document.activeWorkspaceId === workspaceId, 'inactive workspace edit');
+  requireValue(state.activeProjectId === document.activeProjectId && state.activeProjectName === document.activeProjectName,
+    'workspace edit belongs to a different project');
+  const { activeProjectId, activeProjectName, settings, ...geometry } = state;
+  if (validate) { validateGeometry(geometry); validateSettings(settings); }
+  return { ...document, settings, workspaces: document.workspaces.map(w =>
+    w.id === workspaceId ? { ...w, geometry } : w) };
+}

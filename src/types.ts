@@ -483,6 +483,7 @@ export interface ProjectSettings {
   roofPitchScale: number; // e.g. 4 (for 4:12 pitch -> sqrt(1 + (4/12)^2) = 1.054)
   roofOverhangInches: number; // e.g. 18 inches
   studSpacingInches: 16 | 24; // 16" or 24" O.C.
+  gridSnap?: boolean; // Optional for legacy projects
   gridSnapSize: number; // 0.5 ft (6") or 1.0 ft
   angleSnapIncrement: number; // 15, 45, or 90 degrees
   orthoMode: boolean;

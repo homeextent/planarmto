@@ -61,7 +61,7 @@ test('guest project round trip preserves PDF calibration and source metadata', a
   await saveProjectToDirectory(state.activeProjectName, state);
   const projects = await getSavedProjects();
   assert.equal(projects.length, 1);
-  assert.deepEqual(projects[0].state.underlay, state.underlay);
+  assert.deepEqual(('schemaVersion' in projects[0].state ? undefined : projects[0].state.underlay), state.underlay);
   assert.equal(JSON.parse(values.get(directoryKey)!)[0].state, undefined);
 });
 
@@ -122,13 +122,90 @@ test('authenticated save and reload preserve PDF data without duplicate src/url'
     if (options?.method === 'POST') {
       saved = JSON.parse(String(options.body));
       assert.equal(saved.id, state.activeProjectId);
-      assert.deepEqual(saved.state.underlay, state.underlay);
+      assert.deepEqual(('schemaVersion' in saved.state ? undefined : saved.state.underlay), state.underlay);
       return new Response(JSON.stringify({ success: true }));
     }
     return new Response(JSON.stringify([saved]));
   };
   await saveProjectToDirectory('Test', state);
   const [project] = await getSavedProjects();
-  assert.deepEqual(project.state.underlay, state.underlay);
+  assert.deepEqual(('schemaVersion' in project.state ? undefined : project.state.underlay), state.underlay);
   assert.equal(values.size, 0);
+});
+
+test('typed project persists all workspaces and independent copies', async () => {
+  const { normalizeProjectInput, addWorkspace, updateWorkspaceView } = await import('../src/engine/workspaceController');
+  const { workspaceFloorplan } = await import('../src/engine/projectDocument');
+  let doc = normalizeProjectInput(fixture());
+  doc = addWorkspace(doc,'roof','Roof','roof');
+  const view = workspaceFloorplan(doc);
+  view.underlay = { ...fixture().underlay, feetPerPixel: .025 };
+  doc = updateWorkspaceView(doc,'roof',view);
+  const saved = await saveProjectToDirectory('Original',doc);
+  const copy = await saveProjectToDirectory('Copy',doc,{id:'copy'});
+  assert.equal(saved.estimatedTotal,0);
+  assert.notEqual(saved.id,copy.id);
+  const projects = await getSavedProjects();
+  assert.equal(projects.length,2);
+  for(const p of projects) {
+    assert.equal('schemaVersion' in p.state,true);
+    const restored = normalizeProjectInput(p.state);
+    assert.equal(restored.workspaces.length,2);
+    assert.equal(workspaceFloorplan(restored,'roof').underlay?.feetPerPixel,.025);
+    assert.equal(restored.activeProjectId,String(p.id));
+  }
+  saveAutoSaveState(doc);
+  assert.deepEqual(getAutoSaveState()?.state,doc);
+  assert.ok(JSON.parse(values.get(directoryKey)!).every((p:any)=>!p.state));
+});
+test('typed authenticated project round trip retains all workspaces', async () => {
+  const { normalizeProjectInput, addWorkspace } = await import('../src/engine/workspaceController');
+  configureUser(12);
+  const doc = addWorkspace(normalizeProjectInput(fixture()),'roof','Roof','roof');
+  let saved:any;
+  globalThis.fetch = async (_url,options) => {
+    if(options?.method==='POST') {
+      saved=JSON.parse(String(options.body));
+      return new Response(JSON.stringify({success:true}));
+    }
+    return new Response(JSON.stringify([saved]));
+  };
+  await saveProjectToDirectory('Original',doc);
+  const [restored] = await getSavedProjects();
+  assert.deepEqual(restored.state,{...doc,activeProjectName:'Original'});
+  assert.equal(values.size,0);
+});
+test('unreadable directory cannot silently overwrite existing records', async () => {
+  values.set(directoryKey,'invalid JSON');
+  await assert.rejects(saveProjectToDirectory('Test',fixture()),/Unable to read saved projects directory/);
+  assert.equal(values.get(directoryKey),'invalid JSON');
+  assert.equal(values.has(payloadKey),false);
+});
+test('authenticated directory read failure does not fall back to guest data', async () => {
+  configureUser(12);
+  globalThis.fetch = async () => new Response(JSON.stringify({message:'Denied'}),{status:403});
+  await assert.rejects(getSavedProjects(),/Unable to read authenticated projects/);
+});
+
+test('typed recovery rejects invalid geometry without replacing previous valid draft', async () => {
+  const { normalizeProjectInput, addWorkspace } = await import('../src/engine/workspaceController');
+  const { workspaceRenderView, commitWorkspaceRenderView } = await import('../src/engine/projectDocument');
+  const doc = addWorkspace(normalizeProjectInput(fixture()),'roof','Roof','roof');
+  saveAutoSaveState(doc);
+  const previous = values.get(autoKey);
+  const view = workspaceRenderView(doc);
+  const invalid = commitWorkspaceRenderView(doc,'roof',{...view,nodes:[{id:'bad',x:NaN,y:0}]},false);
+  assert.throws(()=>saveAutoSaveState(invalid),/Automatic recovery/);
+  assert.equal(values.get(autoKey),previous);
+  assert.deepEqual(getAutoSaveState()?.state,doc);
+});
+test('typed recovery quota failure preserves previous complete multi-workspace document', async () => {
+  const { normalizeProjectInput, addWorkspace } = await import('../src/engine/workspaceController');
+  const doc = addWorkspace(normalizeProjectInput(fixture()),'roof','Roof','roof');
+  saveAutoSaveState(doc);
+  const previous = values.get(autoKey);
+  failKey = autoKey;
+  assert.throws(()=>saveAutoSaveState({...doc,activeProjectName:'Changed'}),/Automatic recovery/);
+  assert.equal(values.get(autoKey),previous);
+  assert.deepEqual(getAutoSaveState()?.state,doc);
 });
