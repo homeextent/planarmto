@@ -7,12 +7,18 @@ export const segmentDistance=(p:Point,a:Point,b:Point)=>{
  const q={x:a.x+t*dx,y:a.y+t*dy};return {point:q,distance:Math.hypot(p.x-q.x,p.y-q.y)};
 };
 const segments=(p:Point[])=>p.map((a,i)=>[a,p[(i+1)%p.length]] as const);
-export function snapRoofPoint(p:Point,entities:RoofEntity[],tolerance:number,grid:number|null):Point {
+export type RoofSnap={point:Point;type:'node'|'edge'|'grid'|'free'};
+export function roofSnap(p:Point,entities:RoofEntity[],tolerance:number,grid:number|null,locked?:RoofSnap|null,breakout=tolerance*2,eligible:(q:Point)=>boolean=()=>true):RoofSnap {
+ if(locked&&locked.type==='node'&&eligible(locked.point)&&Math.hypot(p.x-locked.point.x,p.y-locked.point.y)<=breakout)return locked;
  let best:Point|null=null,d=tolerance;
- for(const e of entities)for(const q of roofPoints(e)){const n=Math.hypot(p.x-q.x,p.y-q.y);if(n<=d){d=n;best=q}}
- if(best)return {...best};
- for(const e of entities)for(const [a,b] of ('polygon' in e?segments(e.polygon):[[e.start,e.end]])){const q=segmentDistance(p,a,b);if(q.distance<=d){d=q.distance;best=q.point}}
- return best?{...best}:grid&&grid>0?{x:Math.round(p.x/grid)*grid,y:Math.round(p.y/grid)*grid}:p;
+ for(const e of entities)for(const q of roofPoints(e)){const n=Math.hypot(p.x-q.x,p.y-q.y);if(eligible(q)&&n<=d){d=n;best=q}}
+ if(best)return {point:{...best},type:'node'};
+ for(const e of entities)for(const [a,b] of ('polygon' in e?segments(e.polygon):[[e.start,e.end]])){const q=segmentDistance(p,a,b);if(eligible(q.point)&&q.distance<=d){d=q.distance;best=q.point}}
+ if(best)return {point:{...best},type:'edge'};
+ return grid&&grid>0?{point:{x:Math.round(p.x/grid)*grid,y:Math.round(p.y/grid)*grid},type:'grid'}:{point:p,type:'free'};
+}
+export function snapRoofPoint(p:Point,entities:RoofEntity[],tolerance:number,grid:number|null):Point {
+ return roofSnap(p,entities,tolerance,grid).point;
 }
 export function boundaryAt(p:Point,entities:RoofEntity[],tolerance:number){
  let best:{start:Point;end:Point;distance:number}|undefined;
