@@ -149,8 +149,8 @@ For standalone web hosting or local development:
 - **Data Persistence**: Browser localStorage with JSON export/import
 
 
-## PDF blueprint import (Increment A — validated release candidate)
+## PDF blueprint import (Increment A — v2.15.0)
 
 Import a PDF via **Import Blueprint**; single-page files bypass the picker, while multi-page files show paginated thumbnails. Choose a sheet and a target longest edge (3,400 / 5,000 / 6,000 pixels). The browser rasterizes and optimizes the selected sheet locally, displays the actual dimensions, and uses the existing two-point calibration workflow. New PDF and image underlays default to 50% opacity; saved opacity is preserved. One underlay is supported per project; independent floor workspaces and consolidated level-aware MTO are future increments. See [validation and deployment notes](docs/pdf-blueprint-import.md).
 
-GitHub Actions run 45398914590 at ce1025645d06538d208bb07fe5c7abfd01edc5a0 passed TypeScript, build, dependency audit, PHP syntax, eight persistence regressions and disposable WordPress/MariaDB integration (authenticated REST round trip, guest isolation, forced DB write failure, worker JavaScript MIME and byte equality). Staging integration and separately authorized production release remain pending; verify browser PDF import and persistence on SiteGround after deployment.
+GitHub Actions run 45398914590 at ce1025645d06538d208bb07fe5c7abfd01edc5a0 passed TypeScript, build, dependency audit, PHP syntax, eight persistence regressions and disposable WordPress/MariaDB integration (authenticated REST round trip, guest isolation, forced DB write failure, worker JavaScript MIME and byte equality). Staging commit 7ab225a passed post-merge CI run 45400095850. The owner authorized the v2.15.0 production release on 2026-11-24; deployment and SiteGround browser import and persistence smoke tests remain pending.
