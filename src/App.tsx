@@ -164,6 +164,29 @@ function AppContent() {
     return () => clearTimeout(timer);
   }, [document, isDirty, recovery]);
 
+  // The exact immutable document produced by placement is the correction lease.
+  const placementRef = useRef<{ token: string; document: typeof document } | null>(null);
+  const commitDraftPlacement = (token: string, next: FloorplanState | RoofEntity[], replace = false): boolean => {
+    if(currentDocument.current!==document)return false;
+    const prior=placementRef.current;
+    if(replace&&(!prior||prior.token!==token||prior.document!==document))return false;
+    try {
+      let updated: typeof document;
+      if(Array.isArray(next)){
+        if(activeWorkspace.type!=='roof')return false;
+        validateRoofTopology(next);
+        updated=replaceSpecialistEntities(document,activeWorkspace.id,next);
+      }else{
+        if(activeWorkspace.type!=='floor')return false;
+        updated=commitWorkspaceRenderView(document,activeWorkspace.id,{...next,settings:document.settings},true);
+      }
+      if(!replace)setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements}]);
+      setRedoStack([]);
+      currentDocument.current=updated;placementRef.current={token,document:updated};
+      setDocument(updated);setIsDirty(true);setStorageWarning('');return true;
+    }catch(err){setStorageWarning(err instanceof Error?err.message:String(err));return false;}
+  };
+
   // Update State with Undo history tracking
   const handleStateChange = useCallback((newState: FloorplanState, pushHistory = true, historicalSnapshot?: FloorplanState) => {
     if (currentDocument.current.activeWorkspaceId !== document.activeWorkspaceId || currentDocument.current !== document) return;
@@ -650,7 +673,7 @@ function AppContent() {
       }
     }
     setActiveTool(tool);
-    if (tool !== 'select' && tool !== 'roof_opening' && tool !== 'roof_vertex') {
+    if (tool !== 'select' && tool !== 'roof_opening' && tool !== 'roof_vertex' && tool !== 'roof_generate') {
       setSelection({ type: 'none' });
     }
   }, [activeTool, state.settings, handleUpdateSettings, previousSnapSetting, saveSnapSetting, clearSnapSetting]);
