@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 
-## [Unreleased] — PDF blueprint import (Increment A)
+## [2.15.0] - 2026-11-24 — PDF blueprint import (Increment A)
 
 ### Added
 - Client-side PDF.js import, paginated sheet picker, adaptive raster encoding and resolution optimization, source metadata and actual resolution notification.
@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Validation
 - Owner accepted local PDF import, calibration, drafting, persistence, default opacity and unchanged MTO.
 - GitHub Actions run 45398914590 at ce10256 passed all eight persistence regressions, build, audit, PHP syntax and isolated WordPress REST/database/worker delivery tests.
-- Added independent validation CI. Staging integration and separately approved production deployment remain pending; SiteGround browser smoke testing remains required.
+- Added independent validation CI. Staging merge 7ab225a passed post-merge CI run 45400095850. Owner authorized production release on 2026-11-24. Production deployment and SiteGround browser smoke testing remain pending until the release PR is validated and merged.
 
 ## [2.14.3] - 2026-11-23
 
