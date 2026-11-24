@@ -9,26 +9,49 @@ const on=(p:Point,a:Point,b:Point)=>Math.abs(cross(a,b,p))<=EPS*Math.max(1,dist(
 const segments=(p:Point[])=>p.map((a,i)=>[a,p[(i+1)%p.length]] as [Point,Point]);
 const proper=(a:Point,b:Point,c:Point,d:Point)=>cross(a,b,c)*cross(a,b,d)<0&&cross(c,d,a)*cross(c,d,b)<0&&![on(a,c,d),on(b,c,d),on(c,a,b),on(d,a,b)].some(Boolean);
 const intersects=(a:Point,b:Point,c:Point,d:Point)=>proper(a,b,c,d)||on(a,c,d)||on(b,c,d)||on(c,a,b)||on(d,a,b);
-const mid=(a:Point,b:Point)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
 export function projectedArea(p:Point[]):number {
  if(p.length<3)return 0;
  const o=p[0];return Math.abs(p.reduce((s,a,i)=>{const b=p[(i+1)%p.length];return s+(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x)},0))/2;
 }
 export const slopeFactor=(pitch:number)=>Math.hypot(1,pitch/12);
 export function simplePolygon(p:Point[]):boolean {
- if(p.length<3||p.some(a=>!Number.isFinite(a.x)||!Number.isFinite(a.y))||projectedArea(p)<=EPS)return false;
+ if(p.length<3||new Set(p.map(q=>JSON.stringify([q.x,q.y]))).size!==p.length||p.some(a=>!Number.isFinite(a.x)||!Number.isFinite(a.y))||projectedArea(p)<=EPS)return false;
  const e=segments(p);
+ if(e.some(([a,b],i)=>{const c=p[(i+2)%p.length];return on(c,a,b)||on(a,b,c)}))return false;
  return e.every(([a,b],i)=>dist(a,b)>EPS&&e.every(([c,d],j)=>i===j||Math.abs(i-j)===1||Math.abs(i-j)===e.length-1||!intersects(a,b,c,d)));
 }
 function inside(p:Point,poly:Point[],boundary=true):boolean {
  if(segments(poly).some(([a,b])=>on(p,a,b)))return boundary;
  let hit=false;for(const [a,b] of segments(poly))if((a.y>p.y)!==(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)hit=!hit;return hit;
 }
+// Partition a segment at every boundary intersection, including collinear endpoints.
+// Test every open interval rather than a single midpoint (concave boundaries can cross repeatedly).
+export function boundaryIntervals(a:Point,b:Point,polygons:Point[][]):number[]{
+ const dx=b.x-a.x,dy=b.y-a.y,l=dx*dx+dy*dy;
+ if(l<=EPS*EPS)return [0,1];
+ const values=[0,1],add=(t:number)=>{if(t>0&&t<1)values.push(t)};
+ for(const poly of polygons)for(const [c,d] of segments(poly)){
+  const ux=d.x-c.x,uy=d.y-c.y,det=dx*uy-dy*ux;
+  if(Math.abs(det)>EPS*Math.sqrt(l)*Math.hypot(ux,uy)){
+   const t=((c.x-a.x)*uy-(c.y-a.y)*ux)/det;
+   const u=((c.x-a.x)*dy-(c.y-a.y)*dx)/det;
+   if(u>=-EPS&&u<=1+EPS)add(t);
+  }else for(const p of [c,d])if(on(p,a,b))add(((p.x-a.x)*dx+(p.y-a.y)*dy)/l);
+ }
+ return values.sort((a,b)=>a-b).filter((t,i,v)=>!i||t-v[i-1]>1e-10);
+}
+const interpolate=(a:Point,b:Point,t:number)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
+function samples(a:Point,b:Point,polys:Point[][]):Point[]{
+ const t=boundaryIntervals(a,b,polys);return t.slice(1).map((x,i)=>interpolate(a,b,(x+t[i])/2));
+}
 function contained(inner:Point[],outer:Point[]):boolean {
- return inner.every(p=>inside(p,outer))&&segments(inner).every(([a,b])=>inside(mid(a,b),outer)&&!segments(outer).some(([c,d])=>proper(a,b,c,d)));
+ return inner.every(p=>inside(p,outer))&&segments(inner).every(([a,b])=>samples(a,b,[outer]).every(p=>inside(p,outer)));
 }
 function overlap(a:Point[],b:Point[]):boolean {
- return contained(a,b)||contained(b,a)||a.some(p=>inside(p,b,false))||b.some(p=>inside(p,a,false))||segments(a).some(([p,q])=>inside(mid(p,q),b,false)||segments(b).some(([r,s])=>proper(p,q,r,s)))||segments(b).some(([p,q])=>inside(mid(p,q),a,false));
+ return contained(a,b)||contained(b,a)||a.some(p=>inside(p,b,false))||b.some(p=>inside(p,a,false))||segments(a).some(([p,q])=>samples(p,q,[b]).some(r=>inside(r,b,false)))||segments(b).some(([p,q])=>samples(p,q,[a]).some(r=>inside(r,a,false)));
+}
+export function roofBoundaryOwners(a:Point,b:Point,planes:Plane[]):string[]{
+ return planes.filter(p=>segments(p.polygon).some(([c,d])=>on(a,c,d)&&on(b,c,d))).map(p=>p.id);
 }
 function sameRun(a:Edge,b:Edge):boolean {
  if(Math.abs(cross(a.start,a.end,b.start))>EPS*dist(a.start,a.end)||Math.abs(cross(a.start,a.end,b.end))>EPS*dist(a.start,a.end))return false;
@@ -52,6 +75,7 @@ export function validateRoofTopology(entities:RoofEntity[]):void {
  for(const [i,p] of planes.entries())for(const q of planes.slice(i+1))if(overlap(p.polygon,q.polygon))throw Error('Overlapping roof planes require reconciliation: '+p.id+' / '+q.id);
  for(const [i,o] of openings.entries()){
   const p=planes.find(p=>p.id===o.planeId)!;
+  if(projectedArea(o.polygon)>=projectedArea(p.polygon)-EPS)throw Error('Opening cannot consume entire roof plane');
   if(!contained(o.polygon,p.polygon))throw Error('Opening outside parent plane: '+o.id);
   for(const q of openings.slice(i+1))if(q.planeId===o.planeId&&overlap(o.polygon,q.polygon))throw Error('Overlapping roof openings');
  }
@@ -59,6 +83,8 @@ export function validateRoofTopology(entities:RoofEntity[]):void {
   if(edges.slice(i+1).some(q=>sameRun(e,q)))throw Error('Duplicate or overlapping roof edge');
   const parents=e.planeIds.map(id=>planes.find(p=>p.id===id)!);
   if(!parents.every(p=>segments(p.polygon).some(([a,b])=>on(e.start,a,b)&&on(e.end,a,b))))throw Error('Edge must follow a parent plane boundary');
+  const ts=boundaryIntervals(e.start,e.end,planes.map(p=>p.polygon));
+  for(let j=1;j<ts.length;j++){const owners=roofBoundaryOwners(interpolate(e.start,e.end,ts[j-1]),interpolate(e.start,e.end,ts[j]),planes);if(owners.length!==e.planeIds.length||owners.some(id=>!e.planeIds.includes(id)))throw Error('Edge ownership changes along boundary; split or reconcile edge');}
   if(['ridge','hip','valley'].includes(e.edgeType)&&parents.length!==2)throw Error('Shared edge requires two planes');
   if(['eave','rake','abutment','parapet'].includes(e.edgeType)&&parents.length!==1)throw Error('Exterior edge requires one plane');
   if(parents.length===2){
@@ -77,6 +103,8 @@ export function measureRoof(workspaceId:string,entities:RoofEntity[]):{rows:Quan
   rows.push(value===null?{...base,status:'unquantified',reason}:{...base,status:'measured',quantity:value});
  };
  const planes=entities.filter((e):e is Plane=>e.kind==='roofPlane');
+ const edges=entities.filter((e):e is Edge=>e.kind==='roofEdge');
+ for(const p of planes){if(segments(p.polygon).some(([a,b])=>{const ts=boundaryIntervals(a,b,planes.map(q=>q.polygon).concat(edges.map(e=>[e.start,e.end])));return ts.slice(1).some((t,i)=>{const x=interpolate(a,b,ts[i]),y=interpolate(a,b,t);return !edges.some(e=>e.planeIds.includes(p.id)&&e.edgeType!=='unclassified'&&on(x,e.start,e.end)&&on(y,e.start,e.end))})}))warnings.push('Plane '+p.id+': boundary classification incomplete');}
  for(const e of entities){
   if(e.kind==='roofPlane'){
    const area=projectedArea(e.polygon),f=e.pitchRise===null?null:slopeFactor(e.pitchRise);
@@ -87,6 +115,7 @@ export function measureRoof(workspaceId:string,entities:RoofEntity[]):{rows:Quan
    add(e,'roof.gross','SF','gross sloped polygon',f===null?null:area*f);
    add(e,'roof.deduction','SF','included sloped openings',unknown||f===null?null:deduct*f,'Pitch or opening treatment missing');
    add(e,'roof.covering','SF','net sloped polygon',unknown||f===null?null:(area-deduct)*f,'Pitch or opening treatment missing');
+   if(e.pitchRise!==null&&e.pitchRise>0&&e.slopeDegrees===null)warnings.push('Plane '+e.id+': slope direction unspecified');
    if(e.pitchRise===null)warnings.push('Plane '+e.id+': pitch unspecified');
    if(unknown)warnings.push('Plane '+e.id+': opening treatment unspecified');
   }else if(e.kind==='roofEdge'){
@@ -95,7 +124,7 @@ export function measureRoof(workspaceId:string,entities:RoofEntity[]):{rows:Quan
    if(e.planeIds.length===2){
     const q=planes.find(p=>p.id===e.planeIds[1])!;
     if(edgeLength(e.start,e.end,q.pitchRise,q.slopeDegrees)===null)len=null;
-    if(p.elevationFt===null||q.elevationFt===null)warnings.push('Edge '+e.id+': junction elevation not verified');
+    if(p.elevationFt===null||q.elevationFt===null||len===null)warnings.push('Edge '+e.id+': junction elevation not verified');
    }
    add(e,'roof.edge.'+e.edgeType,'LF','actual classified edge',e.edgeType==='unclassified'?null:len);
    for(const [key,code] of [['fascia','roof.fascia'],['gutter','roof.gutter'],['soffit','roof.soffit.run']] as const){
