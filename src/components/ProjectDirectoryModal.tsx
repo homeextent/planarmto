@@ -8,6 +8,7 @@ import {
   deleteProjectFromDirectory,
   renameProjectInDirectory,
   getAutoSaveState,
+  getHistoricalAutoSaveRaw,
 } from '../utils/storage';
 import {
   FolderOpen,
@@ -336,6 +337,15 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
           </div>
         </div>
 
+        {getHistoricalAutoSaveRaw() !== null && <div className="px-4 py-2 text-xs text-amber-300 flex justify-between items-center">
+          <span>Historical recovery retained for export only.</span>
+          <button className="underline" onClick={() => {
+            const raw=getHistoricalAutoSaveRaw(); if(raw===null) return;
+            const url=URL.createObjectURL(new Blob([raw],{type:'application/json'}));
+            const link=document.createElement('a'); link.href=url; link.download='PlanarMTO_Historical_Recovery.json';
+            link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+          }}>Export historical recovery</button>
+        </div>}
         {/* Auto-Save recovery notice if available */}
         {autoSaveItem && (
           <div className="bg-amber-950/20 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between text-xs text-amber-300">
@@ -515,13 +525,13 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
                           <div className="text-[10px] uppercase font-bold text-slate-500">Area</div>
                           <div className="font-mono font-bold text-slate-200 flex items-center gap-1 mt-0.5">
                             <Ruler className="w-3 h-3 text-emerald-400" />
-                            {true ? 'Pending C' : project.grossSf + ' SF'}
+                            Pending C
                           </div>
                         </div>
                         <div>
                           <div className="text-[10px] uppercase font-bold text-slate-500">Total Est.</div>
                           <div className="font-mono font-bold text-emerald-400 truncate mt-0.5">
-                            {true ? 'Not quantified' : '$' + project.estimatedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            Not quantified
                           </div>
                         </div>
                       </div>
