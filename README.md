@@ -4,9 +4,9 @@
 
 ---
 
-## Development status — Increment B (staging integration candidate)
+## Development status — C.1A (owner accepted; staging integration gated)
 
-B.1 typed project architecture and B.2 workspace management use schema v2 with independent floor, roof, foundation and site geometry, blueprint calibration and undo/redo, and shared project settings/rates. B.2 includes complete-project persistence, recovery prompt and immutable CAD update optimization. Existing single-floor legacy estimates remain supported; new/expanded typed projects are explicitly unquantified until Increment C. See [B.2 specification and acceptance record](docs/b2-workspace-management.md). Production remains v2.15.1; combined B/C release v2.16.0 is separately gated.
+Increment B is integrated. C.1A establishes canonical schema v3, explicit-only scope assignments (unquantified, assigned, excluded with reason), specialist entity and quantity contracts, independent workspace geometry/calibration, shared settings/rates and validated complete-project persistence. Assignment is not measurement completeness. Historical legacy/unversioned projects are retired; unsupported saved records remain export-only, without automatic deletion. Bounded explicit v2 preview migration is supported without guessing specialist geometry. Existing floor formulas are retained; specialist drafting and calculation engines follow in C.1B–D, integration safeguards in C.1E, consolidated reporting/pricing in C.2. The feature descriptions below include existing floor engine capabilities, not an assertion that consolidated reporting is currently enabled. See [C.1A specification and acceptance](docs/c1a-measurement-architecture.md). Production remains v2.15.1; v2.16.0 is separately gated.
 
 ## Key Features
 
