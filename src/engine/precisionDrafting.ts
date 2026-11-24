@@ -28,3 +28,14 @@ export function rectanglePoints(a:Point,b:Point):Point[]{
  if(a.x===b.x||a.y===b.y)throw Error('Rectangle requires nonzero width and depth.');
  return [a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}].map(p=>({...p}));
 }
+
+/** Resize an axis-aligned rectangle about its first corner; never silently regularize a polygon. */
+export function resizeRectangle(polygon:Point[],width:number,depth:number):Point[]{
+ if(polygon.length!==4)throw Error('Only rectangular geometry supports width/depth editing.');
+ const a=polygon[0],b=polygon[2],expected=rectanglePoints(a,b);
+ const reverse=[expected[0],expected[3],expected[2],expected[1]];
+ const matches=(p:Point[])=>p.every((q,i)=>Math.hypot(q.x-polygon[i].x,q.y-polygon[i].y)<1e-7);
+ if(!matches(expected)&&!matches(reverse))throw Error('Only axis-aligned rectangles support width/depth editing.');
+ const next=rectanglePoints(a,exactRectangleCorner(a,b,width,depth));
+ return matches(expected)?next:[next[0],next[3],next[2],next[1]];
+}
