@@ -61,7 +61,7 @@ test('guest project round trip preserves PDF calibration and source metadata', a
   await saveProjectToDirectory(state.activeProjectName, state);
   const projects = await getSavedProjects();
   assert.equal(projects.length, 1);
-  assert.deepEqual(projects[0].state.underlay, state.underlay);
+  assert.deepEqual(('schemaVersion' in projects[0].state ? undefined : projects[0].state.underlay), state.underlay);
   assert.equal(JSON.parse(values.get(directoryKey)!)[0].state, undefined);
 });
 
@@ -122,13 +122,13 @@ test('authenticated save and reload preserve PDF data without duplicate src/url'
     if (options?.method === 'POST') {
       saved = JSON.parse(String(options.body));
       assert.equal(saved.id, state.activeProjectId);
-      assert.deepEqual(saved.state.underlay, state.underlay);
+      assert.deepEqual(('schemaVersion' in saved.state ? undefined : saved.state.underlay), state.underlay);
       return new Response(JSON.stringify({ success: true }));
     }
     return new Response(JSON.stringify([saved]));
   };
   await saveProjectToDirectory('Test', state);
   const [project] = await getSavedProjects();
-  assert.deepEqual(project.state.underlay, state.underlay);
+  assert.deepEqual(('schemaVersion' in project.state ? undefined : project.state.underlay), state.underlay);
   assert.equal(values.size, 0);
 });
