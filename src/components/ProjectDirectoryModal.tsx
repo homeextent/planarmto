@@ -97,6 +97,8 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
       await saveProjectToDirectory(defaultName, currentState);
       const updated = await getSavedProjects();
       setProjects(updated);
+    } catch (err) {
+      alert('Project operation failed: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsLoading(false);
     }
@@ -126,6 +128,8 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
       const updated = await getSavedProjects();
       setProjects(updated);
       setSaveAsModalOpen(false);
+    } catch (err) {
+      alert('Project operation failed: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsLoading(false);
     }
@@ -137,6 +141,8 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
       const updated = await deleteProjectFromDirectory(id);
       setProjects(updated);
       setDeleteConfirmId(null);
+    } catch (err) {
+      alert('Project operation failed: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsLoading(false);
     }
@@ -148,6 +154,8 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
       await saveProjectToDirectory(`${project.name} (Copy)`, project.state);
       const updated = await getSavedProjects();
       setProjects(updated);
+    } catch (err) {
+      alert('Project operation failed: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsLoading(false);
     }
@@ -164,6 +172,9 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
       try {
         const updated = await renameProjectInDirectory(id, editingName.trim());
         setProjects(updated);
+      } catch (err) {
+        alert('Project operation failed: ' + (err instanceof Error ? err.message : String(err)));
+        return;
       } finally {
         setIsLoading(false);
       }

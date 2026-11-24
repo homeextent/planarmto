@@ -107,6 +107,7 @@ function AppContent() {
 
   // Tracking unsaved changes
   const [isDirty, setIsDirty] = useState(false);
+  const [storageWarning, setStorageWarning] = useState('');
 
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, worldX: number, worldY: number } | null>(null);
@@ -124,7 +125,8 @@ function AppContent() {
       return;
     }
     const timer = setTimeout(() => {
-      saveAutoSaveState(state);
+      try { saveAutoSaveState(state); setStorageWarning(''); }
+      catch (err) { setStorageWarning(err instanceof Error ? err.message : 'Automatic recovery failed.'); }
     }, 1000);
     return () => clearTimeout(timer);
   }, [state, isDirty]);
@@ -393,8 +395,10 @@ function AppContent() {
   const handleSaveProject = useCallback(async () => {
     const { activeProjectId, activeProjectName } = state;
     if (activeProjectId) {
-      await saveProjectToDirectory(activeProjectName, state, { id: activeProjectId });
-      setIsDirty(false);
+      try {
+        await saveProjectToDirectory(activeProjectName, state, { id: activeProjectId });
+        setIsDirty(false);
+      } catch (err) { alert('Project not saved: ' + (err instanceof Error ? err.message : String(err))); }
     } else {
       handleSaveProjectAs();
     }
@@ -410,9 +414,11 @@ function AppContent() {
         activeProjectName: newName,
       };
       // Immediately commit to storage
-      await saveProjectToDirectory(newName, newState, { id: newId });
-      setState(newState);
-      setIsDirty(false);
+      try {
+        await saveProjectToDirectory(newName, newState, { id: newId });
+        setState(newState);
+        setIsDirty(false);
+      } catch (err) { alert('Project not saved: ' + (err instanceof Error ? err.message : String(err))); }
     }
   }, [state]);
 
@@ -619,6 +625,7 @@ function AppContent() {
     <div className="h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans select-none" onClick={() => setContextMenu(null)}>
       <div className="flex flex-col h-full w-full">
       {/* 1. TOP HEADER BAR */}
+      {storageWarning && <div role="alert" className="bg-amber-950 text-amber-100 px-3 py-2 text-sm">{storageWarning}</div>}
       <HeaderBar
         state={state}
         onChange={handleStateChange}

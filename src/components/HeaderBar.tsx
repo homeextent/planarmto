@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { FloorplanState, ProjectSettings, UnitSystem, SelectionState } from '../types';
 import {
   createBlankProject,
@@ -30,6 +30,9 @@ import {
   Plus,
   LogIn,
 } from 'lucide-react';
+
+import type { BlueprintPdf } from '../utils/pdfUnderlayImporter';
+const PdfSheetPickerModal = lazy(() => import('./PdfSheetPickerModal').then(m => ({ default: m.PdfSheetPickerModal })));
 
 interface HeaderBarProps {
   state: FloorplanState;
@@ -71,6 +74,47 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   selection,
 }) => {
   const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
+
+  const latestState = useRef(state);
+  latestState.current = state;
+  const request = useRef(0);
+  const [pdfImport, setPdfImport] = useState<{ pdf: BlueprintPdf; filename: string; origin: FloorplanState } | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfError, setPdfError] = useState('');
+  const [pdfNotice, setPdfNotice] = useState('');
+  const pdfRef = useRef<BlueprintPdf | null>(null);
+  useEffect(() => () => { request.current++; void pdfRef.current?.destroy(); }, []);
+  const cancelPdf = () => {
+    request.current++;
+    void pdfRef.current?.destroy();
+    pdfRef.current = null;
+    setPdfImport(null); setPdfBusy(false); setPdfError('');
+  };
+  const importPage = async (pdf: BlueprintPdf, filename: string, origin: FloorplanState, page: number, edge: number, token: number) => {
+    setPdfBusy(true); setPdfError(''); setPdfNotice('');
+    try {
+      const { renderBlueprintPage } = await import('../utils/pdfUnderlayImporter');
+      const result = await renderBlueprintPage(pdf, page, edge, 850_000, () => token === request.current);
+      if (token !== request.current) return;
+      if (latestState.current !== origin) throw new Error('Project changed during import. Cancel and import again.');
+      // PDF underlays store the raster once; legacy image imports remain unchanged.
+      const next: FloorplanState = { ...origin, underlay: {
+        src: result.src, worldX: 0, worldY: 0,
+        feetPerPixel: 50 / result.width, opacity: .5, isLocked: false, isVisible: true,
+        pdfSource: { filename, page, width: result.width, height: result.height },
+      }};
+      const encoded = JSON.stringify(next);
+      if (encoded.length > 2_000_000) throw new Error('Project exceeds the conservative import storage budget. Try a lower resolution.');
+      const probe = '__planarmto_pdf_import_probe__';
+      try { localStorage.setItem(probe, encoded); } catch { throw new Error('Insufficient local storage for this blueprint. Free storage or try a lower resolution.'); }
+      finally { localStorage.removeItem(probe); }
+      onChange(next);
+      cancelPdf();
+      setPdfNotice('PDF page ' + page + ' imported at ' + result.width + ' × ' + result.height + ' px' + (Math.max(result.width, result.height) < edge - 1 ? ' (optimized to fit storage or pixel limits).' : '.'));
+    } catch (err) {
+      if (token === request.current) setPdfError(err instanceof Error ? err.message : 'Unable to render PDF.');
+    } finally { if (token === request.current) setPdfBusy(false); }
+  };
 
   const handleUnitToggle = (unit: UnitSystem) => {
     onChange({
@@ -148,9 +192,30 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     reader.readAsText(file);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
+    if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+      cancelPdf();
+      setPdfNotice('');
+      const token = request.current;
+      const origin = latestState.current;
+      setPdfBusy(true);
+      try {
+        const { openBlueprintPdf } = await import('../utils/pdfUnderlayImporter');
+        const pdf = await openBlueprintPdf(file);
+        if (token !== request.current) { await pdf.destroy(); return; }
+        pdfRef.current = pdf;
+        if (pdf.numPages === 1) {
+          await importPage(pdf, file.name, origin, 1, 5000, token);
+          if (token === request.current) setPdfImport({ pdf, filename: file.name, origin });
+        } else setPdfImport({ pdf, filename: file.name, origin });
+      } catch (err) {
+        if (token === request.current) setPdfError(err instanceof Error ? err.message : 'Unable to open PDF.');
+      } finally { if (token === request.current) setPdfBusy(false); }
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -167,7 +232,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             worldX: 0,
             worldY: 0,
             feetPerPixel: defaultFpp,
-            opacity: 0.7,
+            opacity: 0.5,
             isLocked: false,
             isVisible: true,
           },
@@ -305,18 +370,26 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
         {/* Blueprint Underlay Import */}
         <label
           className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-colors border border-slate-700/60"
-          title="Import Blueprint / Floor Plan Image"
+          title="Import Blueprint / Floor Plan Image or PDF"
         >
           <ImageIcon className="w-3.5 h-3.5 text-sky-400" />
           <span>Import Blueprint</span>
           <input
             type="file"
-            accept=".png, .jpg, .jpeg, .webp, .svg"
+            accept=".png, .jpg, .jpeg, .webp, .svg, .pdf, application/pdf"
+            disabled={pdfBusy || !!pdfImport}
             onChange={handleImageUpload}
             className="hidden"
           />
         </label>
         
+        {pdfBusy && !pdfImport && <button onClick={cancelPdf} className="text-xs text-sky-300">Processing PDF… Cancel</button>}
+        {pdfNotice && <div role="status" className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-sky-600 bg-slate-900 text-sky-100 px-4 py-3 text-sm shadow-xl flex items-center gap-4">{pdfNotice}<button onClick={() => setPdfNotice('')} aria-label="Dismiss import notification">Dismiss</button></div>}
+        {pdfError && !pdfImport && <span role="alert" className="text-xs text-red-300">{pdfError}</span>}
+        {pdfImport && <Suspense fallback={<span>Loading sheet picker…</span>}>
+          <PdfSheetPickerModal pdf={pdfImport.pdf} filename={pdfImport.filename} busy={pdfBusy} error={pdfError}
+            onCancel={cancelPdf} onSelect={(page, edge) => void importPage(pdfImport.pdf, pdfImport.filename, pdfImport.origin, page, edge, request.current)} />
+        </Suspense>}
         {state.underlay && (
           <button
             onClick={onSelectUnderlay}

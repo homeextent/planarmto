@@ -702,6 +702,7 @@ export interface MTOReport {
 }
 
 export interface UnderlayImage {
+  pdfSource?: { filename: string; page: number; width: number; height: number };
   src: string;
   url?: string;
   worldX: number; // Top-left corner X in World Feet relative to CAD (0,0)

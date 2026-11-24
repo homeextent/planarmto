@@ -21,6 +21,7 @@
     "jspdf": "^4.2.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "pdfjs-dist": "4.10.38",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "uuid": "^14.0.2",
@@ -36,5 +37,10 @@
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.3"
+  },
+  "overrides": {
+    "express": {
+      "qs": "6.16.2"
+    }
   }
 }
