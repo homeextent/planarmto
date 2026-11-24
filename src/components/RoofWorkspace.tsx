@@ -7,15 +7,15 @@ export function RoofToolbar({activeTool,onSelectTool}:{activeTool:ActiveTool;onS
  return <aside className="w-36 shrink-0 bg-slate-900 border-r border-slate-700 p-2 overflow-y-auto"><h2 className="text-xs uppercase text-slate-400 mb-3">Roof tools</h2>{tools.map(([t,label])=><button key={t} onClick={()=>onSelectTool(t)} className={'block w-full text-left text-xs rounded p-2 mb-1 '+(activeTool===t?'bg-sky-700 text-white':'bg-slate-800 hover:bg-slate-700')}>{label}</button>)}</aside>;
 }
 const field='w-full rounded bg-slate-800 border border-slate-600 px-2 py-1 text-sm text-slate-100';
-function Numeric({label,value,onCommit,min,max}:{label:string;value:number|null;onCommit:(n:number|null)=>void;min?:number;max?:number}){
+function Numeric({label,value,onCommit,min,max}:{label:string;value:number|null;onCommit:(n:number|null)=>boolean|undefined;min?:number;max?:number}){
  const [draft,setDraft]=useState(value===null?'':String(value));
- return <label className="block text-xs text-slate-400">{label}<input className={field} type="number" step="any" min={min} max={max} value={draft} placeholder="Not specified" onChange={e=>setDraft(e.target.value)} onBlur={()=>{const n=draft.trim()===''?null:Number(draft);if(n!==null&&(!Number.isFinite(n)||(min!==undefined&&n<min)||(max!==undefined&&n>max))){setDraft(value===null?'':String(value));return;}if(n!==value)onCommit(n)}} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur()}}/></label>;
+ return <label className="block text-xs text-slate-400">{label}<input className={field} type="number" step="any" min={min} max={max} value={draft} placeholder="Not specified" onChange={e=>setDraft(e.target.value)} onBlur={()=>{const n=draft.trim()===''?null:Number(draft);if(n!==null&&(!Number.isFinite(n)||(min!==undefined&&n<min)||(max!==undefined&&n>max))){setDraft(value===null?'':String(value));return;}if(n!==value&&!onCommit(n))setDraft(value===null?'':String(value))}} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur()}}/></label>;
 }
 const options:Applicability[]=['unspecified','included','excluded'];
 export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,onDelete}:{workspaceId:string;entities:RoofEntity[];selection:SelectionState;onChange:(e:RoofEntity[])=>boolean;onSelect:(s:SelectionState)=>void;onDelete:()=>void}){
  const e=selection.type==='roof'?entities.find(e=>e.id===selection.id):undefined;
  const result=useMemo(()=>{try{return measureRoof(workspaceId,entities)}catch(err){return {rows:[],warnings:[err instanceof Error?err.message:String(err)]}}},[workspaceId,entities]);
- const update=(patch:Partial<RoofEntity>)=>{if(e)onChange(entities.map(q=>q.id===e.id?{...q,...patch} as RoofEntity:q))};
+ const update=(patch:Partial<RoofEntity>)=>{if(e)return onChange(entities.map(q=>q.id===e.id?{...q,...patch} as RoofEntity:q))};
  const totals=new Map<string,{unit:string;qty:number;missing:number}>();
  for(const r of result.rows){const x=totals.get(r.code)||{unit:r.unit,qty:0,missing:0};if(r.status==='measured')x.qty+=r.quantity;else x.missing++;totals.set(r.code,x)}
  const labels:Record<string,string>={'roof.projected':'Projected gross area','roof.gross':'Gross sloped area','roof.deduction':'Opening deductions','roof.covering':'Net covering','roof.fascia':'Fascia','roof.gutter':'Eavestrough','roof.soffit.run':'Soffit run','roof.soffit.area':'Soffit area'};
@@ -23,9 +23,10 @@ export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,
  <h2 className="text-sm font-semibold">Roof properties</h2>
  <select aria-label="Select roof entity" className={field} value={e?.id||''} onChange={ev=>onSelect(ev.target.value?{type:'roof',id:ev.target.value}:{type:'none'})}><option value="">Select entity</option>{entities.map((q,i)=><option key={q.id} value={q.id}>{i+1}. {q.kind}{q.kind==='roofEdge'?' · '+q.edgeType:''}</option>)}</select>
  {e&&<div key={JSON.stringify(e)} className="space-y-2">
- <label className="block text-xs">Source reference<input className={field} defaultValue={e.source.reference} onBlur={ev=>{if(ev.target.value.trim()&&ev.target.value!==e.source.reference)update({source:{...e.source,reference:ev.target.value.trim()}})}}/></label>
+ <label className="block text-xs">Source reference<input className={field} defaultValue={e.source.reference} onBlur={ev=>{if(!ev.target.value.trim()||(ev.target.value!==e.source.reference&&!update({source:{...e.source,reference:ev.target.value.trim()}})))ev.target.value=e.source.reference}}/></label>
  {'polygon' in e&&<div className="text-xs">Projected polygon: {projectedArea(e.polygon).toFixed(2)} SF</div>}
  {e.kind==='roofPlane'&&<>
+ <div className="flex flex-wrap gap-1">{[0,3,4,6,8,10,12].map(p=><button key={p} type="button" className="rounded bg-slate-800 px-2 py-1 text-xs" onClick={()=>update({pitchRise:p})}>{p}:12</button>)}</div>
  <Numeric label="Pitch rise per 12" value={e.pitchRise} min={0} onCommit={pitchRise=>update({pitchRise})}/>
  <Numeric label="Downslope direction (0 right, 90 down)" value={e.slopeDegrees} min={0} max={359.999999} onCommit={slopeDegrees=>update({slopeDegrees})}/>
  <Numeric label="Elevation at first vertex (ft, optional)" value={e.elevationFt} onCommit={elevationFt=>update({elevationFt})}/>
