@@ -1,8 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { RoofEntity } from '../engine/measurements/measurementTypes';
 import { generateRectangularRoof, type RoofConfig } from '../engine/measurements/roofGenerator';
-import { validateRoofTopology } from '../engine/measurements/roofMeasurements';
-import { parseDimension, exactEndpoint, exactRectangleCorner, rectanglePoints, orthoPoint } from '../engine/precisionDrafting';
+import { validateRoofTopology, polygonDraftError } from '../engine/measurements/roofMeasurements';
+import { parseDimension, exactEndpoint, exactRectangleCorner, rectanglePoints, orthoPoint, resizeRectangle } from '../engine/precisionDrafting';
 import { roofPoints, roofSnap, type RoofSnap, boundaryAt, moveRoofVertex, segmentDistance } from '../engine/measurements/roofEditing';
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
@@ -198,6 +198,8 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
   const [roofDraft, setRoofDraft] = useState<Point2D[]>([]);
   const [roofCursor, setRoofCursor] = useState<Point2D | null>(null);
+  const [generationSource,setGenerationSource]=useState<RoofEntity|null>(null);
+  const [polygonError,setPolygonError]=useState('');
   const [generationOutline,setGenerationOutline]=useState<Point2D[]|null>(null);
   const [generationConfig,setGenerationConfig]=useState<RoofConfig>({type:'hip',pitch:6,direction:90,ridge:'horizontal'});
   const [generationPreview,setGenerationPreview]=useState<RoofEntity[]|null>(null);
@@ -209,7 +211,20 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   const [dimensionB,setDimensionB]=useState('');
   const [dimensionError,setDimensionError]=useState('');
   const [roofVertex, setRoofVertex] = useState<number | null>(null);
-  useEffect(() => { setRoofDraft([]); setRoofCursor(null); setRoofVertex(null); setRoofTarget(null); roofLock.current=null; setDimensionA(''); setDimensionB(''); setDimensionError(''); setGenerationOutline(null);setGenerationPreview(null);setGenerationError(''); }, [activeTool, selection.id, roofMode]);
+  useEffect(() => { setRoofDraft([]); setRoofCursor(null); setRoofVertex(null); setRoofTarget(null); roofLock.current=null; setDimensionA(''); setDimensionB(''); setDimensionError(''); setGenerationOutline(null);setGenerationSource(null);setGenerationPreview(null);setGenerationError('');setPolygonError('');
+    if(activeTool==='roof_generate'&&selection.type==='roof'){
+      const selected=roofEntities?.find(e=>e.id===selection.id);
+      if(selected){
+        try{
+          if(selected.kind!=='roofPlane')throw Error('Select a rectangular roof plane, or clear selection to draw a new outline.');
+          const p=selected.polygon;
+          resizeRectangle(p,Math.abs(p[2]?.x-p[0]?.x),Math.abs(p[2]?.y-p[0]?.y));
+          setGenerationOutline(p);setGenerationSource(selected);
+          if(selected.pitchRise!==null&&selected.pitchRise>0)setGenerationConfig(c=>({...c,pitch:selected.pitchRise!}));
+        }catch(err){setGenerationError(err instanceof Error?err.message:String(err));}
+      }
+    }
+  }, [activeTool, selection.id, roofMode]);
   // Sticky lock for OSNAP with hysteresis
   const lockedSnapNodeRef = useRef<{ id: string; x: number; y: number } | null>(null);
 
@@ -2246,6 +2261,10 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         ctx.beginPath();ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;
         const preview=(roofMode==='rectangle'||activeTool==='roof_generate')&&roofDraft.length===1&&roofCursor&&roofDraft[0].x!==roofCursor.x&&roofDraft[0].y!==roofCursor.y?rectanglePoints(roofDraft[0],roofCursor):[...roofDraft,...(roofCursor?[roofCursor]:[])];
         preview.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if((roofMode==='rectangle'||activeTool==='roof_generate')&&preview.length===4)ctx.closePath();ctx.stroke();
+        if(roofMode==='polygon'&&activeTool!=='roof_generate'){
+          for(const [i,p] of roofDraft.entries()){const q=worldToScreen(p.x,p.y);ctx.fillStyle=i===0?'#4ade80':'#fbbf24';ctx.fillRect(q.x-3,q.y-3,6,6);}
+          if(roofDraft.length>=3){const q=worldToScreen(roofDraft[0].x,roofDraft[0].y);ctx.strokeStyle='#4ade80';ctx.beginPath();ctx.arc(q.x,q.y,8,0,Math.PI*2);ctx.stroke();if(roofTarget?.type==='node'&&distance(roofTarget.point,roofDraft[0])<1e-6){ctx.fillStyle='#4ade80';ctx.fillText('CLOSE POLYGON',q.x+12,q.y-12);}}
+        }
         if(roofCursor){const a=roofDraft[roofDraft.length-1],q=worldToScreen(roofCursor.x,roofCursor.y);ctx.fillStyle='#fef3c7';ctx.font='12px sans-serif';ctx.fillText(roofMode==='rectangle'?formatLength(Math.abs(a.x-roofCursor.x))+' × '+formatLength(Math.abs(a.y-roofCursor.y)):formatLength(distance(a,roofCursor)),q.x,q.y-18);}
       }
       if(roofTarget&&(roofTarget.type==='node'||roofTarget.type==='edge')){const q=worldToScreen(roofTarget.point.x,roofTarget.point.y);ctx.strokeStyle=roofTarget.type==='node'?'#4ade80':'#fbbf24';ctx.lineWidth=2;ctx.beginPath();ctx.arc(q.x,q.y,12,0,Math.PI*2);ctx.stroke();ctx.fillStyle=ctx.strokeStyle;ctx.fillText(roofTarget.type==='node'?'LOCKED':'EDGE',q.x,q.y+23);}
@@ -2296,7 +2315,10 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   }, [renderCanvas]);
 
   const finishRoofPolygon = (polygon=roofDraft) => {
-    if (!roofEntities || !onRoofChange || polygon.length < 3) return;
+    if (!roofEntities || !onRoofChange) return;
+    const error=polygonDraftError(polygon);
+    if(error){setPolygonError(error);return;}
+    setPolygonError('');
     if(activeTool==='roof_generate'){if(polygon.length!==4)return;setGenerationOutline(polygon);setGenerationPreview(null);setGenerationError('');setRoofDraft([]);setRoofCursor(null);return;}
     const id=uuidv4(), base={id,physicalId:id,assemblyId:id,source:{reference:'Roof workspace drawing'}};
     let entity:RoofEntity;
@@ -2307,18 +2329,32 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       entity={...base,kind:'roofOpening',polygon,planeId:parent.id,deduction:'unspecified'};
     }else if(activeTool==='roof_soffit'||activeTool==='roof_insulation')entity={...base,kind:'roofSurface',polygon,purpose:activeTool==='roof_soffit'?'soffit':'insulation',pitchRise:null};
     else return;
+    try{validateRoofTopology([...roofEntities,entity]);}
+    catch(err){setPolygonError((err instanceof Error?err.message:String(err)).replace(/: [\da-f-]{36}( \/ [\da-f-]{36})?/gi,''));return;}
     if(onRoofChange([...roofEntities,entity])){setRoofDraft([]);setRoofCursor(null);onToolChange('select');onSelect({type:'roof',id});}
   };
   const getRoofSnap=(raw:Point2D)=>{
     const start=roofDraft[roofDraft.length-1];
     const constrained=!!start&&roofMode==='polygon'&&state.settings.orthoMode&&['roof_plane','roof_opening','roof_soffit','roof_insulation'].includes(activeTool);
+    if(roofMode==='polygon'&&activeTool!=='roof_generate'&&roofDraft.length>=3){
+      const first=roofDraft[0];
+      const locked=roofLock.current?.type==='node'&&distance(roofLock.current.point,first)<1e-6;
+      if(distance(raw,first)<=(locked?30:15)/transform.scale){
+        const target:RoofSnap={point:first,type:'node'};roofLock.current=target;return target;
+      }
+    }
+    if(roofMode==='polygon'&&activeTool!=='roof_generate'){
+      const draftNode=roofDraft.find(q=>distance(raw,q)<=15/transform.scale&&(!constrained||Math.abs(q.x-start.x)<1e-6||Math.abs(q.y-start.y)<1e-6));
+      if(draftNode){const target:RoofSnap={point:draftNode,type:'node'};roofLock.current=target;return target;}
+    }
     const target=roofSnap(raw,roofEntities||[],15/transform.scale,state.settings.gridSnap?state.settings.gridSnapSize:null,roofLock.current,30/transform.scale,q=>!constrained||Math.abs(q.x-start.x)<1e-6||Math.abs(q.y-start.y)<1e-6);
     if(constrained&&(target.type==='grid'||target.type==='free'))target.point=orthoPoint(start,target.point);
     roofLock.current=target.type==='node'?target:null;return target;
   };
   const addRoofPoint=(point:Point2D)=>{
     if((roofMode==='rectangle'||activeTool==='roof_generate')&&roofDraft.length===1){try{finishRoofPolygon(rectanglePoints(roofDraft[0],point));}catch(err){setDimensionError(String(err));}return;}
-    if(!roofDraft.length||distance(point,roofDraft[roofDraft.length-1])>1e-6)setRoofDraft(prev=>[...prev,point]);
+    if(roofDraft.some(q=>distance(point,q)<=1e-6)){setPolygonError('This vertex already exists. Choose a different point or close at the first vertex.');return;}
+    setPolygonError('');setRoofDraft(prev=>[...prev,point]);
     roofLock.current=null;
   };
   const commitFloorRectangle=(start:Point2D,end:Point2D,exact=false)=>{
@@ -2401,6 +2437,13 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       setDimensionA('');setDimensionB('');setDimensionError('');
     }catch(err){setDimensionError(err instanceof Error?err.message:String(err));}
   };
+  const generationBase=()=>{
+    const entities=roofEntities||[];
+    if(!generationSource)return entities;
+    if(!entities.includes(generationSource))throw Error('Selected roof geometry changed. Cancel and reopen generation.');
+    if(entities.some(e=>(e.kind==='roofEdge'&&e.planeIds.includes(generationSource.id))||(e.kind==='roofOpening'&&e.planeId===generationSource.id)))throw Error('Selected roof plane has dependent edges or openings. Review those dependencies before replacement.');
+    return entities.filter(e=>e.id!==generationSource.id);
+  };
   // Handle Mouse Down
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -2430,7 +2473,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
     if (roofEntities && onRoofChange && (activeTool.startsWith('roof_') || activeTool==='select')) {
       const tolerance=10/transform.scale;
-      if(generationOutline)return;
+      if(generationOutline||(activeTool==='roof_generate'&&selection.type==='roof'))return;
       const snapped=getRoofSnap(rawWorld).point;
       if(activeTool==='roof_edge'){
         const boundary=boundaryAt(rawWorld,roofEntities,tolerance);
@@ -2453,7 +2496,11 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         if(selection.type==='roof')onSelect({type:'none'});
       }else {
         if(activeTool==='roof_opening'&&!roofEntities.some(q=>q.id===selection.id&&q.kind==='roofPlane')){alert('Select the parent roof plane first.');return;}
-        if(roofMode==='polygon'&&roofDraft.length>=3&&distance(snapped,roofDraft[0])<=tolerance){finishRoofPolygon();return;}
+        if(activeTool!=='roof_generate'&&roofMode==='polygon'&&roofDraft.length>=3&&distance(snapped,roofDraft[0])<=1e-6){
+          const last=roofDraft[roofDraft.length-1],first=roofDraft[0];
+          if(state.settings.orthoMode&&Math.abs(last.x-first.x)>1e-6&&Math.abs(last.y-first.y)>1e-6){setPolygonError('Closing edge is diagonal. Use Finish polygon to deliberately close it.');return;}
+          finishRoofPolygon();return;
+        }
         addRoofPoint(snapped);
         return;
       }
@@ -3094,14 +3141,15 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         }}
       />
 
-      {generationOutline&&<section className="absolute top-20 left-4 z-20 bg-slate-900 border border-sky-600 rounded-lg p-4 text-xs space-y-3 w-64 shadow-xl"><h3 className="font-semibold text-sky-300">Generate Roof Skeleton</h3><p>Rectangular roof perimeter · preview only</p><label className="block">Configuration<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.type} onChange={e=>{setGenerationConfig(c=>({...c,type:e.target.value as RoofConfig['type']}));setGenerationPreview(null)}}>{['hip','gable','shed','flat'].map(t=><option key={t}>{t}</option>)}</select></label>{generationConfig.type!=='flat'&&<label className="block">Pitch rise per 12<input className="block w-full bg-slate-800 p-2 rounded" type="number" min="0.01" max="48" step="any" value={generationConfig.pitch} onChange={e=>{setGenerationConfig(c=>({...c,pitch:Number(e.target.value)}));setGenerationPreview(null)}}/></label>}{generationConfig.type==='gable'&&<label>Ridge orientation<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.ridge} onChange={e=>{setGenerationConfig(c=>({...c,ridge:e.target.value as RoofConfig['ridge']}));setGenerationPreview(null)}}><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>}{generationConfig.type==='shed'&&<label>Downslope direction<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.direction} onChange={e=>{setGenerationConfig(c=>({...c,direction:Number(e.target.value) as RoofConfig['direction']}));setGenerationPreview(null)}}>{[[0,'Right'],[90,'Down'],[180,'Left'],[270,'Up']].map(([v,n])=><option key={v} value={v}>{n}</option>)}</select></label>}<p className="text-slate-400">No automatic overhang or assembly allowances. Review against drawings.</p>{generationError&&<p role="alert" className="text-amber-300">{generationError}</p>}<div className="flex gap-2"><button className="bg-sky-700 rounded p-2" onClick={()=>{try{const next=generateRectangularRoof(generationOutline[0],generationOutline[2],generationConfig,uuidv4);validateRoofTopology([...(roofEntities||[]),...next]);setGenerationPreview(next);setGenerationError('');}catch(err){setGenerationPreview(null);setGenerationError(err instanceof Error?err.message:String(err));}}}>Preview</button><button disabled={!generationPreview} className="bg-emerald-700 disabled:opacity-40 rounded p-2" onClick={()=>{if(generationPreview&&onRoofChange?.([...(roofEntities||[]),...generationPreview]))onToolChange('select');}}>Apply</button><button className="bg-slate-700 rounded p-2" onClick={()=>onToolChange('select')}>Cancel</button></div></section>}
+      {(polygonError||(!generationOutline&&generationError))&&<div role="alert" className="absolute top-16 left-1/2 -translate-x-1/2 z-20 bg-slate-900 border border-amber-600 text-amber-300 rounded p-3 text-xs">{polygonError||generationError}</div>}
+      {generationOutline&&<section className="absolute top-20 left-4 z-20 bg-slate-900 border border-sky-600 rounded-lg p-4 text-xs space-y-3 w-64 shadow-xl"><h3 className="font-semibold text-sky-300">Generate Roof Skeleton</h3><p>Rectangular roof perimeter · preview only</p><label className="block">Configuration<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.type} onChange={e=>{setGenerationConfig(c=>({...c,type:e.target.value as RoofConfig['type']}));setGenerationPreview(null)}}>{['hip','gable','shed','flat'].map(t=><option key={t}>{t}</option>)}</select></label>{generationConfig.type!=='flat'&&<label className="block">Pitch rise per 12<input className="block w-full bg-slate-800 p-2 rounded" type="number" min="0.01" max="48" step="any" value={generationConfig.pitch} onChange={e=>{setGenerationConfig(c=>({...c,pitch:Number(e.target.value)}));setGenerationPreview(null)}}/></label>}{generationConfig.type==='gable'&&<label>Ridge orientation<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.ridge} onChange={e=>{setGenerationConfig(c=>({...c,ridge:e.target.value as RoofConfig['ridge']}));setGenerationPreview(null)}}><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>}{generationConfig.type==='shed'&&<label>Downslope direction<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.direction} onChange={e=>{setGenerationConfig(c=>({...c,direction:Number(e.target.value) as RoofConfig['direction']}));setGenerationPreview(null)}}>{[[0,'Right'],[90,'Down'],[180,'Left'],[270,'Up']].map(([v,n])=><option key={v} value={v}>{n}</option>)}</select></label>}<p className="text-slate-400">No automatic overhang or assembly allowances. Review against drawings.</p>{generationError&&<p role="alert" className="text-amber-300">{generationError}</p>}<div className="flex gap-2"><button className="bg-sky-700 rounded p-2" onClick={()=>{try{const next=generateRectangularRoof(generationOutline[0],generationOutline[2],generationConfig,uuidv4);validateRoofTopology([...generationBase(),...next]);setGenerationPreview(next);setGenerationError('');}catch(err){setGenerationPreview(null);setGenerationError(err instanceof Error?err.message:String(err));}}}>Preview</button><button disabled={!generationPreview} className="bg-emerald-700 disabled:opacity-40 rounded p-2" onClick={()=>{try{if(generationPreview){const next=[...generationBase(),...generationPreview];validateRoofTopology(next);if(onRoofChange?.(next)){onSelect({type:'none'});onToolChange('select');}}}catch(err){setGenerationError(err instanceof Error?err.message:String(err));}}}>Apply</button><button className="bg-slate-700 rounded p-2" onClick={()=>onToolChange('select')}>Cancel</button></div></section>}
       {dimensionStart&&<form className="absolute bottom-20 left-4 bg-slate-900 border border-sky-700 rounded p-3 text-xs space-y-2 shadow-xl" onSubmit={e=>{e.preventDefault();commitDimensions()}}><div className="text-sky-300 font-semibold">Exact dimensions</div><div className="flex gap-2"><label>{rectangularDraft?'Width (X)':'Length'}<input aria-label={rectangularDraft?'Width':'Length'} className="block w-24 bg-slate-800 border rounded p-1" placeholder={state.settings.unitSystem==='metric'?'m':'ft'} value={dimensionA} onChange={e=>setDimensionA(e.target.value)}/></label>{rectangularDraft&&<label>Depth (Y)<input aria-label="Depth" className="block w-24 bg-slate-800 border rounded p-1" value={dimensionB} onChange={e=>setDimensionB(e.target.value)}/></label>}<button type="submit" className="bg-sky-700 rounded px-2 self-end py-1">Apply</button></div><p>Move toward endpoint, enter dimensions, press Enter.</p>{dimensionError&&<p role="alert" className="text-amber-300">{dimensionError}</p>}</form>}
       {/* Floating Canvas Overlays & Controls */}
       {/* Top Center Tool Info Banner */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-4 py-1.5 rounded-full text-xs text-slate-300 shadow-xl flex items-center gap-3">
         <span className={`flex items-center gap-1.5 font-medium ${activeTool === 'wall_pen' || activeTool === 'wall_rect' || activeTool === 'room_box' ? 'text-amber-200' : 'text-sky-400'}`}>
           <Compass className="w-3.5 h-3.5" />
-          {activeTool.startsWith('roof_') ? (activeTool==='roof_generate'?'Draw rectangular roof outline':activeTool==='roof_edge'?'Click a roof plane boundary':activeTool==='roof_vertex'?'Select vertex, then click new position':'Click polygon vertices, then Finish polygon') : activeTool === 'wall_pen'
+          {activeTool.startsWith('roof_') ? (activeTool==='roof_generate'?(generationOutline?'Configure roof skeleton':selection.type==='roof'?'Selected roof outline':'Draw rectangular roof outline'):activeTool==='roof_edge'?'Click a roof plane boundary':activeTool==='roof_vertex'?'Select vertex, then click new position':'Click polygon vertices, then Finish polygon') : activeTool === 'wall_pen'
             ? activeWallStartNodeId
               ? 'Click to place next wall node (Double-click / ESC to finish)'
               : 'Click to drop start node for wall'
