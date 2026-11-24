@@ -71,6 +71,8 @@ export function validateRoofTopology(entities:RoofEntity[]):void {
  const planes=entities.filter((e):e is Plane=>e.kind==='roofPlane');
  const edges=entities.filter((e):e is Edge=>e.kind==='roofEdge');
  const openings=entities.filter(e=>e.kind==='roofOpening');
+ const surfaces=entities.filter(e=>e.kind==='roofSurface');
+ for(const [i,p] of surfaces.entries())for(const q of surfaces.slice(i+1))if(p.purpose===q.purpose&&overlap(p.polygon,q.polygon))throw Error('Overlapping same-purpose roof surfaces require reconciliation');
  for(const e of entities)if('polygon' in e&&!simplePolygon(e.polygon))throw Error('Invalid roof polygon: '+e.id);
  for(const [i,p] of planes.entries())for(const q of planes.slice(i+1))if(overlap(p.polygon,q.polygon))throw Error('Overlapping roof planes require reconciliation: '+p.id+' / '+q.id);
  for(const [i,o] of openings.entries()){
@@ -113,6 +115,7 @@ export function measureRoof(workspaceId:string,entities:RoofEntity[]):{rows:Quan
    const deduct=openings.reduce((n,o)=>n+(o.kind==='roofOpening'&&o.deduction==='included'?projectedArea(o.polygon):0),0);
    add(e,'roof.projected','SF','gross projected polygon',area);
    add(e,'roof.gross','SF','gross sloped polygon',f===null?null:area*f);
+   add(e,'roof.opening.projected','SF','all geometric openings',openings.reduce((n,o)=>n+(o.kind==='roofOpening'?projectedArea(o.polygon):0),0));
    add(e,'roof.deduction','SF','included sloped openings',unknown||f===null?null:deduct*f,'Pitch or opening treatment missing');
    add(e,'roof.covering','SF','net sloped polygon',unknown||f===null?null:(area-deduct)*f,'Pitch or opening treatment missing');
    if(e.pitchRise!==null&&e.pitchRise>0&&e.slopeDegrees===null)warnings.push('Plane '+e.id+': slope direction unspecified');
@@ -128,7 +131,7 @@ export function measureRoof(workspaceId:string,entities:RoofEntity[]):{rows:Quan
    }
    add(e,'roof.edge.'+e.edgeType,'LF','actual classified edge',e.edgeType==='unclassified'?null:len);
    for(const [key,code] of [['fascia','roof.fascia'],['gutter','roof.gutter'],['soffit','roof.soffit.run']] as const){
-    const a=e.applicability?.[key];if(a==='excluded')continue;
+    const a=e.applicability?.[key];if(a==='excluded'){warnings.push('Edge '+e.id+': '+key+' explicitly excluded');continue;}
     add(e,code,'LF','explicit edge assembly',a==='included'&&e.edgeType!=='unclassified'?len:null,'Applicability, classification or slope missing');
    }
   }else if(e.kind==='roofSurface'){
