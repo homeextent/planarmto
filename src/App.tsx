@@ -14,7 +14,7 @@ import {
   ClipboardState,
 } from './types';
 import { createModernTwoBedroomRancher, createBlankProject } from './engine/samplePlans';
-import { calculateMTO, calculateEstimatedCost, DEFAULT_UNIT_COST_RATES, safeMergeRates } from './engine/estimator';
+import { calculateMTO, DEFAULT_UNIT_COST_RATES, safeMergeRates } from './engine/estimator';
 import { detectRoomFaces, isPointInPolygon } from './engine/cadMath';
 import {
   hydrateSettingsWithBranding,
@@ -39,7 +39,7 @@ import { ProjectDirectoryModal } from './components/ProjectDirectoryModal';
 import { WorkspaceBar } from './components/WorkspaceBar';
 import { createProjectDocument, workspaceRenderView, commitWorkspaceRenderView, serializeProjectDocument } from './engine/projectDocument';
 import type { ProjectDocument, WorkspaceType } from './engine/projectDocument';
-import { normalizeProjectInput, updateWorkspaceView, selectWorkspace, addWorkspace, renameWorkspace, moveWorkspace, removeWorkspace, canReportLegacyEstimate, validateBlueprintBudget } from './engine/workspaceController';
+import { normalizeProjectInput, selectWorkspace, addWorkspace, renameWorkspace, moveWorkspace, removeWorkspace, canReportLegacyEstimate, validateBlueprintBudget } from './engine/workspaceController';
 import { ProjectProvider, useProject } from './context/ProjectContext';
 
 export default function App() {
@@ -469,6 +469,7 @@ function AppContent() {
   // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (recovery) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         if (e.shiftKey) {
@@ -483,11 +484,12 @@ function AppContent() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSaveProject, handleSaveProjectAs]);
+  }, [handleSaveProject, handleSaveProjectAs, recovery]);
 
   // Global Clipboard Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (recovery) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
@@ -530,7 +532,7 @@ function AppContent() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleCopy, handleCut, handlePaste, handleDuplicate, handleDeleteSelected, handleUndo, handleRedo]);
+  }, [handleCopy, handleCut, handlePaste, handleDuplicate, handleDeleteSelected, handleUndo, handleRedo, recovery]);
 
   const handleNewBlankProject = async () => {
     if (isDirty && !window.confirm('Replace the current unsaved project?')) return;
@@ -633,26 +635,17 @@ function AppContent() {
   }, [activeTool, state.settings, handleUpdateSettings, previousSnapSetting, saveSnapSetting, clearSnapSetting]);
 
   // Real-Time Material Take-Off calculation
-  const mtoReport = useMemo(() => calculateMTO(reportable ? state : createBlankProject()), [state, reportable]);
+  const emptyReport = useMemo(() => calculateMTO(createBlankProject()), []);
+  const mtoReport = useMemo(() => reportable ? calculateMTO(state) : emptyReport, [state, reportable, emptyReport]);
 
-  const estimatedCost = useMemo(() => {
-    return calculateEstimatedCost(
-      mtoReport,
-      costRates,
-      state.settings.categoryInclusions,
-      state.settings.itemInclusions,
-      state.settings,
-      state.stamps,
-      state.apertures
-    );
-  }, [mtoReport, costRates, state.settings, state.stamps, state.apertures]);
 
   return (
     <div className="h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans select-none" onClick={() => setContextMenu(null)}>
       <div className="flex flex-col h-full w-full">
       {/* 1. TOP HEADER BAR */}
-      {recovery && <div role="dialog" aria-label="Recover previous session" className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/75 p-4"><div className="max-w-md w-full bg-slate-900 border border-slate-600 rounded-xl p-5 space-y-4"><h2 className="text-lg font-semibold">Recover previous session?</h2><p className="text-sm text-slate-300">An automatically saved project was found from your previous session.</p><div className="bg-slate-800 rounded p-3"><strong>{recovery.state?.activeProjectName || 'Recovered project'}</strong><div className="text-xs text-slate-400">{new Date(recovery.timestamp).toLocaleString()}</div></div><div className="flex flex-wrap gap-2"><button className="bg-sky-700 rounded px-3 py-2 text-sm" onClick={() => { try { const restored = normalizeProjectInput(recovery.state); installDocument(restored, true); setRecovery(null); } catch (err) { alert('Recovery failed: ' + (err instanceof Error ? err.message : String(err))); } }}>Recover project</button><button className="bg-slate-700 rounded px-3 py-2 text-sm" onClick={() => { setRecovery(null); }}>Continue with blank project</button></div><p className="text-xs text-slate-400">Continuing leaves the previous recovery record available in the Project Directory until another draft is autosaved.</p></div></div>}
+      {recovery && <div role="dialog" aria-modal="true" aria-label="Recover previous session" className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/75 p-4"><div className="max-w-md w-full bg-slate-900 border border-slate-600 rounded-xl p-5 space-y-4"><h2 className="text-lg font-semibold">Recover previous session?</h2><p className="text-sm text-slate-300">An automatically saved project was found from your previous session.</p><div className="bg-slate-800 rounded p-3"><strong>{recovery.state?.activeProjectName || 'Recovered project'}</strong><div className="text-xs text-slate-400">{new Date(recovery.timestamp).toLocaleString()}</div></div><div className="flex flex-wrap gap-2"><button className="bg-sky-700 rounded px-3 py-2 text-sm" onClick={() => { try { const restored = normalizeProjectInput(recovery.state); installDocument(restored, true); setRecovery(null); } catch (err) { alert('Recovery failed: ' + (err instanceof Error ? err.message : String(err))); } }}>Recover project</button><button className="bg-slate-700 rounded px-3 py-2 text-sm" onClick={() => { setRecovery(null); }}>Continue with blank project</button></div><p className="text-xs text-slate-400">Continuing leaves the previous recovery record available in the Project Directory until another draft is autosaved.</p></div></div>}
       {storageWarning && <div role="alert" className="bg-amber-950 text-amber-100 px-3 py-2 text-sm">{storageWarning}</div>}
+      <div className="contents" inert={!!recovery}>
       <HeaderBar
         key={workspaceEpoch}
         state={state}
@@ -790,6 +783,7 @@ function AppContent() {
         onLoadProject={handleLoadProjectFromDirectory}
         onNewBlankProject={handleNewBlankProject}
       />
+      </div>
       </div>
 
       {/* Context Menu UI */}
