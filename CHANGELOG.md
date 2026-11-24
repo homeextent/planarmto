@@ -18,14 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserve floor formulas, CAD workspace isolation and PDF underlays; consolidated pricing/reporting remains gated until C.2. Specialist drafting/measurement engines remain C.1B–D; integrated ownership checks C.1E.
 - Owner accepted candidate `8e4a0e6` on 2026-11-24: 14 local checks passed, zero failed, cursor responsiveness N/A/deferred for independent investigation, two historical export checks waived (obsolete records). CI #38 run 45459637724/job 138678390424: 37/37 tests (17 persistence, 8 architecture, 7 lifecycle, 5 measurement), TypeScript/build/audit (zero vulnerabilities)/PHP/PDF worker and isolated WordPress round trip passed. Nonblocking Node url.parse deprecation warning. Owner authorized documentation-only closeout and staging merge subject to final CI; main remains unchanged.
 
-### Increment B (integrated)
+- PR #8 merged into staging at `c1a0bf7` after documentation-only candidate `3d0830e` passed CI #40 ([run 45462442984](https://github.com/homeextent/planarmto/actions/runs/45462442984)). Post-merge staging push [run 45462698052](https://github.com/homeextent/planarmto/actions/runs/45462698052), job 138689310248, completed successfully; owner CLI and job details verified. C.1A formally complete. Production `main` remains v2.15.1 at `0423cb6`.
+
+### Increment B (integrated; schema v2 superseded by C.1A)
 
 ### Added
 - B.1 canonical schema v2, typed optional workspaces and explicit scope ownership; B.2 workspace management, independent geometry/calibration/history, shared rates, full-document save/export/import and session recovery.
 ### Fixed
 - Clean startup hydration, recovery preservation, structural sharing in CAD updates and removal of unused cost calculations for unquantified typed projects.
 ### Validation
-- B.1 PR #6 accepted; B.2 PR #7 candidate `5d821f7` passed CI #29 (run 45447983433), 29/29 tests, audit and three-workspace WordPress round trip. Owner passed 10/10 functional corrective checks; reported no cursor lag after matching displays near 60 Hz. Owner authorized proceeding; sustained and controlled baseline performance measurement not independently established. No production promotion; specialist takeoff and consolidation remain Increment C.
+- B.1 PR #6 accepted; B.2 PR #7 candidate `5d821f7` passed CI #29 (run 45447983433), 29/29 tests, audit and three-workspace WordPress round trip. Owner passed 10/10 functional corrective checks; reported no cursor lag after matching displays near 60 Hz. Owner authorized proceeding; sustained and controlled baseline performance measurement not independently established. Final accepted B.2 candidate `32c1569` passed CI #32 (run 45453385544); PR #7 merged at `99c5985`, with successful post-merge push CI confirmed by owner CLI. No production promotion; specialist takeoff and consolidation remain Increment C.
 
 ## [2.15.1] - 2026-11-24 — Production compatibility hotfix
 
