@@ -112,3 +112,37 @@ test('roof workspace geometry stays independent when switching to floor and back
   await page.getByLabel('Select roof entity').selectOption({index:1});
   await area(page,'1200.00');
 });
+
+test('imperial fractional dimensions preserve exact canonical area', async ({page}) => {
+  await rectangle(page);
+  await dimensions(page, "20' 6\",10'");
+  await area(page,'205.00');
+});
+
+test('metric keyboard dimensions are converted to canonical feet', async ({page}) => {
+  await page.getByRole('button',{name:'Metric (m)',exact:true}).click();
+  await rectangle(page);
+  await dimensions(page,'12.192,9.144');
+  await area(page,'1200.00');
+});
+
+test('opening outside its selected parent cannot commit', async ({page}) => {
+  await rectangle(page);
+  await page.getByRole('button',{name:'Roof opening',exact:true}).click();
+  await clickCanvas(page,600,500);
+  await clickCanvas(page,680,580);
+  await expect(page.getByRole('alert').filter({hasText:/contain|outside|parent|boundary|within/i})).toBeVisible();
+  await expect(entities(page)).toHaveCount(2);
+});
+
+test('selected plane with a dependent classified boundary cannot be silently replaced', async ({page}) => {
+  await rectangle(page);
+  await page.getByRole('button',{name:'6:12',exact:true}).click();
+  await page.getByRole('button',{name:'Classify edge',exact:true}).click();
+  await clickCanvas(page,400,250);
+  await expect(entities(page)).toHaveCount(3);
+  await page.getByLabel('Select roof entity').selectOption({index:1});
+  await page.getByRole('button',{name:'Generate roof skeleton',exact:true}).click();
+  await expect(page.getByRole('alert').filter({hasText:/depend|edge|reference|replace/i})).toBeVisible();
+  await expect(entities(page)).toHaveCount(3);
+});
