@@ -100,7 +100,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       // PDF underlays store the raster once; legacy image imports remain unchanged.
       const next: FloorplanState = { ...origin, underlay: {
         src: result.src, worldX: 0, worldY: 0,
-        feetPerPixel: 50 / result.width, opacity: .7, isLocked: false, isVisible: true,
+        feetPerPixel: 50 / result.width, opacity: .5, isLocked: false, isVisible: true,
         pdfSource: { filename, page, width: result.width, height: result.height },
       }};
       const encoded = JSON.stringify(next);
@@ -232,7 +232,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             worldX: 0,
             worldY: 0,
             feetPerPixel: defaultFpp,
-            opacity: 0.7,
+            opacity: 0.5,
             isLocked: false,
             isVisible: true,
           },
