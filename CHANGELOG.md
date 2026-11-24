@@ -20,7 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Surface browser quota, automatic recovery and WordPress project-save failures rather than falsely acknowledging successful persistence.
 - Updated dependency lockfile and scoped Express qs override; local audit previously reported zero findings.
 
-Release remains gated on final build, persistence and production-style worker verification; no deployment yet.
+### Validation
+- Owner accepted local PDF import, calibration, drafting, persistence, default opacity and unchanged MTO.
+- GitHub Actions run 45398914590 at ce10256 passed all eight persistence regressions, build, audit, PHP syntax and isolated WordPress REST/database/worker delivery tests.
+- Added independent validation CI. Staging integration and separately approved production deployment remain pending; SiteGround browser smoke testing remains required.
 
 ## [2.14.3] - 2026-11-23
 
