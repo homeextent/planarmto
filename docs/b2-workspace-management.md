@@ -1,6 +1,6 @@
 # B.2 — Typed workspace management and persistence
 
-Status: owner accepted for staging integration; final documentation candidate CI pending. Based on accepted B.1 staging commit 0c19c0874350292f6f633ab72f5ae60589f0c758. Production v2.15.1 remains unchanged. B and C are jointly gated for v2.16.0.
+Status: completed historical B.2 acceptance record; schema v2 and legacy estimator availability described below are superseded by C.1A on staging. Based on accepted B.1 staging commit 0c19c0874350292f6f633ab72f5ae60589f0c758. Production v2.15.1 remains unchanged. B and C are jointly gated for v2.16.0.
 
 ## Implemented candidate
 
@@ -35,3 +35,8 @@ Owner initial local review: 13 of 17 checks passed; shared settings/rates, recov
 ## Owner acceptance and staging authorization — 2026-11-24
 
 Corrective candidate 5d821f706b7e8d0818f19ea0bc512b30b6086aab passed Validate PlanarMTO #29, run 45447983433, job 138636973645: 14 persistence, eight architecture and seven workspace lifecycle tests (29 total); zero audit findings; build, PHP, worker delivery and three-workspace WordPress/database round trip passed. Owner confirmed all ten non-performance corrective checks passed, including storage safeguards, without an independently witnessed browser quota exhaustion test. Cursor responsiveness initially pending. System sampling showed 77–95% CPU idle and 9.8 GiB available RAM, NVIDIA GTX 1060 3GB sampled at 93% GPU use, Chrome hardware-accelerated Canvas/compositing and mixed display refresh rates. Owner reported no cursor lag after changing display settings near 60 Hz. Environmental contribution suspected, not conclusively isolated; no sustained or controlled v2.15.1 comparison independently recorded. Owner subsequently authorized proceeding. Accept functional B.2 for staging, retain performance observation for regression monitoring. No further source changes in documentation closeout. C.1/C.2 and production promotion remain separately gated.
+
+
+## Final integration record
+
+Owner accepted final candidate `32c1569`; CI #32 run 45453385544 passed, PR #7 merged at `99c5985` and owner CLI confirmed successful post-merge staging push CI (55 seconds). C.1A subsequently superseded the schema and legacy compatibility policy; refer to [C.1A](c1a-measurement-architecture.md) for current authority. Historical B.2 requirements and evidence are preserved, not current instructions to re-enable legacy reporting.

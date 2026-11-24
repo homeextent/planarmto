@@ -1,104 +1,76 @@
-# Developer & Git Cheat Sheet
+# PlanarMTO Developer & Repository Protocol
 
-## Branch & Release Workflow (`staging` → `main`)
-- **Active Development Branch (`staging`):** All feature work, bug fixes, refactors, and AI agent sessions (**Antigravity** and **Roo Code**) MUST run on the **`staging`** branch.
-- **Protected Production Branch (`main`):** Never commit experimental or unverified edits directly to `main`. `main` represents verified production releases deployed to WordPress.
-- **Automated CI/CD Deployment:** Merging `staging` into `main` and pushing to GitHub triggers automated deployment via GitHub Actions (`.github/workflows/deploy.yml`). The workflow builds the production assets and deploys `planar-mto.php` + `dist/` directly to SiteGround (`/wp-content/plugins/planar-mto/`) at `https://theinnovativegroup.ca/planarmto/`, then flushes the SiteGround Dynamic Cache.
-- **Manual Offline Backup:** `npm run build:zip` remains available at any time as a manual offline backup generator.
-- **AI Agent Pre-Flight Rule:** Before modifying any files, Antigravity and Roo Code must verify `git branch --show-current` is `staging` (if on `main`, run `git checkout staging` first).
+## Governing workflow
 
-**Standard Development Loop (on `staging`)**
-```bash
-git checkout staging
-git add .
-git commit -m "feat: description of work"
-git push
-```
+Applies to every developer and AI agent. Read README, SYSTEM_BIBLE, CHANGELOG and the active milestone specification before changing files. Confirm the exact staging baseline and a clean working tree. Never develop directly on staging or main. Staging is the integration branch; main is deployed production. Owner-approved scope, CI, technical review and acceptance are mandatory.
 
-## Production Release Loop (`staging` → `main` → SiteGround Production)
+1. Define architecture, bounded scope and acceptance criteria. Do not expand dependencies, infrastructure, spending or release scope without authorization.
+2. Branch from validated staging (feature/<increment>-<description> or docs/<description>). Verify branch and repository before editing.
+3. Make logical commits on the isolated branch. Open draft PR targeting staging when substantially implemented. Intermediate feature commits need not trigger CI.
+4. Review actual CI results for exact HEAD and resolve failures. Review safeguards, regression coverage and code; passing CI is not equivalent to browser acceptance.
+5. Obtain owner local production-preview acceptance for visible/interactive changes. Documentation-only changes do not require visual acceptance.
+6. Synchronize README, CHANGELOG, SYSTEM_BIBLE, milestone documents and DEVELOPER if workflow changes. Keep Unreleased entries until separately authorized production version bump; record exact commit/run IDs, waivers, limitations and pending gates.
+7. Revalidate exact final HEAD, check staging baseline and mergeability, then merge PR into staging only with owner authorization. Verify post-merge push CI and synchronize local staging.
+8. Production promotion requires separate explicit authorization, release PR to main, successful CI, approved version/tag as applicable, deployment verification and live smoke tests. Never bypass protections or push directly to main. Do not trigger deployment manually from feature or staging branches.
 
-1. Verify all changes locally in `npm run dev` (http://localhost:3000/) and run `npm run lint` (`tsc --noEmit`).
-2. Merge `staging` into `main`, tag the release, and push to GitHub:
+## Local commands
+
+Repository: homeextent/planarmto. Local path: /media/jeremy/MEDIA/dev/repos/planarmto. Use Node 22 (CI parity). Stop previous dev/preview process with Ctrl+C before dependency installation or builds.
 
 ```bash
-git checkout main
-git pull origin main
-git merge staging
-git tag v2.14.2
-git push origin main --tags
-git checkout staging
-```
-
-Pushing to `main` automatically triggers GitHub Actions (`deploy.yml`):
-- Runs `npm ci`, `npm run lint` (`tsc --noEmit`), and `npm run build` (`vite build`).
-- Deploys `planar-mto.php` and `dist/` directly to `/wp-content/plugins/planar-mto/` over SiteGround SSH.
-- Flushes the SiteGround dynamic cache.
-- Can also be triggered manually via `workflow_dispatch` in GitHub Actions.
-
-*Note: For an offline backup archive, run `npm run build:zip` from `main` to generate `../../builds/planar-mto.zip`.*
-
-## Local Development
-- Start local dev server: `npm run dev`
-- Open local preview in browser: http://localhost:3000/
-- Type-check TypeScript without emitting files: `npm run lint`
-- Install new package: `npm install <package-name>`
-- Run build check: `npm run build`
-- Build WP Plugin Package (Offline Backup): `npm run build:zip` (Compiles React assets and exports `planar-mto.zip` to builds directory `../../builds/`)
-- Deploy WP Plugin: Automated via GitHub Actions on push to `main` (manual upload via WP Admin remains available using `planar-mto.zip` backup if ever needed)
-- Flush WP Permalinks: Go to Settings > Permalinks and click Save Changes (required if `/planarmto` endpoint returns 404)
-
-## Multi-Tenant Development & API (v2.1.0+)
-- Storage Abstraction: `src/utils/storage.ts` automatically switches between WordPress REST API and localStorage based on `isWP()`.
-- REST API: Custom namespace `planarmto/v1` handles project CRUD, branding, and global rates.
-- Database: `wp_planarmto_projects` stores user-scoped data indexed by `tenant_id` (`get_current_user_id()`).
-- Testing: When developing locally (`npm run dev`), the system uses localStorage. To test MySQL persistence, build and install the plugin on a WordPress instance.
-
-## Git Basics & Terminal Usage
-- Check current branch and modified/staged files: `git status`
-- Switch to staging branch: `git checkout staging`
-- Stage all changes for commit: `git add .`
-- Commit changes with message: `git commit -m "feat: description of work"`
-- Push commits to GitHub: `git push`
-- Pull latest changes from remote: `git pull`
-- Terminal Prompt Tip: Do NOT copy the terminal prefix (e.g., `jeremy@jeremy-pc:...$`). Only type/paste the text that appears after the `$` symbol.
-
-## Git Advanced & Project Backups
-- Create clean `.zip` archive of committed code outside root: `git archive -o ../planarMTO.zip HEAD`
-- Create `.zip` archive including uncommitted edits: `zip -r ../project-backup.zip . -x "*.git*" "node_modules/*"`
-- Create and switch to new branch: `git checkout -b branch-name`
-- Discard uncommitted edits on a single file: `git checkout -- <path/to/file>`
-- Undo last commit (keep local edits): `git reset --soft HEAD~1`
-- View commit log history: `git log --oneline`
-
-## Hard Reset Local Branch to Match GitHub
-To completely discard all local modifications, delete untracked files, and reset your active branch (`staging`) to match GitHub:
-
-```bash
+git status
 git fetch origin
-git reset --hard origin/staging
-git clean -fd
+git switch staging
+git pull --ff-only origin staging
+git switch -c feature/example
 ```
-*(Replace `origin/staging` with `origin/main` if resetting `main`.)*
 
-- `git fetch origin`: Downloads the latest state and commit history from GitHub without touching local working files.
-- `git reset --hard origin/staging`: Forces local tracked files to match `origin/staging`, permanently discarding all uncommitted local modifications.
-- `git clean -fd`: Removes all untracked files and directories created locally during build or test runs.
+For an existing remote feature branch, use git switch <branch> (or git switch --track origin/<branch> on first checkout), then git pull --ff-only origin <branch>. Check git log -1 --oneline against the validated candidate. Stage only intended paths and inspect git diff --cached before commit. Never use force push, hard reset, or git clean on user work without explicit authorization and preservation review.
 
-## System & VS Code Troubleshooting
-- Reload VS Code extension host: `Ctrl + Shift + P` -> Developer: Reload Window
-- Toggle Developer Console: Help > Toggle Developer Tools
-- Force kill VS Code (run in Linux terminal `Ctrl + Alt + T`): `pkill -9 -f code`
-- Reopen project from terminal: `code /media/jeremy/MEDIA/dev/repos/planarmto`
-- Verify Ripgrep installation: `rg --version`
+Install locked dependencies with npm ci when needed (fresh checkout or dependency lock change); no reinstall required for unchanged dependencies in a working environment. Development server: npm run dev (port 3000, binds all interfaces). Acceptance uses the production bundle:
 
-## Roo Code Workflow
-- Branch Check: Confirm `git branch` is on `staging` before starting any task.
-- Mode Selection: Use Architect Mode for codebase audits and handoffs, then switch to Code Mode for multi-file edits.
-- Model Selection: Use `gemini-flash-latest` with thinking tokens capped (~3,000–4,000) and auto-condense threshold set to 40%.
-- Start New Session: Click the `+` (New Task) icon at top-right before starting a new feature sprint or release packaging step.
+```bash
+npm run lint && npm run build && npm run preview -- --host 127.0.0.1
+```
 
-## Repository Maintenance Protocol
-Following the completion and user approval of any feature, bug fix, or architectural modification on `staging` (prior to merging to `main`), the codebase build process must systematically update:
-- `README.md`: If new UI controls, toolbar options, or workflow capabilities are added.
-- `SYSTEM_BIBLE.md`: If mathematical formulas, topological algorithms, calculation logic, or data structures are altered.
-- `CHANGELOG.md`: Generate a new semantic version entry (`[vX.X.X]`) documenting feature releases, refactors, and QA resolutions.
+Open http://127.0.0.1:4173 (or port shown by Vite). Local browser storage is distinct from production. Preserve real project data; use disposable fixtures/profiles for destructive or quota tests. Do not deliberately fill normal browser storage.
+
+## CI and exact-commit verification
+
+.github/workflows/validate.yml runs on PRs targeting staging/main, staging pushes, and manual dispatch. It uses Node 22, npm ci, TypeScript lint, persistence/project-document/workspace-controller/measurement-contracts tests, production build, npm audit --audit-level=high, PHP lint, PDF worker naming/reference/byte checks and isolated WordPress integration. Keep tests synchronized with the active milestone.
+
+```bash
+npx --no-install tsx --test tests/persistence.test.ts tests/project-document.test.ts tests/workspace-controller.test.ts tests/measurement-contracts.test.ts
+npm run lint
+npm run build
+npm audit --audit-level=high
+php -l planar-mto.php
+```
+
+The isolated WordPress integration is bash tests/wordpress-integration.sh in the configured CI environment. Do not claim actual SiteGround/browser acceptance from isolated tests.
+
+GitHub connector commit lookup may omit push-triggered runs. Verify with GitHub CLI using the full staging merge SHA:
+
+```bash
+gh run list --repo homeextent/planarmto --branch staging --commit <merge-sha> --limit 5 --json databaseId,status,conclusion,event,url
+```
+
+Use the exact run ID to retrieve job details and logs. Do not merge against stale or queued CI. If CI discovery is blocked, report the limitation and obtain independent evidence rather than assume success.
+
+## Architecture and storage
+
+Current staging authority: schema v3; C.1A accepted and integrated at c1a0bf7. Four optional typed workspaces with independent geometry/calibration; shared project settings/rates. Specialist contracts are structural groundwork, not completed specialist engines. Preserve existing floor formula regression tests. Unquantified is not zero; assignment is not completeness. No consolidated estimates/print until C.2. Historical legacy/unversioned records are retired, retained without automatic deletion, and unsupported records are export-only. Explicit v2 preview migration is bounded. Separate v3 recovery key. Do not remove historical data as part of normal development.
+
+src/utils/storage.ts selects authenticated WordPress REST or guest localStorage. REST namespace planarmto/v1 handles project CRUD, branding and rates; WordPress project data is user-scoped. Authenticated project failures surface without guest fallback. Full document validation and provisional per-image/project budgets apply. See SYSTEM_BIBLE for governing architecture.
+
+## Production deployment and backups
+
+Production remains v2.15.1 until separately authorized combined B/C release v2.16.0. .github/workflows/deploy.yml runs on main pushes or manual dispatch; it uses npm ci, lint and build, then rsyncs planar-mto.php and dist to SiteGround over SSH port 18765 and attempts cache flush. Manual dispatch is a production operation and must only use the authorized production ref. Do not expose secret values or change hosting configuration without authorization. Verify deployment result and live PDF import, authentication, persistence and release-specific features. Live URL: https://theinnovativegroup.ca/planarmto/.
+
+npm run build:zip creates ../../builds/planar-mto.zip relative to the repository root (verified packaging script). This is an offline backup of the selected committed release when run from a clean checkout; it is not a deployment approval. Preserve prior artifacts separately if needed, because the script replaces the existing ZIP. For a tracked-source backup, git archive -o ../planarMTO.zip HEAD. Review uncommitted/untracked data before creating wider backups. If /planarmto returns 404, investigate deployment and WordPress routing; permalink refresh is a separate administrative operation.
+
+## Current milestone evidence
+
+PR #8 merged into staging at `c1a0bf7` after documentation-only candidate `3d0830e` passed CI #40 ([run 45462442984](https://github.com/homeextent/planarmto/actions/runs/45462442984)). Post-merge staging push [run 45462698052](https://github.com/homeextent/planarmto/actions/runs/45462698052), job 138689310248, completed successfully; owner CLI and job details verified. C.1A formally complete. Production `main` remains v2.15.1 at `0423cb6`.
+
+Next: C.1B roof drafting and measurement after documentation synchronization. No production promotion or C.1B implementation as part of this housekeeping.
