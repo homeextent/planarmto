@@ -6,6 +6,18 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     base: './',
+    // SiteGround CDN omits JavaScript MIME for .mjs assets. Keep the PDF.js
+    // module worker bytes unchanged, but publish them with a .js extension.
+    build: {
+      rollupOptions: {
+        output: {
+          assetFileNames: (asset) =>
+            asset.names.some(name => name === 'pdf.worker.min.mjs')
+              ? 'assets/pdf.worker.min-[hash].js'
+              : 'assets/[name]-[hash][extname]',
+        },
+      },
+    },
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
