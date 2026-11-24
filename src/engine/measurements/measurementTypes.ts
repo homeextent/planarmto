@@ -3,11 +3,12 @@ export type Point = { x: number; y: number };
 export type SpecialistKind = 'roof' | 'foundation' | 'site';
 export type MeasurementSource = { reference: string; note?: string };
 type Identity = { id: string; physicalId: string; assemblyId: string; source: MeasurementSource };
+export type Applicability = 'included'|'excluded'|'unspecified';
 export type RoofEntity = Identity & (
   | { kind: 'roofPlane'; polygon: Point[]; pitchRise: number | null; slopeDegrees: number | null; elevationFt: number | null }
-  | { kind: 'roofEdge'; start: Point; end: Point; planeIds: string[]; edgeType: 'eave'|'rake'|'ridge'|'hip'|'valley'|'abutment'|'parapet'|'unclassified' }
-  | { kind: 'roofOpening'; polygon: Point[]; planeId: string }
-  | { kind: 'roofSurface'; polygon: Point[]; purpose: 'soffit'|'insulation'; pitchRise: number | null; depthFt?: number }
+  | { kind: 'roofEdge'; start: Point; end: Point; planeIds: string[]; applicability?: { fascia?: Applicability; gutter?: Applicability; soffit?: Applicability }; edgeType: 'eave'|'rake'|'ridge'|'hip'|'valley'|'abutment'|'parapet'|'unclassified' }
+  | { kind: 'roofOpening'; polygon: Point[]; planeId: string; deduction?: Applicability }
+  | { kind: 'roofSurface'; polygon: Point[]; purpose: 'soffit'|'insulation'; pitchRise: number | null; depthFt?: number; insulationType?: string; surfaceBasis?: 'horizontal'|'sloped' }
 );
 export type FoundationEntity = Identity & (
   | { kind: 'foundationWall'|'stripFooting'; start: Point; end: Point; widthFt: number | null; heightFt: number | null; elevationFt: number | null }
@@ -38,6 +39,7 @@ const str = (x: unknown) => typeof x === 'string' && x.trim().length > 0;
 const num = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 const positiveOrMissing = (x: unknown) => x === null || (num(x) && x > 0);
 const finiteOrMissing = (x: unknown) => x === null || num(x);
+const applicability = (v: unknown) => v === undefined || ['included','excluded','unspecified'].includes(v as string);
 const pitch = (x: unknown) => x === null || (num(x) && x >= 0);
 const point = (x: unknown): x is Point => obj(x) && num(x.x) && num(x.y);
 function check(ok: unknown, msg: string): asserts ok { if (!ok) throw new Error('Invalid measurement: '+msg); }
@@ -63,9 +65,9 @@ export function validateSpecialistEntities(type: string, entities: unknown): ass
     check(allowed[type as SpecialistKind].includes(e.kind),'entity incompatible with workspace');
     switch(e.kind) {
       case 'roofPlane': check(polygon(e.polygon)&&pitch(e.pitchRise)&&finiteOrMissing(e.elevationFt)&&(e.slopeDegrees===null||(num(e.slopeDegrees)&&e.slopeDegrees>=0&&e.slopeDegrees<360)),'roof plane'); break;
-      case 'roofEdge': check(line(e)&&Array.isArray(e.planeIds)&&e.planeIds.length>0&&e.planeIds.length<=2&&new Set(e.planeIds).size===e.planeIds.length&&['eave','rake','ridge','hip','valley','abutment','parapet','unclassified'].includes(e.edgeType),'roof edge'); break;
-      case 'roofOpening': check(polygon(e.polygon)&&str(e.planeId),'roof opening'); break;
-      case 'roofSurface': check(polygon(e.polygon)&&['soffit','insulation'].includes(e.purpose)&&pitch(e.pitchRise)&&(e.depthFt===undefined||num(e.depthFt)&&e.depthFt>0),'roof surface'); break;
+      case 'roofEdge': check(line(e)&&Array.isArray(e.planeIds)&&e.planeIds.length>0&&e.planeIds.length<=2&&new Set(e.planeIds).size===e.planeIds.length&&['eave','rake','ridge','hip','valley','abutment','parapet','unclassified'].includes(e.edgeType),'roof edge'); check(e.applicability===undefined||(obj(e.applicability)&&Object.keys(e.applicability).every(k=>['fascia','gutter','soffit'].includes(k))&&Object.values(e.applicability).every(applicability)),'edge applicability'); break;
+      case 'roofOpening': check(polygon(e.polygon)&&str(e.planeId),'roof opening'); check(applicability(e.deduction),'opening deduction'); break;
+      case 'roofSurface': check(polygon(e.polygon)&&['soffit','insulation'].includes(e.purpose)&&pitch(e.pitchRise)&&(e.depthFt===undefined||num(e.depthFt)&&e.depthFt>0),'roof surface'); check((e.insulationType===undefined||str(e.insulationType))&&(e.surfaceBasis===undefined||['horizontal','sloped'].includes(e.surfaceBasis))&&(e.surfaceBasis!=='horizontal'||e.pitchRise===0),'surface basis'); break;
       case 'foundationWall': case 'stripFooting': check(line(e)&&positiveOrMissing(e.widthFt)&&positiveOrMissing(e.heightFt)&&finiteOrMissing(e.elevationFt),'foundation line assembly'); break;
       case 'padFooting': case 'slab': case 'foundationRegion': check(polygon(e.polygon)&&positiveOrMissing(e.depthFt)&&finiteOrMissing(e.elevationFt)&&['concrete','insulation','excavation','backfill','granular'].includes(e.purpose)&&(!['padFooting','slab'].includes(e.kind)||e.purpose==='concrete'),'foundation region'); break;
       case 'foundationLine': check(line(e)&&['drainage','waterproofing'].includes(e.purpose)&&(e.heightFt===undefined||num(e.heightFt)&&e.heightFt>0),'foundation linear feature'); break;
