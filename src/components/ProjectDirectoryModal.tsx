@@ -390,7 +390,9 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {filteredProjects.map((project) => {
-                const isEditing = editingId === project.id;
+                let openable = true;
+                try { normalizeProjectInput(project.state); } catch { openable = false; }
+                const isEditing = editingId === project.id && openable;
                 const formattedDate = new Date(project.updatedAt).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -441,7 +443,9 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
                               <h3 className="text-sm font-bold text-slate-100 truncate group-hover:text-sky-300 transition-colors">
                                 {project.name}
                               </h3>
+                              {!openable && <span className="text-amber-300 text-[10px]">Export only</span>}
                               <button
+                                disabled={!openable}
                                 onClick={() => handleStartRename(project)}
                                 className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-500 hover:text-slate-300 transition-opacity"
                                 title="Rename project"
@@ -471,6 +475,7 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
                             <Download className="w-3.5 h-3.5" />
                           </button>
                           <button
+                            disabled={!openable}
                             onClick={() => handleDuplicate(project)}
                             className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
                             title="Duplicate project"
@@ -539,6 +544,7 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
 
                     {/* Open Button */}
                     <button
+                      disabled={!openable}
                       onClick={() => {
                         onLoadProject({ ...project.state, activeProjectId: String(project.id), activeProjectName: project.name }, project.name);
                         onClose();
@@ -546,7 +552,7 @@ export const ProjectDirectoryModal: React.FC<ProjectDirectoryModalProps> = ({
                       className="w-full py-2 bg-slate-800 hover:bg-sky-600 text-slate-200 hover:text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 hover:border-sky-500 cursor-pointer transition-all shadow-sm"
                     >
                       <FolderOpen className="w-3.5 h-3.5" />
-                      <span>Open in CAD Canvas</span>
+                      <span>{openable ? 'Open in CAD Canvas' : 'Historical or unsupported project — export only'}</span>
                     </button>
                   </div>
                 );
