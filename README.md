@@ -147,3 +147,8 @@ For standalone web hosting or local development:
 - **Icons**: Lucide React
 - **PDF Engine**: jsPDF & html2canvas
 - **Data Persistence**: Browser localStorage with JSON export/import
+
+
+## PDF blueprint import (Increment A — release candidate)
+
+Import a PDF via **Import Blueprint**; single-page files bypass the picker, while multi-page files show paginated thumbnails. Choose a sheet and a target longest edge (3,400 / 5,000 / 6,000 pixels). The browser rasterizes and optimizes the selected sheet locally, displays the actual dimensions, and uses the existing two-point calibration workflow. New PDF and image underlays default to 50% opacity; saved opacity is preserved. One underlay is supported per project; independent floor workspaces and consolidated level-aware MTO are future increments. See [validation and deployment notes](docs/pdf-blueprint-import.md).
