@@ -2366,7 +2366,10 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     if(roofMode==='polygon'&&activeTool!=='roof_generate'&&roofDraft.length>=3){
       const first=roofDraft[0];
       const locked=roofLock.current?.type==='node'&&distance(roofLock.current.point,first)<1e-6;
-      if(distance(raw,first)<=(locked?30:15)/transform.scale){
+      const gridTarget=state.settings.gridSnap?snapPointToGrid(raw,state.settings.gridSnapSize):raw;
+      // A click on the same grid cell as the first vertex must close the draft,
+      // even when grid spacing is larger than the screen-space capture radius.
+      if(distance(raw,first)<=(locked?30:15)/transform.scale||distance(gridTarget,first)<=1e-6){
         const target:RoofSnap={point:first,type:'node'};roofLock.current=target;return target;
       }
     }
