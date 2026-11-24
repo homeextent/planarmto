@@ -30,6 +30,8 @@ jobs:
         run: npm run lint
       - name: Persistence regression tests
         run: npx --no-install tsx --test tests/persistence.test.ts
+      - name: Typed workspace architecture regression tests
+        run: npx --no-install tsx --test tests/project-document.test.ts
       - name: Production build
         run: npm run build
       - name: Dependency audit
