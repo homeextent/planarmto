@@ -51,3 +51,14 @@ test('canonical round trip and history retain specialist geometry and shared set
  const invalid={...restored,workspaces:restored.workspaces.map(w=>w.id==='roof'?{...w,measurements:[p,plane('overlap',rect(1,1,5,5))]}:w)};
  assert.throws(()=>serializeProjectDocument(invalid),/Overlapping/);
 });
+
+test('duplicate soffit surfaces rejected; independent insulation permitted',()=>{
+ const a:RoofEntity={...base('s'),kind:'roofSurface',polygon:rect(0,0,10,2),purpose:'soffit',surfaceBasis:'horizontal',pitchRise:0};
+ assert.throws(()=>validateRoofTopology([a,{...a,...base('s2')}]),/Overlapping same-purpose/);
+ validateRoofTopology([a,{...a,...base('i'),purpose:'insulation'}]);
+});
+test('geometric opening area survives unspecified deduction',()=>{
+ const p=plane('p');const o:RoofEntity={...base('o'),kind:'roofOpening',polygon:rect(2,2,4,5),planeId:'p'};
+ near(value([p,o],'roof.opening.projected'),20);
+ assert.equal(measureRoof('roof',[p,o]).rows.find(r=>r.code==='roof.covering')?.status,'unquantified');
+});
