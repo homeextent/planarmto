@@ -1,12 +1,12 @@
 # PDF blueprint import — Increment A
 
-Status: implementation candidate; dependency lockfile and validation outstanding. Do not merge or deploy.
+Status: release candidate, owner local functional acceptance recorded before final opacity/persistence changes. Final validation outstanding; do not deploy or merge until approved.
 
-- Browser-only PDF.js worker, selected-page rasterization, 12-page thumbnail batches, single-page bypass, 3400/5000/6000-pixel targets, 24-million-pixel cap and adaptive PNG/WebP/JPEG encoding.
-- Conservative 700,000-character image cap and 2,000,000-character serialized project cap; localStorage probe is only a preflight, not a guarantee of persistence.
-- Source filename, page and raster dimensions saved with the existing singular underlay. Imported sheets require manual two-point calibration. Existing underlay replaced only after successful rasterization and preflight.
-- No multi-level state, drawing library, external service or MTO formula changes. Title-block detection deferred.
-- Existing persistence fallback can swallow quota errors; explicit save failure handling and realistic WordPress payload tests remain acceptance requirements.
+- Browser-only PDF.js worker, single-page bypass, 12-page thumbnail batches, 3400/5000/6000-pixel targets, 24-million-pixel cap, 80 MiB PDF cap, adaptive PNG/WebP/JPEG encoding and bounded downsampling.
+- 850,000-character encoded image cap and 2,000,000-character serialized project cap. Browser quota probe is only a preflight. Actual imported resolution is displayed. New PDF and image imports default to 50% opacity; stored opacity remains unchanged.
+- PDF filename, page and raster dimensions retained; canonical src avoids duplicate raster data for new PDFs. Manual two-point calibration, yellow calibration markers and amber wall/room previews. Existing underlay replaced only after successful import; cancellation preservation confirmed by owner.
+- Explicit local save and autosave failure feedback, authenticated WP save acknowledgement, DB write failure HTTP response, guest/local persistence distinction. Local directory rollback is best effort; no database migration.
+- No multi-level state, drawing library, external service or MTO formula changes. Title-block detection deferred. Independent floor workspaces are Increment B; level-aware consolidated MTO is Increment C.
 
 ## Validation before integration
-Run npm install --package-lock-only, npm ci, npm run lint, npm run build using the supported Node version. Commit the generated lockfile. Verify actual worker asset loading in WordPress production-style hosting. Review dependency security audit. Test existing image formats, single/multi-page PDFs, rotated sheets, large/scanned sheets, corrupt/password-protected files, cancel/failure, project switching, memory limits, calibration, project save/reload and unchanged MTO. Verify thumbnail rendering concurrency and cancellation. Test storage limits including duplicate autosave and directory payloads. Confirm no production deployment before approval.
+Owner previously confirmed PDF import, optimization, calibration, drafting, local save/reload and cancellation; earlier npm audit reported zero findings. Re-run npm ci, npm run lint, npm run build, npm audit and php -l planar-mto.php for the final candidate. Verify ordinary image imports and PDF default opacity, previously saved opacity, local save/reload, guest saves, quota failure and unchanged MTO. Test authenticated WP save/reload and simulated DB failure in a nonproduction WP environment. Verify generated worker .mjs loads from the plugin dist/assets directory with JavaScript MIME type in production-style hosting, not a login page or HTML response. Test rotated, corrupt/password-protected and large scanned PDFs and cancellation during processing as applicable. No deployment without owner approval.
