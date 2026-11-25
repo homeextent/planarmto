@@ -225,7 +225,8 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         try{
           if(selected.kind!=='roofPlane')throw Error('Select a rectangular roof plane, or clear selection to draw a new outline.');
           const p=selected.polygon;
-          resizeRectangle(p,Math.abs(p[2]?.x-p[0]?.x),Math.abs(p[2]?.y-p[0]?.y));
+          try { resizeRectangle(p,Math.abs(p[2]?.x-p[0]?.x),Math.abs(p[2]?.y-p[0]?.y)); }
+          catch { throw Error('Automatic roof skeleton generation requires a rectangular outline. For irregular roofs, draft individual roof planes and classify their boundaries manually.'); }
           if(roofEntities?.some(e=>(e.kind==='roofEdge'&&e.planeIds.includes(selected.id))||(e.kind==='roofOpening'&&e.planeId===selected.id)))throw Error('Selected roof plane has dependent edges or openings. Review those dependencies before replacement.');
           setGenerationOutline(p);setGenerationSource(selected);
           setGenerationConfig(c=>({...c,pitch:selected.pitchRise??0,type:selected.pitchRise===0?'flat':c.type==='flat'?'hip':c.type}));
@@ -2477,6 +2478,12 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   const rectangularDraft=activeTool==='roof_generate'||activeTool==='wall_rect'||activeTool==='room_box'||(roofAreaTool&&roofMode==='rectangle');
   const dimensionStart=roofAreaTool?roofDraft[roofDraft.length-1]:activeTool==='wall_pen'?(state.nodes.find(n=>n.id===activeWallStartNodeId)||pendingWallStart):rectangularDraft?roomBoxStart:null;
   const dimensionToward=roofAreaTool?roofCursor:draftMousePos;
+  const liveStart=recent?.start||dimensionStart;
+  const liveEnd=recent?.toward||draftDirection.current||dimensionToward;
+  const liveRect=recent?.rectangle??rectangularDraft;
+  const liveUnit=state.settings.unitSystem==='metric'?'m':'ft';
+  const liveFormat=(v:number)=>(v*(liveUnit==='m'?0.3048:1)).toFixed(2);
+  const liveValue=liveStart&&liveEnd?(liveRect?liveFormat(Math.abs(liveEnd.x-liveStart.x))+' × '+liveFormat(Math.abs(liveEnd.y-liveStart.y)):liveFormat(Math.hypot(liveEnd.x-liveStart.x,liveEnd.y-liveStart.y)))+' '+liveUnit:null;
   const commitDimensions=(value=dimensionA)=>{
     try{
       const last=recentRef.current;
@@ -2553,8 +2560,10 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       if(generationOutline||(activeTool==='roof_generate'&&selection.type==='roof'))return;
       const snapped=getRoofSnap(rawWorld).point;
       if(activeTool==='roof_edge'){
+        const existing=roofEntities.find(q=>q.kind==='roofEdge'&&segmentDistance(rawWorld,q.start,q.end).distance<=tolerance);
+        if(existing){onToolChange('select');onSelect({type:'roof',id:existing.id});return;}
         const boundary=boundaryAt(rawWorld,roofEntities,tolerance);
-        if(!boundary)return;
+        if(!boundary){setPolygonError('Click a roof plane boundary to classify an edge.');return;}
         const id=uuidv4(),entity:RoofEntity={id,physicalId:id,assemblyId:id,source:{reference:'Roof workspace drawing'},kind:'roofEdge',...boundary,edgeType:'unclassified'};
         if(onRoofChange([...roofEntities,entity])){onToolChange('select');onSelect({type:'roof',id});}
         return;
@@ -3216,6 +3225,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           <input aria-label="Dimensions" className="w-36 bg-slate-800 border rounded p-1" placeholder={(recent?.rectangle??rectangularDraft)?'Width,depth':'Length'} value={dimensionA} disabled={!recent&&!dimensionStart} onFocus={()=>{if(!draftDirection.current&&dimensionToward)draftDirection.current={...dimensionToward};}} onChange={e=>setDimensionA(e.target.value)}/>
           <button type="submit" disabled={!dimensionA} className="bg-sky-700 disabled:opacity-40 rounded px-2 py-1">Apply</button>
         </label>
+        {liveValue&&<p aria-label="Live drafting dimensions" className="text-sky-300">{recent?'Placement reference':'Live'}: {liveValue}</p>}
         <p>{recent?'Type dimensions to correct last placement':dimensionStart?'Type dimensions or click endpoint':'Ready'}</p>
         {dimensionError&&<p role="alert" className="text-amber-300">{dimensionError}</p>}
       </form>
@@ -3224,7 +3234,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-4 py-1.5 rounded-full text-xs text-slate-300 shadow-xl flex items-center gap-3">
         <span className={`flex items-center gap-1.5 font-medium ${activeTool === 'wall_pen' || activeTool === 'wall_rect' || activeTool === 'room_box' ? 'text-amber-200' : 'text-sky-400'}`}>
           <Compass className="w-3.5 h-3.5" />
-          {activeTool.startsWith('roof_') ? (activeTool==='roof_generate'?(generationOutline?'Configure roof skeleton':selection.type==='roof'?'Selected roof outline':'Draw rectangular roof outline'):activeTool==='roof_edge'?'Click a roof plane boundary':activeTool==='roof_vertex'?'Select vertex, then click new position':'Click polygon vertices, then Finish polygon') : activeTool === 'wall_pen'
+          {activeTool.startsWith('roof_') ? (activeTool==='roof_generate'?(generationOutline?'Configure roof skeleton':selection.type==='roof'?'Selected roof outline':'Draw rectangular roof outline'):activeTool==='roof_edge'?'Click a roof boundary or existing edge':activeTool==='roof_vertex'?'Select vertex, then click new position':`${activeTool==='roof_soffit'?'Draw soffit surface':activeTool==='roof_insulation'?'Draw insulation surface':activeTool==='roof_opening'?'Draw opening in selected plane':'Draw roof plane'} · ${roofMode==='rectangle'?(roofDraft.length?'Click opposite corner or type width,depth':'Click first corner'):'Click vertices; close at first or Finish polygon'}`) : activeTool === 'wall_pen'
             ? activeWallStartNodeId
               ? 'Click to place next wall node (Double-click / ESC to finish)'
               : 'Click to drop start node for wall'
