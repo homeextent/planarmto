@@ -330,3 +330,266 @@ test('R4 intersecting angled runs retain unresolved quantities across roundtrip 
  const row=m.rows.find(r=>r.elementId===c.id);assert.ok(row?.status==='measured');if(row?.status==='measured')closeQuantity(row.quantity,400/27);
  assert.equal(canReportProjectEstimate(restored),false);
 });
+
+import { previewAssemblyChange, applyAssemblyPreview } from '../src/engine/measurements/foundationAssemblyController';
+import type { AssemblyIntent, ManualDrainageRoute, Source } from '../src/engine/measurements/foundationAssemblyModel';
+import { addWorkspace, replaceFoundationPresets } from '../src/engine/workspaceController';
+
+const assemblySource:Source={kind:'plan',reference:'Synthetic confirmed takeoff'};
+const c=<T,>(value:T)=>({value,confirmation:assemblySource});
+const unconfigured={status:'pending',reason:'Awaiting owner decision'} as const;
+const poured={kind:'catalogue',category:'concrete',id:'poured concrete'} as const;
+function assemblyFixture(){
+ let seq=0;
+ const id=()=> 'fixture-id-'+(++seq);
+ const doc=addWorkspace(createProjectDocument(createBlankProject(),'floor'),'foundation','Synthetic foundation','foundation');
+ const vertices=[{x:0,y:0},{x:40,y:0},{x:40,y:30},{x:0,y:30}].map((point,i)=>({id:'vertex-'+i,point}));
+ const segments=vertices.map((v,i)=>({id:'edge-'+i,startVertexId:v.id,endVertexId:vertices[(i+1)%vertices.length].id}));
+ const input:AssemblyIntent={trace:{kind:'rectangle',reference:'exterior',vertices,segments,source:assemblySource},overrides:[],specifications:{
+  walls:{status:'included',specification:{material:c(poured),widthFt:c(8/12),heightFt:c(8),datum:c({basis:'base',elevationFt:0})}},
+  footing:unconfigured,drainage:unconfigured,exteriorLayers:[],slab:unconfigured,insulation:unconfigured,granular:unconfigured,
+ }};
+ return {doc,input,id};
+}
+function assemblyWallVolume(preview:ReturnType<typeof previewAssemblyChange>,code:string){
+ return preview.quantities.after.filter(r=>r.code===code&&r.status==='measured').reduce((sum,row)=>sum+(row.status==='measured'?row.quantity:0),0);
+}
+function expectVolume(actual:number,expected:number){
+ assert.ok(Math.abs(actual-expected)<1e-7,actual+' differs from '+expected);
+}
+test('coordinated assembly uses exact wall, strip, waterproofing and drainage engines with atomic history',()=>{
+ const {doc,input,id}=assemblyFixture();
+ input.specifications.footing={status:'included',specification:{material:c(poured),widthFt:c(2),depthFt:c(.5),alignment:c({kind:'centred'}),top:c({kind:'wallBase'})}};
+ input.specifications.drainage={status:'included',specification:{material:c({kind:'catalogue',category:'drainage',id:'perforated rigid pvc drainage pipe'}),route:c({kind:'footingEdgeOffset',offsetFt:8/12})}};
+ input.specifications.exteriorLayers=[{id:'membrane',scope:{status:'included',specification:{
+  material:c({kind:'catalogue',category:'waterproofing',id:'sheet waterproofing membrane'}),coverage:c({kind:'specifiedHeight',heightFt:6}),
+ }}}];
+ const snapshot={view:workspaceFloorplan(doc),measurements:[]};
+ const preview=previewAssemblyChange(doc,'foundation','assembly',null,{kind:'create',input},id);
+ assert.deepEqual(preview.conflicts,[]);
+ expectVolume(assemblyWallVolume(preview,'foundation.wall.concrete'),27.12757201646);
+ expectVolume(assemblyWallVolume(preview,'foundation.footing.strip.concrete'),5.08641975309);
+ expectVolume(assemblyWallVolume(preview,'foundation.waterproofing.area'),840);
+ expectVolume(assemblyWallVolume(preview,'foundation.drainage.length'),150.66666666667);
+ assert.ok(preview.unresolvedSpecifications.some(g=>g.path==='attributes.nominalDiameterFt'&&g.blocks.includes('materialSpecification')));
+ const applied=applyAssemblyPreview(doc,preview);
+ assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(applied)),applied);
+ assert.throws(()=>applyAssemblyPreview(applied,preview),/Stale/);
+ const [parent]=applied.workspaces[1].foundationAssemblies!;
+ const next=structuredClone(input),footing=next.specifications.footing;
+ assert.equal(footing.status,'included');
+ if(footing.status==='included')footing.specification.depthFt=c(1);
+ const modified=previewAssemblyChange(applied,'foundation','assembly',parent.revisionId,{kind:'replaceIntent',input:next},id);
+ assert.deepEqual(modified.conflicts,[]);
+ expectVolume(assemblyWallVolume(modified,'foundation.footing.strip.concrete'),10.17283950617);
+ assert.deepEqual(modified.changes!.parents[0].children,parent.children);
+ const modifiedDocument=applyAssemblyPreview(applied,modified);
+ const reverted=previewAssemblyChange(modifiedDocument,'foundation','assembly',modified.changes!.parents[0].revisionId,{kind:'replaceIntent',input},id);
+ assert.deepEqual(reverted.conflicts,[]);
+ expectVolume(assemblyWallVolume(reverted,'foundation.footing.strip.concrete'),5.08641975309);
+ const thicker=structuredClone(input),walls=thicker.specifications.walls;
+ if(walls.status==='included')walls.specification.widthFt=c(10/12);
+ const thickerPreview=previewAssemblyChange(applied,'foundation','assembly',parent.revisionId,{kind:'replaceIntent',input:thicker},id);
+ assert.deepEqual(thickerPreview.conflicts,[]);
+ expectVolume(assemblyWallVolume(thickerPreview,'foundation.wall.concrete'),33.744855967);
+ assert.deepEqual(thickerPreview.changes!.parents[0].trace,parent.trace);
+ assert.equal(previewAssemblyChange(applied,'foundation','assembly',parent.revisionId,{kind:'replaceIntent',input},id).changes,null);
+ assert.deepEqual(restoreWorkspaceSnapshot(applied,'foundation',snapshot),doc);
+ assert.throws(()=>replaceSpecialistEntities(applied,'foundation',applied.workspaces[1].measurements.slice(1)),/parent assembly/);
+});
+test('included incomplete specifications preserve known independent drainage and distinguish pending and exclusion',()=>{
+ const {doc,input,id}=assemblyFixture();
+ input.specifications.walls={status:'included',specification:{}};
+ input.specifications.slab={status:'excluded',reason:'Outside bid'};
+ const route:ManualDrainageRoute={kind:'manual',closed:false,
+   vertices:[{id:'route-a',point:{x:0,y:0}},{id:'route-b',point:{x:10,y:0}}],
+   segments:[{id:'route-first',startVertexId:'route-a',endVertexId:'route-b'}]};
+ input.specifications.drainage={status:'included',specification:{material:c({kind:'catalogue',category:'drainage',id:'solid drainage pipe'}),route:c(route)}};
+ const preview=previewAssemblyChange(doc,'foundation','assembly',null,{kind:'create',input},id);
+ assert.deepEqual(preview.conflicts,[]);
+ expectVolume(assemblyWallVolume(preview,'foundation.drainage.length'),10);
+ assert.ok(preview.unresolvedSpecifications.some(g=>g.path==='walls.widthFt'&&g.blocks.includes('quantity')));
+ assert.ok(preview.unresolvedSpecifications.some(g=>g.path==='attributes.nominalDiameterFt'));
+ assert.equal(preview.quantities.after.length,1);
+ const applied=applyAssemblyPreview(doc,preview);
+ const parent=applied.workspaces[1].foundationAssemblies![0];
+ const modified=structuredClone(input);
+ if(modified.specifications.drainage.status==='included')modified.specifications.drainage.specification.route=c({...route,vertices:[route.vertices[0],{...route.vertices[1],point:{x:15,y:0}}]});
+ const moved=previewAssemblyChange(applied,'foundation','assembly',parent.revisionId,{kind:'replaceIntent',input:modified},id);
+ assert.deepEqual(moved.conflicts,[]);
+ assert.deepEqual(moved.changes!.parents[0].children,parent.children);
+ expectVolume(assemblyWallVolume(moved,'foundation.drainage.length'),15);
+});
+test('project-local preset versions, origin and confirmed snapshots validate through exact v3 round-trip',()=>{
+ const {doc,input,id}=assemblyFixture();
+ const version={version:1,name:'Synthetic wall template',systems:{
+  walls:{status:'included' as const,specification:{widthFt:c(8/12)}},
+  footing:unconfigured,exteriorLayers:[],drainage:unconfigured,insulation:unconfigured,granular:unconfigured,
+ }};
+ const preset={id:'local-preset',version:1 as const,origin:{presetId:'original-copy',version:2},versions:[version]};
+ const selected=replaceFoundationPresets(doc,[preset]);
+ input.preset={presetId:preset.id,version,confirmation:assemblySource};
+ const next=applyAssemblyPreview(selected,previewAssemblyChange(selected,'foundation','assembly',null,{kind:'create',input},id));
+ const deleted=replaceFoundationPresets(next,[]);
+ const restored=deserializeProjectDocument(serializeProjectDocument(deleted));
+ assert.deepEqual(restored.workspaces[1].foundationAssemblies![0].preset,input.preset);
+ assert.throws(()=>replaceFoundationPresets(selected,[{...preset,versions:[version,version]}]),/versions must increase/);
+});
+
+test('independent slab extent and confirmed under-slab stack retain exact quantities and sequencing',()=>{
+ const {doc,input,id}=assemblyFixture();
+ input.specifications.walls=unconfigured;
+ input.specifications.slab={status:'included',specification:{
+  material:c(poured),extent:c({kind:'independent',points:[{x:0,y:0},{x:40,y:0},{x:40,y:30},{x:0,y:30}]}),
+  thicknessFt:c(4/12),baseFt:c(0),footingRelation:c(assemblySource),
+ }};
+ input.specifications.insulation={status:'included',specification:{id:c('foam'),material:c({kind:'catalogue',category:'insulation',id:'eps'}),thicknessFt:c(.25)}};
+ input.specifications.granular={status:'included',specification:{id:c('granular'),material:c({kind:'catalogue',category:'granular',id:'clear crushed stone'}),thicknessFt:c(.5)}};
+ const preview=previewAssemblyChange(doc,'foundation','assembly',null,{kind:'create',input},id);
+ assert.deepEqual(preview.conflicts,[]);
+ expectVolume(assemblyWallVolume(preview,'foundation.slab.concrete'),14.81481481481);
+ expectVolume(assemblyWallVolume(preview,'foundation.insulation.area'),1200);
+ expectVolume(assemblyWallVolume(preview,'foundation.insulation.foam'),3600);
+ expectVolume(assemblyWallVolume(preview,'foundation.granular.volume'),22.22222222222);
+ const applied=applyAssemblyPreview(doc,preview);
+ const values=applied.workspaces[1].measurements.filter(e=>'elevationFt' in e).map(e=>'elevationFt'in e?e.elevationFt:null);
+ assert.deepEqual(values,[0,-.25,-.75]);
+});
+
+test('component exclusion survives adoption, dormant scope and reactivation',()=>{
+ const {doc,input,id}=assemblyFixture();
+ const generated=previewAssemblyChange(doc,'foundation','source',null,{kind:'create',input},id);
+ assert.deepEqual(generated.conflicts,[]);
+ const source=generated.changes!;
+ const measurements=structuredClone(source.measurements);
+ const excluded=measurements[0];
+ excluded.scopeApplicability={status:'excluded',reason:'Outside original trade'};
+ const historical=replaceSpecialistEntities(doc,'foundation',measurements);
+ const adopt=previewAssemblyChange(historical,'foundation','adopted',null,{kind:'adopt',input,bindings:source.parents[0].children,source:assemblySource},id);
+ assert.deepEqual(adopt.conflicts,[]);
+ const accepted=applyAssemblyPreview(historical,adopt);
+ const adopted=accepted.workspaces[1].foundationAssemblies![0];
+ assert.deepEqual(adopted.componentScope[0].decision,excluded.scopeApplicability);
+ const off=structuredClone(input);
+ off.specifications.walls={status:'excluded',reason:'Deferred scope'};
+ const hide=previewAssemblyChange(accepted,'foundation','adopted',adopted.revisionId,{kind:'replaceIntent',input:off},id);
+ assert.deepEqual(hide.conflicts,[]);
+ assert.equal(hide.changes!.parents[0].dormantChildren.length,4);
+ const suspended=applyAssemblyPreview(accepted,hide);
+ const restore=previewAssemblyChange(suspended,'foundation','adopted',hide.changes!.parents[0].revisionId,{kind:'replaceIntent',input},id);
+ assert.deepEqual(restore.conflicts,[]);
+ assert.deepEqual(restore.changes!.measurements[0].scopeApplicability,excluded.scopeApplicability);
+ assert.deepEqual(restore.changes!.parents[0].children,adopted.children);
+ assert.equal(restore.quantities.after.filter(r=>r.code==='foundation.wall.concrete').length,3);
+});
+
+test('assembly validation rejects stale manifests, retention overflow and broken identity references',()=>{
+ const {doc,input,id}=assemblyFixture();
+ const preview=previewAssemblyChange(doc,'foundation','assembly',null,{kind:'create',input},id);
+ assert.deepEqual(preview.conflicts,[]);
+ const saved=applyAssemblyPreview(doc,preview);
+ const copy=()=>structuredClone(saved);
+ const damaged=copy();
+ const parent=damaged.workspaces[1].foundationAssemblies![0];
+ parent.children[0].physicalId='not-the-child-physical-id';
+ assert.throws(()=>readProjectDocument(damaged),/mismatched owned measurement/);
+ const stale=copy();
+ const s=stale.workspaces[1].foundationAssemblies![0].specifications.walls;
+ if(s.status==='included')s.specification.heightFt=c(9);
+ assert.throws(()=>readProjectDocument(stale),/stale owned measurement/);
+ const overflow=copy();
+ const overParent=overflow.workspaces[1].foundationAssemblies![0];
+ overParent.dormantChildren=Array.from({length:257},(_,i)=>({disabledAtRevisionId:overParent.revisionId,child:{
+  entityId:'dormant-'+i,physicalId:'dormant-'+i,role:{system:'wall',sourceId:'removed-'+i},
+ }}));
+ assert.throws(()=>readProjectDocument(overflow),/dormantChildren/);
+ const dangling=copy();
+ const d=dangling.workspaces[1].foundationAssemblies![0];
+ d.replacements=[{retired:{kind:'routeVertex',id:'old-vertex'},successorIds:['missing'],revisionId:d.revisionId}];
+ assert.throws(()=>readProjectDocument(dangling),/dangling/);
+});
+
+test('manual drainage replacement preserves excluded predecessor scope in each directed successor',()=>{
+ const {doc,input,id}=assemblyFixture();
+ input.specifications.walls=unconfigured;
+ const route:ManualDrainageRoute={kind:'manual',closed:false,vertices:[{id:'a',point:{x:0,y:0}},{id:'b',point:{x:10,y:0}}],
+    segments:[{id:'edge-old',startVertexId:'a',endVertexId:'b'}]};
+ input.specifications.drainage={status:'included',specification:{material:c({kind:'catalogue',category:'drainage',id:'solid drainage pipe'}),route:c(route),
+  attributes:c({nominalDiameterFt:c(4/12),pipeMaterial:c('PVC'),perforation:c('solid')}),
+ }};
+ const first=applyAssemblyPreview(doc,previewAssemblyChange(doc,'foundation','assembly',null,{kind:'create',input},id));
+ let old=first.workspaces[1].foundationAssemblies![0];
+ const decision={status:'excluded',reason:'Outside owner takeoff'} as const;
+ const excluded=applyAssemblyPreview(first,previewAssemblyChange(first,'foundation','assembly',old.revisionId,{
+  kind:'setComponentScope',entityIds:[old.children[0].entityId],decision,confirmation:assemblySource,
+ },id));
+ old=excluded.workspaces[1].foundationAssemblies![0];
+ const changed=structuredClone(input);
+ if(changed.specifications.drainage.status==='included')changed.specifications.drainage.specification.route=c({
+  kind:'manual',closed:false,vertices:[route.vertices[0],{id:'middle',point:{x:5,y:0}},route.vertices[1]],
+  segments:[{id:'edge-left',startVertexId:'a',endVertexId:'middle'},{id:'edge-right',startVertexId:'middle',endVertexId:'b'}],
+ });
+ const blocked=previewAssemblyChange(excluded,'foundation','assembly',old.revisionId,{kind:'replaceIntent',input:changed},id);
+ assert.match(blocked.conflicts[0].message,/explicit lineage/);
+ const ids=['edge-left','edge-right'].map(segment=>JSON.stringify(['foundation-child','assembly',JSON.stringify(['drainage',segment,null])]));
+ const replacement=previewAssemblyChange(excluded,'foundation','assembly',old.revisionId,{
+  kind:'replaceIntent',input:changed,identityReplacements:[
+    {retired:{kind:'routeSegment',id:'edge-old'},successorIds:['edge-left','edge-right']},
+    {retired:{kind:'child',binding:old.children[0]},successorIds:ids},
+  ],
+ },id);
+ assert.deepEqual(replacement.conflicts,[]);
+ assert.equal(replacement.quantities.after.length,0);
+ const applied=applyAssemblyPreview(excluded,replacement),next=applied.workspaces[1].foundationAssemblies![0];
+ assert.deepEqual(next.children.map(b=>b.entityId),ids);
+ assert.equal(next.componentScope.filter(s=>s.decision.status==='excluded').length,3);
+ assert.ok(applied.workspaces[1].measurements.every(e=>'scopeApplicability' in e&&e.scopeApplicability?.status==='excluded'&&e.scopeApplicability.reason===decision.reason));
+ assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(applied)),applied);
+});
+
+test('coordinated exterior layers remain independently traceable, while duplicated coverage stays unresolved',()=>{
+ const {doc,input,id}=assemblyFixture();
+ const layer=(id:string,material:string)=>({id,scope:{status:'included' as const,specification:{
+  material:c({kind:'catalogue' as const,category:'waterproofing' as const,id:material}),coverage:c({kind:'specifiedHeight' as const,heightFt:6}),
+ }}});
+ input.specifications.exteriorLayers=[layer('membrane','sheet waterproofing membrane'),layer('board','dimpled drainage membrane')];
+ const preview=previewAssemblyChange(doc,'foundation','assembly',null,{kind:'create',input},id);
+ assert.deepEqual(preview.conflicts,[]);
+ expectVolume(assemblyWallVolume(preview,'foundation.waterproofing.area'),1680);
+ assert.deepEqual([...new Set(preview.changes!.measurements.flatMap(e=>e.foundation?.coverage?[e.foundation.coverage.layerId]:[]))].sort(),['board','membrane']);
+ const duplicate=structuredClone(input);
+ duplicate.specifications.exteriorLayers[1]=layer('other-membrane','sheet waterproofing membrane');
+ const unresolved=previewAssemblyChange(doc,'foundation','assembly',null,{kind:'create',input:duplicate},id);
+ assert.ok(unresolved.unresolvedSpecifications.some(g=>g.reason.includes('Overlapping coverage')));
+ assert.equal(unresolved.quantities.after.filter(r=>r.code==='foundation.waterproofing.area'&&r.status==='measured').length,0);
+});
+
+test('staged assembly preview cannot be altered before Apply',()=>{
+ const {doc,input,id}=assemblyFixture();
+ const preview=previewAssemblyChange(doc,'foundation','assembly',null,{kind:'create',input},id);
+ assert.deepEqual(preview.conflicts,[]);
+ preview.changes!.measurements.pop();
+ assert.throws(()=>applyAssemblyPreview(doc,preview),/preview changed/);
+ assert.equal(doc.workspaces[1].measurements.length,0);
+});
+
+test('independent slab adoption preserves its identity, source, and the original takeoff geometry',()=>{
+ const {doc,input,id}=assemblyFixture();
+ const first=applyAssemblyPreview(doc,previewAssemblyChange(doc,'foundation','assembly',null,{kind:'create',input},id));
+ const parent=first.workspaces[1].foundationAssemblies![0];
+ const polygon=[{x:60,y:0},{x:100,y:0},{x:100,y:30},{x:60,y:30}];
+ const slab={kind:'slab' as const,purpose:'concrete' as const,polygon,depthFt:4/12,elevationFt:0,id:'independent-slab',physicalId:'independent-slab',
+  assemblyId:'manual-slab',source:{reference:'Owner traced detached garage slab'},foundation:{version:1 as const,baseElevationConfirmed:true as const,material:'poured concrete'}};
+ const source=replaceSpecialistEntities(first,'foundation',[...first.workspaces[1].measurements,slab]);
+ const next=structuredClone(input);
+ next.specifications.slab={status:'included',specification:{extent:c({kind:'independent',points:polygon}),material:c(poured),
+  thicknessFt:c(4/12),baseFt:c(0),footingRelation:c(assemblySource)}};
+ const adopted=previewAssemblyChange(source,'foundation','assembly',parent.revisionId,{kind:'replaceIntent',input:next,
+  adoption:{source:assemblySource,bindings:[{role:{system:'slab'},entityId:slab.id,physicalId:slab.physicalId}]}},id);
+ assert.deepEqual(adopted.conflicts,[]);
+ const resolved=applyAssemblyPreview(source,adopted);
+ const preserved=resolved.workspaces[1].measurements.find(e=>e.id===slab.id)!;
+ assert.deepEqual(preserved.source,slab.source);
+ assert.equal(preserved.physicalId,slab.physicalId);
+ expectVolume(assemblyWallVolume(adopted,'foundation.slab.concrete'),14.81481481481);
+});

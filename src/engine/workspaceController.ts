@@ -1,10 +1,13 @@
+import { stableValue } from './measurements/foundationAssemblyValidation';
+import type { FoundationAssemblyRecord, FoundationPreset } from './measurements/foundationAssemblyModel';
+import type { FoundationEntity, SpecialistEntity } from './measurements/measurementTypes';
+import { PROJECT_CHARACTER_BUDGET, UNDERLAY_CHARACTER_BUDGET } from './projectBudget';
+export { PROJECT_CHARACTER_BUDGET, UNDERLAY_CHARACTER_BUDGET } from './projectBudget';
 import type { FloorplanState } from '../types';
 import { createBlankProject } from './samplePlans';
 import { commitWorkspaceRenderView, readProjectDocument, replaceWorkspaceGeometry, serializeProjectDocument } from './projectDocument';
 import type { ProjectDocument, WorkspaceType } from './projectDocument';
 
-export const PROJECT_CHARACTER_BUDGET = 4_000_000;
-export const UNDERLAY_CHARACTER_BUDGET = 850_000;
 /** C.2 is the only future authoritative pricing path. */
 export const canReportProjectEstimate = (_doc: ProjectDocument) => false;
 export function normalizeProjectInput(input: unknown): ProjectDocument { return readProjectDocument(input); }
@@ -57,12 +60,32 @@ export function setScopeAssignment(doc: ProjectDocument, kind: import('./project
 }
 export function replaceSpecialistEntities(doc: ProjectDocument, id: string, measurements: import('./measurements/measurementTypes').SpecialistEntity[]): ProjectDocument {
   if(doc.activeWorkspaceId!==id) throw new Error('Inactive specialist workspace edit.');
+  const current=doc.workspaces.find(w=>w.id===id);
+  if(current?.foundationAssemblies?.length){
+    const old=new Map(current.measurements.map(e=>[e.id,e])),next=new Map(measurements.map(e=>[e.id,e]));
+    for(const parent of current.foundationAssemblies)for(const child of parent.children)
+      if(JSON.stringify(stableValue(old.get(child.entityId)))!==JSON.stringify(stableValue(next.get(child.entityId))))
+        throw Error('Use the parent assembly to edit its owned measurements.');
+  }
   return readProjectDocument({...doc,workspaces:doc.workspaces.map(w=>w.id===id?{...w,measurements}:w)});
 }
 
-export type WorkspaceSnapshot={view:FloorplanState;measurements:import('./measurements/measurementTypes').SpecialistEntity[]};
+export function replaceFoundationAssemblyState(doc:ProjectDocument,id:string,measurements:FoundationEntity[],foundationAssemblies:FoundationAssemblyRecord[]):ProjectDocument {
+  if(doc.activeWorkspaceId!==id || doc.workspaces.find(w=>w.id===id)?.type!=='foundation') throw Error('Inactive foundation assembly edit.');
+  return readProjectDocument({...doc,workspaces:doc.workspaces.map(w=>w.id===id?{...w,measurements,foundationAssemblies}:w)});
+}
+
+export function replaceFoundationPresets(doc:ProjectDocument,foundationPresets:FoundationPreset[]):ProjectDocument {
+  return readProjectDocument({...doc,foundationPresets});
+}
+
+export type WorkspaceSnapshot={view:FloorplanState;measurements:SpecialistEntity[];foundationAssemblies?:FoundationAssemblyRecord[]};
 export function restoreWorkspaceSnapshot(doc:ProjectDocument,id:string,snapshot:WorkspaceSnapshot):ProjectDocument {
  if(doc.activeWorkspaceId!==id)throw Error('Inactive workspace history edit');
  const updated=commitWorkspaceRenderView(doc,id,{...snapshot.view,settings:doc.settings,activeProjectId:doc.activeProjectId,activeProjectName:doc.activeProjectName});
- return replaceSpecialistEntities(updated,id,snapshot.measurements);
+ return readProjectDocument({...updated,workspaces:updated.workspaces.map(w=>{
+   if(w.id!==id)return w;
+   const {foundationAssemblies:_previous,...workspace}=w;
+   return {...workspace,measurements:snapshot.measurements,...(snapshot.foundationAssemblies===undefined?{}:{foundationAssemblies:snapshot.foundationAssemblies})};
+ })});
 }

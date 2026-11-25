@@ -1,3 +1,6 @@
+import type { FoundationAssemblyRecord, FoundationPreset } from './measurements/foundationAssemblyModel';
+import { validateFoundationAssemblies, validateFoundationPresets } from './measurements/foundationAssemblyValidation';
+import { PROJECT_CHARACTER_BUDGET, UNDERLAY_CHARACTER_BUDGET } from './projectBudget';
 import type { FloorplanState, ProjectSettings } from '../types';
 import { validateFoundationTopology } from './measurements/foundationTopology';
 import { validateRoofTopology } from './measurements/roofMeasurements';
@@ -16,6 +19,7 @@ export interface EstimatingWorkspace {
   type: WorkspaceType;
   geometry: WorkspaceGeometry;
   measurements: SpecialistEntity[];
+  foundationAssemblies?: FoundationAssemblyRecord[];
 }
 export interface ProjectDocument {
   schemaVersion: 3;
@@ -24,6 +28,7 @@ export interface ProjectDocument {
   settings: ProjectSettings;
   activeWorkspaceId: string;
   workspaces: EstimatingWorkspace[];
+  foundationPresets?: FoundationPreset[];
   scope: { mode: 'explicit'; assignments: Record<ScopeKind, ScopeAssignment> };
 }
 
@@ -109,6 +114,10 @@ function validateDocument(value: unknown): asserts value is ProjectDocument {
   validateIdentity(value);
   requireValue(Array.isArray(value.workspaces) && value.workspaces.length > 0, 'at least one workspace required');
   const ids = new Map<string, WorkspaceType>();
+  const presetInput = value.foundationPresets;
+  if (presetInput !== undefined) validateFoundationPresets(presetInput);
+  const presets = presetInput as FoundationPreset[] | undefined;
+  let boundedAssemblyState = presets !== undefined;
   for (const w of value.workspaces) {
     requireValue(record(w) && nonempty(w.id) && nonempty(w.name)
       && workspaceTypes.includes(w.type as WorkspaceType), 'invalid workspace');
@@ -118,9 +127,19 @@ function validateDocument(value: unknown): asserts value is ProjectDocument {
     validateSpecialistEntities(w.type as string, w.measurements);
     if(w.type==='roof')validateRoofTopology(w.measurements as RoofEntity[]);
     if(w.type==='foundation')validateFoundationTopology(w.measurements as FoundationEntity[]);
+    if (w.foundationAssemblies !== undefined) {
+      requireValue(w.type === 'foundation', 'only foundation workspaces own assembly records');
+      validateFoundationAssemblies(w.foundationAssemblies, w.measurements as FoundationEntity[], presets ?? []);
+      boundedAssemblyState = true;
+    }
     requireValue(!('measurements' in w.geometry), 'specialist entities must be workspace-owned');
     requireValue(!('settings' in w.geometry) && !('activeProjectId' in w.geometry)
       && !('activeProjectName' in w.geometry), 'workspace contains project-owned fields');
+  }
+  if (boundedAssemblyState) {
+    requireValue(JSON.stringify(value).length <= PROJECT_CHARACTER_BUDGET, 'assembly project exceeds storage character budget');
+    for (const workspace of value.workspaces as EstimatingWorkspace[])
+      requireValue((workspace.geometry.underlay?.src?.length ?? 0) <= UNDERLAY_CHARACTER_BUDGET, 'assembly project underlay exceeds storage character budget');
   }
   requireValue(nonempty(value.activeWorkspaceId) && ids.has(value.activeWorkspaceId), 'invalid active workspace');
   const scope = value.scope;
