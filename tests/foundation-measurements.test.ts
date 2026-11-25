@@ -369,3 +369,16 @@ test('switching foundation elevation reference preserves signed physical datum a
  assert.throws(()=>convertFoundationElevation(0,'base','top',null),/positive height or depth/);
  assert.throws(()=>convertFoundationElevation(0,'base','top',0),/positive height or depth/);
 });
+
+import {previewFoundationGeneration} from '../src/engine/measurements/foundationGeneration';
+test('generation guard refuses changing previously confirmed attribution even when candidate remains measured',()=>{
+ const a=wall('z',{x:0,y:0},{x:20,y:0}),b=wall('a',{x:10,y:0},{x:30,y:0});
+ assert.throws(()=>previewFoundationGeneration([a],[b]),/existing confirmed measurements/);
+ const q=wall('independent',{x:50,y:0},{x:70,y:0});assert.ok(previewFoundationGeneration([a],[q]).rows.every(r=>r.status==='measured'));
+});
+test('face-referenced wall rejects stale width but accepts unrelated height edits',()=>{
+ const a=createReferencedWall({x:0,y:0},{x:40,y:0},'face-stale','exterior-left',1);
+ if(a.kind!=='foundationWall')throw Error('Expected wall');
+ assert.throws(()=>qty([{...a,widthFt:2}]),/Face-reference geometry is stale/);
+ const next={...a,heightFt:8};assert.equal(qty([next])[0].status,'measured');
+});

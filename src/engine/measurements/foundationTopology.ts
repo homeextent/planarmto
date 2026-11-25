@@ -1,3 +1,4 @@
+import {faceToCentreline} from './foundationGeometry';
 /** C.1C persistence boundary: explicit foundation topology, not completeness or engineering approval.
  * Preserve historical structurally valid v3 records without inferring new semantics.
  * Pending quantities are allowed; invalid confirmed geometry is not.
@@ -25,6 +26,14 @@ export function validateFoundationTopology(entities:FoundationEntity[]):void {
  const ids=new Set(entities.map(e=>e.id));
  for(const e of entities){
   if(!e.foundation)continue;
+  if(e.kind==='foundationWall'&&e.source.reference.startsWith('Manual foundation wall — ')&&e.source.note?.startsWith('Source face ')){
+   const side=e.source.reference.includes('-left face')?'left':e.source.reference.includes('-right face')?'right':null;
+   if(!side)throw Error('Invalid wall face reference');
+   const original=JSON.parse(e.source.note.slice('Source face '.length));
+   if(e.widthFt!==original.widthFt||!e.foundation.centrelineConfirmed)throw Error('Face-reference geometry is stale; redraft from the original face before changing thickness or reference');
+   const c=faceToCentreline(original.start,original.end,original.widthFt,side);
+   if(Math.hypot(c.start.x-e.start.x,c.start.y-e.start.y)>1e-8||Math.hypot(c.end.x-e.end.x,c.end.y-e.end.y)>1e-8)throw Error('Face-reference geometry is stale; redraft from the original face');
+  }
   if('polygon' in e&&!simplePolygon(e.polygon))throw Error('Invalid foundation polygon: '+e.id);
   if('start' in e&&e.kind!=='foundationLine'){
    const length=Math.hypot(e.end.x-e.start.x,e.end.y-e.start.y);

@@ -1,3 +1,4 @@
+import {previewFoundationGeneration} from '../engine/measurements/foundationGeneration';
 import {nearestFoundationSnap} from '../engine/measurements/foundationSnap';
 import {measureFoundation} from '../engine/measurements/foundationMeasurements';
 import type {RectangleReference} from '../engine/measurements/foundationGeometry';
@@ -3321,7 +3322,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           if(!foundationEntities)throw Error('Foundation workspace unavailable');
           const values=[perimeterWidth,perimeterHeight,perimeterBase];if(values.some(v=>!v.trim()||!Number.isFinite(Number(v))))throw Error('Specify finite wall thickness, height and base elevation');
           const members=generateOrthogonalFoundationPerimeter(perimeterOutline,perimeterReference,Number(perimeterWidth),Number(perimeterHeight),Number(perimeterBase),uuidv4);
-          const result=measureFoundation('preview',[...foundationEntities,...members]),rows=result.rows.filter(r=>members.some(m=>m.id===r.elementId));
+          const result=previewFoundationGeneration(foundationEntities,members),rows=result.rows.filter(r=>members.some(m=>m.id===r.elementId));
           if(rows.length!==members.length||rows.some(r=>r.status!=='measured'))throw Error('Perimeter overlaps or requires unresolved reconciliation');
           const before=measureFoundation('preview',foundationEntities).rows.filter(r=>r.status==='measured');
           if(before.some(r=>result.rows.some(q=>q.elementId===r.elementId&&q.code===r.code&&q.status!=='measured')))throw Error('Perimeter would invalidate existing measurements');

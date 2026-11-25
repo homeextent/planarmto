@@ -458,3 +458,10 @@ test('continuous drafting displays next segment separately from last placement c
  await page.keyboard.type('30');await page.keyboard.press('Enter');await expect(page.getByLabel('Live drafting dimensions')).toHaveText('Placement reference: 30.00 ft');
  await expect(entities(page)).toHaveCount(2);
 });
+
+test('face referenced wall refuses stale thickness edit and preserves original geometry',async({page})=>{
+ await page.getByRole('button',{name:'Foundation wall',exact:true}).click();await page.getByLabel('Foundation wall reference').selectOption('exterior-left');await page.getByLabel('Face reference wall thickness').fill('1');
+ const canvas=page.locator('canvas').first();await canvas.click({position:{x:250,y:250}});await canvas.click({position:{x:550,y:250}});await page.keyboard.type('40');await page.keyboard.press('Enter');
+ const before=await snapshot(page);await page.getByLabel('Width (ft)',{exact:true}).fill('2');await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ await expect(page.getByRole('alert').first()).toBeVisible();expect(await snapshot(page)).toEqual(before);
+});
