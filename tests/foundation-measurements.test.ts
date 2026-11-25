@@ -194,3 +194,31 @@ test('concave slab reference uses actual polygon and unresolved overlaps withhol
  const e=region('l',lshape);near(measureFoundation('f',[e]).footprintReferences[0].netSF!,64);
  const q=region('q',box(2,2,4,4));const result=measureFoundation('f',[e,q]);assert.ok(result.footprintReferences.every(r=>r.netSF===null&&r.reason));
 });
+
+test('manual variable-width stepped T junction reconciles actual shared vertical interval',()=>{
+ const a=wall('horizontal',{x:0,y:0},{x:20,y:0}),b=wall('branch',{x:10,y:0},{x:10,y:10});
+ if(a.kind!=='foundationWall'||b.kind!=='foundationWall')throw Error('Expected walls');
+ a.assemblyId='a';b.assemblyId='b';a.widthFt=2;b.widthFt=1;
+ a.heightFt=8;a.elevationFt=-8;b.heightFt=6;b.elevationFt=-4;
+ const next=assignFoundationAssembly([a,b],[a.id,b.id],'stepped');
+ const rows=qty(next);assert.equal(rows.length,2);assert.ok(rows.every(r=>r.status==='measured'));
+ // 20*2*8 + 10*1*6 - 1*1*4 shared plan and vertical intersection.
+ near(rows.reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),376/27);
+ assert.deepEqual(qty([...next].reverse()).sort((a,b)=>a.elementId.localeCompare(b.elementId)),[...rows].sort((a,b)=>a.elementId.localeCompare(b.elementId)));
+});
+test('manual variable-width crossing walls reconcile only common vertical interval',()=>{
+ const a=wall('a',{x:0,y:0},{x:20,y:0}),b=wall('b',{x:10,y:-10},{x:10,y:10});
+ if(a.kind!=='foundationWall'||b.kind!=='foundationWall')throw Error('Expected walls');
+ a.assemblyId='a';b.assemblyId='b';a.widthFt=2;b.widthFt=1;a.heightFt=8;a.elevationFt=-8;b.heightFt=4;b.elevationFt=-2;
+ const next=assignFoundationAssembly([a,b],[a.id,b.id],'cross');
+ near(qty(next).reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),(320+80-4)/27);
+ b.elevationFt=null;assert.throws(()=>assignFoundationAssembly([a,b],[a.id,b.id],'unknown'),/Confirm compatible/);
+});
+test('multi-offset orthogonal perimeter retains exact ring and centred strip footing reconciliation',()=>{
+ const points=[{x:0,y:0},{x:40,y:0},{x:40,y:10},{x:50,y:10},{x:50,y:30},{x:30,y:30},{x:30,y:40},{x:10,y:40},{x:10,y:30},{x:0,y:30}];
+ let i=0;const id=()=> 'multi'+(++i),w=generateOrthogonalFoundationPerimeter(points,'exterior',1,8,0,id);
+ // Exterior length 180; centreline length 176; 1ft wall and 2ft footing.
+ const rows=qty(w);assert.ok(rows.every(r=>r.status==='measured'));near(rows.reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),176*8/27);
+ const f=deriveStripFootings(w,w.map(e=>e.id),2,1,id);
+ const footing=qty([...w,...f]).filter(r=>r.code==='foundation.footing.strip.concrete');assert.equal(footing.length,10);assert.ok(footing.every(r=>r.status==='measured'));near(footing.reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),352/27);
+});

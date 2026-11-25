@@ -288,3 +288,29 @@ test('slab reference footprint remains separate from concrete volume',async({pag
  await expect(ref).toBeVisible();await expect(ref).toContainText('1200.00 SF');
  await expect(ref).toContainText('Not an additional concrete material quantity.');
 });
+
+test('manual wall assembly assignment preserves physical identities and undo redo',async({page})=>{
+ const canvas=page.locator('canvas').first();
+ const properties=async(width:string,height:string,base:string)=>{
+  for(const [label,value] of [['Material','poured concrete'],['Width (ft)',width],['Height / depth (ft)',height],['Base elevation (ft; blank unknown)',base]])await page.getByLabel(label,{exact:true}).fill(value);
+  await page.getByLabel('Confirm drafted centreline').check();
+  await page.getByLabel('Start junction extension (ft)',{exact:true}).fill('0.5');
+  await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ };
+ await page.getByRole('button',{name:'Foundation wall',exact:true}).click();
+ await canvas.click({position:{x:250,y:250}});await canvas.click({position:{x:550,y:250}});
+ await expect(entities(page)).toHaveCount(2);await properties('1','8','-8');
+ await canvas.click({position:{x:250,y:250}});await canvas.click({position:{x:250,y:440}});
+ await expect(entities(page)).toHaveCount(3);await properties('1','6','-4');
+ const before=await snapshot(page);expect(new Set(before.map(e=>e.assemblyId)).size).toBe(2);
+ await page.getByRole('button',{name:'Select',exact:true}).click();
+ const box=await canvas.boundingBox();if(!box)throw Error('Missing canvas');
+ await page.mouse.move(box.x+190,box.y+190);await page.mouse.down();await page.mouse.move(box.x+600,box.y+480,{steps:5});await page.mouse.up();
+ await expect(page.getByText('2 foundation components selected',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Assign selected to new assembly',exact:true}).click();
+ const after=await snapshot(page);expect(new Set(after.map(e=>e.assemblyId)).size).toBe(1);
+ expect(after.map(e=>e.physicalId)).toEqual(before.map(e=>e.physicalId));
+ expect(after.map(e=>e.foundation?.joinStartFt)).toEqual([.5,.5]);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();expect((await snapshot(page)).map(e=>e.assemblyId)).toEqual(before.map(e=>e.assemblyId));
+ await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();expect((await snapshot(page)).map(e=>e.assemblyId)).toEqual(after.map(e=>e.assemblyId));
+});
