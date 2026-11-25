@@ -149,8 +149,20 @@ test('R4 invalid and missing overhang depths refuse rather than default to zero'
  assert.throws(()=>insetRoof(outer,{north:2,east:2,south:2} as Depths),/every side/);
 });
 test('R4 complete hip and gable outlines require reconciled classified exterior sides',()=>{
- for(const config of [{type:'hip'},{type:'gable',ridge:'horizontal'},{type:'gable',ridge:'vertical'},{type:'shed'}] as Partial<RoofConfig>[]){
+ for(const config of [{type:'hip'},{type:'gable',ridge:'horizontal'},{type:'gable',ridge:'vertical'}] as Partial<RoofConfig>[]){
   const es=generated(40,30,config);const r=rectangularRoof(es,ids(es));
+  assert.deepEqual(r.outer,outer);
+  assert.ok(Object.values(r.boundary).every(b=>b.edgeIds.length>0&&b.soffit==='unspecified'));
+ }
+ // Shed generation deliberately leaves the high boundary unclassified.
+ // Verify refusal first, then explicitly classify the synthetic high boundary.
+ for(const direction of [0,90,180,270] as const){
+  const shed=generated(40,30,{type:'shed',direction});
+  const unresolved=shed.filter(e=>e.kind==='roofEdge'&&e.edgeType==='unclassified');
+  assert.equal(unresolved.length,1);
+  assert.throws(()=>rectangularRoof(shed,ids(shed)),/Classify/);
+  const resolved=shed.map(e=>e.kind==='roofEdge'&&e.edgeType==='unclassified'?{...e,edgeType:'abutment' as const}:e);
+  const r=rectangularRoof(resolved,ids(resolved));
   assert.deepEqual(r.outer,outer);
   assert.ok(Object.values(r.boundary).every(b=>b.edgeIds.length>0&&b.soffit==='unspecified'));
  }
