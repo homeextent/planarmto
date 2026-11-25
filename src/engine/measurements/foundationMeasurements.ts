@@ -2,14 +2,14 @@ import {foundationLayerConflicts} from './foundationLayers';
 /** Initial C.1C measurement adapter. Rectangular compatible systems only for overlap reconciliation.
  * Shared explicit topology validation at the persistence boundary; inspector integration pending.
  */
-import {validateContributionSet,type FoundationEntity,type QuantityContribution} from './measurementTypes';
+import {validateContributionSet,type FoundationEntity,type QuantityContribution,type Point} from './measurementTypes';
 import {simplePolygon,projectedArea} from './roofMeasurements';
-import {extendedStrip,reconcileRectangularPrisms,orthogonalPolygonPieces,polygonEnvelope,type Prism,type Bounds} from './foundationGeometry';
+import {extendedStrip,reconcileRectangularPrisms,orthogonalPolygonPieces,polygonEnvelope,orientedStripFootprint,orientedFootprintsOverlap,type Prism,type Bounds} from './foundationGeometry';
 import {foundationDetails} from './foundationDetails';
 import {foundationCoverage} from './foundationCoverage';
 import {validateFoundationTopology} from './foundationTopology';
 const intersects=(a:Bounds,b:Bounds)=>Math.min(a.xmax,b.xmax)>Math.max(a.xmin,b.xmin)&&Math.min(a.ymax,b.ymax)>Math.max(a.ymin,b.ymin);
-type Solid={entity:FoundationEntity;code:string;material:string;bounds:Bounds|null;prism:Prism|null;pieces:Bounds[]|null;area:number|null;details:ReturnType<typeof foundationDetails>;reason?:string};
+type Solid={entity:FoundationEntity;code:string;material:string;bounds:Bounds|null;prism:Prism|null;pieces:Bounds[]|null;oriented:Point[]|null;area:number|null;details:ReturnType<typeof foundationDetails>;reason?:string};
 export type FoundationVolumeBreakdown={elementId:string;grossCY:number|null;deductionCY:number|null;additionalCY:number|null;netCY:number|null};
 export type FoundationFootprintReference={elementId:string;code:'foundation.footing.pad.area'|'foundation.slab.area';unit:'SF';role:'reference';grossSF:number|null;exclusionSF:number|null;netSF:number|null;reason?:string};
 export type FoundationScopeDiagnostic={elementId:string;physicalId:string;assemblyId:string;status:'included'|'excluded'|'pending'|'legacy';reason?:string};
@@ -36,13 +36,13 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
   const line='start' in e;
   const code=e.kind==='foundationTrench'?'foundation.excavation.volume':e.kind==='foundationWall'?'foundation.wall.concrete':e.kind==='stripFooting'?'foundation.footing.strip.concrete':e.kind==='padFooting'?'foundation.footing.pad.concrete':e.kind==='slab'?'foundation.slab.concrete':'purpose' in e&&e.purpose==='concrete'?'foundation.region.concrete':'foundation.'+('purpose' in e?e.purpose:'unknown')+'.volume';
   const material=e.kind==='foundationTrench'?'excavation':code.endsWith('.concrete')?'concrete':e.kind==='foundationRegion'?e.purpose:'concrete';
-  let bounds:Bounds|null=null,prism:Prism|null=null,pieces:Bounds[]|null=null,area:number|null=null,reason:string|undefined;
+  let bounds:Bounds|null=null,prism:Prism|null=null,pieces:Bounds[]|null=null,oriented:Point[]|null=null,area:number|null=null,reason:string|undefined;
   if(!e.foundation?.material)reason='Confirm material and foundation source semantics';
   else if(material==='concrete'&&e.foundation.material!=='poured concrete')reason='Unsupported concrete construction system';
   if(line){
    if(e.widthFt===null)reason='Missing width';
    else if(!e.foundation?.centrelineConfirmed)reason='Confirm centreline reference';
-   else try{bounds=extendedStrip(e.start,e.end,e.widthFt,e.foundation.joinStartFt,e.foundation.joinEndFt);pieces=[bounds]}catch{reason='Unsupported strip footprint; reconcile explicitly'}
+   else try{oriented=orientedStripFootprint(e.start,e.end,e.widthFt,e.foundation.joinStartFt,e.foundation.joinEndFt);bounds=polygonEnvelope(oriented);if(e.start.x===e.end.x||e.start.y===e.end.y){bounds=extendedStrip(e.start,e.end,e.widthFt,e.foundation.joinStartFt,e.foundation.joinEndFt);pieces=[bounds]}else{area=(Math.hypot(e.end.x-e.start.x,e.end.y-e.start.y)+(e.foundation.joinStartFt??0)+(e.foundation.joinEndFt??0))*e.widthFt;if((e.foundation.joinStartFt??0)!==0||(e.foundation.joinEndFt??0)!==0)reason='Angled junction extensions require explicit reconciliation';}}catch{reason='Unsupported strip footprint; reconcile explicitly'}
   }else if('polygon' in e&&simplePolygon(e.polygon)){bounds=polygonEnvelope(e.polygon);area=projectedArea(e.polygon);try{pieces=orthogonalPolygonPieces(e.polygon)}catch{/* Nonorthogonal polygon may be measured only without unresolved overlap. */}}
   const height='start' in e?e.heightFt:e.depthFt;
   if(height===null)reason='Missing thickness or height';
@@ -50,10 +50,11 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
   if(layerConflicts.has(e.id))reason=layerConflicts.get(e.id)!;
   if(e.scopeApplicability?.status==='pending')reason='Scope pending: '+e.scopeApplicability.reason;
   const details=foundationDetails(e);
-  solids.push({entity:e,code,material,bounds,prism,pieces,area,details,reason});
+  solids.push({entity:e,code,material,bounds,prism,pieces,oriented,area,details,reason});
  }
  // Unknown footprint can overlap any same-purpose solid. Envelopes are only broad-phase rejection, never quantity authority.
- const planOverlap=(a:Solid,b:Solid)=>!a.bounds||!b.bounds||intersects(a.bounds,b.bounds)&&(!a.pieces||!b.pieces||a.pieces.some(x=>b.pieces!.some(y=>intersects(x,y))));
+ const corners=(b:Bounds):Point[]=>[{x:b.xmin,y:b.ymin},{x:b.xmax,y:b.ymin},{x:b.xmax,y:b.ymax},{x:b.xmin,y:b.ymax}];
+ const planOverlap=(a:Solid,b:Solid)=>{if(!a.bounds||!b.bounds)return true;if(!intersects(a.bounds,b.bounds))return false;if(a.oriented&&b.oriented)return orientedFootprintsOverlap(a.oriented,b.oriented);if(a.oriented&&b.pieces)return b.pieces.some(p=>orientedFootprintsOverlap(a.oriented!,corners(p)));if(b.oriented&&a.pieces)return a.pieces.some(p=>orientedFootprintsOverlap(b.oriented!,corners(p)));return !a.pieces||!b.pieces||a.pieces.some(x=>b.pieces!.some(y=>intersects(x,y)));};
  const verticalDisjoint=(a:Solid,b:Solid)=>{const p=a.prism,q=b.prism;return !!p&&!!q&&p.bottomFt!==null&&q.bottomFt!==null&&p.heightFt!==null&&q.heightFt!==null&&(p.bottomFt+p.heightFt<=q.bottomFt||q.bottomFt+q.heightFt<=p.bottomFt)};
  // Distinct concrete codes are not interchangeable for attribution: cross-code overlap is pending.
  for(const s of solids){
@@ -62,6 +63,7 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
    if(s===q||s.material!==q.material)continue;
    if(!planOverlap(s,q))continue;
    if(verticalDisjoint(s,q)&&!s.details.hasDetails&&!q.details.hasDetails)continue;
+   if(q.prism&&s.oriented&&q.oriented&&s.code===q.code&&s.entity.foundation?.material===q.entity.foundation?.material&&!s.details.hasDetails&&!q.details.hasDetails&&s.prism.bottomFt!==null&&s.prism.bottomFt===q.prism.bottomFt&&s.prism.heightFt===q.prism.heightFt&&s.oriented.every(p=>q.oriented!.some(v=>Math.hypot(p.x-v.x,p.y-v.y)<=1e-8)))throw Error('Duplicate physical solid: '+s.entity.id+' / '+q.entity.id);
    if(q.prism&&s.pieces&&q.pieces&&s.prism.bottomFt!==null&&s.prism.bottomFt===q.prism.bottomFt&&s.prism.heightFt===q.prism.heightFt){
     const area=(p:Bounds)=>(p.xmax-p.xmin)*(p.ymax-p.ymin),a=s.pieces.reduce((n,p)=>n+area(p),0),b=q.pieces.reduce((n,p)=>n+area(p),0);
     const shared=s.pieces.reduce((n,p)=>n+q.pieces!.reduce((m,v)=>m+Math.max(0,Math.min(p.xmax,v.xmax)-Math.max(p.xmin,v.xmin))*Math.max(0,Math.min(p.ymax,v.ymax)-Math.max(p.ymin,v.ymin)),0),0);

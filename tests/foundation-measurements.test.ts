@@ -462,3 +462,27 @@ test('irregular generated perimeter reference rejects stale corner extension and
  const a=w[0];assert.throws(()=>qty([{...a,foundation:{...a.foundation!,joinStartFt:0}},...w.slice(1)]),/perimeter reference is stale/);
  const legacy=structuredClone(w);legacy.forEach(e=>delete e.foundation!.perimeterReference);assert.deepEqual(qty(legacy),qty(w));
 });
+
+import {orientedStripFootprint,orientedFootprintsOverlap} from '../src/engine/measurements/foundationGeometry';
+test('bounded isolated angled wall measures exact length times width and height including reversed direction',()=>{
+ const a=wall('angle-a',{x:0,y:0},{x:30,y:40});if(a.kind!=='foundationWall')throw Error('Expected wall');
+ a.widthFt=1;a.heightFt=8;
+ for(const e of [a,{...a,start:a.end,end:a.start}]){
+  const rows=qty([e]);assert.equal(rows[0].status,'measured');if(rows[0].status==='measured')near(rows[0].quantity,400/27);
+ }
+ const face=createReferencedWall({x:0,y:0},{x:30,y:40},'angle-face','exterior-left',1);if(face.kind!=='foundationWall')throw Error('Expected wall');
+ const rows=qty([{...face,heightFt:8}]);assert.equal(rows[0].status,'measured');if(rows[0].status==='measured')near(rows[0].quantity,400/27);
+});
+test('oriented strips distinguish disjoint diagonal footprints with overlapping envelopes',()=>{
+ const a=wall('angle-a',{x:0,y:0},{x:30,y:40}),b=wall('angle-b',{x:0,y:5},{x:30,y:45});
+ assert.equal(orientedFootprintsOverlap(orientedStripFootprint({x:0,y:0},{x:30,y:40},1),orientedStripFootprint({x:0,y:5},{x:30,y:45},1)),false);
+ assert.ok(qty([a,b]).every(r=>r.status==='measured'));
+});
+test('angled intersections remain pending rather than approximate and reversed duplicates are rejected',()=>{
+ const a=wall('angle-a',{x:0,y:0},{x:30,y:40}),b=wall('angle-b',{x:0,y:40},{x:30,y:0});
+ assert.ok(qty([a,b]).every(r=>r.status==='unquantified'));
+ if(a.kind!=='foundationWall'||b.kind!=='foundationWall')throw Error('Expected wall');
+ assert.throws(()=>qty([a,{...a,id:'dup',physicalId:'dup',start:a.end,end:a.start}]),/Duplicate physical solid/);
+ assert.ok(qty([a,{...b,elevationFt:8}]).every(r=>r.status==='measured'));
+ assert.equal(qty([{...a,foundation:{...a.foundation!,joinStartFt:1}}])[0].status,'unquantified');
+});

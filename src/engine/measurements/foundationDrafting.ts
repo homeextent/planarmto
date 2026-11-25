@@ -1,7 +1,7 @@
 import {orthogonalWallPerimeter} from './foundationPerimeterGeometry';
 import type {ActiveTool} from '../../types';
 import type {FoundationEntity,Point} from './measurementTypes';
-import {extendedStrip,foundationRectangle,faceToCentreline,type RectangleReference,type Bounds} from './foundationGeometry';
+import {extendedStrip,orientedStripFootprint,foundationRectangle,faceToCentreline,type RectangleReference,type Bounds} from './foundationGeometry';
 import {polygonDraftError} from './roofMeasurements';
 import {rectanglePoints} from '../precisionDrafting';
 export const foundationTools = [
@@ -28,7 +28,7 @@ export function createFoundationDraft(tool:ActiveTool,start:Point,end:Point,id:s
 export function foundationFootprint(e:FoundationEntity):Point[]|null{
  if('polygon' in e)return e.polygon;
  if(!('widthFt' in e)||e.widthFt===null||!e.foundation?.centrelineConfirmed)return null;
- try{const b=extendedStrip(e.start,e.end,e.widthFt,e.foundation.joinStartFt,e.foundation.joinEndFt);return [{x:b.xmin,y:b.ymin},{x:b.xmax,y:b.ymin},{x:b.xmax,y:b.ymax},{x:b.xmin,y:b.ymax}]}catch{return null}
+ try{return orientedStripFootprint(e.start,e.end,e.widthFt,e.foundation.joinStartFt,e.foundation.joinEndFt)}catch{return null}
 }
 
 /** An explicit perimeter; four members share a physical reconciliation assembly. */
@@ -56,7 +56,7 @@ export function createReferencedWall(start:Point,end:Point,id:string,reference:W
  if(!['exterior-left','exterior-right','interior-left','interior-right'].includes(reference))throw Error('Invalid foundation wall reference');
  if(widthFt===null||!Number.isFinite(widthFt)||widthFt<=0)throw Error('Specify positive wall thickness before face-reference placement');
  const centre=faceToCentreline(start,end,widthFt,reference.endsWith('left')?'left':'right');
- extendedStrip(centre.start,centre.end,widthFt);
+ orientedStripFootprint(centre.start,centre.end,widthFt);
  return {id,physicalId:id,assemblyId:id,source:{reference:'Manual foundation wall — '+reference+' face',note:'Source face '+JSON.stringify({start,end,widthFt})},kind:'foundationWall',...centre,widthFt,heightFt:null,elevationFt:null,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true}};
 }
 

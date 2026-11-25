@@ -111,3 +111,26 @@ export function polygonEnvelope(points:Point[]):Bounds{
  for(const p of points){b.xmin=Math.min(b.xmin,p.x);b.xmax=Math.max(b.xmax,p.x);b.ymin=Math.min(b.ymin,p.y);b.ymax=Math.max(b.ymax,p.y)}
  validateBounds(b);return b;
 }
+
+/** Exact oriented butt-ended footprint with explicit longitudinal extensions.
+ * This does not construct or infer a mitred angled junction. */
+export function orientedStripFootprint(start:Point,end:Point,widthFt:number,joinStartFt=0,joinEndFt=0):Point[]{
+ const length=Math.hypot(end.x-start.x,end.y-start.y);
+ if(![start.x,start.y,end.x,end.y,widthFt,length,joinStartFt,joinEndFt].every(finite)||length<=EPS||widthFt<=EPS||joinStartFt<0||joinEndFt<0)throw Error('Invalid oriented strip dimensions');
+ const ux=(end.x-start.x)/length,uy=(end.y-start.y)/length,nx=-uy*widthFt/2,ny=ux*widthFt/2;
+ const a={x:start.x-ux*joinStartFt,y:start.y-uy*joinStartFt},b={x:end.x+ux*joinEndFt,y:end.y+uy*joinEndFt};
+ const p=[{x:a.x+nx,y:a.y+ny},{x:b.x+nx,y:b.y+ny},{x:b.x-nx,y:b.y-ny},{x:a.x-nx,y:a.y-ny}];
+ if(p.some(q=>!finite(q.x)||!finite(q.y)))throw Error('Nonfinite oriented footprint');
+ return p;
+}
+/** Separating axis test for convex rectangles. Touching is not volumetric overlap. */
+export function orientedFootprintsOverlap(a:Point[],b:Point[]):boolean{
+ for(const p of [a,b])for(let i=0;i<p.length;i++){
+  const q=p[(i+1)%p.length],dx=q.x-p[i].x,dy=q.y-p[i].y,l=Math.hypot(dx,dy);
+  if(l<=EPS)throw Error('Degenerate footprint edge');
+  const project=(v:Point)=>((v.x-p[i].x)*dy-(v.y-p[i].y)*dx)/l;
+  const x=a.map(project),y=b.map(project);
+  if(Math.min(Math.max(...x),Math.max(...y))-Math.max(Math.min(...x),Math.min(...y))<=EPS)return false;
+ }
+ return true;
+}
