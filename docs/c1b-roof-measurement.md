@@ -43,3 +43,26 @@ Baseline c6494aedf5d601d95d1be11c59ae253a076f33b8: CI #64 run 45496886344/job 13
 R3 transaction rules: capture anchor, direction/quadrant, workspace and geometry revision; repeated corrections replace latest operation; undo returns to pre-placement, redo restores corrected result. Reject stale or unsafe corrections, preserve settings and unrelated topology. Keyboard capture excludes other inputs/dialogs and modifier shortcuts. Polygon closure must not duplicate first vertex; explicit Finish, draft retained on error, Ortho conflict explicit. Selected generation uses exact eligible axis-aligned rectangle; block dependent edges/openings, validate preview and apply separately, preserve unrelated entities and no inferred assembly applicability. No bounding-box approximation. Retain 62 existing tests; browser tests must exercise real mouse/keyboard sequences, focus, history, persistence and workspace isolation. No schema bump, production changes or unrelated refactor. Staging 0b55e6a and main 0423cb6 preserved. PR #10 remains draft; no merge before explicit owner acceptance and authorization.
 
 Status: approved scope, implementation and renewed acceptance pending.
+
+## R3.8 regression evidence
+
+CI #78 at f5d8bef verified the trace-supported delayed auto-fit correction, 9 browser tests passed. CI #81 at 08a2d3c passed 12 browser tests. CI #84 at b10f3ec46e75dddc765f1f6444a32f32750958d1 (run 45517372852/job 138880177650) passed all validation stages, 22/22 browser tests including floor precision/history/justification, roof polygon/rectangle, opening containment/overlap, generator configurations and dependency protection, workspace isolation, JSON round trip and reporting gate. CI #80 test corrected for IEEE 754 numerical precision; CI #83 test corrected to distinguish pitch and placement history transactions, retaining original import assertions. Six more cases at e091a3f exercise focus isolation, three alternate rectangle quadrants, manual concavity and explicit Ortho closure. Final CI pending; do not claim 28/28 until verified.
+
+## R3.9 integrated local acceptance checklist
+
+Use disposable synthetic projects only. Start from clean feature/c1b-roof-measurement at the exact final green candidate SHA; npm ci, npm run lint, npm run build, npm run preview -- --host 127.0.0.1. Record SHA, browser, date, actual result and supporting evidence for each check. Stop on any defect and preserve traces/screenshots. No merge before explicit owner acceptance.
+
+- [ ] A01 Floor wall pen: click-click-type length Enter, first anchor transient, repeated correction, continuation from corrected endpoint; Undo/Redo restores pre-placement and final state.
+- [ ] A02 Room box: 20 x 15 ft, all three wall justification modes, exact correction, connected topology protection.
+- [ ] A03 Roof rectangle: 40 x 30 ft in all quadrants; keyboard-first entry, persistent field, repeated correction, imperial fractions and metric units; pointer movement must not change captured anchor/direction. Verify live dimensions and focus isolation.
+- [ ] A04 Polygon: first vertex snap/closure, no duplicate closing vertex, concave manual polygon, explicit Finish, Ortho diagonal warning, invalid duplicate/crossing/zero edge diagnostics and retained draft; zoom/pan snap behavior.
+- [ ] A05 Roof plane: 1200 SF projected, 6:12 = 1341.6407865 SF sloped, explicit flat = 1200 SF; missing pitch not zero. Direction/elevation editing and vertex movement.
+- [ ] A06 Openings: 4 x 5 ft projected opening at 6:12, included deduction gives 1319.2801067 SF net; outside/overlap rejected, parent protected; verify unspecified/excluded treatment.
+- [ ] A07 Boundaries: classify eave/rake/ridge/hip/valley/abutment/parapet; shared ridge once, directional length 15 ft downslope at 6:12 = 16.7705098 LF; missing elevation/junction warning; explicit fascia/gutter/soffit applicability.
+- [ ] A08 Soffit/insulation: independent horizontal/sloped geometry, raw SF and BF; 1000 SF x 6 in = 6000 BF; missing thickness/type flagged; SQ is same roofing area divided by 100.
+- [ ] A09 Generator: selected rectangle immediate configuration, missing pitch warning, hip 40 x 30, square hip, horizontal/vertical gable, shed and flat; preview/cancel unchanged; apply replaces eligible selected plane atomically; dependencies/elevation protected; irregular shapes manual only.
+- [ ] A10 Workspace switches, history, independent calibration and source drawing/underlay; shared settings retained. Save/reopen and JSON round trip with multiple workspaces; floor regression; no consolidated pricing/print.
+- [ ] A11 Visual review: stable viewport during first click; usable controls, snap feedback, dimensions, diagnostics, no runtime errors; record any unresolved usability defects.
+- [ ] A12 Confirm irregular automatic skeleton deferral, absence of new runtime dependencies and production changes; formal owner acceptance and separate staging merge authorization.
+
+Status: checklist prepared; final interaction CI and owner execution outstanding. C.1B not integrated; staging 0b55e6a and production 0423cb6 remain protected.
