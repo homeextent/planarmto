@@ -37,8 +37,9 @@ import { RateCustomizerModal } from './components/RateCustomizerModal';
 import { GlobalProjectSettingsModal } from './components/GlobalProjectSettingsModal';
 import { ProjectDirectoryModal } from './components/ProjectDirectoryModal';
 
+import { FoundationToolbar, FoundationInspector } from './components/FoundationWorkspace';
 import { RoofToolbar, RoofInspector } from './components/RoofWorkspace';
-import type { RoofEntity } from './engine/measurements/measurementTypes';
+import type { RoofEntity, FoundationEntity, SpecialistEntity } from './engine/measurements/measurementTypes';
 import { validateRoofTopology } from './engine/measurements/roofMeasurements';
 import { replaceSpecialistEntities, restoreWorkspaceSnapshot } from './engine/workspaceController';
 import { WorkspaceBar } from './components/WorkspaceBar';
@@ -67,6 +68,7 @@ function AppContent() {
   const state = useMemo(() => workspaceRenderView(document), [document]);
   const [recovery, setRecovery] = useState(() => getAutoSaveState());
   const activeWorkspace = document.workspaces.find(w => w.id === document.activeWorkspaceId)!;
+  const foundationEntities = activeWorkspace.type === 'foundation' ? activeWorkspace.measurements as FoundationEntity[] : undefined;
   const roofEntities = activeWorkspace.type === 'roof' ? activeWorkspace.measurements as RoofEntity[] : undefined;
   const reportable = canReportProjectEstimate(document);
   // Internal CAD views use immutable shared references; persisted documents remain canonical.
@@ -167,15 +169,15 @@ function AppContent() {
 
   // The exact immutable document produced by placement is the correction lease.
   const placementRef = useRef<{ token: string; document: typeof document } | null>(null);
-  const commitDraftPlacement = (token: string, next: FloorplanState | RoofEntity[], replace = false): boolean => {
+  const commitDraftPlacement = (token: string, next: FloorplanState | SpecialistEntity[], replace = false): boolean => {
     if(currentDocument.current!==document)return false;
     const prior=placementRef.current;
     if(replace&&(!prior||prior.token!==token||prior.document!==document))return false;
     try {
       let updated: typeof document;
       if(Array.isArray(next)){
-        if(activeWorkspace.type!=='roof')return false;
-        validateRoofTopology(next);
+        if(activeWorkspace.type!=='roof'&&activeWorkspace.type!=='foundation')return false;
+        if(activeWorkspace.type==='roof')validateRoofTopology(next as RoofEntity[]);
         updated=replaceSpecialistEntities(document,activeWorkspace.id,next);
       }else{
         if(activeWorkspace.type!=='floor')return false;
@@ -211,6 +213,10 @@ function AppContent() {
       currentDocument.current=updated;setDocument(updated);setIsDirty(true);setStorageWarning('');return true;
     }catch(err){setStorageWarning(err instanceof Error?err.message:String(err));return false;}
   },[document,activeWorkspace,state]);
+  const handleFoundationChange = useCallback((entities:FoundationEntity[]):boolean=>{
+    if(currentDocument.current!==document||activeWorkspace.type!=='foundation')return false;
+    try{const updated=replaceSpecialistEntities(document,activeWorkspace.id,entities);setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements}]);setRedoStack([]);currentDocument.current=updated;setDocument(updated);setIsDirty(true);setStorageWarning('');return true;}catch(err){setStorageWarning(err instanceof Error?err.message:String(err));return false;}
+  },[document,activeWorkspace,state]);
   const restoreSnapshot = (snapshot:WorkspaceSnapshot) => {
     const doc=currentDocument.current;
     const next=restoreWorkspaceSnapshot(doc,doc.activeWorkspaceId,snapshot);
@@ -233,6 +239,7 @@ function AppContent() {
 
   // Handle Deleting Selected CAD Element
   const handleDeleteSelected = useCallback(() => {
+    if(selection.type==='foundation'&&foundationEntities){const ids=selection.ids??(selection.id?[selection.id]:[]);if(ids.length&&window.confirm('Delete '+ids.length+' selected foundation component(s), including their parent-owned details?')&&handleFoundationChange(foundationEntities.filter(e=>!ids.includes(e.id))))setSelection({type:'none'});return;}
     if(selection.type==='roof'&&roofEntities){
       if(selection.ids?.length){
         try{
@@ -316,7 +323,7 @@ function AppContent() {
     });
 
     setSelection({ type: 'none' });
-  }, [selection, state, handleStateChange, roofEntities, handleRoofChange]);
+  }, [selection, state, handleStateChange, roofEntities, handleRoofChange, foundationEntities, handleFoundationChange]);
 
   // Clipboard Operations
   const handleCopy = useCallback(() => {
@@ -548,7 +555,7 @@ function AppContent() {
       }
 
       if (e.ctrlKey || e.metaKey) {
-        if(roofEntities && ['c','x','v','d'].includes(e.key.toLowerCase()))return;
+        if((roofEntities||foundationEntities) && ['c','x','v','d'].includes(e.key.toLowerCase()))return;
         switch (e.key.toLowerCase()) {
           case 'c':
             e.preventDefault();
@@ -586,7 +593,7 @@ function AppContent() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleCopy, handleCut, handlePaste, handleDuplicate, handleDeleteSelected, handleUndo, handleRedo, recovery, roofEntities]);
+  }, [handleCopy, handleCut, handlePaste, handleDuplicate, handleDeleteSelected, handleUndo, handleRedo, recovery, roofEntities, foundationEntities]);
 
   const handleNewBlankProject = async () => {
     if (isDirty && !window.confirm('Replace the current unsaved project?')) return;
@@ -730,11 +737,11 @@ function AppContent() {
         onRename={(id, name) => changeWorkspace(doc => renameWorkspace(doc, id, name))}
         onMove={(id, direction) => changeWorkspace(doc => moveWorkspace(doc, id, direction))}
         onDelete={id => changeWorkspace(doc => removeWorkspace(doc, id))}/>
-      {!reportable && <div role="status" className="bg-amber-950 text-amber-100 px-3 py-1.5 text-xs">{roofEntities?'Roof measurement preview — raw quantities only. Consolidated pricing and reporting unavailable until C.2.':'Workspace editing preview — consolidated project quantities and costs unavailable until C.2.'}</div>}
+      {!reportable && <div role="status" className="bg-amber-950 text-amber-100 px-3 py-1.5 text-xs">{foundationEntities?'Foundation measurement preview — raw quantities only. Consolidated pricing and reporting unavailable until C.2.':roofEntities?'Roof measurement preview — raw quantities only. Consolidated pricing and reporting unavailable until C.2.':'Workspace editing preview — consolidated project quantities and costs unavailable until C.2.'}</div>}
       {/* 2. MAIN 3-PANEL WORKSPACE */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left CAD Tool Palette */}
-        {roofEntities ? <RoofToolbar activeTool={activeTool} onSelectTool={handleToolChange}/> : <Toolbar
+        {foundationEntities ? <FoundationToolbar activeTool={activeTool} onSelectTool={handleToolChange}/> : roofEntities ? <RoofToolbar activeTool={activeTool} onSelectTool={handleToolChange}/> : <Toolbar
           activeTool={activeTool}
           onSelectTool={handleToolChange}
           activeWallPreset={activeWallPreset}
@@ -744,6 +751,8 @@ function AppContent() {
         {/* Center Interactive 2D CAD Canvas */}
         <CadCanvas
           key={workspaceEpoch}
+          foundationEntities={foundationEntities}
+          onFoundationChange={handleFoundationChange}
           roofEntities={roofEntities}
           onRoofChange={handleRoofChange}
           commitDraftPlacement={commitDraftPlacement}
@@ -755,7 +764,7 @@ function AppContent() {
           onSelect={setSelection}
           onDeleteSelected={handleDeleteSelected}
           activeWallPreset={activeWallPreset}
-          onContextMenu={roofEntities ? undefined : (e, worldPos) => {
+          onContextMenu={roofEntities||foundationEntities ? undefined : (e, worldPos) => {
             setContextMenu({
               x: e.clientX,
               y: e.clientY,
@@ -765,6 +774,7 @@ function AppContent() {
           }}
         />
 
+        {foundationEntities && <FoundationInspector workspaceId={activeWorkspace.id} entities={foundationEntities} selection={selection} onChange={handleFoundationChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
         {roofEntities && <RoofInspector workspaceId={activeWorkspace.id} entities={roofEntities} selection={selection} onChange={handleRoofChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
         {/* Right Real-time MTO Take-Off Matrix */}
         {reportable && <MtoMatrixPanel
@@ -780,7 +790,7 @@ function AppContent() {
         />}
 
         {/* Floating Context Inspector for selected item */}
-          {selection.type!=='roof' && <InspectorPanel
+          {selection.type!=='roof' && selection.type!=='foundation' && <InspectorPanel
             state={state}
             onChange={handleStateChange}
             selection={selection}
