@@ -90,9 +90,8 @@ function DerivedSoffit({entities,planeIds,onChange}:{entities:RoofEntity[];plane
    const mixed=new Set(inset.pieces.map(p=>statuses[p.side])).size>1;
    const spec:DerivationSpec={version:1,groupId:existing?.groupId??'derived:'+uuidv4(),planeIds:[...planeIds],edgeIds:sides.flatMap(side=>r.boundary[side].edgeIds),depths:d,purpose:'soffit',basis:'horizontal',exclusions:[],boundaryConfirmed:false,cornersConfirmed:confirmed};
    let next:RoofEntity[]|null=null;
-   if(pendingSF>0)setError('Resolve unspecified soffit applicability before applying. Pending strips are not included in measured area.');
-   else if(mixed&&!confirmed)setError('Confirm the mixed corner allocation before applying.');
-   else if(!includedSF)setError('No included soffit surface. No geometry will be created.');
+   if(mixed&&!confirmed)setError('Confirm the mixed corner allocation before applying.');
+   else if(!includedSF&&!pendingSF)setError('No included or pending soffit surface. No geometry will be created.');
    else {try{next=replaceDerivedRoofGroup(entities,spec,uuidv4)}catch(err){setError(err instanceof Error?err.message:String(err))}}
    setPreview({source:entities,next,outer:r.outer,inner:inset.inner,pieces:inset.pieces,statuses,interiorSF:inset.interiorSF,interiorLF:inset.interiorLF,overhangSF:inset.overhangSF,includedSF,pendingSF});
   }catch(err){setError(err instanceof Error?err.message:String(err))}
@@ -116,7 +115,7 @@ function DerivedSoffit({entities,planeIds,onChange}:{entities:RoofEntity[];plane
  <p>Physical overhang: {preview.overhangSF.toFixed(2)} SF</p><p>Interior footprint: {preview.interiorSF.toFixed(2)} SF · {preview.interiorLF.toFixed(2)} LF perimeter (reference only, not confirmed thermal scope)</p>
  {preview.pieces.map(p=><p key={p.side} className="capitalize">{p.side}: {p.projectedSF.toFixed(2)} SF · {preview.statuses[p.side]}</p>)}
  <p className="font-semibold text-teal-300">Included soffit: {preview.includedSF.toFixed(2)} SF</p>
- {preview.pendingSF>0&&<p className="text-amber-300">Pending applicability: {preview.pendingSF.toFixed(2)} SF (not counted)</p>}
+ {preview.pendingSF>0&&<p className="text-amber-300">Pending applicability: {preview.pendingSF.toFixed(2)} SF (geometry retained; quantity unquantified)</p>}
  <div className="flex flex-wrap gap-2"><button className="rounded bg-emerald-800 px-2 py-1 disabled:opacity-40" disabled={!preview.next||preview.source!==entities} onClick={()=>{if(preview.source!==entities||!preview.next)return;if(onChange(preview.next))reset();else setError('Derivation rejected. Review roof measurements.')}}>Apply soffit derivation</button><button className="rounded bg-slate-700 px-2 py-1" onClick={reset}>Cancel soffit derivation</button></div>
  {preview.source!==entities&&<p className="text-amber-300">Roof changed. Preview again.</p>}
  </div>}
@@ -140,7 +139,7 @@ function DerivedInsulation({entities,planeIds,onChange}:{entities:RoofEntity[];p
  const [confirmed,setConfirmed]=useState(existing?.boundaryConfirmed??false);
  const [exclusions,setExclusions]=useState<ExclusionDraft[]>(()=>{
   if(!existing)return [];
-  try{const r=rectangularRoof(entities,planeIds),inner=insetRoof(r.outer,existing.depths).inner;return existing.exclusions.map(b=>({x:String(b.xmin-inner.xmin),y:String(b.ymin-inner.ymin),width:String(b.xmax-b.xmin),depth:String(b.ymax-b.ymin)}));}catch{return []}
+  try{const r=rectangularRoof(entities,planeIds,false),inner=insetRoof(r.outer,existing.depths).inner;return existing.exclusions.map(b=>({x:String(b.xmin-inner.xmin),y:String(b.ymin-inner.ymin),width:String(b.xmax-b.xmin),depth:String(b.ymax-b.ymin)}));}catch{return []}
  });
  const [preview,setPreview]=useState<{source:RoofEntity[];next:RoofEntity[]|null;outer:Bounds;inner:Bounds;exclusions:Bounds[];pieces:ThermalPiece[];projected:number;measured:number;pending:number;excluded:number}|null>(null);
  const [error,setError]=useState('');
@@ -149,7 +148,7 @@ function DerivedInsulation({entities,planeIds,onChange}:{entities:RoofEntity[];p
   setPreview(null);setError('');
   try{
    if(groupIds.length>1)throw Error('Multiple insulation groups match this scope. Reconcile before replacing.');
-   const r=rectangularRoof(entities,planeIds);
+   const r=rectangularRoof(entities,planeIds,false);
    if(sides.some(side=>depths[side].trim()===''||!Number.isFinite(Number(depths[side]))||Number(depths[side])<0))throw Error('Enter a nonnegative horizontal depth for each side, including zero.');
    if(!basis||!material)throw Error('Choose an explicit insulation surface basis and material.');
    const depthFt=thickness.trim()===''?undefined:Number(thickness)/12;
