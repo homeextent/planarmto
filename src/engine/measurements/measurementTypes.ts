@@ -20,6 +20,8 @@ export type RoofDerivationMetadata={
  material?:string;
  thicknessFt?:number;
  pieceKey:string;
+ /** Omitted means included; unresolved soffit pieces retain geometry without measured quantity. */
+ pendingApplicability?:true;
 };
 export type RoofEntity = Identity & (
   | { kind: 'roofPlane'; roofGroupId?: string; polygon: Point[]; pitchRise: number | null; slopeDegrees: number | null; elevationFt: number | null }
@@ -88,6 +90,7 @@ export function validateSpecialistEntities(type: string, entities: unknown): ass
       check(obj(d.depths)&&Object.keys(d.depths).length===4&&['north','east','south','west'].every(k=>num(d.depths[k])&&d.depths[k]>=0),'invalid derivation depths');
       check(d.purpose===e.purpose&&d.basis===e.surfaceBasis&&['horizontal','sloped'].includes(d.basis)&&typeof d.boundaryConfirmed==='boolean'&&typeof d.cornersConfirmed==='boolean','invalid derivation purpose/basis');
       check(Array.isArray(d.exclusions)&&d.exclusions.every(b=>obj(b)&&[b.xmin,b.ymin,b.xmax,b.ymax].every(num)&&b.xmax>b.xmin&&b.ymax>b.ymin),'invalid derivation exclusions');
+      check(d.pendingApplicability===undefined||(d.pendingApplicability===true&&d.purpose==='soffit'),'invalid derived pending applicability');
       check(d.material===e.insulationType&&d.thicknessFt===e.depthFt,'derived surface material/thickness mismatch');
       check(d.purpose==='soffit'?d.basis==='horizontal'&&d.exclusions.length===0&&d.material===undefined&&d.thicknessFt===undefined:d.boundaryConfirmed===true&&str(d.material),'invalid derivation confirmation');
     }
@@ -105,17 +108,20 @@ export function validateSpecialistEntities(type: string, entities: unknown): ass
     }
   }
   const byId=new Map(entities.map(e=>[e.id,e]));
+  const quantityIds=new Set(entities.flatMap(e=>[e.id,e.physicalId,e.assemblyId]));
   const roofGroups=new Set(entities.filter(e=>e.kind==='roofPlane'&&e.roofGroupId!==undefined).map(e=>e.roofGroupId));
   const derivationPieces=new Set<string>();
   const derivationSpecs=new Map<string,string>();
   for(const e of entities) {
     if(e.roofGroupId!==undefined){
+      check(!quantityIds.has(e.roofGroupId),'roof group identity collides with quantity identity');
       check(roofGroups.has(e.roofGroupId),'roof group has no plane');
       if(e.kind==='roofEdge')check(e.planeIds.every((id:string)=>byId.get(id)?.roofGroupId===e.roofGroupId),'roof group edge crosses group ownership');
     }
     if(e.kind==='roofSurface'&&e.derivation!==undefined){
       const d=e.derivation;
       check(d.planeIds.every((id:string)=>byId.get(id)?.kind==='roofPlane')&&d.edgeIds.every((id:string)=>byId.get(id)?.kind==='roofEdge'&&byId.get(id).planeIds.every((p:string)=>d.planeIds.includes(p))),'missing derivation source reference');
+      check(!quantityIds.has(d.groupId),'derivation group identity collides with quantity identity');
       check(!roofGroups.has(d.groupId),'roof and derivation group identities must be distinct');
       const key=JSON.stringify([d.groupId,d.pieceKey]);
       check(!derivationPieces.has(key),'duplicate derivation piece');derivationPieces.add(key);
