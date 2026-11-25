@@ -293,7 +293,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   const clearRoofDrag=()=>{roofDrag.current=null;setRoofMarquee(null);};
   useEffect(()=>{clearRoofDrag();},[activeTool,roofEntities]);
   const selectRoofIds=(ids:string[])=>onSelect(ids.length===0?{type:'none'}:ids.length===1?{type:'roof',id:ids[0]}:{type:'roof',ids});
-  const roofSelectionIds=()=>selection.type==='roof'?(selection.ids??(selection.id?[selection.id]:[])):[];
+  const roofSelectionIds=():string[]=>selection.type==='roof'?(selection.ids??(selection.id?[selection.id]:[])):[];
 
 
   // Underlay interaction state
@@ -3113,7 +3113,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       const screen={x:e.clientX-rect.left,y:e.clientY-rect.top};
       const end=screenToWorld(screen.x,screen.y);
       const hits=distance(drag.screen,screen)>=4?roofWindowSelection(roofEntities,drag.start,end):drag.hitId?[drag.hitId]:[];
-      const selected=new Set(drag.shift?roofSelectionIds():[]);
+      const selected=new Set<string>(drag.shift?roofSelectionIds():[]);
       for(const id of hits){if(drag.shift&&selected.has(id))selected.delete(id);else selected.add(id);}
       selectRoofIds([...selected]);return;
     }
