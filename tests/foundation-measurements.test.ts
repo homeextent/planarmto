@@ -105,3 +105,25 @@ test('horizontal insulation and granular source derivations produce explicit qua
 import {deriveRectangularEnvelope} from '../src/engine/measurements/foundationEnvelopeDerivation';
 test('rectangular exterior envelope reconciles actual outer corners and foam coverage',()=>{let i=0;const id=()=> 'envr'+(++i),w=generateFoundationPerimeter({xmin:0,xmax:40,ymin:0,ymax:30},'exterior',8/12,8,0,id),ids=w.map(e=>e.id);const f=deriveRectangularEnvelope(w,ids,{purpose:'verticalInsulation',heightFt:6,depthFt:.25,foam:true,material:'foam',layerId:'ins'},id);const rows=qty([...w,...f]);for(const [code,expected] of [['foundation.insulation.area',840],['foundation.insulation.foam',2520]] as const){const subset=rows.filter(r=>r.code===code);assert.equal(subset.length,4);assert.ok(subset.every(r=>r.status==='measured'));near(subset.reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),expected)}assert.throws(()=>qty([...w,...f.slice(1)]),/Incomplete/);assert.equal(planFoundationDeletion([...w,...f],[w[0].id]).remaining.length,3)});
 test('rectangular envelope rejects partial sources and unsupported wall openings',()=>{let i=0;const id=()=> 'envr'+(++i),w=generateFoundationPerimeter({xmin:0,xmax:40,ymin:0,ymax:30},'exterior',8/12,8,0,id),ids=w.map(e=>e.id),config={purpose:'waterproofing' as const,heightFt:6,material:'membrane',layerId:'wp'};assert.throws(()=>deriveRectangularEnvelope(w,ids.slice(1),config,id));w[0].foundation!.wallOpenings=[{id:'o',offsetFt:5,widthFt:4,sillFt:2,heightFt:3}];assert.throws(()=>deriveRectangularEnvelope(w,ids,config,id),/openings/)});
+
+import {orthogonalWallPerimeter,offsetOrthogonalPerimeter} from '../src/engine/measurements/foundationPerimeterGeometry';
+import {generateOrthogonalFoundationPerimeter} from '../src/engine/measurements/foundationDrafting';
+const irregularFixtures=[
+ {name:'L',points:[{x:0,y:0},{x:40,y:0},{x:40,y:15},{x:24,y:15},{x:24,y:30},{x:0,y:30}],perimeter:140,area:960},
+ {name:'T',points:[{x:0,y:0},{x:40,y:0},{x:40,y:12},{x:28,y:12},{x:28,y:30},{x:12,y:30},{x:12,y:12},{x:0,y:12}],perimeter:140,area:768},
+ {name:'U',points:[{x:0,y:0},{x:40,y:0},{x:40,y:30},{x:28,y:30},{x:28,y:12},{x:12,y:12},{x:12,y:30},{x:0,y:30}],perimeter:176,area:912}
+];
+for(const f of irregularFixtures)test('orthogonal '+f.name+' perimeter exact ring, all references and winding',()=>{
+ const width=1,expected=f.perimeter*width-4*width*width;
+ for(const points of [f.points,[...f.points].reverse()]){
+ const p=orthogonalWallPerimeter(points,width,'exterior');near(p.areaSF,expected);
+ for(const [ref,vertices] of [['exterior',points],['centreline',p.centre],['interior',p.interior]] as const){
+ let i=0;const e=generateOrthogonalFoundationPerimeter(vertices,ref,width,8,0,()=> 'ir'+(++i)),rows=qty(e);
+ assert.equal(e.length,points.length);assert.ok(rows.every(r=>r.status==='measured'));near(rows.reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),expected*8/27);
+ }
+ }
+});
+test('orthogonal perimeter refuses collapsed recess and nonorthogonal geometry',()=>{
+ const u=irregularFixtures[2].points;assert.throws(()=>offsetOrthogonalPerimeter(u,9));
+ assert.throws(()=>orthogonalWallPerimeter([{x:0,y:0},{x:10,y:0},{x:8,y:10},{x:0,y:10}],1,'exterior'));
+});

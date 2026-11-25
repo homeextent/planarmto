@@ -1,3 +1,4 @@
+import {orthogonalWallPerimeter} from './foundationPerimeterGeometry';
 import type {ActiveTool} from '../../types';
 import type {FoundationEntity,Point} from './measurementTypes';
 import {extendedStrip,foundationRectangle,faceToCentreline,type RectangleReference,type Bounds} from './foundationGeometry';
@@ -55,4 +56,11 @@ export function createReferencedWall(start:Point,end:Point,id:string,reference:W
  const centre=faceToCentreline(start,end,widthFt,reference.endsWith('left')?'left':'right');
  extendedStrip(centre.start,centre.end,widthFt);
  return {id,physicalId:id,assemblyId:id,source:{reference:'Manual foundation wall — '+reference+' face',note:'Source face '+JSON.stringify({start,end,widthFt})},kind:'foundationWall',...centre,widthFt,heightFt:null,elevationFt:null,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true}};
+}
+
+/** Uniform orthogonal closed perimeter, with one explicit physical reconciliation assembly. */
+export function generateOrthogonalFoundationPerimeter(points:Point[],reference:RectangleReference,widthFt:number,heightFt:number,baseFt:number,id:()=>string):FoundationEntity[]{
+ if(!Number.isFinite(heightFt)||heightFt<=0||!Number.isFinite(baseFt))throw Error('Specify positive height and confirmed base elevation for joined walls');
+ const perimeter=orthogonalWallPerimeter(points,widthFt,reference),assemblyId=id();
+ return perimeter.segments.map(segment=>{const entityId=id();return {id:entityId,physicalId:entityId,assemblyId,source:{reference:'Generated orthogonal foundation — '+reference+' reference'},kind:'foundationWall',start:segment.start,end:segment.end,widthFt,heightFt,elevationFt:baseFt,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true,baseElevationConfirmed:true,joinStartFt:segment.joinStartFt,joinEndFt:segment.joinEndFt}}});
 }
