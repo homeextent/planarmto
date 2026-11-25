@@ -74,7 +74,7 @@ R4.9: Generated roof grouping must be distinct from physicalId/assemblyId quanti
 
 Owner authorized closeout after CI #124. Verified exact commit `73680daf5c7194bb57ba6e1e21493ec858b65f81`, [CI #124](https://github.com/homeextent/planarmto/actions/runs/45541929342), job 138962262468: 17 persistence, 8 architecture, 7 lifecycle, 5 specialist contract, 50 roof engine and 38 browser tests passed (125 total); TypeScript, build, audit, PHP syntax, bundled PDF worker and isolated WordPress integration passed. The six dedicated R4 browser workflows cover assembly deletion, directional selection, integrated soffit/deck derivation and group revision, pending soffit reload, thermal exclusions, and editable focus/independent surface preservation.
 
-R4-E changes: 6fb6ce7 refreshes the successful exact placement reference, 7125af0 distinguishes wholly pending perimeter lengths and insulation area/volume from measured zero, 3e85cd7 adds two browser tests and strengthens repeated correction assertions. Target 87 non-browser + 40 browser = 127. **Final exact-HEAD CI pending at documentation preparation; not owner accepted, not integrated.** Derived plan previews are in the inspector. Source edits invalidating dependent groups are refused until explicit group removal/rederivation; no combined source-edit-and-rederive transaction or automatic legacy grouping. Conflicting soffit applicability on a split side requires manual soffit reconciliation; it does not block insulation derivation if the boundary is otherwise reconciled. General irregular skeletons, complex thermal exclusions and sloped/partial-side soffits remain manual. No rates, structural design, procurement or consolidated estimate/print. No new runtime dependencies or schema bump.
+R4-E changes: 6fb6ce7 refreshes the successful exact placement reference, 7125af0 distinguishes wholly pending perimeter lengths and insulation area/volume from measured zero, 3e85cd7 adds two browser tests and strengthens repeated correction assertions. Target 87 non-browser + 40 browser = 127. **Historical preparation checkpoint superseded by formal owner acceptance below; not yet integrated.** Derived plan previews are in the inspector. Source edits invalidating dependent groups are refused until explicit group removal/rederivation; no combined source-edit-and-rederive transaction or automatic legacy grouping. Conflicting soffit applicability on a split side requires manual soffit reconciliation; it does not block insulation derivation if the boundary is otherwise reconciled. General irregular skeletons, complex thermal exclusions and sloped/partial-side soffits remain manual. No rates, structural design, procurement or consolidated estimate/print. No new runtime dependencies or schema bump.
 
 ## R4-E integrated owner acceptance
 
@@ -91,4 +91,24 @@ Use disposable synthetic projects, not customer records. Verify clean feature ch
 - [ ] R4-L09: L-shape automatic generator refusal actionable; manual polygon/edge/soffit/insulation workflow. No bounding rectangle approximation. Confirm irregular and other deferred scope.
 - [ ] R4-L10: Save/export/reopen/import, exact geometry/group metadata and pending quantities preserved. Independent floor and roof calibration/history/underlays; consolidated reporting blocked. Check visual usability, no runtime errors.
 
-Owner acceptance and separate explicit merge authorization remain required. PR #10 draft; staging and main unchanged by feature work. Do not claim final validation before exact final documentation commit CI succeeds.
+The checklist above is retained as the test protocol; the owner-reported results are recorded below. PR #10 remains unmerged pending final documentation-only CI.
+
+
+## R4-E formal owner acceptance
+
+Owner reported all ten R4-L01–L10 local acceptance checks passed on candidate `fb60747f83183016694f4c54ac2dbc609087f5e5` (2026-11-24 Toronto local date); zero failures or deferred checks reported. A07 and A08 remediation accepted. [CI #129](https://github.com/homeextent/planarmto/actions/runs/45542671356), job 138964708488, passed 127/127 tests (87 engine/contract, 40 Chromium) and all validation stages on that exact commit. Owner authorized documentation-only closeout, staging integration and post-merge CI, subject to final exact-head CI and applicable protections. Production main/v2.15.1 remains separately gated. No application changes after owner-tested source are authorized.
+
+| Check | Owner result |
+|---|---|
+| R4-L01 — Precision drafting | Pass |
+| R4-L02 — Hip roof generation | Pass |
+| R4-L03 — Perimeter assemblies | Pass |
+| R4-L04 — Automatic soffit derivation | Pass |
+| R4-L05 — Insulation derivation | Pass |
+| R4-L06 — Thermal exclusions | Pass |
+| R4-L07 — Graphical selection | Pass |
+| R4-L08 — Complete roof deletion | Pass |
+| R4-L09 — Irregular roof workflow | Pass |
+| R4-L10 — Persistence and workspace isolation | Pass |
+
+Acceptance evidence is the owner's submitted register, not independently observed local sessions or per-step screenshots. No new defect reported. General irregular automatic skeletons and unsupported complex thermal/soffit geometry remain intentionally manual; C.1E and C.2 remain separately gated. Final documentation-only CI and post-merge staging CI pending.
