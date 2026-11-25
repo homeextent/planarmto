@@ -31,7 +31,7 @@ const wall=(id:string,start={x:0,y:0},end={x:40,y:0}):FoundationEntity=>({id,phy
 test('foundation contributions retain source identity and canonical CY',()=>{const e=wall('wall');const r=measureFoundation('f',[e]).rows[0];assert.equal(r.elementId,'wall');assert.equal(r.unit,'CY');assert.equal(r.status,'measured');if(r.status==='measured')near(r.quantity,2560/324)});
 test('legacy unconfirmed foundation remains pending',()=>{const e=wall('old');delete e.foundation;assert.equal(measureFoundation('f',[e]).rows[0].status,'unquantified')});
 test('unknown width cannot certify overlapping same-purpose contribution',()=>{const a=wall('a'),b=wall('b');if(b.kind==='foundationWall')b.widthFt=null;assert.ok(measureFoundation('f',[a,b]).rows.every(r=>r.status==='unquantified'))});
-test('cross-assembly overlapping concrete cannot silently double count',()=>{const a=wall('a'),b={...wall('b'),assemblyId:'other'};assert.ok(measureFoundation('f',[a,b]).rows.every(r=>r.status==='unquantified'))});
+test('cross-assembly partially overlapping concrete cannot silently double count',()=>{const a=wall('a'),b={...wall('b',{x:20,y:0},{x:60,y:0}),assemblyId:'other'};const rows=measureFoundation('f',[a,b]).rows;assert.equal(rows.length,2);assert.ok(rows.every(r=>r.status==='unquantified'))});
 test('explicit metadata validation rejects negative junction extension',()=>{const e=wall('a');e.foundation!.joinStartFt=-1;assert.throws(()=>validateSpecialistEntities('foundation',[e]),/junction extension/)});
 test('confirmed compatible duplicate solid is rejected',()=>assert.throws(()=>measureFoundation('f',[wall('a'),wall('b')]),/Duplicate physical solid/));
 
