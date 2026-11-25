@@ -2,7 +2,7 @@ import type {FoundationEntity,FoundationDrainageSource,Point} from './measuremen
 import {foundationRectangle,extendedStrip} from './foundationGeometry';
 const near=(a:number,b:number)=>Math.abs(a-b)<1e-8;
 const same=(a:Point,b:Point)=>near(a.x,b.x)&&near(a.y,b.y);
-function route(entities:FoundationEntity[],ids:string[],offset:number):Point[]{
+export function rectangularExteriorRoute(entities:FoundationEntity[],ids:string[],offset:number):Point[]{
  if(ids.length!==4||new Set(ids).size!==4||!Number.isFinite(offset)||offset<0)throw Error('Select four distinct rectangular walls and specify nonnegative exterior offset');
  const walls=ids.map(id=>{const e=entities.find(q=>q.id===id);if(!e||e.kind!=='foundationWall'||!e.foundation?.centrelineConfirmed||e.widthFt===null||e.foundation.material!=='poured concrete')throw Error('Confirm all four source wall centrelines and widths');return e});
  const w=walls[0].widthFt!;
@@ -19,7 +19,7 @@ function route(entities:FoundationEntity[],ids:string[],offset:number):Point[]{
 }
 export function derivePerimeterDrainage(entities:FoundationEntity[],ids:string[],offsetFt:number,material:string,layerId:string,id:()=>string):FoundationEntity[]{
  if(!material.trim()||!layerId.trim())throw Error('Specify drainage material and layer identity');
- const wallIds=[...ids].sort(),p=route(entities,wallIds,offsetFt);
+ const wallIds=[...ids].sort(),p=rectangularExteriorRoute(entities,wallIds,offsetFt);
  if(entities.some(e=>e.foundation?.drainageSource?.wallIds.some(v=>wallIds.includes(v))))throw Error('Remove existing derived perimeter drainage before regenerating');
  const groupId=id(),assemblyId=id();
  return p.map((start,edge)=>{const entityId=id(),drainageSource:FoundationDrainageSource={version:1,wallIds,groupId,edge,offsetFt,material,layerId};return {id:entityId,physicalId:entityId,assemblyId,source:{reference:'Derived rectangular exterior drainage'},kind:'foundationLine',purpose:'drainage',start,end:p[(edge+1)%4],foundation:{version:1,material,coverage:{confirmed:true,layerId},drainageSource}}});
