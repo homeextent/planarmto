@@ -157,3 +157,22 @@ test('assembly reassignment refuses partial source assemblies and derived depend
  let i=0;const f=deriveStripFootings([a,b],[a.id],2,1,()=> 'dep'+(++i));
  assert.throws(()=>assignFoundationAssembly([a,b,...f],[a.id,b.id],'new'),/dependent derived/);
 });
+
+test('isolated signed offset footing preserves volume and source datum in either direction',()=>{
+ const w=wall('offset-wall');let i=0;
+ for(const offset of [-.5,.5]){
+ const f=deriveStripFootings([w],[w.id],2,1,()=> 'offset'+(++i),offset)[0];
+ if(f.kind!=='stripFooting')throw Error('Expected footing');
+ near(f.start.y,offset);near(f.end.y,offset);assert.equal(f.elevationFt,-1);
+ const row=qty([w,f]).find(r=>r.code==='foundation.footing.strip.concrete')!;
+ assert.equal(row.status,'measured');if(row.status==='measured')near(row.quantity,80/27);
+ assert.throws(()=>qty([w,{...f,start:{...f.start,y:offset+.1}}]),/stale/);
+ }
+});
+test('offset footing refuses joined walls and insufficient footprint',()=>{
+ const w=wall('offset-wall');let i=0;const id=()=> 'offset'+(++i);
+ assert.throws(()=>deriveStripFootings([w],[w.id],2,1,id,1),/contain the source wall/);
+ const q=wall('connected',{x:40,y:0},{x:40,y:10});q.assemblyId='other';
+ assert.throws(()=>deriveStripFootings([w,q],[w.id],2,1,id,.5),/isolated unjoined wall/);
+ w.foundation!.joinStartFt=.5;assert.throws(()=>deriveStripFootings([w],[w.id],2,1,id,.5),/isolated unjoined wall/);
+});

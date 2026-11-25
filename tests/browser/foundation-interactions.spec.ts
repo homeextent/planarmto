@@ -259,3 +259,21 @@ test('foundation inspector converts top elevation into canonical base',async({pa
  const e=(await snapshot(page))[0];if(e.kind!=='foundationWall')throw Error('Expected wall');
  expect(e.elevationFt).toBe(-8);expect(e.foundation?.baseElevationConfirmed).toBe(true);
 });
+
+test('isolated strip footing signed offset persists in source-linked preview and apply',async({page})=>{
+ await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
+ await page.getByLabel('Material',{exact:true}).fill('poured concrete');
+ await page.getByLabel('Width (ft)',{exact:true}).fill('1');
+ await page.getByLabel('Height / depth (ft)',{exact:true}).fill('8');
+ await page.getByLabel('Base elevation (ft; blank unknown)',{exact:true}).fill('0');
+ await page.getByLabel('Confirm drafted centreline').check();
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ await page.getByText('Derive strip footings',{exact:true}).click();
+ await page.getByLabel('Footing width (ft)',{exact:true}).fill('2');
+ await page.getByLabel('Footing depth (ft)',{exact:true}).fill('1');
+ await page.getByLabel('Footing signed offset (ft)',{exact:true}).fill('0.5');
+ await page.getByRole('button',{name:'Preview strip footings',exact:true}).click();
+ await expect(page.getByText('1 footings · 2.9630 CY',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Apply strip footings',exact:true}).click();
+ const f=(await snapshot(page)).find(e=>e.kind==='stripFooting');expect(f?.foundation?.stripSource?.offsetFt).toBe(.5);
+});

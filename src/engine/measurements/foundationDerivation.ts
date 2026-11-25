@@ -3,24 +3,38 @@ import {extendedStrip} from './foundationGeometry';
 type Wall=FoundationEntity & {kind:'foundationWall';start:{x:number;y:number};end:{x:number;y:number};widthFt:number|null;heightFt:number|null;elevationFt:number|null};
 const wall=(e:FoundationEntity):e is Wall=>e.kind==='foundationWall';
 const near=(a:number,b:number)=>Math.abs(a-b)<=1e-8;
-function expected(w:Wall,s:FoundationStripSource){
+function expected(w:Wall,s:FoundationStripSource,entities:FoundationEntity[]){
  if(!w.foundation?.centrelineConfirmed||!w.foundation.baseElevationConfirmed||w.elevationFt===null||w.widthFt===null||w.foundation.material!=='poured concrete')throw Error('Confirm source wall centreline, width, material and base elevation');
  const length=Math.hypot(w.end.x-w.start.x,w.end.y-w.start.y);
  if(!Number.isFinite(length)||length<=1e-8||!Number.isFinite(s.widthFt)||s.widthFt<=0||!Number.isFinite(s.depthFt)||s.depthFt<=0||!Number.isFinite(s.offsetFt))throw Error('Invalid footing dimensions');
- // Bounded centred strip. Nonzero offset and arbitrary junctions require manual drafting.
- if(s.offsetFt!==0)throw Error('Only centred strip derivation is supported; draft offset footings manually');
+ // Offset is signed along the left normal of the directed source in project XY.
+ // Bounded to isolated orthogonal walls, not arbitrary joined or unsupported bearing geometry.
  const a=w.foundation.joinStartFt??0,b=w.foundation.joinEndFt??0;
  if([a,b].some(v=>v!==0&&!near(v,w.widthFt!/2)))throw Error('Unsupported source junction extension');
  const joinStartFt=a===0?0:s.widthFt/2,joinEndFt=b===0?0:s.widthFt/2;
- extendedStrip(w.start,w.end,s.widthFt,joinStartFt,joinEndFt);
- return {start:w.start,end:w.end,widthFt:s.widthFt,heightFt:s.depthFt,elevationFt:w.elevationFt-s.depthFt,joinStartFt,joinEndFt};
+ if(s.offsetFt!==0){
+  if(a!==0||b!==0||entities.some(e=>e.id!==w.id&&wall(e)&&e.assemblyId===w.assemblyId))throw Error('Offset footing requires an isolated unjoined wall');
+  if(Math.abs(s.offsetFt)+w.widthFt/2>s.widthFt/2+1e-8)throw Error('Offset footing must contain the source wall width; confirm bearing design separately');
+  const source=extendedStrip(w.start,w.end,w.widthFt);
+  for(const other of entities.filter(wall)){
+   if(other.id===w.id)continue;
+   if(other.widthFt===null||!other.foundation?.centrelineConfirmed)throw Error('Cannot verify isolation from unconfirmed wall geometry');
+   const q=extendedStrip(other.start,other.end,other.widthFt,other.foundation.joinStartFt,other.foundation.joinEndFt);
+   if(source.xmin<=q.xmax+1e-8&&source.xmax>=q.xmin-1e-8&&source.ymin<=q.ymax+1e-8&&source.ymax>=q.ymin-1e-8)throw Error('Offset footing requires an isolated unjoined wall');
+  }
+ }
+ const dx=-(w.end.y-w.start.y)/length*s.offsetFt,dy=(w.end.x-w.start.x)/length*s.offsetFt;
+ const start={x:w.start.x+dx,y:w.start.y+dy},end={x:w.end.x+dx,y:w.end.y+dy};
+ extendedStrip(start,end,s.widthFt,joinStartFt,joinEndFt);
+ return {start,end,widthFt:s.widthFt,heightFt:s.depthFt,elevationFt:w.elevationFt-s.depthFt,joinStartFt,joinEndFt};
 }
-export function deriveStripFootings(entities:FoundationEntity[],selectedIds:string[],widthFt:number,depthFt:number,id:()=>string):FoundationEntity[]{
+export function deriveStripFootings(entities:FoundationEntity[],selectedIds:string[],widthFt:number,depthFt:number,id:()=>string,offsetFt=0):FoundationEntity[]{
  const walls=entities.filter(e=>selectedIds.includes(e.id)&&wall(e)).filter(wall);
  if(!walls.length||walls.length!==new Set(selectedIds).size)throw Error('Select foundation walls only');
  if(entities.some(e=>e.foundation?.stripSource&&selectedIds.includes(e.foundation.stripSource.wallId)))throw Error('Remove existing derived strip group before regenerating');
+ if(offsetFt!==0&&walls.length!==1)throw Error('Select one isolated wall for offset footing');
  const groupId=id(),assemblyId=id();
- return walls.map(w=>{const s:FoundationStripSource={version:1,wallId:w.id,groupId,offsetFt:0,widthFt,depthFt},g=expected(w,s),entityId=id();return {id:entityId,physicalId:entityId,assemblyId,source:{reference:'Derived strip footing from '+w.id},kind:'stripFooting',start:g.start,end:g.end,widthFt:g.widthFt,heightFt:g.heightFt,elevationFt:g.elevationFt,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true,baseElevationConfirmed:true,joinStartFt:g.joinStartFt,joinEndFt:g.joinEndFt,stripSource:s}}});
+ return walls.map(w=>{const s:FoundationStripSource={version:1,wallId:w.id,groupId,offsetFt,widthFt,depthFt},g=expected(w,s,entities),entityId=id();return {id:entityId,physicalId:entityId,assemblyId,source:{reference:'Derived strip footing from '+w.id},kind:'stripFooting',start:g.start,end:g.end,widthFt:g.widthFt,heightFt:g.heightFt,elevationFt:g.elevationFt,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true,baseElevationConfirmed:true,joinStartFt:g.joinStartFt,joinEndFt:g.joinEndFt,stripSource:s}}});
 }
 export function validateStripSources(entities:FoundationEntity[]):void{
  const seen=new Set<string>(),groups=new Map<string,string>();
@@ -30,7 +44,7 @@ export function validateStripSources(entities:FoundationEntity[]):void{
  if(seen.has(s.wallId))throw Error('Duplicate derived footing source wall');seen.add(s.wallId);
  const groupSpec=JSON.stringify([e.assemblyId,s.widthFt,s.depthFt,s.offsetFt]);
  if(groups.has(s.groupId)&&groups.get(s.groupId)!==groupSpec)throw Error('Inconsistent derived footing group');groups.set(s.groupId,groupSpec);
- const g=expected(w,s);
+ const g=expected(w,s,entities);
  if(!e.foundation?.centrelineConfirmed||!e.foundation.baseElevationConfirmed||e.foundation.material!=='poured concrete'||e.widthFt!==g.widthFt||e.heightFt!==g.heightFt||e.elevationFt!==g.elevationFt||e.start.x!==g.start.x||e.start.y!==g.start.y||e.end.x!==g.end.x||e.end.y!==g.end.y||e.foundation.joinStartFt!==g.joinStartFt||e.foundation.joinEndFt!==g.joinEndFt)throw Error('Derived footing is stale; remove or regenerate the group before editing its source');
  }
 }
