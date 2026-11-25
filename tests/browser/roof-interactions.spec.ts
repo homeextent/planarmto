@@ -284,6 +284,11 @@ test('manual concave orthogonal polygon closes without a duplicate vertex',async
 });
 
 test('Ortho diagonal closure requires explicit Finish polygon',async ({page})=>{
+  // CI #87 established that the fresh workspace has Ortho disabled.
+  // Explicitly enable the required test precondition using the actual UI.
+  if(!(await roofSnapshot(page)).settings.orthoMode){
+    await page.getByTitle('Ortho Mode (Lock 90° angles)',{exact:true}).click();
+  }
   expect((await roofSnapshot(page)).settings.orthoMode).toBe(true);
   await page.getByRole('button',{name:'Roof plane',exact:true}).click();
   await page.getByLabel('Roof drawing mode').selectOption('polygon');
