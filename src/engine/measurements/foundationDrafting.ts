@@ -5,13 +5,14 @@ import {extendedStrip,foundationRectangle,faceToCentreline,type RectangleReferen
 import {polygonDraftError} from './roofMeasurements';
 import {rectanglePoints} from '../precisionDrafting';
 export const foundationTools = [
- ['foundation_wall','Foundation wall'],['foundation_strip','Strip footing'],['foundation_pad','Pad footing'],['foundation_slab','Slab'],
+ ['foundation_perimeter','Polygon foundation perimeter'],['foundation_wall','Foundation wall'],['foundation_strip','Strip footing'],['foundation_pad','Pad footing'],['foundation_slab','Slab'],
  ['foundation_trench','Trench excavation'],['foundation_excavation','Area excavation'],['foundation_backfill','Backfill'],['foundation_granular','Granular'],
  ['foundation_insulation','Horizontal insulation'],['foundation_vertical_insulation','Vertical insulation'],['foundation_waterproofing','Waterproofing'],['foundation_drainage','Drainage']
 ] as const;
 export const foundationArea=(tool:ActiveTool)=>['foundation_pad','foundation_slab','foundation_excavation','foundation_backfill','foundation_granular','foundation_insulation'].includes(tool);
 export const foundationPoints=(e:FoundationEntity)=>'polygon' in e?e.polygon:[e.start,e.end];
 export function createFoundationDraft(tool:ActiveTool,start:Point,end:Point,id:string,polygon?:Point[]):FoundationEntity {
+ if(tool==='foundation_perimeter')throw Error('Use the perimeter generation workflow');
  if(!foundationTools.some(([t])=>t===tool))throw Error('Choose a foundation drawing tool');
  if(!polygon&&Math.hypot(end.x-start.x,end.y-start.y)<=1e-8)throw Error('Choose distinct drafting points');
  const base={id,physicalId:id,assemblyId:id,source:{reference:'Manual foundation draft'}};

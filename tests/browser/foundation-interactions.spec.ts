@@ -229,3 +229,20 @@ test('rectangular exterior waterproofing measures continuous outer faces',async(
  await page.getByRole('button',{name:'Apply envelope',exact:true}).click();await expect(entities(page)).toHaveCount(9);
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();await expect(entities(page)).toHaveCount(5);
 });
+
+test('irregular polygon perimeter previews six walls and commits one undoable assembly',async({page})=>{
+ await page.getByRole('button',{name:'Polygon foundation perimeter',exact:true}).click();
+ const canvas=page.locator('canvas').first();
+ for(const p of [{x:200,y:200},{x:500,y:200},{x:500,y:320},{x:380,y:320},{x:380,y:440},{x:200,y:440}])await canvas.click({position:p});
+ await page.getByRole('button',{name:'Finish foundation polygon',exact:true}).click();
+ await expect(page.getByLabel('Polygon perimeter configuration')).toBeVisible();
+ for(const [label,value] of [['Polygon wall thickness (ft)','1'],['Polygon wall height (ft)','8'],['Polygon wall base (ft)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Preview polygon perimeter',exact:true}).click();
+ await expect(page.getByLabel('Foundation graphical preview')).toHaveText('Preview — 6 uncommitted components');
+ await expect(entities(page)).toHaveCount(1);
+ await page.getByRole('button',{name:'Apply polygon perimeter',exact:true}).click();
+ await expect(entities(page)).toHaveCount(7);
+ const saved=await snapshot(page);expect(new Set(saved.map(e=>e.assemblyId)).size).toBe(1);expect(saved.every(e=>e.kind==='foundationWall')).toBe(true);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();await expect(entities(page)).toHaveCount(1);
+ await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();await expect(entities(page)).toHaveCount(7);
+});
