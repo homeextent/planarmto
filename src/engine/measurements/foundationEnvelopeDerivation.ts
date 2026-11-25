@@ -3,7 +3,7 @@ import type {FoundationEntity,FoundationEnvelopeSource} from './measurementTypes
 import {rectangularExteriorRoute} from './foundationDrainageDerivation';
 import {simplePolygon} from './roofMeasurements';
 import {extendedStrip,faceToCentreline} from './foundationGeometry';
-type Config=Omit<FoundationEnvelopeSource,'version'|'sourceId'|'groupId'|'perimeterWallIds'>;
+type Config=Omit<FoundationEnvelopeSource,'version'|'sourceId'|'groupId'|'perimeterWallIds'|'sourceIds'>;
 const near=(a:number,b:number)=>Math.abs(a-b)<1e-8;
 function geometry(source:FoundationEntity,s:FoundationEnvelopeSource,id:string,assemblyId:string,entities:FoundationEntity[]):FoundationEntity{
  const base={id,physicalId:id,assemblyId,source:{reference:'Derived '+s.purpose+' from '+source.id}};
@@ -39,7 +39,7 @@ export function deriveFoundationEnvelope(entities:FoundationEntity[],ids:string[
  if(!ids.length||new Set(ids).size!==ids.length||!config.material.trim()||!config.layerId.trim())throw Error('Select distinct sources and specify material and layer');
  if(entities.some(e=>{const s=e.foundation?.envelopeSource;return s&&ids.includes(s.sourceId)&&s.purpose===config.purpose&&s.layerId===config.layerId}))throw Error('Remove existing derived layer before regenerating');
  const groupId=id(),assemblyId=id();
- return ids.map(sourceId=>{const source=entities.find(e=>e.id===sourceId);if(!source)throw Error('Missing envelope source');return geometry(source,{...config,version:1,sourceId,groupId},id(),assemblyId,entities)});
+ return ids.map(sourceId=>{const source=entities.find(e=>e.id===sourceId);if(!source)throw Error('Missing envelope source');return geometry(source,{...config,version:1,sourceId,groupId,sourceIds:[...ids].sort()},id(),assemblyId,entities)});
 }
 /** Complete exterior wall loop only; corners terminate at the actual outer vertices. */
 export function deriveRectangularEnvelope(entities:FoundationEntity[],ids:string[],config:Config,id:()=>string):FoundationEntity[]{
@@ -57,14 +57,16 @@ export function deriveRectangularEnvelope(entities:FoundationEntity[],ids:string
  });
 }
 export function validateEnvelopeSources(entities:FoundationEntity[]):void{
- const seen=new Set<string>(),groups=new Map<string,string>(),perimeters=new Map<string,FoundationEnvelopeSource[]>();
+ const seen=new Set<string>(),groups=new Map<string,string>(),perimeters=new Map<string,FoundationEnvelopeSource[]>(),members=new Map<string,FoundationEnvelopeSource[]>();
  for(const e of entities){const s=e.foundation?.envelopeSource;if(!s)continue;const source=entities.find(q=>q.id===s.sourceId);if(!source)throw Error('Missing derived envelope source');
  const key=JSON.stringify([s.sourceId,s.purpose,s.layerId]);if(seen.has(key))throw Error('Duplicate derived envelope layer');seen.add(key);
+ const list=members.get(s.groupId)??[];list.push(s);members.set(s.groupId,list);
  if(s.perimeterWallIds){const g=perimeters.get(s.groupId)??[];g.push(s);perimeters.set(s.groupId,g)}
- const spec=JSON.stringify([e.assemblyId,s.purpose,s.perimeterWallIds?null:s.side,s.heightFt,s.depthFt,s.offsetBelowSlabFt,s.material,s.layerId,s.foam,s.perimeterWallIds?[...s.perimeterWallIds].sort():null]);if(groups.has(s.groupId)&&groups.get(s.groupId)!==spec)throw Error('Inconsistent envelope group');groups.set(s.groupId,spec);
+ const spec=JSON.stringify([e.assemblyId,s.purpose,s.perimeterWallIds?null:s.side,s.heightFt,s.depthFt,s.offsetBelowSlabFt,s.material,s.layerId,s.foam,s.sourceIds?[...s.sourceIds].sort():null,s.perimeterWallIds?[...s.perimeterWallIds].sort():null]);if(groups.has(s.groupId)&&groups.get(s.groupId)!==spec)throw Error('Inconsistent envelope group');groups.set(s.groupId,spec);
  const expected=geometry(source,s,e.id,e.assemblyId,entities);
  const signature=(q:FoundationEntity)=>JSON.stringify(['polygon' in q?q.polygon:[q.start,q.end],'depthFt' in q?q.depthFt:null,'heightFt' in q?q.heightFt:null,'elevationFt' in q?q.elevationFt:null,q.foundation?.material,q.foundation?.baseElevationConfirmed,q.foundation?.coverage?.layerId,q.foundation?.coverage?.confirmed,q.foundation?.coverage?.openingTreatment,q.foundation?.coverage?.foam,q.foundation?.coverage?.thicknessFt,q.foundation?.granularLayerId]);
  if(signature(e)!==signature(expected))throw Error('Derived envelope is stale; remove or regenerate before editing source');
  }
+ for(const group of members.values()){const ids=group[0].sourceIds;if(ids&&(group.length!==ids.length||ids.some(id=>!group.some(s=>s.sourceId===id))))throw Error('Incomplete derived envelope group');}
  for(const g of perimeters.values())if(g.length!==g[0].perimeterWallIds!.length||new Set(g.map(s=>s.sourceId)).size!==g.length||g[0].perimeterWallIds!.some(id=>!g.some(s=>s.sourceId===id)))throw Error('Incomplete exterior envelope group');
 }

@@ -409,3 +409,16 @@ test('explicit drainage replacement keeps original on invalid candidate and perm
  const members=derivePerimeterDrainage(plan.base,ids,3,'pipe','drain',id),next=applyFoundationGeneration(before,members,plan.removedIds);
  near(qty(next).filter(r=>r.code==='foundation.drainage.length').reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),164);
 });
+
+test('new strip derivation manifest rejects incomplete groups without rewriting historical records',()=>{
+ const a=wall('manifest-a',{x:0,y:0},{x:40,y:0}),b=wall('manifest-b',{x:0,y:20},{x:40,y:20});let n=0;const id=()=> 'manifest'+(++n);
+ const f=deriveStripFootings([a,b],[a.id,b.id],2,1,id);assert.deepEqual(f[0].foundation!.stripSource!.wallIds,[a.id,b.id]);
+ assert.throws(()=>qty([a,b,f[0]]),/Incomplete derived strip group/);
+ const legacy=structuredClone(f[0]);delete legacy.foundation!.stripSource!.wallIds;assert.ok(qty([a,b,legacy]).every(r=>r.status==='measured'));
+});
+test('new independent envelope derivation manifest rejects missing members',()=>{
+ const a=wall('manifest-a',{x:0,y:0},{x:40,y:0}),b=wall('manifest-b',{x:0,y:20},{x:40,y:20});let n=0;const id=()=> 'manifest'+(++n);
+ const f=deriveFoundationEnvelope([a,b],[a.id,b.id],{purpose:'waterproofing',heightFt:6,side:'left',material:'membrane',layerId:'wp'},id);
+ assert.throws(()=>qty([a,b,f[0]]),/Incomplete derived envelope group/);
+ const legacy=structuredClone(f[0]);delete legacy.foundation!.envelopeSource!.sourceIds;assert.ok(qty([a,b,legacy]).every(r=>r.status==='measured'));
+});
