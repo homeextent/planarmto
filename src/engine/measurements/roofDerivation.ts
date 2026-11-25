@@ -1,5 +1,5 @@
 /** R4-C pure geometry. No persistence or automatic scope assignment. Canonical feet. */
-import type {Point,RoofEntity,Applicability} from './measurementTypes';
+import type {Point,RoofEntity,Applicability,RoofDerivationMetadata} from './measurementTypes';
 import {projectedArea,validateRoofTopology,slopeFactor} from './roofMeasurements';
 type Plane=Extract<RoofEntity,{kind:'roofPlane'}>;
 type Edge=Extract<RoofEntity,{kind:'roofEdge'}>;
@@ -20,7 +20,7 @@ function conserve(actual:number,expected:number,message:string){
  if(!Number.isFinite(actual)||Math.abs(actual-expected)>EPS*Math.max(1,expected))throw Error(message);
 }
 export function rectangularRoof(entities:RoofEntity[],planeIds:string[]){
- validateRoofTopology(entities);
+ validateRoofTopology(entities.filter(e=>e.kind!=='roofSurface'));
  const selected=new Set(planeIds);
  const planes=entities.filter((e):e is Plane=>e.kind==='roofPlane'&&selected.has(e.id));
  if(!planes.length||planes.length!==planeIds.length||selected.size!==planeIds.length)throw Error('Select distinct existing roof planes.');
@@ -119,4 +119,45 @@ export function thermalPieces(rectangles:Bounds[],planes:Plane[],basis:'horizont
   conserve(pieces.slice(start).reduce((n,p)=>n+p.projectedSF,0),area(b),'Roof planes do not cover the thermal boundary.');
  }
  return pieces;
+}
+
+type Surface=Extract<RoofEntity,{kind:'roofSurface'}>;
+export type DerivationSpec=Omit<RoofDerivationMetadata,'pieceKey'>;
+type DerivedPiece=Pick<Surface,'polygon'|'pitchRise'> & {pieceKey:string};
+const sameIds=(a:string[],b:string[])=>a.length===b.length&&new Set(a).size===a.length&&a.every(id=>b.includes(id));
+/** Reconstruct geometry from current source, never from saved quantity totals. */
+export function reconstructRoofSurfaces(entities:RoofEntity[],spec:DerivationSpec):DerivedPiece[]{
+ const r=rectangularRoof(entities,spec.planeIds);
+ const edgeIds=sides.flatMap(side=>r.boundary[side].edgeIds);
+ if(!sameIds(spec.edgeIds,edgeIds))throw Error('Derived roof boundary references changed. Remove or rederive surfaces.');
+ const inset=insetRoof(r.outer,spec.depths);
+ if(spec.purpose==='soffit'){
+  if(spec.basis!=='horizontal')throw Error('Derived soffit must be horizontal.');
+  if(new Set(inset.pieces.map(p=>r.boundary[p.side].soffit)).size>1&&!spec.cornersConfirmed)throw Error('Confirm mixed soffit corner allocation.');
+  // Do not commit an apparently complete area while applicability is unresolved.
+  if(inset.pieces.some(p=>r.boundary[p.side].soffit==='unspecified'))throw Error('Resolve soffit applicability before committing derived surfaces.');
+  return inset.pieces.filter(p=>r.boundary[p.side].soffit==='included').map(p=>({pieceKey:p.side,polygon:p.polygon,pitchRise:0}));
+ }
+ if(!spec.boundaryConfirmed||!spec.material)throw Error('Confirm thermal boundary and insulation material.');
+ const rects=thermalRectangles(inset.inner,spec.exclusions);
+ return rects.flatMap((b,i)=>thermalPieces([b],[...r.planes].sort((a,b)=>a.id.localeCompare(b.id)),spec.basis).map(p=>({pieceKey:JSON.stringify([i,p.planeId??null]),polygon:p.polygon,pitchRise:p.pitchRise})));
+}
+function samePolygon(a:Point[],b:Point[]){
+ return a.length===b.length&&a.every((p,i)=>near(p.x,b[i].x)&&near(p.y,b[i].y));
+}
+/** Called after structural and ordinary topology validation. */
+export function validateDerivedRoofSurfaces(entities:RoofEntity[]):void{
+ const groups=new Map<string,Surface[]>();
+ for(const e of entities)if(e.kind==='roofSurface'&&e.derivation){
+  const group=groups.get(e.derivation.groupId)||[];group.push(e);groups.set(e.derivation.groupId,group);
+ }
+ for(const group of groups.values()){
+  const spec=group[0].derivation!;
+  const expected=reconstructRoofSurfaces(entities,spec);
+  if(expected.length!==group.length)throw Error('Incomplete or stale derived roof group. Remove or rederive surfaces.');
+  for(const p of expected){
+   const actual=group.find(e=>e.derivation!.pieceKey===p.pieceKey);
+   if(!actual||actual.pitchRise!==p.pitchRise||!samePolygon(actual.polygon,p.polygon))throw Error('Stale derived roof surface. Remove or rederive surfaces.');
+  }
+ }
 }
