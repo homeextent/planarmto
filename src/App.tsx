@@ -1,3 +1,4 @@
+import {planRoofDeletion} from './engine/measurements/roofSelection';
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -233,6 +234,15 @@ function AppContent() {
   // Handle Deleting Selected CAD Element
   const handleDeleteSelected = useCallback(() => {
     if(selection.type==='roof'&&roofEntities){
+      if(selection.ids?.length){
+        try{
+          const plan=planRoofDeletion(roofEntities,selection.ids);
+          const count=(kind:RoofEntity['kind'])=>plan.removed.filter(e=>e.kind===kind).length;
+          const message=['Delete selected roof geometry?',plan.selectedIds.length+' selected entities; '+plan.dependentIds.length+' additional dependent entities.',count('roofPlane')+' roof planes, '+count('roofEdge')+' roof edges, '+count('roofOpening')+' openings, '+count('roofSurface')+' surfaces.','Unselected independent measurements are preserved. This operation can be undone.'].join('\n');
+          if(window.confirm(message)&&handleRoofChange(plan.remaining))setSelection({type:'none'});
+        }catch(err){setStorageWarning(err instanceof Error?err.message:String(err));}
+        return;
+      }
       if(roofEntities.some(e=>(e.kind==='roofEdge'&&e.planeIds.includes(selection.id||''))||(e.kind==='roofOpening'&&e.planeId===selection.id))){setStorageWarning('Remove dependent roof edges and openings before deleting the plane.');return;}
       if(handleRoofChange(roofEntities.filter(e=>e.id!==selection.id)))setSelection({type:'none'});return;
     }
