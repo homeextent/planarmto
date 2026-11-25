@@ -302,3 +302,31 @@ test('generated perimeter reference is preserved on roundtrip and rejects corrup
  const corrupt=structuredClone(doc);corrupt.workspaces.find(q=>q.id==='foundation-a')!.measurements=[{...a,widthFt:2},...w.slice(1)];
  assert.throws(()=>readProjectDocument(corrupt),/perimeter reference is stale/);
 });
+
+import {createReferencedWall} from '../src/engine/measurements/foundationDrafting';
+test('R4 angled face-reference wall and manual footing survive canonical project roundtrip with exact independent quantities',()=>{
+ const a=createReferencedWall({x:0,y:0},{x:30,y:40},'r4-angle','exterior-left',1.25);
+ if(a.kind!=='foundationWall')throw Error('Expected wall');
+ const wall={...a,heightFt:8,elevationFt:0,foundation:{...a.foundation!,baseElevationConfirmed:true as const}};
+ const footing:FoundationEntity={id:'r4-angle-footing',physicalId:'r4-angle-footing',assemblyId:'r4-angle-footing',source:{reference:'Explicit independent angled strip'},kind:'stripFooting',start:a.start,end:a.end,widthFt:2,heightFt:1,elevationFt:-1,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true,baseElevationConfirmed:true}};
+ const doc=replaceSpecialistEntities(foundationDoc(),'foundation-a',[wall,footing]),restored=deserializeProjectDocument(serializeProjectDocument(doc));
+ assert.deepEqual(restored,doc);
+ const saved=restored.workspaces.find(w=>w.id==='foundation-a')!.measurements as FoundationEntity[];
+ sumFoundation(saved,'foundation.wall.concrete',500/27);sumFoundation(saved,'foundation.footing.strip.concrete',100/27);
+ assert.equal(canReportProjectEstimate(restored),false);
+ assert.deepEqual(restored.workspaces.find(w=>w.id==='floor-a'),doc.workspaces.find(w=>w.id==='floor-a'));
+ const corrupt=structuredClone(doc);corrupt.workspaces.find(w=>w.id==='foundation-a')!.measurements=[{...wall,widthFt:2},footing];
+ assert.throws(()=>readProjectDocument(corrupt),/Face-reference geometry is stale/);
+});
+test('R4 intersecting angled runs retain unresolved quantities across roundtrip without blocking independent solids',()=>{
+ const base={kind:'foundationWall' as const,widthFt:1,heightFt:8,elevationFt:0,source:{reference:'Explicit angled run'},foundation:{version:1 as const,material:'poured concrete',centrelineConfirmed:true as const,baseElevationConfirmed:true as const}};
+ const a:FoundationEntity={...base,id:'r4-a',physicalId:'r4-a',assemblyId:'r4-cross',start:{x:0,y:0},end:{x:30,y:40}};
+ const b:FoundationEntity={...base,id:'r4-b',physicalId:'r4-b',assemblyId:'r4-cross',start:{x:0,y:40},end:{x:30,y:0}};
+ const c:FoundationEntity={...base,id:'r4-c',physicalId:'r4-c',assemblyId:'r4-independent',start:{x:60,y:0},end:{x:90,y:40}};
+ const doc=replaceSpecialistEntities(foundationDoc(),'foundation-a',[a,b,c]),restored=deserializeProjectDocument(serializeProjectDocument(doc));
+ assert.deepEqual(restored,doc);
+ const m=measureFoundation('foundation-a',restored.workspaces.find(w=>w.id==='foundation-a')!.measurements as FoundationEntity[]);
+ assert.ok(m.rows.filter(r=>r.elementId===a.id||r.elementId===b.id).every(r=>r.status==='unquantified'));
+ const row=m.rows.find(r=>r.elementId===c.id);assert.ok(row?.status==='measured');if(row?.status==='measured')closeQuantity(row.quantity,400/27);
+ assert.equal(canReportProjectEstimate(restored),false);
+});

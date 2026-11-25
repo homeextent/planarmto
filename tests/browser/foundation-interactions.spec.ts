@@ -496,3 +496,26 @@ test('coordinated foundation run dimensions commit as one history transaction',a
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();expect(await snapshot(page)).toEqual(before);
  await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();expect(await snapshot(page)).toEqual(after);
 });
+
+test('angled face-reference foundation wall preserves exact length, width, quantity and history',async({page})=>{
+ await page.getByRole('button',{name:'Foundation wall',exact:true}).click();
+ await page.getByLabel('Foundation wall reference').selectOption('exterior-left');
+ await page.getByLabel('Face reference wall thickness').fill('1.25');
+ const canvas=page.locator('canvas').first();
+ await canvas.click({position:{x:250,y:250}});await canvas.click({position:{x:550,y:390}});
+ await page.keyboard.type('42');await page.keyboard.press('Enter');
+ await expect(page.getByLabel('Live drafting dimensions')).toHaveText('Placement reference: 42.00 ft');
+ const draft=await snapshot(page),wall=draft[0];if(wall.kind!=='foundationWall')throw Error('Expected wall');
+ expect(Math.abs(wall.end.x-wall.start.x)).toBeGreaterThan(0);expect(Math.abs(wall.end.y-wall.start.y)).toBeGreaterThan(0);
+ expect(Math.hypot(wall.end.x-wall.start.x,wall.end.y-wall.start.y)).toBeCloseTo(42,6);
+ expect(wall.widthFt).toBe(1.25);
+ for(const [label,value] of [['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','-8']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ await expect(page.getByText('15.56 CY',{exact:true})).toBeVisible();
+ const after=await snapshot(page);
+ expect(after[0]).toMatchObject({id:wall.id,heightFt:8,elevationFt:-8,foundation:{centrelineConfirmed:true,baseElevationConfirmed:true}});
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();expect(await snapshot(page)).toEqual(draft);
+ await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();expect(await snapshot(page)).toEqual(after);
+ const group=page.getByRole('group',{name:'Select workspace'});await group.getByRole('button',{name:/· Floor$/}).first().click();await group.getByRole('button',{name:/Synthetic foundation/}).click();
+ await expect(page.getByText('15.56 CY',{exact:true})).toBeVisible();expect(await snapshot(page)).toEqual(after);
+});
