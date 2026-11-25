@@ -1,3 +1,4 @@
+import {validateDerivedRoofSurfaces} from './roofDerivation';
 import type {Point,RoofEntity,QuantityContribution,Applicability} from './measurementTypes';
 import {validateSpecialistEntities,validateContributionSet} from './measurementTypes';
 type Plane=Extract<RoofEntity,{kind:'roofPlane'}>;
@@ -110,6 +111,7 @@ export function validateRoofTopology(entities:RoofEntity[]):void {
    if(zp!==null&&zq!==null&&p.elevationFt!==null&&q.elevationFt!==null&&Math.abs(p.elevationFt+zp-q.elevationFt-zq)>EPS)throw Error('Incompatible shared edge elevations');
   }
  }
+ validateDerivedRoofSurfaces(entities);
 }
 export function measureRoof(workspaceId:string,entities:RoofEntity[]):{rows:QuantityContribution[];warnings:string[]} {
  validateRoofTopology(entities);
