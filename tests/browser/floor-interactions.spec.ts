@@ -91,3 +91,42 @@ test('room box exact correction preserves four-wall topology and undo',async ({p
   await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
   expect(floor(await snapshot(page)).walls).toHaveLength(0);
 });
+
+for(const [mode,sign] of [['interior_face',1],['centerline',0],['exterior_face',-1]] as const){
+  test('room dimensions respect '+mode,async ({page})=>{
+    await page.getByTitle('Global Project & Engine Settings',{exact:true}).click();
+    await page.locator('#select-wall-justification').selectOption(mode);
+    await page.locator('#save-settings-button').click();
+    await page.getByRole('button',{name:'4-Wall Room Box',exact:true}).click();
+    await click(page,250,250);
+    await click(page,490,490);
+    await exact(page,'20,15');
+    const doc=await snapshot(page),g=floor(doc);
+    expect(doc.settings.wallJustification).toBe(mode);
+    expect(g.nodes).toHaveLength(4);
+    expect(g.walls).toHaveLength(4);
+    expect(g.rooms).toHaveLength(1);
+    const t=Math.abs(g.walls[0].thickness-3.5/12)<0.001?4.5/12:g.walls[0].thickness;
+    const ls=lengths(doc).sort((a,b)=>a-b);
+    for(const n of ls.slice(0,2))expect(n).toBeCloseTo(15+sign*t,6);
+    for(const n of ls.slice(2))expect(n).toBeCloseTo(20+sign*t,6);
+  });
+}
+
+test('connected wall correction refuses to detach the existing endpoint',async ({page})=>{
+  await page.getByRole('button',{name:'Wall Pen (Continuous)',exact:true}).click();
+  await click(page,250,250);
+  await click(page,490,250);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'Wall Pen (Continuous)',exact:true}).click();
+  await click(page,490,490);
+  await click(page,490,250);
+  const before=await snapshot(page);
+  expect(floor(before).walls).toHaveLength(2);
+  expect(floor(before).nodes).toHaveLength(3);
+  // Export focuses a header button; explicitly use the persistent dimension field.
+  await page.getByLabel('Dimensions',{exact:true}).fill('20');
+  await page.getByLabel('Dimensions',{exact:true}).press('Enter');
+  await expect(page.getByRole('alert').filter({hasText:/connected geometry/i})).toBeVisible();
+  expect(floor(await snapshot(page))).toEqual(floor(before));
+});
