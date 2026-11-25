@@ -445,3 +445,20 @@ test('coordinated run edit refuses generated reference width changes and stale d
  const f=deriveStripFootings(w,w.map(e=>e.id),2,1,id);
  assert.throws(()=>editFoundationRuns([...w,...f],valid),/stale/);
 });
+
+test('generated perimeter reference survives vertical edits and rejects stale plan geometry',()=>{
+ let n=0;const id=()=> 'ref'+(++n);
+ for(const reference of ['exterior','centreline','interior'] as const){
+  const w=generateFoundationPerimeter({xmin:0,xmax:40,ymin:0,ymax:30},reference,1,8,0,id);
+  const a=w[0];if(a.kind!=='foundationWall')throw Error('Expected wall');
+  assert.ok(qty([{...a,heightFt:6},...w.slice(1)]).every(r=>r.status==='measured'));
+  assert.throws(()=>qty([{...a,widthFt:2},...w.slice(1)]),/perimeter reference is stale/);
+  assert.throws(()=>qty([{...a,start:{x:a.start.x+1,y:a.start.y}},...w.slice(1)]),/perimeter reference is stale/);
+  assert.ok(qty(w.slice(1)).every(r=>r.status==='measured'));
+ }
+});
+test('irregular generated perimeter reference rejects stale corner extension and retains legacy compatibility',()=>{
+ let n=0;const id=()=> 'refirr'+(++n),w=generateOrthogonalFoundationPerimeter([{x:0,y:0},{x:40,y:0},{x:40,y:20},{x:20,y:20},{x:20,y:40},{x:0,y:40}],'exterior',1,8,0,id);
+ const a=w[0];assert.throws(()=>qty([{...a,foundation:{...a.foundation!,joinStartFt:0}},...w.slice(1)]),/perimeter reference is stale/);
+ const legacy=structuredClone(w);legacy.forEach(e=>delete e.foundation!.perimeterReference);assert.deepEqual(qty(legacy),qty(w));
+});

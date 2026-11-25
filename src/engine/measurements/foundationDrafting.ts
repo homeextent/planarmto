@@ -35,7 +35,8 @@ export function foundationFootprint(e:FoundationEntity):Point[]|null{
 export function generateFoundationPerimeter(bounds:Bounds,reference:RectangleReference,widthFt:number,heightFt:number,baseFt:number|null,id:()=>string):FoundationEntity[]{
  if(!Number.isFinite(heightFt)||heightFt<=0||baseFt!==null&&!Number.isFinite(baseFt))throw Error('Specify positive wall height and valid base elevation');
  const rectangle=foundationRectangle(bounds,widthFt,reference),assemblyId=id();
- return rectangle.segments.map(segment=>{const entityId=id();return {id:entityId,physicalId:entityId,assemblyId,source:{reference:'Generated rectangular foundation — '+reference+' reference'},kind:'foundationWall',start:segment.start,end:segment.end,widthFt,heightFt,elevationFt:baseFt,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true,...(baseFt!==null?{baseElevationConfirmed:true as const}:{}),joinStartFt:segment.joinStartFt,joinEndFt:segment.joinEndFt}}});
+ const points=rectanglePoints({x:bounds.xmin,y:bounds.ymin},{x:bounds.xmax,y:bounds.ymax});
+ return rectangle.segments.map((segment,edge)=>{const entityId=id();return {id:entityId,physicalId:entityId,assemblyId,source:{reference:'Generated rectangular foundation — '+reference+' reference'},kind:'foundationWall',start:segment.start,end:segment.end,widthFt,heightFt,elevationFt:baseFt,foundation:{version:1,perimeterReference:{version:1,kind:'rectangle',reference,points,widthFt,edge},material:'poured concrete',centrelineConfirmed:true,...(baseFt!==null?{baseElevationConfirmed:true as const}:{}),joinStartFt:segment.joinStartFt,joinEndFt:segment.joinEndFt}}});
 }
 
 /** Plan overlays are informational; openings above the base do not erase the wall footprint. */
@@ -63,5 +64,5 @@ export function createReferencedWall(start:Point,end:Point,id:string,reference:W
 export function generateOrthogonalFoundationPerimeter(points:Point[],reference:RectangleReference,widthFt:number,heightFt:number,baseFt:number,id:()=>string):FoundationEntity[]{
  if(!Number.isFinite(heightFt)||heightFt<=0||!Number.isFinite(baseFt))throw Error('Specify positive height and confirmed base elevation for joined walls');
  const perimeter=orthogonalWallPerimeter(points,widthFt,reference),assemblyId=id();
- return perimeter.segments.map(segment=>{const entityId=id();return {id:entityId,physicalId:entityId,assemblyId,source:{reference:'Generated orthogonal foundation — '+reference+' reference'},kind:'foundationWall',start:segment.start,end:segment.end,widthFt,heightFt,elevationFt:baseFt,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true,baseElevationConfirmed:true,joinStartFt:segment.joinStartFt,joinEndFt:segment.joinEndFt}}});
+ return perimeter.segments.map((segment,edge)=>{const entityId=id();return {id:entityId,physicalId:entityId,assemblyId,source:{reference:'Generated orthogonal foundation — '+reference+' reference'},kind:'foundationWall',start:segment.start,end:segment.end,widthFt,heightFt,elevationFt:baseFt,foundation:{version:1,perimeterReference:{version:1,kind:'orthogonal',reference,points:points.map(p=>({...p})),widthFt,edge},material:'poured concrete',centrelineConfirmed:true,baseElevationConfirmed:true,joinStartFt:segment.joinStartFt,joinEndFt:segment.joinEndFt}}});
 }

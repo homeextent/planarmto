@@ -1,4 +1,5 @@
-import {faceToCentreline} from './foundationGeometry';
+import {orthogonalWallPerimeter} from './foundationPerimeterGeometry';
+import {faceToCentreline,foundationRectangle,polygonEnvelope} from './foundationGeometry';
 /** C.1C persistence boundary: explicit foundation topology, not completeness or engineering approval.
  * Preserve historical structurally valid v3 records without inferring new semantics.
  * Pending quantities are allowed; invalid confirmed geometry is not.
@@ -33,6 +34,13 @@ export function validateFoundationTopology(entities:FoundationEntity[]):void {
    if(e.widthFt!==original.widthFt||!e.foundation.centrelineConfirmed)throw Error('Face-reference geometry is stale; redraft from the original face before changing thickness or reference');
    const c=faceToCentreline(original.start,original.end,original.widthFt,side);
    if(Math.hypot(c.start.x-e.start.x,c.start.y-e.start.y)>1e-8||Math.hypot(c.end.x-e.end.x,c.end.y-e.end.y)>1e-8)throw Error('Face-reference geometry is stale; redraft from the original face');
+  }
+  const p=e.foundation.perimeterReference;
+  if(p){
+   if(e.kind!=='foundationWall'||!e.foundation.centrelineConfirmed||e.widthFt!==p.widthFt)throw Error('Generated perimeter reference is stale');
+   const segments=p.kind==='rectangle'?foundationRectangle(polygonEnvelope(p.points),p.widthFt,p.reference).segments:orthogonalWallPerimeter(p.points,p.widthFt,p.reference).segments;
+   const s=segments[p.edge];
+   if(!s||Math.hypot(s.start.x-e.start.x,s.start.y-e.start.y)>1e-8||Math.hypot(s.end.x-e.end.x,s.end.y-e.end.y)>1e-8||Math.abs(s.joinStartFt-(e.foundation.joinStartFt??0))>1e-8||Math.abs(s.joinEndFt-(e.foundation.joinEndFt??0))>1e-8)throw Error('Generated perimeter reference is stale; regenerate original geometry');
   }
   if('polygon' in e&&!simplePolygon(e.polygon))throw Error('Invalid foundation polygon: '+e.id);
   if('start' in e&&e.kind!=='foundationLine'){

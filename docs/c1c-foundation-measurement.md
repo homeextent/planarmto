@@ -63,3 +63,6 @@ CI #176 verified explicit replacement (272/272). Review of persistence validator
 
 ### R3 coordinated run editing
 CI #177 verified complete derived group membership (274/274). Coordinated run editor records explicit per-member width, height/depth, base and junction extensions for complete selected compatible assemblies, commits once, preserves identities, validates source links and protects unrelated confirmed quantities. Generated perimeter widths/junctions are refused in both single and coordinated inspectors pending full reference integrity validation. No automatic junction design. R4 local acceptance and supported angled geometry remain outstanding.
+
+### R3 generated perimeter reference integrity
+CI #180 verified coordinated editing (277/277), resolving #178 compiler and #179 analytical fixture errors. New rectangular and orthogonal generated walls retain original reference points, reference basis, width and segment index in additive v3 metadata. Persistence recomputes the original plan geometry and rejects stale width, endpoints or junctions; vertical edits and intentional individual wall deletion remain possible. Historical records without reference metadata are not migrated. R4 angled straight-run validation and acceptance traceability remain outstanding.

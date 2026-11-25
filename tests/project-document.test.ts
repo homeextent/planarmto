@@ -293,3 +293,12 @@ test('R2 integrated coincident layer conflict remains pending across persistence
  sumFoundation(saved,'foundation.drainage.length',176);sumFoundation(saved,'foundation.slab.concrete',896/81);
  assert.equal(canReportProjectEstimate(restored),false);
 });
+
+test('generated perimeter reference is preserved on roundtrip and rejects corrupted geometry on import',()=>{
+ let n=0;const w=generateFoundationPerimeter({xmin:0,xmax:40,ymin:0,ymax:30},'exterior',1,8,0,()=> 'persist-ref'+(++n));
+ const doc=replaceSpecialistEntities(foundationDoc(),'foundation-a',w);
+ assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(doc)),doc);
+ const a=w[0];if(a.kind!=='foundationWall')throw Error('Expected wall');
+ const corrupt=structuredClone(doc);corrupt.workspaces.find(q=>q.id==='foundation-a')!.measurements=[{...a,widthFt:2},...w.slice(1)];
+ assert.throws(()=>readProjectDocument(corrupt),/perimeter reference is stale/);
+});
