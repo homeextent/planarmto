@@ -465,3 +465,21 @@ test('face referenced wall refuses stale thickness edit and preserves original g
  const before=await snapshot(page);await page.getByLabel('Width (ft)',{exact:true}).fill('2');await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
  await expect(page.getByRole('alert').first()).toBeVisible();expect(await snapshot(page)).toEqual(before);
 });
+
+test('explicit strip replacement previews cancels and commits one undoable transaction',async({page})=>{
+ await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
+ for(const [label,value] of [['Material','poured concrete'],['Width (ft)','1'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByLabel('Confirm drafted centreline').check();await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ await page.getByText('Derive strip footings',{exact:true}).click();
+ await page.getByLabel('Footing width (ft)',{exact:true}).fill('2');await page.getByLabel('Footing depth (ft)',{exact:true}).fill('1');
+ await page.getByRole('button',{name:'Preview strip footings',exact:true}).click();await page.getByRole('button',{name:'Apply strip footings',exact:true}).click();
+ const before=await snapshot(page);
+ await page.getByLabel('Select foundation entity').selectOption({index:1});
+ await page.getByLabel('Replace existing strip footings',{exact:true}).check();await page.getByLabel('Footing width (ft)',{exact:true}).fill('3');
+ await page.getByRole('button',{name:'Preview strip footings',exact:true}).click();await expect(page.getByText('Replace 1 existing components with 1 new components.',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Cancel strip footings',exact:true}).click();expect(await snapshot(page)).toEqual(before);
+ await page.getByRole('button',{name:'Preview strip footings',exact:true}).click();await page.getByRole('button',{name:'Apply strip footings',exact:true}).click();
+ const after=await snapshot(page);expect(after).toHaveLength(2);expect(after.find(e=>e.kind==='stripFooting')).toMatchObject({widthFt:3});expect(after[1].id).not.toBe(before[1].id);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();expect(await snapshot(page)).toEqual(before);
+ await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();expect(await snapshot(page)).toEqual(after);
+});

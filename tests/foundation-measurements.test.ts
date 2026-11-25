@@ -382,3 +382,30 @@ test('face-referenced wall rejects stale width but accepts unrelated height edit
  assert.throws(()=>qty([{...a,widthFt:2}]),/Face-reference geometry is stale/);
  const next={...a,heightFt:8};assert.equal(qty([next])[0].status,'measured');
 });
+
+import {foundationReplacement,applyFoundationGeneration} from '../src/engine/measurements/foundationGeneration';
+test('explicit strip group replacement is complete and preserves unrelated quantities',()=>{
+ const a=wall('replace-a',{x:0,y:0},{x:40,y:0}),b=wall('replace-b',{x:0,y:20},{x:40,y:20});let n=0;const id=()=> 'replace'+(++n),ids=[a.id,b.id];
+ const old=deriveStripFootings([a,b],ids,2,1,id),before=[a,b,...old];
+ assert.throws(()=>foundationReplacement(before,[a.id],'strip',true),/Select all source/);
+ const plan=foundationReplacement(before,ids,'strip',true);assert.equal(plan.removedIds.length,2);
+ const members=deriveStripFootings(plan.base,ids,3,1,id),next=applyFoundationGeneration(before,members,plan.removedIds);
+ assert.equal(next.length,before.length);assert.ok(old.every(e=>!next.some(q=>q.id===e.id)));assert.equal(before.length,4);
+ near(qty(next).filter(r=>r.code==='foundation.footing.strip.concrete').reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),240/27);
+});
+test('explicit envelope replacement preserves other layers and refuses loss of scope decisions',()=>{
+ let n=0;const id=()=> 'replaceenv'+(++n),w=generateFoundationPerimeter({xmin:0,xmax:40,ymin:0,ymax:30},'exterior',1,8,0,id),ids=w.map(e=>e.id);
+ const config={purpose:'waterproofing' as const,material:'membrane',layerId:'wp',heightFt:6};
+ const old=deriveRectangularEnvelope(w,ids,config,id),drain=derivePerimeterDrainage(w,ids,2,'pipe','drain',id),before=[...w,...old,...drain];
+ const plan=foundationReplacement(before,ids,'envelope',true,'waterproofing','wp');
+ const members=deriveRectangularEnvelope(plan.base,ids,{...config,heightFt:5},id),next=applyFoundationGeneration(before,members,plan.removedIds);
+ assert.ok(drain.every(e=>next.includes(e)));near(qty(next).filter(r=>r.code==='foundation.waterproofing.area').reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),700);
+ const scoped=before.map(e=>e.id===old[0].id?{...e,scopeApplicability:{status:'excluded' as const,reason:'Existing'}}:e);
+ assert.throws(()=>foundationReplacement(scoped,ids,'envelope',true,'waterproofing','wp'),/applicability decision/);
+});
+test('explicit drainage replacement keeps original on invalid candidate and permits valid new offset',()=>{
+ let n=0;const id=()=> 'replacedr'+(++n),w=generateFoundationPerimeter({xmin:0,xmax:40,ymin:0,ymax:30},'exterior',1,8,0,id),ids=w.map(e=>e.id),d=derivePerimeterDrainage(w,ids,2,'pipe','drain',id),before=[...w,...d];
+ const plan=foundationReplacement(before,ids,'drainage',true);assert.throws(()=>derivePerimeterDrainage(plan.base,ids,-1,'pipe','drain',id));assert.equal(before.length,8);
+ const members=derivePerimeterDrainage(plan.base,ids,3,'pipe','drain',id),next=applyFoundationGeneration(before,members,plan.removedIds);
+ near(qty(next).filter(r=>r.code==='foundation.drainage.length').reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),164);
+});

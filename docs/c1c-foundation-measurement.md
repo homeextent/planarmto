@@ -54,3 +54,6 @@ CI #173 verified continuous drafting, snapping and failed-placement recovery (26
 
 ### R3 generation integrity
 CI #174 verified precision feedback and datum conversion (265/265). All foundation generator previews share a guard that rejects new pending rows or changes to existing confirmed contributions (including attribution changes). Manual face-reference records with original source-face metadata are validated against stored canonical centreline and thickness; stale geometry is refused. Explicit replacement workflow remains a separate R3 increment. Existing manual edits and legacy records without source-face metadata are not silently relocated.
+
+### R3 explicit derived group replacement
+CI #175 verified generation integrity and face-reference protection (268/268). Strip, envelope and drainage generators now offer opt-in replacement of matching existing groups with complete source selection. Preview preserves original records until Apply; explicit old applicability decisions are refused rather than discarded, unrelated confirmed quantities must remain unchanged, and the entire replacement commits as one history transaction. Envelope replacement matches purpose and layer identity; changing layer identity requires separate manual resolution. New derived IDs identify the replacement; undo restores originals. No implicit removal.
