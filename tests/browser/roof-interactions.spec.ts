@@ -43,8 +43,10 @@ test('rectangle keyboard correction, repeated correction and one undo transactio
   await dimensions(page,'40,30');
   await area(page,'1200.00');
   await expect(page.getByLabel('Projected width (ft)')).toHaveValue('40');
+  await expect(page.getByLabel('Live drafting dimensions')).toHaveText('Placement reference: 40.00 × 30.00 ft');
   await dimensions(page,'40,20');
   await area(page,'800.00');
+  await expect(page.getByLabel('Live drafting dimensions')).toHaveText('Placement reference: 40.00 × 20.00 ft');
   await page.getByTitle('Undo (Ctrl+Z)', {exact:true}).click();
   await expect(entities(page)).toHaveCount(1);
   await page.getByTitle('Redo (Ctrl+Y)', {exact:true}).click();
@@ -619,4 +621,42 @@ test('R4 keyboard deletion respects editable focus and preserves independent sur
  expect(roofOf(await roofSnapshot(page))).toEqual([independent]);
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
  expect(roofOf(await roofSnapshot(page))).toEqual(before);
+});
+
+test('R4 closeout wholly pending bulk edge lengths are not displayed as zero',async ({page})=>{
+ await rectangle(page);
+ await page.getByRole('button',{name:'Classify edge',exact:true}).click();
+ await clickCanvas(page,400,250);
+ await page.getByLabel('Classification',{exact:true}).selectOption('eave');
+ const bulk=page.getByRole('region',{name:'Bulk perimeter assemblies'});
+ await expect(bulk.getByText('1 target edges · Not quantified (1 pending)',{exact:true})).toBeVisible();
+ await bulk.getByLabel('Bulk fascia',{exact:true}).selectOption('included');
+ await bulk.getByRole('button',{name:'Preview assignments'}).click();
+ await expect(bulk.getByText('1 target edges · Not quantified (1 pending)',{exact:true}).last()).toBeVisible();
+});
+test('R4 closeout unknown sloped insulation volume is not reported as zero',async ({page})=>{
+ await rectangle(page);
+ // Establish a single rectangular plane with unknown pitch and four classified boundaries.
+ for(const [x,y] of [[400,250],[550,350],[400,450],[250,350]]){
+  await page.getByRole('button',{name:'Classify edge',exact:true}).click();
+  await clickCanvas(page,x,y);
+  await page.getByLabel('Classification',{exact:true}).selectOption('eave');
+ }
+ await expect(entities(page)).toHaveCount(6);
+ await page.getByLabel('Select roof entity').selectOption({index:1});
+ const panel=page.getByRole('region',{name:'Derive insulation surfaces'});
+ await panel.getByLabel('Uniform thermal inset (ft)').fill('0');
+ await panel.getByRole('button',{name:'Use thermal inset for all sides'}).click();
+ await panel.getByLabel('Derived insulation basis').selectOption('sloped');
+ await panel.getByLabel('Derived insulation material').selectOption('blown fiberglass');
+ await panel.getByLabel('Derived insulation thickness (inches)').fill('6');
+ await panel.getByRole('checkbox',{name:'Confirm thermal boundary'}).check();
+ await panel.getByRole('button',{name:'Preview insulation derivation'}).click();
+ await expect(panel.getByText('Sloped insulation: Not quantified',{exact:true})).toBeVisible();
+ await expect(panel.getByText('Geometric volume (reference only): Not quantified; no procurement or R-value calculation.',{exact:true})).toBeVisible();
+ await expect(panel.getByRole('button',{name:'Apply insulation derivation'})).toBeEnabled();
+ await panel.getByRole('button',{name:'Apply insulation derivation'}).click();
+ const roof=roofOf(await roofSnapshot(page));
+ expect(roof.filter(e=>e.kind==='roofSurface')).toHaveLength(1);
+ expect(roof.find(e=>e.kind==='roofSurface')).toMatchObject({pitchRise:null,surfaceBasis:'sloped',insulationType:'blown fiberglass'});
 });
