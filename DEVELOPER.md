@@ -2,14 +2,14 @@
 
 ## Governing workflow
 
-Applies to every developer and AI agent. Read README, SYSTEM_BIBLE, CHANGELOG and the active milestone specification before changing files. Confirm the exact staging baseline and a clean working tree. Never develop directly on staging or main. Staging is the integration branch; main is deployed production. Owner-approved scope, CI, technical review and acceptance are mandatory.
+Applies to every developer and AI agent. Read README, ROADMAP, SYSTEM_BIBLE, DEVELOPER, CHANGELOG and the active milestone specification before changing files. Confirm the exact staging baseline and a clean working tree. Never develop directly on staging or main. Staging is the integration branch; main is deployed production. Owner-approved scope, CI, technical review and acceptance are mandatory.
 
 1. Define architecture, bounded scope and acceptance criteria. Do not expand dependencies, infrastructure, spending or release scope without authorization.
 2. Branch from validated staging (feature/<increment>-<description> or docs/<description>). Verify branch and repository before editing.
 3. Make logical commits on the isolated branch. Open draft PR targeting staging when substantially implemented. Intermediate feature commits need not trigger CI.
 4. Review actual CI results for exact HEAD and resolve failures. Review safeguards, regression coverage and code; passing CI is not equivalent to browser acceptance.
 5. Obtain owner local production-preview acceptance for visible/interactive changes. Documentation-only changes do not require visual acceptance.
-6. Synchronize README, CHANGELOG, SYSTEM_BIBLE, milestone documents and DEVELOPER if workflow changes. Keep Unreleased entries until separately authorized production version bump; record exact commit/run IDs, waivers, limitations and pending gates.
+6. Review all five governing root files (README, ROADMAP, SYSTEM_BIBLE, DEVELOPER, CHANGELOG) and applicable milestone documents at closure; update each wherever needed. Reconcile implemented capabilities, architecture, roadmap status, workflow, historical evidence and pending gates. Record accepted implementation/merge evidence without recursively requiring new documentation commits for every housekeeping CI. Keep Unreleased entries until separately authorized production version bump; record exact commit/run IDs, waivers, limitations and pending gates.
 7. Revalidate exact final HEAD, check staging baseline and mergeability, then merge PR into staging only with owner authorization. Verify post-merge push CI and synchronize local staging.
 8. Production promotion requires separate explicit authorization, release PR to main, successful CI, approved version/tag as applicable, deployment verification and live smoke tests. Never bypass protections or push directly to main. Do not trigger deployment manually from feature or staging branches.
 
@@ -59,7 +59,7 @@ Use the exact run ID to retrieve job details and logs. Do not merge against stal
 
 ## Architecture and storage
 
-Current staging authority: schema v3; C.1A accepted and integrated at c1a0bf7. Four optional typed workspaces with independent geometry/calibration; shared project settings/rates. Specialist contracts are structural groundwork, not completed specialist engines. Preserve existing floor formula regression tests. Unquantified is not zero; assignment is not completeness. No consolidated estimates/print until C.2. Historical legacy/unversioned records are retired, retained without automatic deletion, and unsupported records are export-only. Explicit v2 preview migration is bounded. Separate v3 recovery key. Do not remove historical data as part of normal development.
+Current staging authority: schema v3; C.1A and C.1B integrated, latter at 3649f54. Four optional typed workspaces with independent geometry/calibration; shared project settings/rates. Roof specialist engine is implemented; foundation and site contracts remain structural groundwork. Preserve existing floor formula regression tests. Unquantified is not zero; assignment is not completeness. No consolidated estimates/print until C.2. Historical legacy/unversioned records are retired, retained without automatic deletion, and unsupported records are export-only. Explicit v2 preview migration is bounded. Separate v3 recovery key. Do not remove historical data as part of normal development.
 
 src/utils/storage.ts selects authenticated WordPress REST or guest localStorage. REST namespace planarmto/v1 handles project CRUD, branding and rates; WordPress project data is user-scoped. Authenticated project failures surface without guest fallback. Full document validation and provisional per-image/project budgets apply. See SYSTEM_BIBLE for governing architecture.
 
@@ -73,7 +73,7 @@ npm run build:zip creates ../../builds/planar-mto.zip relative to the repository
 
 PR #8 merged into staging at `c1a0bf7` after documentation-only candidate `3d0830e` passed CI #40 ([run 45462442984](https://github.com/homeextent/planarmto/actions/runs/45462442984)). Post-merge staging push [run 45462698052](https://github.com/homeextent/planarmto/actions/runs/45462698052), job 138689310248, completed successfully; owner CLI and job details verified. C.1A formally complete. Production `main` remains v2.15.1 at `0423cb6`.
 
-Next: C.1B roof drafting and measurement after documentation synchronization. No production promotion or C.1B implementation as part of this housekeeping.
+Next: C.1C foundation specification after roadmap housekeeping integration. C.1D is deferred; see [ROADMAP.md](ROADMAP.md). No production promotion or application implementation in this housekeeping.
 
 ## Evidence-driven debugging and browser regression protocol
 
@@ -89,6 +89,8 @@ Playwright is an exact-pinned development-only dependency. Chromium runs against
 
 Reference baseline: feature commit f5d8bef9e0ce8f5e53444b87cfb13ce9f5d7b162, CI #78 / run 45515709731, nine browser tests passed, all validation stages passed. The trace-supported delayed auto-fit correction resolved the previously failing first-vertex closure test without relaxing its assertion. This is a feature baseline, not staging integration or owner acceptance. R3.8 coverage expansion remains pending validation.
 
-### C.1B R4-E acceptance preparation
+### C.1B R4-E acceptance and integration
 
 Owner reported all ten R4-L01–L10 local acceptance checks passed on candidate `fb60747f83183016694f4c54ac2dbc609087f5e5` (2026-11-24 Toronto local date); zero failures or deferred checks reported. A07 and A08 remediation accepted. [CI #129](https://github.com/homeextent/planarmto/actions/runs/45542671356), job 138964708488, passed 127/127 tests (87 engine/contract, 40 Chromium) and all validation stages on that exact commit. Owner authorized documentation-only closeout, staging integration and post-merge CI, subject to final exact-head CI and applicable protections. Production main/v2.15.1 remains separately gated. No application changes after owner-tested source are authorized. Verify final documentation-only diff against accepted SHA, final exact-head CI, PR base and protection checks before merge. Verify post-merge staging CI; no main changes.
+
+C.1B staging integration: owner accepted `fb60747f83183016694f4c54ac2dbc609087f5e5` (10/10 local checks; CI #129, 127/127 tests). Documentation-only head `8d707902adbf7365ef6e78a64bdab90ce634732e` passed [CI #132](https://github.com/homeextent/planarmto/actions/runs/45544873706) (127/127, job 138971962757). [PR #10](https://github.com/homeextent/planarmto/pull/10) merged into staging at `3649f546cbf0a6e19b831753181cc8616330c22c`; owner confirmed clean synchronized local staging and successful post-merge CI #133. Merge and branch identity independently verified; CI #133 is owner-reported, with exact run ID/job logs not independently retrieved because the commit lookup omits push runs. No production promotion; main remains v2.15.1 at `0423cb6`.
