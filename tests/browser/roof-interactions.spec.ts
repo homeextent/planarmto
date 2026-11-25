@@ -552,7 +552,7 @@ test('R4 pending soffit geometry remains unquantified after apply and project re
  expect(surfaces.filter(e=>e.derivation?.pendingApplicability)).toHaveLength(1);
  const total=page.locator('div.flex.justify-between').filter({has:page.getByText('Soffit area',{exact:true})});
  await expect(total).toHaveText('Soffit area184.00 SF + pending');
- await page.locator('input[type=file]').setInputFiles({name:'pending-soffit.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(before))});
+ await page.locator('[title="Import JSON Project"] input[type=file]').setInputFiles({name:'pending-soffit.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(before))});
  await expect(entities(page)).toHaveCount(18);
  await expect(total).toHaveText('Soffit area184.00 SF + pending');
  expect(roofOf(await roofSnapshot(page))).toEqual(roofOf(before));
@@ -595,7 +595,8 @@ test('R4 keyboard deletion respects editable focus and preserves independent sur
  await page.getByRole('button',{name:'Soffit area',exact:true}).click();
  await clickCanvas(page,760,250);
  await clickCanvas(page,850,330);
- await page.getByLabel('Surface basis',{exact:true}).selectOption('horizontal');
+ await expect(entities(page)).toHaveCount(15);
+ await page.getByRole('combobox',{name:'Surface basis',exact:true}).selectOption('horizontal');
  const before=roofOf(await roofSnapshot(page));
  expect(before).toHaveLength(14);
  const independent=before.find(e=>e.kind==='roofSurface')!;
