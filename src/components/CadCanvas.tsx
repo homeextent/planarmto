@@ -1,3 +1,4 @@
+import {roofWindowSelection} from '../engine/measurements/roofSelection';
 import { v4 as uuidv4 } from 'uuid';
 import type { RoofEntity } from '../engine/measurements/measurementTypes';
 import { generateRectangularRoof, type RoofConfig } from '../engine/measurements/roofGenerator';
@@ -287,6 +288,13 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   // Marquee selection state
   const [marqueeStart, setMarqueeStart] = useState<Point2D | null>(null);
   const [marqueeEnd, setMarqueeEnd] = useState<Point2D | null>(null);
+  const roofDrag=useRef<{start:Point2D;screen:Point2D;hitId?:string;shift:boolean}|null>(null);
+  const [roofMarquee,setRoofMarquee]=useState<{start:Point2D;end:Point2D}|null>(null);
+  const clearRoofDrag=()=>{roofDrag.current=null;setRoofMarquee(null);};
+  useEffect(()=>{clearRoofDrag();},[activeTool,roofEntities]);
+  const selectRoofIds=(ids:string[])=>onSelect(ids.length===0?{type:'none'}:ids.length===1?{type:'roof',id:ids[0]}:{type:'roof',ids});
+  const roofSelectionIds=()=>selection.type==='roof'?(selection.ids??(selection.id?[selection.id]:[])):[];
+
 
   // Underlay interaction state
   const [isHoveringUnderlay, setIsHoveringUnderlay] = useState(false);
@@ -670,7 +678,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         }
       } else if (e.key === 'Escape') {
         setCorrection(null);setPendingWallStart(null);pendingStartWall.current=undefined;pendingStartState.current=null;
-        setRoofDraft([]); setRoofCursor(null); setRoofVertex(null);
+        clearRoofDrag();setRoofDraft([]); setRoofCursor(null); setRoofVertex(null);
         setActiveWallStartNodeId(null);
         setDraftMousePos(null);
         setRoomBoxStart(null);
@@ -2273,6 +2281,11 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         }
         if((selected||activeTool.startsWith('roof_'))&&'polygon' in e)for(const [i,p] of points.entries()){ctx.fillStyle=roofVertex===i?'#fbbf24':'#fff';ctx.fillRect(p.x-3,p.y-3,6,6);}
       }
+      if(roofMarquee){
+        const a=worldToScreen(roofMarquee.start.x,roofMarquee.start.y),b=worldToScreen(roofMarquee.end.x,roofMarquee.end.y),crossing=roofMarquee.start.x>roofMarquee.end.x;
+        ctx.save();ctx.strokeStyle=crossing?'#4ade80':'#38bdf8';ctx.fillStyle=crossing?'rgba(74,222,128,.10)':'rgba(56,189,248,.10)';ctx.lineWidth=1.5;ctx.setLineDash(crossing?[5,4]:[]);
+        ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.restore();
+      }
       if(generationOutline){ctx.save();ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.setLineDash([5,4]);ctx.beginPath();generationOutline.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.stroke();ctx.setLineDash([]);for(const e of generationPreview||[]){if(e.kind==='roofPlane'){ctx.beginPath();e.polygon.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fillStyle='rgba(56,189,248,.15)';ctx.fill();}else if(e.kind==='roofEdge'){const a=worldToScreen(e.start.x,e.start.y),b=worldToScreen(e.end.x,e.end.y);ctx.strokeStyle=e.edgeType==='ridge'?'#fbbf24':e.edgeType==='hip'?'#38bdf8':'#4ade80';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}}ctx.restore();}
       if(roofDraft.length){
         ctx.beginPath();ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;
@@ -2324,7 +2337,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     roomSnapFeedback,
     marqueeStart,
     marqueeEnd,
-    roofEntities, roofDraft, roofCursor, roofVertex, roofMode, roofTarget, generationOutline, generationPreview,
+    roofEntities, roofDraft, roofCursor, roofVertex, roofMode, roofTarget, generationOutline, generationPreview, roofMarquee,
   ]);
 
   useEffect(() => {
@@ -2579,8 +2592,12 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       if(activeTool==='select'){
         const hit=[...roofEntities].reverse().find(q=>q.kind==='roofEdge'&&segmentDistance(rawWorld,q.start,q.end).distance<=tolerance)
           ||[...roofEntities].reverse().find(q=>'polygon' in q&&isPointInPolygon(rawWorld,q.polygon));
-        if(hit){onSelect({type:'roof',id:hit.id});return;}
-        if(selection.type==='roof')onSelect({type:'none'});
+        // Preserve ordinary annotation clicks; roof drags remain separate from floor marquee.
+        const noteHit=!hit&&!e.shiftKey&&(state.annotations||[]).some(a=>distance(rawWorld,{x:a.x,y:a.y})<=tolerance);
+        if(!noteHit){
+          roofDrag.current={start:rawWorld,screen:{x:clientX,y:clientY},hitId:hit?.id,shift:e.shiftKey};
+          return;
+        }
       }else {
         if(activeTool==='roof_opening'&&!roofEntities.some(q=>q.id===selection.id&&q.kind==='roofPlane')){alert('Select the parent roof plane first.');return;}
         if(activeTool!=='roof_generate'&&roofMode==='polygon'&&roofDraft.length>=3&&distance(snapped,roofDraft[0])<=1e-6){
@@ -2908,6 +2925,12 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     }
     const rawWorld = screenToWorld(clientX, clientY);
     
+    if(roofDrag.current){
+      if(!(e.buttons&1)){clearRoofDrag();return;}
+      const drag=roofDrag.current;
+      if(distance(drag.screen,{x:clientX,y:clientY})>=4||roofMarquee)setRoofMarquee({start:drag.start,end:rawWorld});
+      return;
+    }
     if(roofEntities&&activeTool.startsWith('roof_')) {const target=getRoofSnap(rawWorld);setRoofTarget(target);setRoofCursor(target.point);return;}
     // Check for underlay hover
     if (state.underlay && state.underlay.isVisible && !state.underlay.isLocked && underlayImageRef.current) {
@@ -3083,6 +3106,17 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
   // Handle Mouse Up
   const handleMouseUp = (e: React.MouseEvent) => {
+    if(roofDrag.current&&roofEntities&&e.button===0){
+      const drag=roofDrag.current,rect=canvasRef.current?.getBoundingClientRect();
+      clearRoofDrag();
+      if(!rect)return;
+      const screen={x:e.clientX-rect.left,y:e.clientY-rect.top};
+      const end=screenToWorld(screen.x,screen.y);
+      const hits=distance(drag.screen,screen)>=4?roofWindowSelection(roofEntities,drag.start,end):drag.hitId?[drag.hitId]:[];
+      const selected=new Set(drag.shift?roofSelectionIds():[]);
+      for(const id of hits){if(drag.shift&&selected.has(id))selected.delete(id);else selected.add(id);}
+      selectRoofIds([...selected]);return;
+    }
     setIsPanning(false); setIsDraggingElement(false); setActiveDragAnchorNodeId(null); setRoomSnapFeedback(null);
     if (!hasMovedDuringDrag && pendingSelectionOnMouseUp) onSelect(pendingSelectionOnMouseUp);
     setPendingSelectionOnMouseUp(null); setHasMovedDuringDrag(false);
@@ -3204,6 +3238,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onMouseLeave={()=>{if(roofDrag.current)clearRoofDrag();}}
         onDoubleClick={handleDoubleClick}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -3251,7 +3286,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
             ? 'Click anywhere on canvas to drop Text Note'
             : activeTool === 'ruler_measure'
             ? 'Click two points to measure distance'
-            : roofEntities?'Select a roof entity or note':'Select & Move (Click wall, node, room, stamp, or note)'}
+            : roofEntities?'Select roof entities · Shift-click toggles · drag left/right for window/crossing':'Select & Move (Click wall, node, room, stamp, or note)'}
         </span>
         <div className="w-[1px] h-3.5 bg-slate-700 mx-1" />
         {roofDraft.length>=3&&<button className="bg-sky-700 px-2 py-1 rounded" onClick={()=>finishRoofPolygon()}>Finish polygon</button>}
@@ -3370,7 +3405,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       {selection.type !== 'none' && (selection.id || (selection.ids && selection.ids.length > 0)) && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/95 border border-sky-500/30 backdrop-blur-md px-4 py-2 rounded-xl shadow-2xl flex items-center gap-3">
           <span className="text-xs font-semibold text-sky-400 uppercase tracking-wider">
-            {selection.type === 'multiple' 
+            {(selection.type === 'multiple'||(selection.type==='roof'&&selection.ids&&selection.ids.length>1)) 
               ? `Selected: ${selection.ids?.length || 0} Items` 
               : `Selected: ${selection.type} (${selection.id?.slice(0, 8)})`}
           </span>
