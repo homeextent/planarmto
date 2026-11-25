@@ -19,7 +19,7 @@ const intersects=(a:Bounds,b:Bounds)=>Math.min(a.xmax,b.xmax)-Math.max(a.xmin,b.
 function conserve(actual:number,expected:number,message:string){
  if(!Number.isFinite(actual)||Math.abs(actual-expected)>EPS*Math.max(1,expected))throw Error(message);
 }
-export function rectangularRoof(entities:RoofEntity[],planeIds:string[]){
+export function rectangularRoof(entities:RoofEntity[],planeIds:string[],requireConsistentSoffit=true){
  validateRoofTopology(entities.filter(e=>e.kind!=='roofSurface'));
  const selected=new Set(planeIds);
  const planes=entities.filter((e):e is Plane=>e.kind==='roofPlane'&&selected.has(e.id));
@@ -45,8 +45,8 @@ export function rectangularRoof(entities:RoofEntity[],planeIds:string[]){
   }
   if(!runs.length||!near(cursor,end))throw Error('Classify the entire '+side+' roof boundary before deriving surfaces.');
   const statuses=new Set(runs.map(r=>r.e.applicability?.soffit||'unspecified'));
-  if(statuses.size!==1)throw Error('Conflicting soffit applicability along '+side+' side. Use manual drafting.');
-  boundary[side]={edgeIds:runs.map(r=>r.e.id),soffit:[...statuses][0]};
+  if(requireConsistentSoffit&&statuses.size!==1)throw Error('Conflicting soffit applicability along '+side+' side. Use manual drafting.');
+  boundary[side]={edgeIds:runs.map(r=>r.e.id),soffit:statuses.size===1?[...statuses][0]:'unspecified'};
  }
  return {outer,planes,boundary};
 }
@@ -122,21 +122,20 @@ export function thermalPieces(rectangles:Bounds[],planes:Plane[],basis:'horizont
 }
 
 type Surface=Extract<RoofEntity,{kind:'roofSurface'}>;
-export type DerivationSpec=Omit<RoofDerivationMetadata,'pieceKey'>;
-type DerivedPiece=Pick<Surface,'polygon'|'pitchRise'> & {pieceKey:string};
+export type DerivationSpec=Omit<RoofDerivationMetadata,'pieceKey'|'pendingApplicability'>;
+type DerivedPiece=Pick<Surface,'polygon'|'pitchRise'> & {pieceKey:string;pendingApplicability?:true};
 const sameIds=(a:string[],b:string[])=>a.length===b.length&&new Set(a).size===a.length&&a.every(id=>b.includes(id));
 /** Reconstruct geometry from current source, never from saved quantity totals. */
 export function reconstructRoofSurfaces(entities:RoofEntity[],spec:DerivationSpec):DerivedPiece[]{
- const r=rectangularRoof(entities,spec.planeIds);
+ const r=rectangularRoof(entities,spec.planeIds,spec.purpose==='soffit');
  const edgeIds=sides.flatMap(side=>r.boundary[side].edgeIds);
  if(!sameIds(spec.edgeIds,edgeIds))throw Error('Derived roof boundary references changed. Remove or rederive surfaces.');
  const inset=insetRoof(r.outer,spec.depths);
  if(spec.purpose==='soffit'){
   if(spec.basis!=='horizontal')throw Error('Derived soffit must be horizontal.');
   if(new Set(inset.pieces.map(p=>r.boundary[p.side].soffit)).size>1&&!spec.cornersConfirmed)throw Error('Confirm mixed soffit corner allocation.');
-  // Do not commit an apparently complete area while applicability is unresolved.
-  if(inset.pieces.some(p=>r.boundary[p.side].soffit==='unspecified'))throw Error('Resolve soffit applicability before committing derived surfaces.');
-  return inset.pieces.filter(p=>r.boundary[p.side].soffit==='included').map(p=>({pieceKey:p.side,polygon:p.polygon,pitchRise:0}));
+  // Retain unresolved strip geometry, but never treat it as measured scope.
+  return inset.pieces.filter(p=>r.boundary[p.side].soffit!=='excluded').map(p=>({pieceKey:p.side,polygon:p.polygon,pitchRise:0,...(r.boundary[p.side].soffit==='unspecified'?{pendingApplicability:true as const}:{})}));
  }
  if(!spec.boundaryConfirmed||!spec.material)throw Error('Confirm thermal boundary and insulation material.');
  const rects=thermalRectangles(inset.inner,spec.exclusions);
@@ -157,7 +156,7 @@ export function validateDerivedRoofSurfaces(entities:RoofEntity[]):void{
   if(expected.length!==group.length)throw Error('Incomplete or stale derived roof group. Remove or rederive surfaces.');
   for(const p of expected){
    const actual=group.find(e=>e.derivation!.pieceKey===p.pieceKey);
-   if(!actual||actual.pitchRise!==p.pitchRise||!samePolygon(actual.polygon,p.polygon))throw Error('Stale derived roof surface. Remove or rederive surfaces.');
+   if(!actual||actual.pitchRise!==p.pitchRise||actual.derivation!.pendingApplicability!==p.pendingApplicability||!samePolygon(actual.polygon,p.polygon))throw Error('Stale derived roof surface. Remove or rederive surfaces.');
   }
  }
 }
@@ -184,7 +183,7 @@ export function replaceDerivedRoofGroup(entities:RoofEntity[],spec:DerivationSpe
    polygon:p.polygon.map(q=>({...q})),pitchRise:p.pitchRise,
    ...(spec.material!==undefined?{insulationType:spec.material}:{}),
    ...(spec.thicknessFt!==undefined?{depthFt:spec.thicknessFt}:{}),
-   derivation:{...spec,planeIds:[...spec.planeIds],edgeIds:[...spec.edgeIds],depths:{...spec.depths},exclusions:spec.exclusions.map(b=>({...b})),pieceKey:p.pieceKey}
+   derivation:{...spec,planeIds:[...spec.planeIds],edgeIds:[...spec.edgeIds],depths:{...spec.depths},exclusions:spec.exclusions.map(b=>({...b})),pieceKey:p.pieceKey,...(p.pendingApplicability?{pendingApplicability:true as const}:{pendingApplicability:undefined})}
   };
  });
  const next=[...remaining,...generated];
