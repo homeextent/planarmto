@@ -1,6 +1,6 @@
 import {manualFoundationCoverage} from '../engine/measurements/foundationManualCoverage';
 import {setFoundationApplicability} from '../engine/measurements/foundationApplicability';
-import {assignFoundationAssembly,foundationBaseElevation} from '../engine/measurements/foundationAssembly';
+import {assignFoundationAssembly,foundationBaseElevation,convertFoundationElevation} from '../engine/measurements/foundationAssembly';
 import {derivePerimeterDrainage} from '../engine/measurements/foundationDrainageDerivation';
 import {deriveFoundationEnvelope,deriveRectangularEnvelope} from '../engine/measurements/foundationEnvelopeDerivation';
 import type {FoundationEnvelopeSource} from '../engine/measurements/measurementTypes';
@@ -42,7 +42,7 @@ function Properties({entity,onSave}:{key?:string;entity:FoundationEntity;onSave:
  {input('Material',material,setMaterial)}
  {'widthFt' in entity&&<>{input('Width (ft)',width,setWidth)}{input('Height / depth (ft)',height,setHeight)}<label className="block"><input type="checkbox" checked={centre} onChange={e=>setCentre(e.target.checked)}/> Confirm drafted centreline</label>{centre&&<>{input('Start junction extension (ft)',joinStart,setJoinStart)}{input('End junction extension (ft)',joinEnd,setJoinEnd)}</>}</>}
  {'polygon' in entity&&input('Depth (ft)',depth,setDepth)}
- {'elevationFt' in entity&&<><label className="block">Elevation reference<select aria-label="Elevation reference" className={field} value={elevationBasis} onChange={e=>{setElevationBasis(e.target.value as 'base'|'top');setElevation('')}}><option value="base">Base</option><option value="top">Top</option></select></label>{input(elevationBasis==='base'?'Base elevation (ft; blank unknown)':'Top elevation (ft; blank unknown)',elevation,setElevation)}</>}
+ {'elevationFt' in entity&&<><label className="block">Elevation reference<select aria-label="Elevation reference" className={field} value={elevationBasis} onChange={e=>{try{const next=e.target.value as 'base'|'top';const value=convertFoundationElevation(number(elevation),elevationBasis,next,number('widthFt' in entity?height:depth));setElevationBasis(next);setElevation(value===null?'':String(value));setError('')}catch(err){setError(err instanceof Error?err.message:String(err))}}}><option value="base">Base</option><option value="top">Top</option></select></label>{input(elevationBasis==='base'?'Base elevation (ft; blank unknown)':'Top elevation (ft; blank unknown)',elevation,setElevation)}</>}
  {entity.kind==='foundationLine'&&entity.purpose!=='drainage'&&input('Coverage height (ft)',height,setHeight)}
  {entity.kind==='foundationRegion'&&entity.purpose==='granular'&&input('Granular layer identity',layer,setLayer)}
  {coverage&&<>{input('Layer identity',layer,setLayer)}<label className="block"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> Confirm explicit route / net coverage, no remaining openings</label>

@@ -361,3 +361,11 @@ test('foundation snapping uses confirmed physical footprint and closed polygon e
  assert.deepEqual(nearestFoundationSnap({x:5,y:1.1},[a],.2),{point:{x:5,y:1},kind:'edge'});
  const s=region('s',box(0,0,10,10));assert.deepEqual(nearestFoundationSnap({x:-.1,y:5},[s],.2),{point:{x:0,y:5},kind:'edge'});
 });
+
+import {convertFoundationElevation} from '../src/engine/measurements/foundationAssembly';
+test('switching foundation elevation reference preserves signed physical datum and refuses unknown dimensions',()=>{
+ for(const base of [-8,0,5]){const top=convertFoundationElevation(base,'base','top',8);assert.equal(top,base+8);assert.equal(convertFoundationElevation(top,'top','base',8),base)}
+ assert.equal(convertFoundationElevation(null,'base','top',null),null);
+ assert.throws(()=>convertFoundationElevation(0,'base','top',null),/positive height or depth/);
+ assert.throws(()=>convertFoundationElevation(0,'base','top',0),/positive height or depth/);
+});

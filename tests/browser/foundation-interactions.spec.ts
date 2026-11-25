@@ -430,3 +430,31 @@ test('invalid exact face-reference placement retains actionable error and no geo
  await page.getByLabel('Dimensions',{exact:true}).fill('40');await page.getByLabel('Dimensions',{exact:true}).press('Enter');
  await expect(entities(page)).toHaveCount(2);
 });
+
+test('foundation elevation reference switches preserve saved physical base',async({page})=>{
+ await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
+ for(const [label,value] of [['Material','poured concrete'],['Width (ft)','1'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','-8']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByLabel('Confirm drafted centreline').check();await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ await page.getByLabel('Elevation reference').selectOption('top');await expect(page.getByLabel('Top elevation (ft; blank unknown)',{exact:true})).toHaveValue('0');
+ await page.getByLabel('Elevation reference').selectOption('base');await expect(page.getByLabel('Base elevation (ft; blank unknown)',{exact:true})).toHaveValue('-8');
+ await page.getByLabel('Elevation reference').selectOption('top');await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ expect((await snapshot(page))[0]).toMatchObject({elevationFt:-8,foundation:{baseElevationConfirmed:true}});
+});
+test('foundation focused dimensions cancel without geometry and subsequent canvas placement supports keyboard correction',async({page})=>{
+ await page.getByRole('button',{name:'Foundation wall',exact:true}).click();
+ const canvas=page.locator('canvas').first();await canvas.click({position:{x:250,y:250}});await canvas.hover({position:{x:550,y:250}});
+ const dimensions=page.getByLabel('Dimensions',{exact:true});await dimensions.fill('40');await dimensions.press('Escape');
+ await expect(dimensions).toHaveValue('');await expect(entities(page)).toHaveCount(1);
+ await canvas.click({position:{x:550,y:250}});await page.keyboard.type('30');await page.keyboard.press('Enter');
+ await expect(page.getByLabel('Live drafting dimensions')).toHaveText('Placement reference: 30.00 ft');
+ const e=(await snapshot(page))[0];if(e.kind!=='foundationWall')throw Error('Expected wall');expect(Math.hypot(e.end.x-e.start.x,e.end.y-e.start.y)).toBeCloseTo(30,6);
+});
+test('continuous drafting displays next segment separately from last placement correction',async({page})=>{
+ await page.getByRole('button',{name:'Foundation wall',exact:true}).click();await page.getByLabel('Continuous foundation drafting').check();
+ const canvas=page.locator('canvas').first();await canvas.click({position:{x:250,y:250}});await canvas.click({position:{x:550,y:250}});
+ await page.keyboard.type('40');await page.keyboard.press('Enter');await canvas.hover({position:{x:550,y:440}});
+ await expect(page.getByLabel('Live drafting dimensions')).toHaveText('Placement reference: 40.00 ft');
+ await expect(page.getByLabel('Next foundation segment dimensions')).toContainText('Next segment:');
+ await page.keyboard.type('30');await page.keyboard.press('Enter');await expect(page.getByLabel('Live drafting dimensions')).toHaveText('Placement reference: 30.00 ft');
+ await expect(entities(page)).toHaveCount(2);
+});

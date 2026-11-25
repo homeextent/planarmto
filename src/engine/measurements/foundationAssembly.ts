@@ -9,6 +9,16 @@ export function foundationBaseElevation(value:number|null,basis:'base'|'top',hei
  if(basis!=='top'||height===null||!Number.isFinite(height)||height<=0||!Number.isFinite(value-height))throw Error('Top elevation requires confirmed positive height or depth');
  return value-height;
 }
+/** Changing the displayed datum must preserve the physical interval. */
+export function convertFoundationElevation(value:number|null,from:'base'|'top',to:'base'|'top',height:number|null):number|null{
+ if(value===null)return null;
+ if(!Number.isFinite(value))throw Error('Invalid elevation');
+ if(from===to)return value;
+ if(height===null||!Number.isFinite(height)||height<=0)throw Error('Confirm positive height or depth before switching elevation reference');
+ const result=from==='base'?value+height:value-height;
+ if(!Number.isFinite(result))throw Error('Invalid elevation conversion');
+ return result;
+}
 /** Join whole independently drafted compatible line assemblies, never partially reassign an existing group. */
 export function assignFoundationAssembly(entities:FoundationEntity[],ids:string[],assemblyId:string):FoundationEntity[]{
  const selected=entities.filter(e=>ids.includes(e.id));
