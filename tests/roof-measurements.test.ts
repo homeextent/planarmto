@@ -187,6 +187,9 @@ test('R4 mixed soffit applicability is explicit; split side conflict refused',()
  assert.equal(east.length,2);
  const modified=es.map(e=>e.id===east[0].id&&e.kind==='roofEdge'?{...e,applicability:{...e.applicability,soffit:'included' as const}}:e);
  assert.throws(()=>rectangularRoof(modified,ids(modified)),/Conflicting soffit applicability/);
+ assert.deepEqual(rectangularRoof(modified,ids(modified),false).outer,outer);
+ const thermal=derivedFixture(modified,'insulation');
+ near(value([...modified,...thermal.surfaces],'roof.insulation.horizontal'),936);
  const assigned=generated(40,30).map(e=>e.kind==='roofEdge'&&e.edgeType==='eave'?{...e,applicability:{...e.applicability,soffit:e.start.y===0&&e.end.y===0?'included' as const:'excluded' as const}}:e);
  const r=rectangularRoof(assigned,ids(assigned));assert.equal(r.boundary.north.soffit,'included');assert.equal(r.boundary.east.soffit,'excluded');
  near(insetRoof(r.outer,uniform(2)).pieces.filter(p=>r.boundary[p.side].soffit==='included').reduce((n,p)=>n+p.projectedSF,0),80);
@@ -237,7 +240,7 @@ type DerivedSurface=Extract<RoofEntity,{kind:'roofSurface'}>;
 const sourceRoof=(w=40,pitch=6):RoofEntity[]=>generated(w,30,{pitch}).map(e=>e.kind==='roofPlane'?{...e,roofGroupId:'roof-group'}:e.kind==='roofEdge'?{...e,roofGroupId:'roof-group',applicability:{...e.applicability,soffit:e.edgeType==='eave'?'included':'excluded'}}:e);
 function derivedFixture(source:RoofEntity[],purpose:'soffit'|'insulation',basis:'horizontal'|'sloped'='horizontal'){
  const spec:DerivationSpec={version:1,groupId:'derived-'+purpose,planeIds:ids(source),edgeIds:source.filter(e=>e.kind==='roofEdge'&&e.planeIds.length===1).map(e=>e.id),depths:uniform(2),purpose,basis,exclusions:[],boundaryConfirmed:true,cornersConfirmed:true,...(purpose==='insulation'?{material:'closed cell foam',thicknessFt:.5}:{})};
- const surfaces:DerivedSurface[]=reconstructRoofSurfaces(source,spec).map((p,i)=>({...base(spec.groupId+'-'+i),kind:'roofSurface',purpose,polygon:p.polygon,pitchRise:p.pitchRise,surfaceBasis:basis,insulationType:spec.material,depthFt:spec.thicknessFt,derivation:{...spec,pieceKey:p.pieceKey}}));
+ const surfaces:DerivedSurface[]=reconstructRoofSurfaces(source,spec).map((p,i)=>({...base(spec.groupId+'-'+i),kind:'roofSurface',purpose,polygon:p.polygon,pitchRise:p.pitchRise,surfaceBasis:basis,insulationType:spec.material,depthFt:spec.thicknessFt,derivation:{...spec,pieceKey:p.pieceKey,...(p.pendingApplicability?{pendingApplicability:true as const}:{})}}));
  return {spec,surfaces};
 }
 test('R4 canonical derived hip surfaces preserve analytical quantities and separate identities',()=>{
@@ -268,7 +271,21 @@ test('R4 soffit applicability change requires reconciliation; mixed corners requ
  assert.throws(()=>validateRoofTopology([...changed,...s.surfaces]),/Incomplete/);
  assert.throws(()=>reconstructRoofSurfaces(changed,{...s.spec,cornersConfirmed:false}),/Confirm mixed/);
  const unresolved=source.map(e=>e.kind==='roofEdge'&&e.id===s.spec.edgeIds[0]?{...e,applicability:{...e.applicability,soffit:'unspecified' as const}}:e);
- assert.throws(()=>reconstructRoofSurfaces(unresolved,s.spec),/Resolve soffit/);
+ const pending=reconstructRoofSurfaces(unresolved,s.spec);
+ assert.equal(pending.filter(p=>p.pendingApplicability).length,1);
+ assert.throws(()=>validateRoofTopology([...unresolved,...s.surfaces]),/Stale/);
+ let n=0;const next=replaceDerivedRoofGroup(unresolved,s.spec,()=> 'pending-'+ ++n);
+ const rows=measureRoof('roof',next).rows.filter(r=>r.code==='roof.soffit.area');
+ assert.equal(rows.filter(r=>r.status==='unquantified').length,1);
+ assert.equal(rows.find(r=>r.status==='unquantified')?.reason,'Soffit applicability unspecified');
+ near(rows.reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),184);
+ const doc=addWorkspace(createProjectDocument(createBlankProject(),'floor'),'roof','Roof','roof');
+ const saved=deserializeProjectDocument(serializeProjectDocument(replaceSpecialistEntities(doc,'roof',next)));
+ const restored=saved.workspaces[1].measurements as RoofEntity[];
+ assert.deepEqual(restored,JSON.parse(JSON.stringify(next)));
+ assert.equal(measureRoof('roof',restored).rows.filter(r=>r.code==='roof.soffit.area'&&r.status==='unquantified').length,1);
+ const tampered=next.map(e=>e.kind==='roofSurface'&&e.derivation?.pendingApplicability?{...e,derivation:{...e.derivation,pendingApplicability:undefined}}:e);
+ assert.throws(()=>validateRoofTopology(tampered),/Stale/);
 });
 test('R4 derived identity and consistent group parameters validated',()=>{
  const source=sourceRoof(),s=derivedFixture(source,'soffit'),first=s.surfaces[0],second=s.surfaces[1];
@@ -415,4 +432,11 @@ test('R4 directional window and crossing distinguish containment, intersection a
  const diagonal:RoofEntity={...edge,start:{x:0,y:0},end:{x:10,y:10}};
  assert.deepEqual(roofWindowSelection([diagonal],{x:9,y:3},{x:7,y:1}),[]);
  assert.deepEqual(roofWindowSelection([diagonal],{x:6,y:6},{x:4,y:4}),['line']);
+});
+
+test('R4 grouping metadata must not reuse an entity or measurement identity',()=>{
+ const source=sourceRoof(),s=derivedFixture(source,'soffit');
+ const collision=source.map(e=>e.kind==='roofPlane'||e.kind==='roofEdge'?{...e,roofGroupId:source[0].physicalId}:e);
+ assert.throws(()=>validateRoofTopology(collision),/roof group identity collides/);
+ assert.throws(()=>validateRoofTopology([...source,...s.surfaces.map(e=>({...e,derivation:{...e.derivation!,groupId:source[0].assemblyId}}))]),/derivation group identity collides/);
 });
