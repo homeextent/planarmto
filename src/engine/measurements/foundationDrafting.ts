@@ -1,6 +1,6 @@
 import type {ActiveTool} from '../../types';
 import type {FoundationEntity,Point} from './measurementTypes';
-import {extendedStrip,foundationRectangle,type RectangleReference,type Bounds} from './foundationGeometry';
+import {extendedStrip,foundationRectangle,faceToCentreline,type RectangleReference,type Bounds} from './foundationGeometry';
 import {polygonDraftError} from './roofMeasurements';
 import {rectanglePoints} from '../precisionDrafting';
 export const foundationTools = [
@@ -44,4 +44,15 @@ export function foundationDetailOutlines(e:FoundationEntity):{id:string;kind:'op
  const l=Math.hypot(e.end.x-e.start.x,e.end.y-e.start.y);if(l<=1e-8)return [];
  const ux=(e.end.x-e.start.x)/l,uy=(e.end.y-e.start.y)/l,t=e.widthFt/2;
  return (f.wallOpenings??[]).map(o=>{const a={x:e.start.x+ux*o.offsetFt,y:e.start.y+uy*o.offsetFt},b={x:a.x+ux*o.widthFt,y:a.y+uy*o.widthFt};return {id:o.id,kind:'opening',points:[{x:a.x-uy*t,y:a.y+ux*t},{x:b.x-uy*t,y:b.y+ux*t},{x:b.x+uy*t,y:b.y-ux*t},{x:a.x+uy*t,y:a.y-ux*t}]};});
+}
+
+export type WallDraftReference='centreline'|'exterior-left'|'exterior-right'|'interior-left'|'interior-right';
+/** Side describes the location of the concrete relative to the directed face in stored XY coordinates. */
+export function createReferencedWall(start:Point,end:Point,id:string,reference:WallDraftReference,widthFt:number|null):FoundationEntity{
+ if(reference==='centreline')return createFoundationDraft('foundation_wall',start,end,id);
+ if(!['exterior-left','exterior-right','interior-left','interior-right'].includes(reference))throw Error('Invalid foundation wall reference');
+ if(widthFt===null||!Number.isFinite(widthFt)||widthFt<=0)throw Error('Specify positive wall thickness before face-reference placement');
+ const centre=faceToCentreline(start,end,widthFt,reference.endsWith('left')?'left':'right');
+ extendedStrip(centre.start,centre.end,widthFt);
+ return {id,physicalId:id,assemblyId:id,source:{reference:'Manual foundation wall — '+reference+' face',note:'Source face '+JSON.stringify({start,end,widthFt})},kind:'foundationWall',...centre,widthFt,heightFt:null,elevationFt:null,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true}};
 }

@@ -152,3 +152,19 @@ test('foundation window and crossing selection distinguish partial and complete 
  await drag(450,210,350,290);await expect(page.getByRole('button',{name:'Delete selected foundation components'})).toBeVisible();
  await drag(200,200,600,300);await expect(page.getByRole('button',{name:'Delete selected foundation components'})).toBeVisible();
 });
+
+test('wall face drafting stores canonical offset and preserves source length through correction',async({page})=>{
+ await page.getByRole('button',{name:'Foundation wall',exact:true}).click();
+ await page.getByLabel('Foundation wall reference').selectOption('exterior-left');
+ await page.getByLabel('Face reference wall thickness').fill('1');
+ const canvas=page.locator('canvas').first();
+ await canvas.click({position:{x:250,y:250}});await canvas.click({position:{x:550,y:250}});
+ await page.keyboard.type('40');await page.keyboard.press('Enter');
+ await expect(entities(page)).toHaveCount(2);
+ const e=(await snapshot(page))[0];if(e.kind!=='foundationWall')throw Error('Expected wall');
+ expect(e.widthFt).toBe(1);expect(e.foundation?.centrelineConfirmed).toBe(true);expect(e.heightFt).toBeNull();
+ const source=JSON.parse(e.source.note!.replace('Source face ',''));
+ expect(e.start.y-source.start.y).toBeCloseTo(.5,6);
+ expect(e.end.x-e.start.x).toBeCloseTo(40,6);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();await expect(entities(page)).toHaveCount(1);
+});
