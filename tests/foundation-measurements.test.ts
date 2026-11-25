@@ -177,3 +177,20 @@ test('offset footing refuses joined walls and insufficient footprint',()=>{
  w.foundation!.joinStartFt=.5;assert.throws(()=>deriveStripFootings([w],[w.id],2,1,id,.5),/isolated unjoined wall/);
  assert.throws(()=>deriveStripFootings([w],[w.id],2,1,id,0),/Unsupported source junction extension/);
 });
+
+test('pad reference footprint separate from concrete and count ledger',()=>{
+ const e:FoundationEntity={id:'pad',physicalId:'pad',assemblyId:'pad',source:{reference:'fixture'},kind:'padFooting',polygon:box(0,0,4,4),depthFt:1,purpose:'concrete',elevationFt:0,foundation:{version:1,material:'poured concrete',baseElevationConfirmed:true}};
+ const m=measureFoundation('f',[e]);assert.equal(m.rows.length,2);assert.equal(m.footprintReferences.length,1);
+ const a=m.footprintReferences[0];assert.equal(a.code,'foundation.footing.pad.area');assert.equal(a.role,'reference');near(a.netSF!,16);
+ assert.ok(m.rows.every(r=>r.unit!=='SF'));
+});
+test('net slab reference excludes openings but not thickening and is independent of missing depth',()=>{
+ const e=region('slab',box(0,0,40,30));if(e.kind!=='slab')throw Error('Expected slab');
+ e.foundation!.slabOpenings=[{id:'o',polygon:box(2,2,6,10)}];e.foundation!.slabThickenings=[{id:'t',polygon:box(20,10,10,10),depthFt:1.5,basis:'total'}];
+ const m=measureFoundation('f',[e]),a=m.footprintReferences[0];near(a.grossSF!,1200);near(a.exclusionSF!,60);near(a.netSF!,1140);assert.equal(m.rows.length,1);
+ e.depthFt=null;const pending=measureFoundation('f',[e]);assert.equal(pending.rows[0].status,'unquantified');near(pending.footprintReferences[0].netSF!,1140);
+});
+test('concave slab reference uses actual polygon and unresolved overlaps withhold net area',()=>{
+ const e=region('l',lshape);near(measureFoundation('f',[e]).footprintReferences[0].netSF!,64);
+ const q=region('q',box(2,2,4,4));const result=measureFoundation('f',[e,q]);assert.ok(result.footprintReferences.every(r=>r.netSF===null&&r.reason));
+});

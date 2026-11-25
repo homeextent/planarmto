@@ -277,3 +277,14 @@ test('isolated strip footing signed offset persists in source-linked preview and
  await page.getByRole('button',{name:'Apply strip footings',exact:true}).click();
  const f=(await snapshot(page)).find(e=>e.kind==='stripFooting');expect(f?.foundation?.stripSource?.offsetFt).toBe(.5);
 });
+
+test('slab reference footprint remains separate from concrete volume',async({page})=>{
+ await place(page,'Slab',{x:250,y:250},{x:550,y:450},'40,30');
+ await page.getByLabel('Material',{exact:true}).fill('poured concrete');
+ await page.getByLabel('Depth (ft)',{exact:true}).fill('0.3333333333333333');
+ await page.getByLabel('Base elevation (ft; blank unknown)',{exact:true}).fill('0');
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ const ref=page.getByLabel('Selected foundation footprint reference');
+ await expect(ref).toBeVisible();await expect(ref).toContainText('1200.00 SF');
+ await expect(ref).toContainText('Not an additional concrete material quantity.');
+});

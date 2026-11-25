@@ -10,9 +10,10 @@ import {validateFoundationTopology} from './foundationTopology';
 const intersects=(a:Bounds,b:Bounds)=>Math.min(a.xmax,b.xmax)>Math.max(a.xmin,b.xmin)&&Math.min(a.ymax,b.ymax)>Math.max(a.ymin,b.ymin);
 type Solid={entity:FoundationEntity;code:string;material:string;bounds:Bounds|null;prism:Prism|null;pieces:Bounds[]|null;area:number|null;details:ReturnType<typeof foundationDetails>;reason?:string};
 export type FoundationVolumeBreakdown={elementId:string;grossCY:number|null;deductionCY:number|null;additionalCY:number|null;netCY:number|null};
-export function measureFoundation(workspaceId:string,entities:FoundationEntity[]):{rows:QuantityContribution[];warnings:string[];detailBreakdown:FoundationVolumeBreakdown[]} {
+export type FoundationFootprintReference={elementId:string;code:'foundation.footing.pad.area'|'foundation.slab.area';unit:'SF';role:'reference';grossSF:number|null;exclusionSF:number|null;netSF:number|null;reason?:string};
+export function measureFoundation(workspaceId:string,entities:FoundationEntity[]):{rows:QuantityContribution[];warnings:string[];detailBreakdown:FoundationVolumeBreakdown[];footprintReferences:FoundationFootprintReference[]} {
  validateFoundationTopology(entities);
- const rows:QuantityContribution[]=[],warnings:string[]=[],solids:Solid[]=[],detailBreakdown:FoundationVolumeBreakdown[]=[];
+ const rows:QuantityContribution[]=[],warnings:string[]=[],solids:Solid[]=[],detailBreakdown:FoundationVolumeBreakdown[]=[],footprintReferences:FoundationFootprintReference[]=[];
  const add=(e:FoundationEntity,code:string,unit:QuantityContribution['unit'],basis:string,value:number|null,reason='Missing or unconfirmed foundation input')=>{
   const base={workspaceId,elementId:e.id,physicalId:e.physicalId,assemblyId:e.assemblyId,source:e.source,code,unit,basis};
   rows.push(value===null?{...base,status:'unquantified',reason}:{...base,status:'measured',quantity:value});
@@ -86,8 +87,19 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
   add(s.entity,s.code,'CY','net geometric installed volume',net===null?null:net/27,reason);
   if(s.entity.kind==='padFooting')add(s.entity,'foundation.footing.pad.count','EA','reference pad count',net===null?null:1,reason);
 
+  if(s.entity.kind==='padFooting'||s.entity.kind==='slab'){
+   // Geometry-only reference: do not feed the concrete material contribution ledger.
+   // A valid, explicit poured-concrete outline may have known area before thickness is entered.
+   // Other same-material potentially overlapping components with unresolved vertical or plan relationship
+   // prevent a confirmed net footprint; no additive cross-component area total is implied.
+   const e=s.entity,confirmed=e.foundation?.material==='poured concrete'&&s.area!==null;
+   const conflict=solids.some(q=>q!==s&&q.material===s.material&&planOverlap(s,q)&&(!verticalDisjoint(s,q)||s.details.hasDetails||q.details.hasDetails));
+   const gross=confirmed?s.area:null,exclusion=confirmed?(e.foundation?.slabOpenings??[]).reduce((n,o)=>n+projectedArea(o.polygon),0):null;
+   const net=gross===null||exclusion===null||conflict?null:gross-exclusion;
+   footprintReferences.push({elementId:e.id,code:e.kind==='slab'?'foundation.slab.area':'foundation.footing.pad.area',unit:'SF',role:'reference',grossSF:gross,exclusionSF:exclusion,netSF:net,...(net===null?{reason:conflict?'Potential overlapping concrete; resolve physical relationship':'Confirm material and valid footprint'}:{})});
+  }
   if(reason)warnings.push(s.entity.id+': '+reason);
  }
  for(const c of foundationCoverage(entities)){add(c.entity,c.code,c.unit,c.basis,c.value,c.reason);if(c.value===null)warnings.push(c.entity.id+': '+c.reason)}
- validateContributionSet(rows);return {rows,warnings,detailBreakdown};
+ validateContributionSet(rows);return {rows,warnings,detailBreakdown,footprintReferences};
 }
