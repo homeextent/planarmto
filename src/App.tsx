@@ -780,7 +780,7 @@ function AppContent() {
           }}
         />
 
-        {foundationEntities && <FoundationInspector key={activeWorkspace.id} onPreview={members=>setFoundationGhost(members?{workspaceId:activeWorkspace.id,source:foundationEntities,members}:null)} filter={visibleFoundationKind} onFilter={kind=>{setFoundationFilter({workspaceId:activeWorkspace.id,kind});setSelection({type:'none'})}} workspaceId={activeWorkspace.id} entities={foundationEntities} selection={selection} onChange={handleFoundationChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
+        {foundationEntities && <FoundationInspector metric={state.settings.unitSystem==='metric'} key={activeWorkspace.id} onPreview={members=>setFoundationGhost(members?{workspaceId:activeWorkspace.id,source:foundationEntities,members}:null)} filter={visibleFoundationKind} onFilter={kind=>{setFoundationFilter({workspaceId:activeWorkspace.id,kind});setSelection({type:'none'})}} workspaceId={activeWorkspace.id} entities={foundationEntities} selection={selection} onChange={handleFoundationChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
         {roofEntities && <RoofInspector workspaceId={activeWorkspace.id} entities={roofEntities} selection={selection} onChange={handleRoofChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
         {/* Right Real-time MTO Take-Off Matrix */}
         {reportable && <MtoMatrixPanel

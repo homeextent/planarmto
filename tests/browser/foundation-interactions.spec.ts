@@ -2,11 +2,18 @@ import {test,expect,type Page} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import type {ProjectDocument} from '../../src/engine/projectDocument';
 import type {FoundationEntity} from '../../src/engine/measurements/measurementTypes';
-async function snapshot(page:Page):Promise<FoundationEntity[]>{
+async function projectSnapshot(page:Page):Promise<ProjectDocument>{
  const [download]=await Promise.all([page.waitForEvent('download'),page.getByTitle('Save Project JSON',{exact:true}).click()]);
  const path=await download.path();if(!path)throw Error('Missing JSON download');
- const doc=JSON.parse(await readFile(path,'utf8')) as ProjectDocument;
- return doc.workspaces.find(w=>w.type==='foundation')!.measurements as FoundationEntity[];
+ return JSON.parse(await readFile(path,'utf8')) as ProjectDocument;
+}
+async function snapshot(page:Page):Promise<FoundationEntity[]>{
+ return (await projectSnapshot(page)).workspaces.find(w=>w.type==='foundation')!.measurements as FoundationEntity[];
+}
+async function fillFoundationField(page:Page,label:string,value:string){
+ const field=page.getByLabel(label,{exact:true});
+ if(['Material','Derived layer material','Drainage material'].includes(label))await field.selectOption(value);
+ else await field.fill(value);
 }
 const entities=(page:Page)=>page.getByLabel('Select foundation entity').locator('option');
 async function place(page:Page,tool:string,a:{x:number;y:number},b:{x:number;y:number},dimensions:string){
@@ -42,8 +49,8 @@ test('foundation rectangle exact correction and single history transaction',asyn
 });
 test('wall inspector confirms dimensions and raw concrete quantity',async({page})=>{
  await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
- await page.getByLabel('Material',{exact:true}).fill('poured concrete');
- await page.getByLabel('Width (ft)',{exact:true}).fill('0.6666666666666666');
+ await page.getByLabel('Material',{exact:true}).selectOption('poured concrete');
+ await page.getByLabel('Width (in)',{exact:true}).fill('0.6666666666666666 ft');
  await page.getByLabel('Height / depth (ft)',{exact:true}).fill('8');
  await page.getByLabel('Base elevation (ft; blank unknown)',{exact:true}).fill('0');
  await page.getByLabel('Confirm drafted centreline').check();
@@ -71,7 +78,7 @@ test('foundation polygon closes at first vertex',async({page})=>{
 });
 test('rectangular foundation preview cancel and apply are atomic',async({page})=>{
  await page.getByText('Generate rectangular foundation',{exact:true}).click();
- for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (ft)','0.6666666666666666'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (in)','0.6666666666666666 ft'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview perimeter',exact:true}).click();
  await expect(page.getByText('4 walls · 27.1276 CY',{exact:true})).toBeVisible();
  await expect(page.getByLabel('Foundation graphical preview')).toHaveText('Preview — 4 uncommitted components');
@@ -94,15 +101,15 @@ test('rectangular foundation preview cancel and apply are atomic',async({page})=
 
 test('selected wall derives centred footing with atomic undo',async({page})=>{
  await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
- await page.getByLabel('Material',{exact:true}).fill('poured concrete');
- await page.getByLabel('Width (ft)',{exact:true}).fill('0.6666666666666666');
+ await page.getByLabel('Material',{exact:true}).selectOption('poured concrete');
+ await page.getByLabel('Width (in)',{exact:true}).fill('0.6666666666666666 ft');
  await page.getByLabel('Height / depth (ft)',{exact:true}).fill('8');
  await page.getByLabel('Base elevation (ft; blank unknown)',{exact:true}).fill('0');
  await page.getByLabel('Confirm drafted centreline').check();
  await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
  await page.getByText('Derive strip footings',{exact:true}).click();
- await page.getByLabel('Footing width (ft)',{exact:true}).fill('2');
- await page.getByLabel('Footing depth (ft)',{exact:true}).fill('1');
+ await page.getByLabel('Footing width (in)',{exact:true}).fill('2 ft');
+ await page.getByLabel('Footing depth (in)',{exact:true}).fill('1 ft');
  await page.getByRole('button',{name:'Preview strip footings',exact:true}).click();
  await expect(page.getByText('1 footings · 2.9630 CY',{exact:true})).toBeVisible();
  await expect(entities(page)).toHaveCount(2);
@@ -114,10 +121,10 @@ test('selected wall derives centred footing with atomic undo',async({page})=>{
 
 test('wall opening inspector validates, edits and undoes net deduction',async({page})=>{
  await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
- for(const [label,value] of [['Material','poured concrete'],['Width (ft)','0.6666666666666666'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Material','poured concrete'],['Width (in)','0.6666666666666666 ft'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','0']])await fillFoundationField(page,label,value);
  await page.getByLabel('Confirm drafted centreline').check();
  await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
- for(const [label,value] of [['Opening offset (ft)','5'],['Opening sill (ft)','2'],['Opening width (ft)','4'],['Opening height (ft)','3']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Opening offset (ft)','5'],['Opening sill (ft)','2'],['Opening width (ft)','4'],['Opening height (ft)','3']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Add wall opening',exact:true}).click();
  const summary=page.getByRole('region',{name:'Selected concrete volume breakdown'});
  await expect(summary.getByText('7.6049 CY',{exact:true})).toBeVisible();
@@ -131,16 +138,16 @@ test('wall opening inspector validates, edits and undoes net deduction',async({p
 });
 test('slab exclusion and thickening inspector report nonadditive breakdown',async({page})=>{
  await place(page,'Slab',{x:250,y:250},{x:550,y:450},'40,30');
- await page.getByLabel('Material',{exact:true}).fill('poured concrete');
- await page.getByLabel('Depth (ft)',{exact:true}).fill(String(4/12));
+ await page.getByLabel('Material',{exact:true}).selectOption('poured concrete');
+ await page.getByLabel('Depth (in)',{exact:true}).fill(String(4/12)+' ft');
  await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
  const slab=(await snapshot(page))[0];if(slab.kind!=='slab')throw Error('Expected slab');
  const x=Math.min(...slab.polygon.map(p=>p.x)),y=Math.min(...slab.polygon.map(p=>p.y));
- for(const [label,value] of [['Detail origin X (ft)',String(x+1)],['Detail origin Y (ft)',String(y+1)],['Detail width (ft)','6'],['Detail length (ft)','10']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Detail origin X (ft)',String(x+1)],['Detail origin Y (ft)',String(y+1)],['Detail width (ft)','6'],['Detail length (ft)','10']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Add slab exclusion',exact:true}).click();
  await expect(page.getByRole('region',{name:'Selected concrete volume breakdown'}).getByText('14.0741 CY',{exact:true})).toBeVisible();
  await page.getByLabel('Slab detail type').selectOption('thickening');
- for(const [label,value] of [['Detail origin X (ft)',String(x+20)],['Detail origin Y (ft)',String(y+10)],['Detail width (ft)','10'],['Detail length (ft)','10'],['Thickening depth (ft)','1.5']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Detail origin X (ft)',String(x+20)],['Detail origin Y (ft)',String(y+10)],['Detail width (ft)','10'],['Detail length (ft)','10'],['Thickening depth (in)','1.5 ft']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Add slab thickening',exact:true}).click();
  const summary=page.getByRole('region',{name:'Selected concrete volume breakdown'});
  await expect(summary.getByText('4.3210 CY',{exact:true})).toBeVisible();
@@ -164,7 +171,7 @@ test('foundation window and crossing selection distinguish partial and complete 
 test('wall face drafting stores canonical offset and preserves source length through correction',async({page})=>{
  await page.getByRole('button',{name:'Foundation wall',exact:true}).click();
  await page.getByLabel('Foundation wall reference').selectOption('exterior-left');
- await page.getByLabel('Face reference wall thickness').fill('1');
+ await page.getByLabel('Face reference wall thickness (in)').fill('1 ft');
  const canvas=page.locator('canvas').first();
  await canvas.click({position:{x:250,y:250}});await canvas.click({position:{x:550,y:250}});
  await page.keyboard.type('40');await page.keyboard.press('Enter');
@@ -179,12 +186,12 @@ test('wall face drafting stores canonical offset and preserves source length thr
 
 test('selected wall derives waterproofing coverage with atomic undo',async({page})=>{
  await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
- for(const [label,value] of [['Material','poured concrete'],['Width (ft)','0.6666666666666666'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Material','poured concrete'],['Width (in)','0.6666666666666666 ft'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','0']])await fillFoundationField(page,label,value);
  await page.getByLabel('Confirm drafted centreline').check();
  await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
  await page.getByText('Derive foundation envelope',{exact:true}).click();
  await page.getByLabel('Derived coverage height (ft)',{exact:true}).fill('6');
- await page.getByLabel('Derived layer material',{exact:true}).fill('membrane');
+ await page.getByLabel('Derived layer material',{exact:true}).selectOption('sheet waterproofing membrane');
  await page.getByLabel('Derived layer identity',{exact:true}).fill('wp');
  await page.getByRole('button',{name:'Preview envelope',exact:true}).click();
  await expect(page.getByText('240.0000 SF',{exact:true})).toBeVisible();
@@ -197,13 +204,13 @@ test('selected wall derives waterproofing coverage with atomic undo',async({page
 
 test('rectangular wall assembly derives exterior drainage with preview and undo',async({page})=>{
  await page.getByText('Generate rectangular foundation',{exact:true}).click();
- for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (ft)','0.6666666666666666'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (in)','0.6666666666666666 ft'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview perimeter',exact:true}).click();
  await page.getByRole('button',{name:'Apply perimeter',exact:true}).click();
  await page.getByLabel('Select foundation entity').selectOption({index:1});
  await page.getByRole('button',{name:'Select entire foundation assembly',exact:true}).click();
  await page.getByText('Derive perimeter drainage',{exact:true}).click();
- for(const [label,value] of [['Drainage exterior offset (ft)','2'],['Drainage material','pipe'],['Drainage layer identity','drain']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Drainage exterior offset (in)','2 ft'],['Drainage material','perforated rigid pvc drainage pipe'],['Drainage layer identity','drain']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview drainage',exact:true}).click();
  await expect(page.getByText('156.0000 LF',{exact:true})).toBeVisible();
  await expect(entities(page)).toHaveCount(5);
@@ -215,7 +222,7 @@ test('rectangular wall assembly derives exterior drainage with preview and undo'
 
 test('foundation component visibility filters selection without changing saved quantities',async({page})=>{
  await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
- for(const [label,value] of [['Material','poured concrete'],['Width (ft)','0.6666666666666666'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Material','poured concrete'],['Width (in)','0.6666666666666666 ft'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','0']])await fillFoundationField(page,label,value);
  await page.getByLabel('Confirm drafted centreline').check();await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
  await page.getByRole('button',{name:'Slab',exact:true}).click();const canvas=page.locator('canvas').first();await canvas.click({position:{x:250,y:350}});await canvas.click({position:{x:550,y:450}});
  await expect(entities(page)).toHaveCount(3);
@@ -225,11 +232,11 @@ test('foundation component visibility filters selection without changing saved q
 
 test('rectangular exterior waterproofing measures continuous outer faces',async({page})=>{
  await page.getByText('Generate rectangular foundation',{exact:true}).click();
- for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (ft)','0.6666666666666666'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (in)','0.6666666666666666 ft'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview perimeter',exact:true}).click();await page.getByRole('button',{name:'Apply perimeter',exact:true}).click();
  await page.getByLabel('Select foundation entity').selectOption({index:1});await page.getByRole('button',{name:'Select entire foundation assembly',exact:true}).click();
  await page.getByText('Derive foundation envelope',{exact:true}).click();await page.getByLabel('Complete orthogonal exterior').check();
- for(const [label,value] of [['Derived coverage height (ft)','6'],['Derived layer material','membrane'],['Derived layer identity','wp']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Derived coverage height (ft)','6'],['Derived layer material','sheet waterproofing membrane'],['Derived layer identity','wp']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview envelope',exact:true}).click();await expect(page.getByText('840.0000 SF',{exact:true})).toBeVisible();await expect(page.getByLabel('Foundation graphical preview')).toHaveText('Preview — 4 uncommitted components');
  await page.getByRole('button',{name:'Apply envelope',exact:true}).click();await expect(entities(page)).toHaveCount(9);
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();await expect(entities(page)).toHaveCount(5);
@@ -241,7 +248,7 @@ test('irregular polygon perimeter previews six walls and commits one undoable as
  for(const p of [{x:200,y:200},{x:500,y:200},{x:500,y:320},{x:380,y:320},{x:380,y:440},{x:200,y:440}])await canvas.click({position:p});
  await page.getByRole('button',{name:'Finish foundation polygon',exact:true}).click();
  await expect(page.getByLabel('Polygon perimeter configuration')).toBeVisible();
- for(const [label,value] of [['Polygon wall thickness (ft)','1'],['Polygon wall height (ft)','8'],['Polygon wall base (ft)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Polygon wall thickness (in)','1 ft'],['Polygon wall height (ft)','8'],['Polygon wall base (ft)','0']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview polygon perimeter',exact:true}).click();
  await expect(page.getByLabel('Foundation graphical preview')).toHaveText('Preview — 6 uncommitted components');
  await expect(entities(page)).toHaveCount(1);
@@ -254,8 +261,8 @@ test('irregular polygon perimeter previews six walls and commits one undoable as
 
 test('foundation inspector converts top elevation into canonical base',async({page})=>{
  await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
- await page.getByLabel('Material',{exact:true}).fill('poured concrete');
- await page.getByLabel('Width (ft)',{exact:true}).fill('1');
+ await page.getByLabel('Material',{exact:true}).selectOption('poured concrete');
+ await page.getByLabel('Width (in)',{exact:true}).fill('1 ft');
  await page.getByLabel('Height / depth (ft)',{exact:true}).fill('8');
  await page.getByLabel('Elevation reference',{exact:true}).selectOption('top');
  await page.getByLabel('Top elevation (ft; blank unknown)',{exact:true}).fill('0');
@@ -267,16 +274,16 @@ test('foundation inspector converts top elevation into canonical base',async({pa
 
 test('isolated strip footing signed offset persists in source-linked preview and apply',async({page})=>{
  await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
- await page.getByLabel('Material',{exact:true}).fill('poured concrete');
- await page.getByLabel('Width (ft)',{exact:true}).fill('1');
+ await page.getByLabel('Material',{exact:true}).selectOption('poured concrete');
+ await page.getByLabel('Width (in)',{exact:true}).fill('1 ft');
  await page.getByLabel('Height / depth (ft)',{exact:true}).fill('8');
  await page.getByLabel('Base elevation (ft; blank unknown)',{exact:true}).fill('0');
  await page.getByLabel('Confirm drafted centreline').check();
  await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
  await page.getByText('Derive strip footings',{exact:true}).click();
- await page.getByLabel('Footing width (ft)',{exact:true}).fill('2');
- await page.getByLabel('Footing depth (ft)',{exact:true}).fill('1');
- await page.getByLabel('Footing signed offset (ft)',{exact:true}).fill('0.5');
+ await page.getByLabel('Footing width (in)',{exact:true}).fill('2 ft');
+ await page.getByLabel('Footing depth (in)',{exact:true}).fill('1 ft');
+ await page.getByLabel('Footing signed offset (in)',{exact:true}).fill('0.5 ft');
  await page.getByRole('button',{name:'Preview strip footings',exact:true}).click();
  await expect(page.getByText('1 footings · 2.9630 CY',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Apply strip footings',exact:true}).click();
@@ -285,8 +292,8 @@ test('isolated strip footing signed offset persists in source-linked preview and
 
 test('slab reference footprint remains separate from concrete volume',async({page})=>{
  await place(page,'Slab',{x:250,y:250},{x:550,y:450},'40,30');
- await page.getByLabel('Material',{exact:true}).fill('poured concrete');
- await page.getByLabel('Depth (ft)',{exact:true}).fill('0.3333333333333333');
+ await page.getByLabel('Material',{exact:true}).selectOption('poured concrete');
+ await page.getByLabel('Depth (in)',{exact:true}).fill('0.3333333333333333 ft');
  await page.getByLabel('Base elevation (ft; blank unknown)',{exact:true}).fill('0');
  await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
  const ref=page.getByLabel('Selected foundation footprint reference');
@@ -297,7 +304,7 @@ test('slab reference footprint remains separate from concrete volume',async({pag
 test('manual wall assembly assignment preserves physical identities and undo redo',async({page})=>{
  const canvas=page.locator('canvas').first();
  const properties=async(width:string,height:string,base:string)=>{
-  for(const [label,value] of [['Material','poured concrete'],['Width (ft)',width],['Height / depth (ft)',height],['Base elevation (ft; blank unknown)',base]])await page.getByLabel(label,{exact:true}).fill(value);
+  for(const [label,value] of [['Material','poured concrete'],['Width (in)',width+' ft'],['Height / depth (ft)',height],['Base elevation (ft; blank unknown)',base]])await fillFoundationField(page,label,value);
   await page.getByLabel('Confirm drafted centreline').check();
   await page.getByLabel('Start junction extension (ft)',{exact:true}).fill('0.5');
   await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
@@ -322,7 +329,7 @@ test('manual wall assembly assignment preserves physical identities and undo red
 
 test('foundation applicability excludes quantities without deleting geometry and undo restores scope',async({page})=>{
  await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
- for(const [label,value] of [['Material','poured concrete'],['Width (ft)','1'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Material','poured concrete'],['Width (in)','1 ft'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','0']])await fillFoundationField(page,label,value);
  await page.getByLabel('Confirm drafted centreline').check();await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
  await page.getByLabel('Foundation applicability',{exact:true}).selectOption('excluded');
  await page.getByLabel('Scope decision reason',{exact:true}).fill('Existing wall retained');
@@ -334,15 +341,15 @@ test('foundation applicability excludes quantities without deleting geometry and
 
 test('under-slab derived layers persist explicit nonoverlapping vertical stack',async({page})=>{
  await place(page,'Slab',{x:250,y:250},{x:550,y:450},'40,30');
- for(const [label,value] of [['Material','poured concrete'],['Depth (ft)','0.3333333333333333'],['Base elevation (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Material','poured concrete'],['Depth (in)','0.3333333333333333 ft'],['Base elevation (ft; blank unknown)','0']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
  await page.getByText('Derive foundation envelope',{exact:true}).click();
  await page.getByLabel('Derived layer type').selectOption('horizontalInsulation');
- for(const [label,value] of [['Derived layer thickness (ft)','0.25'],['Layer top below slab base (ft)','0'],['Derived layer material','foam'],['Derived layer identity','foam']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Derived layer thickness (in)','0.25 ft'],['Layer top below slab base (in)','0 ft'],['Derived layer material','eps'],['Derived layer identity','foam']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview envelope',exact:true}).click();await page.getByRole('button',{name:'Apply envelope',exact:true}).click();
  await page.getByLabel('Select foundation entity').selectOption({index:1});
  await page.getByLabel('Derived layer type').selectOption('granular');
- for(const [label,value] of [['Derived layer thickness (ft)','0.5'],['Layer top below slab base (ft)','0.25'],['Derived layer material','stone'],['Derived layer identity','stone']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Derived layer thickness (in)','0.5 ft'],['Layer top below slab base (in)','0.25 ft'],['Derived layer material','clear crushed stone'],['Derived layer identity','stone']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview envelope',exact:true}).click();await page.getByRole('button',{name:'Apply envelope',exact:true}).click();
  const saved=await snapshot(page),g=saved.find(e=>e.kind==='foundationRegion'&&e.purpose==='granular');
  expect(g).toMatchObject({elevationFt:-.75,foundation:{granularLayerId:'stone',envelopeSource:{offsetBelowSlabFt:.25}}});
@@ -350,7 +357,7 @@ test('under-slab derived layers persist explicit nonoverlapping vertical stack',
 
 test('manual vertical insulation confirms explicit opening treatment and foam thickness',async({page})=>{
  await place(page,'Vertical insulation',{x:250,y:250},{x:550,y:250},'40');
- for(const [label,value] of [['Material','foam'],['Coverage height (ft)','8'],['Layer identity','wall foam'],['Insulation thickness (ft)','0.25']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Material','eps'],['Coverage height (ft)','8'],['Layer identity','wall foam'],['Insulation thickness (in)','0.25 ft']])await fillFoundationField(page,label,value);
  await page.getByLabel('Confirm explicit route / net coverage, no remaining openings',{exact:true}).check();
  await page.getByLabel('Calculate foam board feet',{exact:true}).check();
  await page.getByLabel('Coverage opening treatment',{exact:true}).selectOption('alreadyDeducted');
@@ -364,7 +371,7 @@ test('manual vertical insulation confirms explicit opening treatment and foam th
 });
 test('manual horizontal insulation uses entered region depth for foam board feet',async({page})=>{
  await place(page,'Horizontal insulation',{x:250,y:250},{x:550,y:450},'40,30');
- for(const [label,value] of [['Material','foam'],['Depth (ft)','0.25'],['Base elevation (ft; blank unknown)','-0.25'],['Layer identity','slab foam']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Material','eps'],['Depth (in)','0.25 ft'],['Base elevation (ft; blank unknown)','-0.25'],['Layer identity','slab foam']])await fillFoundationField(page,label,value);
  await page.getByLabel('Confirm explicit route / net coverage, no remaining openings',{exact:true}).check();
  await page.getByLabel('Calculate foam board feet',{exact:true}).check();
  await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
@@ -377,11 +384,11 @@ test('irregular exterior envelope previews and applies one component per source 
  const canvas=page.locator('canvas').first();
  for(const p of [{x:200,y:200},{x:500,y:200},{x:500,y:320},{x:380,y:320},{x:380,y:440},{x:200,y:440}])await canvas.click({position:p});
  await page.getByRole('button',{name:'Finish foundation polygon',exact:true}).click();
- for(const [label,value] of [['Polygon wall thickness (ft)','1'],['Polygon wall height (ft)','8'],['Polygon wall base (ft)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Polygon wall thickness (in)','1 ft'],['Polygon wall height (ft)','8'],['Polygon wall base (ft)','0']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview polygon perimeter',exact:true}).click();await page.getByRole('button',{name:'Apply polygon perimeter',exact:true}).click();
  await page.getByLabel('Select foundation entity').selectOption({index:1});await page.getByRole('button',{name:'Select entire foundation assembly',exact:true}).click();
  await page.getByText('Derive foundation envelope',{exact:true}).click();await page.getByLabel('Complete orthogonal exterior').check();
- for(const [label,value] of [['Derived coverage height (ft)','6'],['Derived layer material','membrane'],['Derived layer identity','wp']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Derived coverage height (ft)','6'],['Derived layer material','sheet waterproofing membrane'],['Derived layer identity','wp']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview envelope',exact:true}).click();await expect(page.getByLabel('Foundation graphical preview')).toHaveText('Preview — 6 uncommitted components');
  await page.getByRole('button',{name:'Apply envelope',exact:true}).click();await expect(entities(page)).toHaveCount(13);
  const saved=await snapshot(page),derived=saved.filter(e=>e.foundation?.envelopeSource);expect(derived).toHaveLength(6);expect(new Set(derived.map(e=>e.foundation?.envelopeSource?.sourceId)).size).toBe(6);
@@ -393,11 +400,11 @@ test('irregular perimeter drainage preview and apply preserves closed source-lin
  const canvas=page.locator('canvas').first();
  for(const p of [{x:200,y:200},{x:500,y:200},{x:500,y:320},{x:380,y:320},{x:380,y:440},{x:200,y:440}])await canvas.click({position:p});
  await page.getByRole('button',{name:'Finish foundation polygon',exact:true}).click();
- for(const [label,value] of [['Polygon wall thickness (ft)','1'],['Polygon wall height (ft)','8'],['Polygon wall base (ft)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Polygon wall thickness (in)','1 ft'],['Polygon wall height (ft)','8'],['Polygon wall base (ft)','0']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview polygon perimeter',exact:true}).click();await page.getByRole('button',{name:'Apply polygon perimeter',exact:true}).click();
  await page.getByLabel('Select foundation entity').selectOption({index:1});await page.getByRole('button',{name:'Select entire foundation assembly',exact:true}).click();
  await page.getByText('Derive perimeter drainage',{exact:true}).click();
- for(const [label,value] of [['Drainage exterior offset (ft)','2'],['Drainage material','pipe'],['Drainage layer identity','drain']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Drainage exterior offset (in)','2 ft'],['Drainage material','perforated rigid pvc drainage pipe'],['Drainage layer identity','drain']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview drainage',exact:true}).click();
  await expect(page.getByLabel('Foundation graphical preview')).toHaveText('Preview — 6 uncommitted components');await expect(entities(page)).toHaveCount(7);
  await page.getByRole('button',{name:'Apply drainage',exact:true}).click();await expect(entities(page)).toHaveCount(13);
@@ -431,14 +438,14 @@ test('invalid exact face-reference placement retains actionable error and no geo
  const canvas=page.locator('canvas').first();await canvas.click({position:{x:250,y:250}});await canvas.hover({position:{x:550,y:250}});
  await page.keyboard.type('40');await page.keyboard.press('Enter');
  await expect(page.getByRole('alert')).toBeVisible();await expect(entities(page)).toHaveCount(1);
- await page.getByLabel('Face reference wall thickness').fill('1');
+ await page.getByLabel('Face reference wall thickness (in)').fill('1 ft');
  await page.getByLabel('Dimensions',{exact:true}).fill('40');await page.getByLabel('Dimensions',{exact:true}).press('Enter');
  await expect(entities(page)).toHaveCount(2);
 });
 
 test('foundation elevation reference switches preserve saved physical base',async({page})=>{
  await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
- for(const [label,value] of [['Material','poured concrete'],['Width (ft)','1'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','-8']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Material','poured concrete'],['Width (in)','1 ft'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','-8']])await fillFoundationField(page,label,value);
  await page.getByLabel('Confirm drafted centreline').check();await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
  await page.getByLabel('Elevation reference').selectOption('top');await expect(page.getByLabel('Top elevation (ft; blank unknown)',{exact:true})).toHaveValue('0');
  await page.getByLabel('Elevation reference').selectOption('base');await expect(page.getByLabel('Base elevation (ft; blank unknown)',{exact:true})).toHaveValue('-8');
@@ -487,22 +494,22 @@ test('continuous drafting displays next segment separately from last placement c
 });
 
 test('face referenced wall refuses stale thickness edit and preserves original geometry',async({page})=>{
- await page.getByRole('button',{name:'Foundation wall',exact:true}).click();await page.getByLabel('Foundation wall reference').selectOption('exterior-left');await page.getByLabel('Face reference wall thickness').fill('1');
+ await page.getByRole('button',{name:'Foundation wall',exact:true}).click();await page.getByLabel('Foundation wall reference').selectOption('exterior-left');await page.getByLabel('Face reference wall thickness (in)').fill('1 ft');
  const canvas=page.locator('canvas').first();await canvas.click({position:{x:250,y:250}});await canvas.click({position:{x:550,y:250}});await page.keyboard.type('40');await page.keyboard.press('Enter');
- const before=await snapshot(page);await page.getByLabel('Width (ft)',{exact:true}).fill('2');await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ const before=await snapshot(page);await page.getByLabel('Width (in)',{exact:true}).fill('2 ft');await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
  await expect(page.getByRole('alert').first()).toBeVisible();expect(await snapshot(page)).toEqual(before);
 });
 
 test('explicit strip replacement previews cancels and commits one undoable transaction',async({page})=>{
  await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
- for(const [label,value] of [['Material','poured concrete'],['Width (ft)','1'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Material','poured concrete'],['Width (in)','1 ft'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','0']])await fillFoundationField(page,label,value);
  await page.getByLabel('Confirm drafted centreline').check();await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
  await page.getByText('Derive strip footings',{exact:true}).click();
- await page.getByLabel('Footing width (ft)',{exact:true}).fill('2');await page.getByLabel('Footing depth (ft)',{exact:true}).fill('1');
+ await page.getByLabel('Footing width (in)',{exact:true}).fill('2 ft');await page.getByLabel('Footing depth (in)',{exact:true}).fill('1 ft');
  await page.getByRole('button',{name:'Preview strip footings',exact:true}).click();await page.getByRole('button',{name:'Apply strip footings',exact:true}).click();
  const before=await snapshot(page);
  await page.getByLabel('Select foundation entity').selectOption({index:1});
- await page.getByLabel('Replace existing strip footings',{exact:true}).check();await page.getByLabel('Footing width (ft)',{exact:true}).fill('3');
+ await page.getByLabel('Replace existing strip footings',{exact:true}).check();await page.getByLabel('Footing width (in)',{exact:true}).fill('3 ft');
  await page.getByRole('button',{name:'Preview strip footings',exact:true}).click();await expect(page.getByText('Replace 1 existing components with 1 new components.',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Cancel strip footings',exact:true}).click();expect(await snapshot(page)).toEqual(before);
  await page.getByRole('button',{name:'Preview strip footings',exact:true}).click();await page.getByRole('button',{name:'Apply strip footings',exact:true}).click();
@@ -513,7 +520,7 @@ test('explicit strip replacement previews cancels and commits one undoable trans
 
 test('coordinated foundation run dimensions commit as one history transaction',async({page})=>{
  await page.getByText('Generate rectangular foundation',{exact:true}).click();
- for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (ft)','1'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (in)','1 ft'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview perimeter',exact:true}).click();await page.getByRole('button',{name:'Apply perimeter',exact:true}).click();
  const before=await snapshot(page);await page.getByLabel('Select foundation entity').selectOption({index:1});await page.getByRole('button',{name:'Select entire foundation assembly',exact:true}).click();
  await page.getByText('Coordinated run dimensions',{exact:true}).click();
@@ -527,7 +534,7 @@ test('coordinated foundation run dimensions commit as one history transaction',a
 test('angled face-reference foundation wall preserves exact length, width, quantity and history',async({page})=>{
  await page.getByRole('button',{name:'Foundation wall',exact:true}).click();
  await page.getByLabel('Foundation wall reference').selectOption('exterior-left');
- await page.getByLabel('Face reference wall thickness').fill('1.25');
+ await page.getByLabel('Face reference wall thickness (in)').fill('1.25 ft');
  const canvas=page.locator('canvas').first();
  await canvas.click({position:{x:250,y:250}});await canvas.click({position:{x:550,y:390}});
  await page.keyboard.type('42');await page.keyboard.press('Enter');
@@ -536,7 +543,7 @@ test('angled face-reference foundation wall preserves exact length, width, quant
  expect(Math.abs(wall.end.x-wall.start.x)).toBeGreaterThan(0);expect(Math.abs(wall.end.y-wall.start.y)).toBeGreaterThan(0);
  expect(Math.hypot(wall.end.x-wall.start.x,wall.end.y-wall.start.y)).toBeCloseTo(42,6);
  expect(wall.widthFt).toBe(1.25);
- for(const [label,value] of [['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','-8']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','-8']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
  await expect(page.getByText('15.56 CY',{exact:true})).toBeVisible();
  const after=await snapshot(page);
@@ -562,7 +569,7 @@ test('continuous nonwall drafting remains active after face-reference wall tool 
 });
 test('scope applicability editor reflects selected record instead of reusing previous decision',async({page})=>{
  await page.getByText('Generate rectangular foundation',{exact:true}).click();
- for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (ft)','1'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (in)','1 ft'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview perimeter',exact:true}).click();await page.getByRole('button',{name:'Apply perimeter',exact:true}).click();
  await page.getByLabel('Select foundation entity').selectOption({index:1});
  await page.getByLabel('Foundation applicability',{exact:true}).selectOption('excluded');await page.getByLabel('Scope decision reason',{exact:true}).fill('Existing wall');
@@ -574,4 +581,167 @@ test('scope applicability editor reflects selected record instead of reusing pre
  await expect(page.getByLabel('Scope decision reason',{exact:true})).toHaveCount(0);
  await page.getByLabel('Select foundation entity').selectOption({index:1});await expect(page.getByLabel('Foundation applicability',{exact:true})).toHaveValue('excluded');
  await expect(page.getByLabel('Scope decision reason',{exact:true})).toHaveValue('Existing wall');
+});
+
+test('graphical foundation rectangle uses exact dimensions and one committed history entry',async({page})=>{
+ const canvas=page.locator('canvas').first();
+ await page.getByRole('button',{name:'Rectangle foundation',exact:true}).click();
+ await canvas.click({position:{x:250,y:250}});
+ await canvas.hover({position:{x:550,y:450}});
+ await expect(page.getByLabel('Live drafting dimensions')).toHaveText(/^Live: .* × .* ft$/);
+ await canvas.click({position:{x:550,y:450}});
+ await expect(page.getByLabel('Rectangle perimeter configuration')).toBeVisible();
+ await expect(entities(page)).toHaveCount(1);
+ await page.keyboard.type('40,30');await page.keyboard.press('Enter');
+ await expect(page.getByLabel('Live drafting dimensions')).toHaveText('Placement reference: 40.00 × 30.00 ft');
+ await fillFoundationField(page,'Rectangle wall thickness (in)','8');
+ await fillFoundationField(page,'Rectangle wall height (ft)',`8'`);
+ await fillFoundationField(page,'Rectangle wall base (ft)','0');
+ await page.getByRole('button',{name:'Preview rectangle perimeter',exact:true}).click();
+ await expect(page.getByLabel('Rectangle perimeter quantity')).toHaveText('4 walls · 27.1276 CY');
+ await expect(entities(page)).toHaveCount(1);
+ await page.getByRole('button',{name:'Apply rectangle perimeter',exact:true}).click();
+ const saved=await snapshot(page);
+ expect(saved).toHaveLength(4);
+ expect(saved.every(e=>e.foundation?.perimeterReference?.reference==='exterior')).toBe(true);
+ const trace=saved[0].foundation!.perimeterReference!.points;
+ expect(Math.abs(trace[2].x-trace[0].x)).toBeCloseTo(40,10);
+ expect(Math.abs(trace[2].y-trace[0].y)).toBeCloseTo(30,10);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
+ await expect(entities(page)).toHaveCount(1);
+ await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();
+ expect(await snapshot(page)).toEqual(saved);
+});
+
+test('continuous perimeter trace highlights closure and retains an invalid draft for recovery',async({page})=>{
+ const canvas=page.locator('canvas').first();
+ await page.getByRole('button',{name:'Foundation wall',exact:true}).click();
+ await page.getByLabel('Continuous foundation drafting').check();
+ await page.getByRole('button',{name:'Trace continuous perimeter',exact:true}).click();
+ for(const [x,y] of [[250,250],[550,250],[550,450],[400,450]])await canvas.click({position:{x,y}});
+ await canvas.hover({position:{x:253,y:250}});
+ await expect(page.getByText('Start node snapped',{exact:true})).toBeVisible();
+ await canvas.click({position:{x:253,y:250}});
+ await expect(page.getByRole('alert').filter({hasText:'Close perimeter with orthogonal edges'})).toBeVisible();
+ await expect(entities(page)).toHaveCount(1);
+ await page.getByRole('button',{name:'Remove last vertex',exact:true}).click();
+ await canvas.click({position:{x:250,y:450}});
+ await canvas.click({position:{x:250,y:250}});
+ await expect(page.getByLabel('Polygon perimeter configuration')).toBeVisible();
+ await expect(entities(page)).toHaveCount(1);
+ await page.getByRole('button',{name:'Cancel polygon perimeter',exact:true}).click();
+ await expect(page.getByLabel('Polygon perimeter configuration')).toHaveCount(0);
+ await expect(entities(page)).toHaveCount(1);
+});
+
+test('wall endpoint snap continues an independent wall without adopting its source',async({page})=>{
+ const canvas=page.locator('canvas').first();
+ await place(page,'Foundation wall',{x:250,y:250},{x:490,y:250},'10');
+ const [first]=await snapshot(page);
+ await page.getByRole('button',{name:'Select',exact:true}).click();
+ await page.getByRole('button',{name:'Foundation wall',exact:true}).click();
+ await canvas.hover({position:{x:495,y:250}});
+ await expect(page.getByText('Wall endpoint snapped',{exact:true})).toBeVisible();
+ await canvas.click({position:{x:495,y:250}});
+ await canvas.click({position:{x:490,y:490}});
+ const [before,added]=await snapshot(page);
+ if(first.kind!=='foundationWall'||added.kind!=='foundationWall')throw Error('Expected walls');
+ expect(before).toEqual(first);
+ expect(added.start).toEqual(first.end);
+ expect(added.assemblyId).not.toBe(first.assemblyId);
+});
+
+test('foundation units and catalogue preserve canonical values across unit changes',async({page})=>{
+ await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},`40' 6"`);
+ await fillFoundationField(page,'Material','poured concrete');
+ await fillFoundationField(page,'Width (in)','7 1/2');
+ await fillFoundationField(page,'Height / depth (ft)',`8' 6"`);
+ await fillFoundationField(page,'Base elevation (ft; blank unknown)','-8');
+ await page.getByLabel('Confirm drafted centreline').check();
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ const [first]=await snapshot(page);
+ expect(first).toMatchObject({widthFt:.625,heightFt:8.5,elevationFt:-8,foundation:{material:'poured concrete'}});
+ if(first.kind!=='foundationWall')throw Error('Expected wall');
+ expect(Math.hypot(first.end.x-first.start.x,first.end.y-first.start.y)).toBeCloseTo(40.5,10);
+ await page.getByRole('button',{name:'Metric (m)',exact:true}).click();
+ await expect(page.getByLabel('Width (mm)',{exact:true})).toHaveValue('190.5');
+ await expect(page.getByLabel('Height / depth (m)',{exact:true})).toHaveValue('2.5908');
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ expect((await snapshot(page))[0]).toEqual(first);
+ await expect(page.getByLabel('Material',{exact:true}).locator('option')).toHaveText(['Select material','Poured concrete']);
+});
+
+test('unsupported saved concrete and custom insulation keep their measurement classifications',async({page})=>{
+ await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
+ await fillFoundationField(page,'Material','poured concrete');
+ await fillFoundationField(page,'Width (in)','8');
+ await fillFoundationField(page,'Height / depth (ft)','8');
+ await fillFoundationField(page,'Base elevation (ft; blank unknown)','0');
+ await page.getByLabel('Confirm drafted centreline').check();
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ const doc=await projectSnapshot(page);
+ const workspace=doc.workspaces.find(w=>w.type==='foundation')!;
+ const [historical]=workspace.measurements as FoundationEntity[];
+ historical.foundation!.material='concrete block';
+ page.once('dialog',dialog=>dialog.accept());
+ await page.getByTitle('Import JSON Project').locator('input').setInputFiles({name:'historical.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(doc))});
+ await page.getByText('Not quantified',{exact:true}).waitFor();
+ await page.getByLabel('Select foundation entity').selectOption({index:1});
+ await expect(page.getByRole('option',{name:'Saved material · concrete block'})).toBeDisabled();
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ expect(await snapshot(page)).toEqual([historical]);
+ await page.getByRole('button',{name:'Horizontal insulation',exact:true}).click();
+ const canvas=page.locator('canvas').first();
+ await canvas.click({position:{x:250,y:400}});
+ await canvas.click({position:{x:450,y:550}});
+ await fillFoundationField(page,'Material','other');
+ await fillFoundationField(page,'Depth (in)','3');
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ expect((await snapshot(page)).find(e=>e.kind==='foundationRegion')?.foundation).toBeUndefined();
+ await page.getByLabel('Material description',{exact:true}).fill('Specified rigid fibreboard');
+ await page.getByLabel('Layer identity',{exact:true}).fill('separate fibreboard layer');
+ await page.getByLabel('Confirm explicit route / net coverage, no remaining openings').check();
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ expect((await snapshot(page)).find(e=>e.kind==='foundationRegion')?.foundation?.material).toBe('Specified rigid fibreboard');
+});
+
+test('calibrated graphical rectangle preserves the underlay and original trace through zoom and reopen',async({page})=>{
+ const drawing='<svg xmlns="http://www.w3.org/2000/svg" width="600" height="480"><path fill="none" stroke="red" stroke-width="3" d="M50 50H450V350H50Z"/></svg>';
+ await page.getByTitle('Import Blueprint / Floor Plan Image or PDF').locator('input').setInputFiles({name:'synthetic.svg',mimeType:'image/svg+xml',buffer:Buffer.from(drawing)});
+ await expect(page.getByTitle('Open Blueprint Underlay Settings')).toBeVisible();
+ const canvas=page.locator('canvas').first();
+ const size=await canvas.evaluate(e=>({w:e.clientWidth,h:e.clientHeight}));
+ const pixel=(x:number,y:number,feetPerPixel:number)=>{
+  const scale=Math.max(10,Math.min(60,Math.min(size.w/(600*feetPerPixel+12),size.h/(480*feetPerPixel+12))*0.85));
+  return {x:Math.round(size.w/2+(x-300)*feetPerPixel*scale),y:Math.round(size.h/2+(y-240)*feetPerPixel*scale)};
+ };
+ const fit=page.getByTitle('Zoom to Fit',{exact:true});
+ await fit.click();
+ await page.getByRole('button',{name:'Calibrate scale',exact:true}).click();
+ await canvas.click({position:pixel(50,50,50/600)});
+ page.once('dialog',dialog=>dialog.accept('40'));
+ await canvas.click({position:pixel(450,50,50/600)});
+ const foundation=(doc:ProjectDocument)=>doc.workspaces.find(w=>w.type==='foundation')!;
+ const calibrated=foundation(await projectSnapshot(page)).geometry.underlay!;
+ expect(calibrated.feetPerPixel).toBeCloseTo(.1,3);
+ await page.getByTitle('Zoom In',{exact:true}).click();
+ await fit.click();
+ await page.getByRole('button',{name:'Rectangle foundation',exact:true}).click();
+ await canvas.click({position:pixel(50,50,calibrated.feetPerPixel)});
+ await canvas.click({position:pixel(450,350,calibrated.feetPerPixel)});
+ await page.keyboard.type('40,30');await page.keyboard.press('Enter');
+ await page.getByLabel('Rectangle reference',{exact:true}).selectOption('interior');
+ await fillFoundationField(page,'Rectangle wall thickness (in)','8');
+ await fillFoundationField(page,'Rectangle wall height (ft)','8');
+ await fillFoundationField(page,'Rectangle wall base (ft)','0');
+ await page.getByRole('button',{name:'Preview rectangle perimeter',exact:true}).click();
+ const volume=(2*(8/12)*(40+30)+4*(8/12)**2)*8/27;
+ await expect(page.getByLabel('Rectangle perimeter quantity')).toHaveText('4 walls · '+volume.toFixed(4)+' CY');
+ await page.getByRole('button',{name:'Apply rectangle perimeter',exact:true}).click();
+ const saved=await projectSnapshot(page);
+ expect(foundation(saved).geometry.underlay).toEqual(calibrated);
+ await page.reload();
+ await page.getByTitle('Import JSON Project').locator('input').setInputFiles({name:'synthetic-foundation.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(saved))});
+ await expect(page.getByRole('heading',{name:'Foundation tools'})).toBeVisible();
+ expect(foundation(await projectSnapshot(page))).toEqual(foundation(saved));
 });

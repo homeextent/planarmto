@@ -1,3 +1,4 @@
+import {parseFoundationDimension, displayFoundationDimension} from '../src/engine/measurements/foundationUnits';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {rectangleBounds,orthogonalStrip,reconcileRectangularPrisms,type Prism} from '../src/engine/measurements/foundationGeometry';
@@ -485,4 +486,17 @@ test('angled intersections remain pending rather than approximate and reversed d
  assert.throws(()=>qty([a,{...a,id:'dup',physicalId:'dup',start:a.end,end:a.start}]),/Duplicate physical solid/);
  assert.ok(qty([a,{...b,elevationFt:8}]).every(r=>r.status==='measured'));
  assert.equal(qty([{...a,foundation:{...a.foundation!,joinStartFt:1}}])[0].status,'unquantified');
+});
+
+test('foundation construction dimensions parse fractional and metric inputs to canonical feet',()=>{
+ for(const [text,unit,expected] of [
+  ['8','in',8/12], ['7 1/2','in',7.5/12], ['1/2"','ft',.5/12], ["8' 6\"", 'in',8.5],
+  ['8.5 ft','mm',8.5], ["40' 6\"", 'ft',40.5], ['-152.4','mm',-.5], ['2.5908','m',8.5], ['0 mm','in',0],
+ ] as const){
+  const feet=parseFoundationDimension(text,unit);
+  assert.notEqual(feet,null);
+  near(feet!,expected);
+ }
+ for(const text of ['','--8','8..2','7 1/0','8x','2 m 3','8\' 12"'])assert.equal(parseFoundationDimension(text,'in'),null);
+ assert.equal(displayFoundationDimension(.625,'mm'),'190.5');
 });
