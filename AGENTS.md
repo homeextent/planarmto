@@ -14,3 +14,15 @@ Node 22; locked npm dependencies. Read .github/workflows/validate.yml as current
 
 ## Current authorization and stop gates
 Transition and documentation housekeeping authorized. First task is local read-only inspection and baseline/functional reproduction, safe branch cleanup per owner request, and R5 implementation plan. R5 product direction endorsed; exact defaults, material catalogue, persistence/ownership semantics and change policy require review/approval before implementation. Do not claim all local acceptance passed. Stop after baseline evidence and R5 decision proposal for owner/ChatGPT review; no R5 application edits until bounded scope approved. Once approved, implement locally in coherent increments without repeated approvals for already authorized scope; stop on material scope conflict or owner acceptance. C.1E, C.2 and release each separately gated.
+
+## Development execution and resource efficiency
+
+- Use repository documentation as the authoritative source of project context.
+- Follow mandatory reading requirements, but avoid repeatedly reviewing unchanged documentation within the same session.
+- Limit repository analysis to the approved implementation scope.
+- Prefer targeted automated tests during iterative development. Run the complete required validation suite at milestone completion, integration gates and when shared architecture is affected.
+- Summarize successful command output. Preserve complete diagnostic logs locally and inspect relevant excerpts when required.
+- Avoid reinvestigating resolved issues unless new evidence warrants reconsideration.
+- Prefer concise progress reports and consolidated implementation summaries.
+- Avoid unnecessary parallel agents, duplicated analysis and redundant test execution.
+- Resource efficiency must not supersede correctness, security, data integrity, regression coverage or existing authorization requirements.
