@@ -395,3 +395,130 @@ test('R4 bulk eaves assignment previews, cancels, applies and undoes atomically'
   await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();
   expect(roofOf(await roofSnapshot(page))).toEqual(after);
 });
+
+async function r4Hip(page:Page,exact='20,15'){
+ await rectangle(page);
+ await dimensions(page,exact);
+ await page.getByRole('button',{name:'6:12',exact:true}).click();
+ await page.getByRole('button',{name:'Generate roof skeleton',exact:true}).click();
+ const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Generate Roof Skeleton',exact:true})});
+ await panel.getByRole('button',{name:'Preview',exact:true}).click();
+ await panel.getByRole('button',{name:'Apply',exact:true}).click();
+ await expect(entities(page)).toHaveCount(14);
+}
+async function selectR4Assembly(page:Page){
+ await page.getByLabel('Select roof entity').selectOption({index:1});
+ await page.getByRole('button',{name:'Select entire roof assembly',exact:true}).click();
+ await expect(page.getByText('13 roof entities selected',{exact:true})).toBeVisible();
+}
+async function r4Drag(page:Page,x1:number,y1:number,x2:number,y2:number){
+ const b=await page.locator('canvas').first().boundingBox();
+ if(!b)throw Error('Canvas unavailable');
+ await page.mouse.move(b.x+x1,b.y+y1);
+ await page.mouse.down();
+ await page.mouse.move(b.x+x2,b.y+y2,{steps:8});
+ await page.mouse.up();
+}
+test('R4 assembly deletion confirmation cancel apply and exact undo redo',async ({page})=>{
+ await r4Hip(page);
+ const before=roofOf(await roofSnapshot(page));
+ await selectR4Assembly(page);
+ const remove=page.getByRole('button',{name:'Delete selected assembly',exact:true});
+ for(const accept of [false,true]){
+  const promise=page.waitForEvent('dialog');
+  const click=remove.click();
+  const dialog=await promise;
+  expect(dialog.message()).toContain('13 selected entities');
+  expect(dialog.message()).toContain('4 roof planes, 9 roof edges');
+  if(accept)await dialog.accept();else await dialog.dismiss();
+  await click;
+  if(!accept)expect(roofOf(await roofSnapshot(page))).toEqual(before);
+ }
+ await expect(entities(page)).toHaveCount(1);
+ expect(roofOf(await roofSnapshot(page))).toEqual([]);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
+ expect(roofOf(await roofSnapshot(page))).toEqual(before);
+ await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();
+ expect(roofOf(await roofSnapshot(page))).toEqual([]);
+});
+test('R4 directional marquee and shift toggle use roof-specific selection',async ({page})=>{
+ await r4Hip(page);
+ await r4Drag(page,240,240,750,630);
+ await expect(page.getByText('13 roof entities selected',{exact:true})).toBeVisible();
+ await page.keyboard.press('Escape');
+ await expect(page.getByRole('region',{name:'Roof selection'})).toHaveCount(0);
+ // The centre of a 20 x 15 ft hip is on its ridge; a small window contains no full edge or plane.
+ await r4Drag(page,475,410,505,445);
+ await expect(page.getByLabel('Select roof entity')).toHaveValue('');
+ await expect(page.getByRole('region',{name:'Roof selection'})).toHaveCount(0);
+ await r4Drag(page,505,445,475,410);
+ await expect(page.getByRole('region',{name:'Roof selection'})).toBeVisible();
+ await page.keyboard.press('Escape');
+ await clickCanvas(page,490,250);
+ const b=await page.locator('canvas').first().boundingBox();
+ if(!b)throw Error('Canvas unavailable');
+ await page.keyboard.down('Shift');
+ await page.mouse.click(b.x+490,b.y+610);
+ await page.keyboard.up('Shift');
+ await expect(page.getByText('2 roof entities selected',{exact:true})).toBeVisible();
+ await page.keyboard.down('Shift');
+ await page.mouse.click(b.x+490,b.y+610);
+ await page.keyboard.up('Shift');
+ await expect(page.getByRole('region',{name:'Roof selection'})).toHaveCount(0);
+ expect(roofOf(await roofSnapshot(page))).toHaveLength(13);
+});
+test('R4 derived soffit and insulation preview apply replacement protection and dependent deletion',async ({page})=>{
+ await r4Hip(page,'40,30');
+ const bulk=page.getByRole('region',{name:'Bulk perimeter assemblies'});
+ await bulk.getByLabel('Bulk soffit run',{exact:true}).selectOption('included');
+ await bulk.getByRole('checkbox',{name:/Explicitly exclude/}).check();
+ await bulk.getByRole('button',{name:'Preview assignments'}).click();
+ await bulk.getByRole('button',{name:'Apply assignments'}).click();
+ const source=roofOf(await roofSnapshot(page));
+ await selectR4Assembly(page);
+ const soffit=page.getByRole('region',{name:'Derive soffit surfaces'});
+ await soffit.getByLabel('Uniform overhang (ft)',{exact:true}).fill('2');
+ await soffit.getByRole('button',{name:'Use for all sides',exact:true}).click();
+ await soffit.getByRole('button',{name:'Preview soffit derivation'}).click();
+ await expect(soffit.getByText('Included soffit: 264.00 SF',{exact:true})).toBeVisible();
+ expect(roofOf(await roofSnapshot(page))).toEqual(source);
+ await soffit.getByRole('button',{name:'Cancel soffit derivation'}).click();
+ expect(roofOf(await roofSnapshot(page))).toEqual(source);
+ await soffit.getByRole('button',{name:'Preview soffit derivation'}).click();
+ await soffit.getByRole('button',{name:'Apply soffit derivation'}).click();
+ const first=roofOf(await roofSnapshot(page));
+ expect(first).toHaveLength(17);
+ await soffit.getByLabel('Uniform overhang (ft)',{exact:true}).fill('3');
+ await soffit.getByRole('button',{name:'Use for all sides',exact:true}).click();
+ await soffit.getByRole('button',{name:'Preview soffit derivation'}).click();
+ await expect(soffit.getByText('Included soffit: 384.00 SF',{exact:true})).toBeVisible();
+ await soffit.getByRole('button',{name:'Apply soffit derivation'}).click();
+ const revised=roofOf(await roofSnapshot(page));
+ expect(revised).toHaveLength(17);
+ expect(revised.slice(13).map(e=>e.id)).toEqual(first.slice(13).map(e=>e.id));
+ const insulation=page.getByRole('region',{name:'Derive insulation surfaces'});
+ await insulation.getByRole('button',{name:'Copy physical overhang depths from soffit'}).click();
+ await insulation.getByLabel('Derived insulation basis').selectOption('sloped');
+ await insulation.getByLabel('Derived insulation material').selectOption('closed cell foam');
+ await insulation.getByLabel('Derived insulation thickness (inches)').fill('6');
+ await insulation.getByRole('checkbox',{name:'Confirm thermal boundary'}).check();
+ await insulation.getByRole('button',{name:'Preview insulation derivation'}).click();
+ await expect(insulation.getByText('Net projected footprint: 816.00 SF',{exact:true})).toBeVisible();
+ await expect(insulation.getByText('Sloped insulation: '+(816*Math.sqrt(1.25)).toFixed(2)+' SF',{exact:true})).toBeVisible();
+ await expect(insulation.getByText('Foam: '+(816*Math.sqrt(1.25)*6).toFixed(2)+' BF',{exact:true})).toBeVisible();
+ await insulation.getByRole('button',{name:'Apply insulation derivation'}).click();
+ const both=roofOf(await roofSnapshot(page));expect(both).toHaveLength(21);
+ await page.getByLabel('Select roof entity').selectOption({index:14});
+ await expect(page.getByText('Derived surface — group controlled',{exact:true})).toBeVisible();
+ await expect(page.getByLabel('Projected width (ft)',{exact:true})).toHaveCount(0);
+ await expect(page.getByLabel('Surface basis',{exact:true})).toHaveCount(0);
+ await selectR4Assembly(page);
+ const promise=page.waitForEvent('dialog');
+ const click=page.getByRole('button',{name:'Delete selected assembly',exact:true}).click();
+ const dialog=await promise;
+ expect(dialog.message()).toContain('8 additional dependent entities');
+ await dialog.accept();await click;
+ expect(roofOf(await roofSnapshot(page))).toEqual([]);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
+ expect(roofOf(await roofSnapshot(page))).toEqual(both);
+});
