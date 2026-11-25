@@ -26,3 +26,14 @@ The owner approved five coordinated R5 specification packages. Implement R5.1 an
 - Prefer concise progress reports and consolidated implementation summaries.
 - Avoid unnecessary parallel agents, duplicated analysis and redundant test execution.
 - Resource efficiency must not supersede correctness, security, data integrity, regression coverage or existing authorization requirements.
+
+### CI monitoring and resource efficiency
+
+- Delegate CI monitoring to `gh run watch` with a 60-second polling interval.
+- Avoid frequent model-driven CI status queries.
+- Where terminal polling is necessary, use the longest practical wait interval.
+- Retrieve concise CI conclusions on success.
+- Retrieve relevant failed-step logs only when failures occur.
+- Avoid importing complete successful CI logs into the model context.
+- Do not repeatedly analyse unchanged CI status.
+- Preserve exact-candidate CI verification at all required acceptance gates.

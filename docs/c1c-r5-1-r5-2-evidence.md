@@ -48,4 +48,6 @@ Application commit: `92a8447d184be40240a9464070aadab6a6c667ba`. Node 22.23.5 loc
 
 The accepted-build probe passed, and the eight targeted refined browser cases passed with synthetic traces under `/tmp/planarmto-r5/refined-artifacts`. The first targeted iteration identified a four-quadrillionths-of-a-foot coordinate subtraction discrepancy in the new rectangle test. The test now compares derived coordinate differences to 10 decimal places, retains the exact displayed quantity check, and compares export and redo records directly. The first log is preserved at `/tmp/planarmto-r5/targeted-first.log`.
 
-Docker is unavailable locally. Isolated WordPress must be verified by exact-candidate CI. Independent source review and real-plan owner acceptance remain open. The R5.3 review must approve the persistence contract before any implementation of it.
+Docker is unavailable locally. [Exact-candidate CI #190](https://github.com/homeextent/planarmto/actions/runs/45699485901/job/139505508221) passed isolated WordPress integration on `785edbc48df8fa6e49855fc96b3de09c394f372b`. Independent source review and real-plan owner acceptance remain open. The R5.3 review must approve the persistence contract before any implementation of it.
+
+Carry forward compound feet-and-inches presentation, metric quantity presentation, persistent material attributes, coordinated multi-material generation, and actual-plan owner acceptance. Input support and synthetic regression coverage leave these acceptance items open.
