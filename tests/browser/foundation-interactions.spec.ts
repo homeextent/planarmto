@@ -15,6 +15,7 @@ async function place(page:Page,tool:string,a:{x:number;y:number},b:{x:number;y:n
  await canvas.click({position:a});await canvas.click({position:b});
  await page.keyboard.type(dimensions);await page.keyboard.press('Enter');
  await expect(entities(page)).toHaveCount(2);
+ await expect(page.getByLabel('Material',{exact:true})).toHaveCount(1);
 }
 const errors=new WeakMap<Page,string[]>();
 test.beforeEach(async({page})=>{
