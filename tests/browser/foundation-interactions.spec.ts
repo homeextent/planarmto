@@ -102,3 +102,40 @@ test('selected wall derives centred footing with atomic undo',async({page})=>{
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
  await expect(entities(page)).toHaveCount(2);
 });
+
+test('wall opening inspector validates, edits and undoes net deduction',async({page})=>{
+ await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
+ for(const [label,value] of [['Material','poured concrete'],['Width (ft)','0.6666666666666666'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByLabel('Confirm drafted centreline').check();
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ for(const [label,value] of [['Opening offset (ft)','5'],['Opening sill (ft)','2'],['Opening width (ft)','4'],['Opening height (ft)','3']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Add wall opening',exact:true}).click();
+ const summary=page.getByRole('region',{name:'Selected concrete volume breakdown'});
+ await expect(summary.getByText('7.6049 CY',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Edit opening 1',exact:true}).click();
+ await page.getByLabel('Opening offset (ft)',{exact:true}).fill('39');
+ await page.getByRole('button',{name:'Save detail edit',exact:true}).click();
+ await expect(page.getByRole('alert').filter({hasText:/outside parent/})).toBeVisible();
+ expect((await snapshot(page))[0].foundation?.wallOpenings?.[0].offsetFt).toBe(5);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
+ expect((await snapshot(page))[0].foundation?.wallOpenings??[]).toHaveLength(0);
+});
+test('slab exclusion and thickening inspector report nonadditive breakdown',async({page})=>{
+ await place(page,'Slab',{x:250,y:250},{x:550,y:450},'40,30');
+ await page.getByLabel('Material',{exact:true}).fill('poured concrete');
+ await page.getByLabel('Depth (ft)',{exact:true}).fill(String(4/12));
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ const slab=(await snapshot(page))[0];if(slab.kind!=='slab')throw Error('Expected slab');
+ const x=Math.min(...slab.polygon.map(p=>p.x)),y=Math.min(...slab.polygon.map(p=>p.y));
+ for(const [label,value] of [['Detail origin X (ft)',String(x+1)],['Detail origin Y (ft)',String(y+1)],['Detail width (ft)','6'],['Detail length (ft)','10']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Add slab exclusion',exact:true}).click();
+ await expect(page.getByRole('region',{name:'Selected concrete volume breakdown'}).getByText('14.0741 CY',{exact:true})).toBeVisible();
+ await page.getByLabel('Slab detail type').selectOption('thickening');
+ for(const [label,value] of [['Detail origin X (ft)',String(x+20)],['Detail origin Y (ft)',String(y+10)],['Detail width (ft)','10'],['Detail length (ft)','10'],['Thickening depth (ft)','1.5']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Add slab thickening',exact:true}).click();
+ const summary=page.getByRole('region',{name:'Selected concrete volume breakdown'});
+ await expect(summary.getByText('4.3210 CY',{exact:true})).toBeVisible();
+ await expect(summary.getByText('18.3951 CY',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Remove thickening 1',exact:true}).click();
+ await expect(summary.getByText('14.0741 CY',{exact:true})).toBeVisible();
+});
