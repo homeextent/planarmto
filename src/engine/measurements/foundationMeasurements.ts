@@ -4,11 +4,13 @@
 import {validateSpecialistEntities,validateContributionSet,type FoundationEntity,type QuantityContribution} from './measurementTypes';
 import {simplePolygon,projectedArea} from './roofMeasurements';
 import {extendedStrip,reconcileRectangularPrisms,orthogonalPolygonPieces,polygonEnvelope,type Prism,type Bounds} from './foundationGeometry';
+import {foundationDetails} from './foundationDetails';
 const intersects=(a:Bounds,b:Bounds)=>Math.min(a.xmax,b.xmax)>Math.max(a.xmin,b.xmin)&&Math.min(a.ymax,b.ymax)>Math.max(a.ymin,b.ymin);
-type Solid={entity:FoundationEntity;code:string;material:string;bounds:Bounds|null;prism:Prism|null;pieces:Bounds[]|null;area:number|null;reason?:string};
-export function measureFoundation(workspaceId:string,entities:FoundationEntity[]):{rows:QuantityContribution[];warnings:string[]} {
+type Solid={entity:FoundationEntity;code:string;material:string;bounds:Bounds|null;prism:Prism|null;pieces:Bounds[]|null;area:number|null;details:ReturnType<typeof foundationDetails>;reason?:string};
+export type FoundationVolumeBreakdown={elementId:string;grossCY:number|null;deductionCY:number|null;additionalCY:number|null;netCY:number|null};
+export function measureFoundation(workspaceId:string,entities:FoundationEntity[]):{rows:QuantityContribution[];warnings:string[];detailBreakdown:FoundationVolumeBreakdown[]} {
  validateSpecialistEntities('foundation',entities);
- const rows:QuantityContribution[]=[],warnings:string[]=[],solids:Solid[]=[];
+ const rows:QuantityContribution[]=[],warnings:string[]=[],solids:Solid[]=[],detailBreakdown:FoundationVolumeBreakdown[]=[];
  const add=(e:FoundationEntity,code:string,unit:QuantityContribution['unit'],basis:string,value:number|null,reason='Missing or unconfirmed foundation input')=>{
   const base={workspaceId,elementId:e.id,physicalId:e.physicalId,assemblyId:e.assemblyId,source:e.source,code,unit,basis};
   rows.push(value===null?{...base,status:'unquantified',reason}:{...base,status:'measured',quantity:value});
@@ -36,7 +38,8 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
   const height='start' in e?e.heightFt:e.depthFt;
   if(height===null)reason='Missing thickness or height';
   if(bounds&&!reason)prism={id:e.id,bounds,bottomFt:e.foundation?.baseElevationConfirmed?e.elevationFt:null,heightFt:height};
-  solids.push({entity:e,code,material,bounds,prism,pieces,area,reason});
+  const details=foundationDetails(e);
+  solids.push({entity:e,code,material,bounds,prism,pieces,area,details,reason});
  }
  // Unknown footprint can overlap any same-purpose solid. Envelopes are only broad-phase rejection, never quantity authority.
  const planOverlap=(a:Solid,b:Solid)=>!a.bounds||!b.bounds||intersects(a.bounds,b.bounds)&&(!a.pieces||!b.pieces||a.pieces.some(x=>b.pieces!.some(y=>intersects(x,y))));
@@ -47,19 +50,19 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
   for(const q of solids){
    if(s===q||s.material!==q.material)continue;
    if(!planOverlap(s,q))continue;
-   if(verticalDisjoint(s,q))continue;
+   if(verticalDisjoint(s,q)&&!s.details.hasDetails&&!q.details.hasDetails)continue;
    if(q.prism&&s.pieces&&q.pieces&&s.prism.bottomFt!==null&&s.prism.bottomFt===q.prism.bottomFt&&s.prism.heightFt===q.prism.heightFt){
     const area=(p:Bounds)=>(p.xmax-p.xmin)*(p.ymax-p.ymin),a=s.pieces.reduce((n,p)=>n+area(p),0),b=q.pieces.reduce((n,p)=>n+area(p),0);
     const shared=s.pieces.reduce((n,p)=>n+q.pieces!.reduce((m,v)=>m+Math.max(0,Math.min(p.xmax,v.xmax)-Math.max(p.xmin,v.xmin))*Math.max(0,Math.min(p.ymax,v.ymax)-Math.max(p.ymin,v.ymin)),0),0);
     if(s.code===q.code&&s.entity.assemblyId===q.entity.assemblyId&&Math.abs(a-shared)<1e-8&&Math.abs(b-shared)<1e-8)throw Error('Duplicate physical solid: '+s.entity.id+' / '+q.entity.id);
    }
-   if(!q.prism||s.prism.bottomFt===null||q.prism.bottomFt===null||!s.pieces||!q.pieces||s.pieces.length>1||q.pieces.length>1||s.code!==q.code||s.entity.assemblyId!==q.entity.assemblyId||s.entity.foundation?.material!==q.entity.foundation?.material){
+   if(s.details.hasDetails||q.details.hasDetails||!q.prism||s.prism.bottomFt===null||q.prism.bottomFt===null||!s.pieces||!q.pieces||s.pieces.length>1||q.pieces.length>1||s.code!==q.code||s.entity.assemblyId!==q.entity.assemblyId||s.entity.foundation?.material!==q.entity.foundation?.material){
     s.reason='Unresolved overlapping physical material or assembly';break;
    }
   }
  }
  // Propagate blocked state through overlapping compatible components.
- let changed=true;while(changed){changed=false;for(const s of solids)if(s.prism&&!s.reason&&solids.some(q=>q!==s&&q.reason&&q.material===s.material&&planOverlap(s,q)&&!verticalDisjoint(s,q))){s.reason='Connected overlap requires reconciliation';changed=true}}
+ let changed=true;while(changed){changed=false;for(const s of solids)if(s.prism&&!s.reason&&solids.some(q=>q!==s&&q.reason&&q.material===s.material&&planOverlap(s,q)&&(!verticalDisjoint(s,q)||s.details.hasDetails||q.details.hasDetails))){s.reason='Connected overlap requires reconciliation';changed=true}}
  const groups=new Map<string,Solid[]>();
  for(const s of solids)if(s.prism&&!s.reason){const key=JSON.stringify([s.code,s.entity.assemblyId,s.entity.foundation?.material]);const g=groups.get(key)||[];g.push(s);groups.set(key,g)}
  const results=new Map<string,{volumeCF:number|null;reason?:string}>();
@@ -77,8 +80,14 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
  }
  for(const s of solids){
   const result=results.get(s.entity.id),reason=s.reason||result?.reason;
-  add(s.entity,s.code,'CY','validated footprint and geometric installed volume',result?.volumeCF==null?null:result.volumeCF/27,reason);
+  const gross=result?.volumeCF??null,d=s.details;
+  const net=gross===null||d.deductionCF===null||d.additionalCF===null?null:gross-d.deductionCF+d.additionalCF;
+  detailBreakdown.push({elementId:s.entity.id,grossCY:gross===null?null:gross/27,deductionCY:gross===null||d.deductionCF===null?null:d.deductionCF/27,additionalCY:gross===null||d.additionalCF===null?null:d.additionalCF/27,netCY:net===null?null:net/27});
+  if(net!==null&&net<0)throw Error('Negative net foundation volume');
+  add(s.entity,s.code,'CY','net geometric installed volume',net===null?null:net/27,reason);
+  if(s.entity.kind==='padFooting')add(s.entity,'foundation.footing.pad.count','EA','reference pad count',net===null?null:1,reason);
+
   if(reason)warnings.push(s.entity.id+': '+reason);
  }
- validateContributionSet(rows);return {rows,warnings};
+ validateContributionSet(rows);return {rows,warnings,detailBreakdown};
 }

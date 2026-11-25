@@ -30,7 +30,10 @@ export type RoofEntity = Identity & (
   | { kind: 'roofSurface'; derivation?: RoofDerivationMetadata; polygon: Point[]; purpose: 'soffit'|'insulation'; pitchRise: number | null; depthFt?: number; insulationType?: string; surfaceBasis?: 'horizontal'|'sloped' }
 );
 /** Explicit v3 foundation semantics; absent metadata on older records is not confirmation. */
-export type FoundationMetadata = { version:1; material:string; baseElevationConfirmed?:true; centrelineConfirmed?:true; joinStartFt?:number; joinEndFt?:number };
+export type WallOpening={id:string;offsetFt:number;widthFt:number;sillFt:number;heightFt:number};
+export type SlabOpening={id:string;polygon:Point[]};
+export type SlabThickening={id:string;polygon:Point[];depthFt:number;basis:'total'|'additional'};
+export type FoundationMetadata = { wallOpenings?:WallOpening[]; slabOpenings?:SlabOpening[]; slabThickenings?:SlabThickening[]; version:1; material:string; baseElevationConfirmed?:true; centrelineConfirmed?:true; joinStartFt?:number; joinEndFt?:number };
 export type FoundationEntity = Identity & { foundation?:FoundationMetadata } & (
   | { kind: 'foundationWall'|'stripFooting'; start: Point; end: Point; widthFt: number | null; heightFt: number | null; elevationFt: number | null }
   | { kind: 'padFooting'|'slab'|'foundationRegion'; polygon: Point[]; depthFt: number | null; purpose: 'concrete'|'insulation'|'excavation'|'backfill'|'granular'; elevationFt: number | null }
@@ -101,6 +104,11 @@ export function validateSpecialistEntities(type: string, entities: unknown): ass
       check(type==='foundation'&&obj(f)&&f.version===1&&str(f.material),'invalid foundation metadata');
       check(f.baseElevationConfirmed===undefined||f.baseElevationConfirmed===true,'invalid foundation datum confirmation');
       check(f.centrelineConfirmed===undefined||((e.kind==='foundationWall'||e.kind==='stripFooting')&&f.centrelineConfirmed===true),'invalid foundation centreline confirmation');
+      if(f.wallOpenings!==undefined)check(e.kind==='foundationWall'&&Array.isArray(f.wallOpenings)&&f.wallOpenings.every(o=>obj(o)&&str(o.id)&&num(o.offsetFt)&&o.offsetFt>=0&&num(o.widthFt)&&o.widthFt>0&&num(o.sillFt)&&o.sillFt>=0&&num(o.heightFt)&&o.heightFt>0),'invalid wall openings');
+      if(f.slabOpenings!==undefined)check(e.kind==='slab'&&Array.isArray(f.slabOpenings)&&f.slabOpenings.every(o=>obj(o)&&str(o.id)&&polygon(o.polygon)),'invalid slab openings');
+      if(f.slabThickenings!==undefined)check(e.kind==='slab'&&Array.isArray(f.slabThickenings)&&f.slabThickenings.every(o=>obj(o)&&str(o.id)&&polygon(o.polygon)&&num(o.depthFt)&&o.depthFt>0&&['total','additional'].includes(o.basis)),'invalid slab thickening');
+      const detailIds=[...(f.wallOpenings??[]),...(f.slabOpenings??[]),...(f.slabThickenings??[])].map(o=>o.id);
+      check(new Set(detailIds).size===detailIds.length,'duplicate foundation detail ID');
       for(const k of ['joinStartFt','joinEndFt'])check(f[k]===undefined||((e.kind==='foundationWall'||e.kind==='stripFooting')&&f.centrelineConfirmed===true&&num(f[k])&&f[k]>=0),'invalid foundation junction extension');
     }
     switch(e.kind) {
