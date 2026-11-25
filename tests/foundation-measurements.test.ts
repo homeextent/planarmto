@@ -288,3 +288,27 @@ test('manual horizontal foam uses canonical region depth and does not invent ope
  e.foundation!.coverage=manualFoundationCoverage(e,{layer:'foam',confirmed:true,foam:true,thicknessFt:1,openingTreatment:'none'});
  assert.equal(e.foundation!.coverage!.openingTreatment,undefined);const rows=qty([e]);assert.ok(rows.every(r=>r.status==='measured'));if(rows[1].status==='measured')near(rows[1].quantity,3600);
 });
+
+import {orthogonalExteriorEdges} from '../src/engine/measurements/foundationExteriorRoute';
+test('irregular L T U exterior envelope uses exact perimeter length and retains source mapping',()=>{
+ const shapes=[
+ [{x:0,y:0},{x:40,y:0},{x:40,y:20},{x:20,y:20},{x:20,y:40},{x:0,y:40}],
+ [{x:0,y:0},{x:40,y:0},{x:40,y:10},{x:25,y:10},{x:25,y:40},{x:15,y:40},{x:15,y:10},{x:0,y:10}],
+ [{x:0,y:0},{x:40,y:0},{x:40,y:40},{x:30,y:40},{x:30,y:10},{x:10,y:10},{x:10,y:40},{x:0,y:40}]
+ ];
+ let i=0;const id=()=> 'irrenv'+(++i);
+ for(const original of shapes)for(const outline of [original,[...original].reverse()]){
+ const walls=generateOrthogonalFoundationPerimeter(outline,'exterior',1,8,-8,id),ids=walls.map(e=>e.id);
+ const perimeter=outline.reduce((n,a,j)=>n+Math.hypot(a.x-outline[(j+1)%outline.length].x,a.y-outline[(j+1)%outline.length].y),0);
+ const edges=orthogonalExteriorEdges(walls,[...ids].reverse());assert.equal(edges.length,ids.length);
+ const f=deriveRectangularEnvelope(walls,ids,{purpose:'verticalInsulation',material:'foam',layerId:'foam',heightFt:6,depthFt:.25,foam:true},id);
+ const rows=qty([...walls,...f]);for(const [code,value] of [['foundation.insulation.area',perimeter*6],['foundation.insulation.foam',perimeter*18]] as const){const subset=rows.filter(r=>r.code===code);assert.equal(subset.length,ids.length);assert.ok(subset.every(r=>r.status==='measured'));near(subset.reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),value)}
+ assert.throws(()=>qty([...walls,...f.slice(1)]),/Incomplete/);
+ assert.equal(planFoundationDeletion([...walls,...f],[walls[0].id]).remaining.length,walls.length-1);
+ }
+});
+test('irregular envelope rejects partial loop and inconsistent confirmed elevations',()=>{
+ let i=0;const id=()=> 'irrenv'+(++i),walls=generateOrthogonalFoundationPerimeter(lshape,'exterior',1,8,0,id),ids=walls.map(e=>e.id),config={purpose:'waterproofing' as const,material:'membrane',layerId:'wp',heightFt:6};
+ assert.throws(()=>deriveRectangularEnvelope(walls,ids.slice(1),config,id));
+ const changed=walls.map((e,i)=>i===0?{...e,elevationFt:-1}:e);assert.throws(()=>deriveRectangularEnvelope(changed,ids,config,id),/equal confirmed wall bases/);
+});

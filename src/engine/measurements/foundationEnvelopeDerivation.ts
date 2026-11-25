@@ -1,3 +1,4 @@
+import {orthogonalExteriorEdges} from './foundationExteriorRoute';
 import type {FoundationEntity,FoundationEnvelopeSource} from './measurementTypes';
 import {rectangularExteriorRoute} from './foundationDrainageDerivation';
 import {simplePolygon} from './roofMeasurements';
@@ -12,12 +13,13 @@ function geometry(source:FoundationEntity,s:FoundationEnvelopeSource,id:string,a
   if(source.foundation.wallOpenings?.length)throw Error('Wall openings require explicit net coverage segments');
   let face=faceToCentreline(source.start,source.end,source.widthFt,s.side);
   if(s.perimeterWallIds){
-   const perimeter=rectangularExteriorRoute(entities,s.perimeterWallIds,0);
+   const perimeter=s.perimeterWallIds.length===4?rectangularExteriorRoute(entities,s.perimeterWallIds,0):null;
    const walls=s.perimeterWallIds.map(id=>entities.find(e=>e.id===id)!);
-   if(walls.some(e=>e.kind!=='foundationWall'||!e.foundation?.baseElevationConfirmed||e.elevationFt===null||e.heightFt===null||e.foundation.wallOpenings?.length||!near(e.elevationFt,source.elevationFt??Infinity)||!near(e.heightFt,source.heightFt!)))throw Error('Rectangular envelope requires equal confirmed wall bases and heights, without openings');
-   const match=perimeter.map((start,i)=>({start,end:perimeter[(i+1)%4]})).find(e=>near(e.start.x,e.end.x)?near(face.start.x,e.start.x)&&near(face.end.x,e.start.x):near(face.start.y,e.start.y)&&near(face.end.y,e.start.y));
+   if(walls.some(e=>e.kind!=='foundationWall'||!e.foundation?.baseElevationConfirmed||e.elevationFt===null||e.heightFt===null||e.foundation.wallOpenings?.length||!near(e.elevationFt,source.elevationFt??Infinity)||!near(e.heightFt,source.heightFt!)))throw Error('Exterior envelope requires equal confirmed wall bases and heights, without openings');
+   const edges=perimeter?perimeter.map((start,i)=>({start,end:perimeter[(i+1)%4]})):orthogonalExteriorEdges(entities,s.perimeterWallIds).filter(e=>e.sourceId===source.id);
+   const match=edges.find(e=>near(e.start.x,e.end.x)?near(face.start.x,e.start.x)&&near(face.end.x,e.start.x):near(face.start.y,e.start.y)&&near(face.end.y,e.start.y));
    if(!match)throw Error('Selected wall face is not exterior');
-   face=match;
+   face={start:match.start,end:match.end};
   }else{
    if(source.foundation.joinStartFt||source.foundation.joinEndFt)throw Error('Joined wall faces require explicit corner reconciliation');
    extendedStrip(source.start,source.end,source.widthFt);
@@ -42,13 +44,14 @@ export function deriveFoundationEnvelope(entities:FoundationEntity[],ids:string[
 /** Complete exterior wall loop only; corners terminate at the actual outer vertices. */
 export function deriveRectangularEnvelope(entities:FoundationEntity[],ids:string[],config:Config,id:()=>string):FoundationEntity[]{
  if(!['waterproofing','verticalInsulation'].includes(config.purpose)||!config.material.trim()||!config.layerId.trim())throw Error('Specify exterior coverage material and layer');
- const perimeterWallIds=[...ids].sort(),p=rectangularExteriorRoute(entities,perimeterWallIds,0);
+ const perimeterWallIds=[...ids].sort(),p=ids.length===4?rectangularExteriorRoute(entities,perimeterWallIds,0):null;
+ const edges=p?p.map((start,i)=>({start,end:p[(i+1)%4],sourceId:null})):orthogonalExteriorEdges(entities,perimeterWallIds);
  if(entities.some(e=>{const s=e.foundation?.envelopeSource;return s&&ids.includes(s.sourceId)&&s.purpose===config.purpose&&s.layerId===config.layerId}))throw Error('Remove existing derived layer before regenerating');
  const groupId=id(),assemblyId=id();
  return perimeterWallIds.map(sourceId=>{
   const source=entities.find(e=>e.id===sourceId)!;
   if(source.kind!=='foundationWall'||source.widthFt===null)throw Error('Expected confirmed wall');
-  const side=(['left','right'] as const).find(side=>{const f=faceToCentreline(source.start,source.end,source.widthFt!,side);return p.some((a,i)=>{const b=p[(i+1)%4];return near(a.x,b.x)?near(f.start.x,a.x)&&near(f.end.x,a.x):near(f.start.y,a.y)&&near(f.end.y,a.y)})});
+  const side=(['left','right'] as const).find(side=>{const f=faceToCentreline(source.start,source.end,source.widthFt!,side);return edges.some(({start:a,end:b,sourceId:id})=>(id===null||id===sourceId)&&(near(a.x,b.x)?near(f.start.x,a.x)&&near(f.end.x,a.x):near(f.start.y,a.y)&&near(f.end.y,a.y)))});
   if(!side)throw Error('Cannot identify exterior wall face');
   return geometry(source,{...config,side,version:1,sourceId,groupId,perimeterWallIds},id(),assemblyId,entities);
  });
@@ -63,5 +66,5 @@ export function validateEnvelopeSources(entities:FoundationEntity[]):void{
  const signature=(q:FoundationEntity)=>JSON.stringify(['polygon' in q?q.polygon:[q.start,q.end],'depthFt' in q?q.depthFt:null,'heightFt' in q?q.heightFt:null,'elevationFt' in q?q.elevationFt:null,q.foundation?.material,q.foundation?.baseElevationConfirmed,q.foundation?.coverage?.layerId,q.foundation?.coverage?.confirmed,q.foundation?.coverage?.openingTreatment,q.foundation?.coverage?.foam,q.foundation?.coverage?.thicknessFt,q.foundation?.granularLayerId]);
  if(signature(e)!==signature(expected))throw Error('Derived envelope is stale; remove or regenerate before editing source');
  }
- for(const g of perimeters.values())if(g.length!==4||new Set(g.map(s=>s.sourceId)).size!==4||g[0].perimeterWallIds!.some(id=>!g.some(s=>s.sourceId===id)))throw Error('Incomplete rectangular envelope group');
+ for(const g of perimeters.values())if(g.length!==g[0].perimeterWallIds!.length||new Set(g.map(s=>s.sourceId)).size!==g.length||g[0].perimeterWallIds!.some(id=>!g.some(s=>s.sourceId===id)))throw Error('Incomplete exterior envelope group');
 }

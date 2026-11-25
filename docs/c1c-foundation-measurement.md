@@ -39,3 +39,6 @@ CI #167 verified applicability (239/239). Explicit horizontal insulation and gra
 
 ### R2 manual coverage controls
 CI #168 verified under-slab ownership (243/243). Manual coverage editor preserves explicit layer, confirmed state, foam flag, vertical thickness and opening-treatment state. Missing treatment remains pending; historical alreadyDeducted remains pending until operator explicitly confirms actual net segments. No implicit reset to none. Horizontal foam BF uses canonical region depth, vertical foam BF uses explicit coverage thickness; missing thickness withholds BF independently of confirmed SF. Existing source-linked geometry validation remains authoritative.
+
+### R2 irregular exterior envelope
+CI #169 verified manual coverage (248/248). Exterior envelope derives one actual exterior face per source wall from a complete uniform simple orthogonal loop of 4–64 walls, exact corner offsets and source-edge mapping. Rectangular legacy orientation is preserved. Requires compatible uniform wall width, half-width corner extensions, equal confirmed bases/heights, no openings. Branched, incomplete, multiple loops or topology-changing offsets are refused. Existing source-linked group validation and deletion remain atomic; irregular drainage uses the same route geometry in the next increment.

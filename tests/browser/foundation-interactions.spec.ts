@@ -223,7 +223,7 @@ test('rectangular exterior waterproofing measures continuous outer faces',async(
  for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (ft)','0.6666666666666666'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
  await page.getByRole('button',{name:'Preview perimeter',exact:true}).click();await page.getByRole('button',{name:'Apply perimeter',exact:true}).click();
  await page.getByLabel('Select foundation entity').selectOption({index:1});await page.getByRole('button',{name:'Select entire foundation assembly',exact:true}).click();
- await page.getByText('Derive foundation envelope',{exact:true}).click();await page.getByLabel('Complete rectangular exterior').check();
+ await page.getByText('Derive foundation envelope',{exact:true}).click();await page.getByLabel('Complete orthogonal exterior').check();
  for(const [label,value] of [['Derived coverage height (ft)','6'],['Derived layer material','membrane'],['Derived layer identity','wp']])await page.getByLabel(label,{exact:true}).fill(value);
  await page.getByRole('button',{name:'Preview envelope',exact:true}).click();await expect(page.getByText('840.0000 SF',{exact:true})).toBeVisible();await expect(page.getByLabel('Foundation graphical preview')).toHaveText('Preview — 4 uncommitted components');
  await page.getByRole('button',{name:'Apply envelope',exact:true}).click();await expect(entities(page)).toHaveCount(9);
@@ -365,4 +365,20 @@ test('manual horizontal insulation uses entered region depth for foam board feet
  await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
  await expect(page.getByText('1200.00 SF',{exact:true})).toBeVisible();await expect(page.getByText('3600.00 BF',{exact:true})).toBeVisible();
  expect((await snapshot(page))[0].foundation?.coverage).toMatchObject({layerId:'slab foam',confirmed:true,foam:true});
+});
+
+test('irregular exterior envelope previews and applies one component per source wall',async({page})=>{
+ await page.getByRole('button',{name:'Polygon foundation perimeter',exact:true}).click();
+ const canvas=page.locator('canvas').first();
+ for(const p of [{x:200,y:200},{x:500,y:200},{x:500,y:320},{x:380,y:320},{x:380,y:440},{x:200,y:440}])await canvas.click({position:p});
+ await page.getByRole('button',{name:'Finish foundation polygon',exact:true}).click();
+ for(const [label,value] of [['Polygon wall thickness (ft)','1'],['Polygon wall height (ft)','8'],['Polygon wall base (ft)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Preview polygon perimeter',exact:true}).click();await page.getByRole('button',{name:'Apply polygon perimeter',exact:true}).click();
+ await page.getByLabel('Select foundation entity').selectOption({index:1});await page.getByRole('button',{name:'Select entire foundation assembly',exact:true}).click();
+ await page.getByText('Derive foundation envelope',{exact:true}).click();await page.getByLabel('Complete orthogonal exterior').check();
+ for(const [label,value] of [['Derived coverage height (ft)','6'],['Derived layer material','membrane'],['Derived layer identity','wp']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Preview envelope',exact:true}).click();await expect(page.getByLabel('Foundation graphical preview')).toHaveText('Preview — 6 uncommitted components');
+ await page.getByRole('button',{name:'Apply envelope',exact:true}).click();await expect(entities(page)).toHaveCount(13);
+ const saved=await snapshot(page),derived=saved.filter(e=>e.foundation?.envelopeSource);expect(derived).toHaveLength(6);expect(new Set(derived.map(e=>e.foundation?.envelopeSource?.sourceId)).size).toBe(6);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();await expect(entities(page)).toHaveCount(7);
 });
