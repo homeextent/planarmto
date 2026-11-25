@@ -28,7 +28,7 @@ export function validateDrainageSources(entities:FoundationEntity[]):void{
  const groups=new Map<string,FoundationEntity[]>(),owners=new Map<string,string>();
  for(const e of entities){const s=e.foundation?.drainageSource;if(!s)continue;for(const id of s.wallIds){if(owners.has(id)&&owners.get(id)!==s.groupId)throw Error('Duplicate derived perimeter drainage source');owners.set(id,s.groupId)}const g=groups.get(s.groupId)??[];g.push(e);groups.set(s.groupId,g)}
  for(const g of groups.values()){
- const first=g[0],s=first.foundation!.drainageSource!,p=route(entities,s.wallIds,s.offsetFt);
+ const first=g[0],s=first.foundation!.drainageSource!,p=rectangularExteriorRoute(entities,s.wallIds,s.offsetFt);
  if(g.length!==4||new Set(g.map(e=>e.foundation!.drainageSource!.edge)).size!==4)throw Error('Incomplete derived drainage group');
  for(const e of g){const d=e.foundation!.drainageSource!;
  if(e.kind!=='foundationLine'||e.purpose!=='drainage'||e.assemblyId!==first.assemblyId||JSON.stringify([...d.wallIds].sort())!==JSON.stringify([...s.wallIds].sort())||d.offsetFt!==s.offsetFt||d.material!==s.material||d.layerId!==s.layerId||!same(e.start,p[d.edge])||!same(e.end,p[(d.edge+1)%4])||e.foundation?.material!==s.material||e.foundation.coverage?.layerId!==s.layerId||!e.foundation.coverage.confirmed)throw Error('Derived drainage is stale; remove or regenerate the group before editing its source');
