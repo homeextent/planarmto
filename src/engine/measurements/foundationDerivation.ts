@@ -37,6 +37,7 @@ export function validateStripSources(entities:FoundationEntity[]):void{
 export function foundationAssemblyIds(entities:FoundationEntity[],id:string):string[]{const e=entities.find(q=>q.id===id);return e?entities.filter(q=>q.assemblyId===e.assemblyId&&q.kind===e.kind).map(q=>q.id):[]}
 export function planFoundationDeletion(entities:FoundationEntity[],selectedIds:string[]){
  const selected=new Set(selectedIds),groups=new Set(entities.filter(e=>e.foundation?.stripSource&&(selected.has(e.id)||selected.has(e.foundation.stripSource.wallId))).map(e=>e.foundation!.stripSource!.groupId));
- const removed=entities.filter(e=>selected.has(e.id)||!!e.foundation?.stripSource&&groups.has(e.foundation.stripSource.groupId));
+ const envelopeGroups=new Set(entities.filter(e=>e.foundation?.envelopeSource&&(selected.has(e.id)||selected.has(e.foundation.envelopeSource.sourceId))).map(e=>e.foundation!.envelopeSource!.groupId));
+ const removed=entities.filter(e=>selected.has(e.id)||!!e.foundation?.stripSource&&groups.has(e.foundation.stripSource.groupId)||!!e.foundation?.envelopeSource&&envelopeGroups.has(e.foundation.envelopeSource.groupId));
  const ids=new Set(removed.map(e=>e.id));return {removed,dependentCount:removed.filter(e=>!selected.has(e.id)).length,remaining:entities.filter(e=>!ids.has(e.id))};
 }

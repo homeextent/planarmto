@@ -168,3 +168,21 @@ test('wall face drafting stores canonical offset and preserves source length thr
  expect(e.end.x-e.start.x).toBeCloseTo(40,6);
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();await expect(entities(page)).toHaveCount(1);
 });
+
+test('selected wall derives waterproofing coverage with atomic undo',async({page})=>{
+ await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
+ for(const [label,value] of [['Material','poured concrete'],['Width (ft)','0.6666666666666666'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByLabel('Confirm drafted centreline').check();
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ await page.getByText('Derive foundation envelope',{exact:true}).click();
+ await page.getByLabel('Derived coverage height (ft)',{exact:true}).fill('6');
+ await page.getByLabel('Derived layer material',{exact:true}).fill('membrane');
+ await page.getByLabel('Derived layer identity',{exact:true}).fill('wp');
+ await page.getByRole('button',{name:'Preview envelope',exact:true}).click();
+ await expect(page.getByText('240.0000 SF',{exact:true})).toBeVisible();
+ await expect(entities(page)).toHaveCount(2);
+ await page.getByRole('button',{name:'Apply envelope',exact:true}).click();
+ await expect(entities(page)).toHaveCount(3);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
+ await expect(entities(page)).toHaveCount(2);
+});
