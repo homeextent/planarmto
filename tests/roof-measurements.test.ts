@@ -124,3 +124,98 @@ test('free wall length edit preserves anchor and rejects connected endpoint or o
  assert.throws(()=>resizeWallSegment({...state,nodes:[...state.nodes,{id:'c',x:10,y:10}],walls:[w,{...w,id:'w2',startNodeId:'b',endNodeId:'c'}]},'w',40),/Connected/);
  assert.throws(()=>resizeWallSegment({...state,apertures:[{id:'o',wallId:'w',offset:5,width:3,height:7,type:'door_passage'}]},'w',6),/opening/);
 });
+
+import {rectangularRoof,insetRoof,thermalRectangles,thermalPieces,type Bounds,type Depths} from '../src/engine/measurements/roofDerivation';
+const outer:Bounds={xmin:0,ymin:0,xmax:40,ymax:30};
+const uniform=(d:number):Depths=>({north:d,east:d,south:d,west:d});
+const ids=(es:RoofEntity[])=>es.filter(e=>e.kind==='roofPlane').map(e=>e.id);
+test('R4 uniform inset conserves area and reconciles four corners',()=>{
+ const result=insetRoof(outer,uniform(2));
+ assert.deepEqual(result.inner,{xmin:2,ymin:2,xmax:38,ymax:28});
+ near(result.interiorSF,936);near(result.interiorLF,124);near(result.overhangSF,264);
+ assert.deepEqual(Object.fromEntries(result.pieces.map(p=>[p.side,p.projectedSF])),{north:80,east:52,south:80,west:52});
+ const surfaces:RoofEntity[]=result.pieces.map(p=>({...base(p.side),kind:'roofSurface',purpose:'soffit',polygon:p.polygon,surfaceBasis:'horizontal',pitchRise:0}));
+ near(value(surfaces,'roof.soffit.area'),264);
+});
+test('R4 nonuniform depths and explicit zero overhang',()=>{
+ const result=insetRoof(outer,{west:1,east:2,north:3,south:0});
+ assert.deepEqual(result.inner,{xmin:1,ymin:3,xmax:38,ymax:30});
+ near(result.interiorSF,999);near(result.overhangSF,201);
+ assert.deepEqual(Object.fromEntries(result.pieces.map(p=>[p.side,p.projectedSF])),{north:120,east:54,west:27});
+ const zero=insetRoof(outer,uniform(0));near(zero.interiorSF,1200);assert.deepEqual(zero.pieces,[]);
+});
+test('R4 invalid and missing overhang depths refuse rather than default to zero',()=>{
+ for(const d of [-1,NaN,Infinity,15,20])assert.throws(()=>insetRoof(outer,uniform(d)));
+ assert.throws(()=>insetRoof(outer,{north:2,east:2,south:2} as Depths),/every side/);
+});
+test('R4 complete hip and gable outlines require reconciled classified exterior sides',()=>{
+ for(const config of [{type:'hip'},{type:'gable',ridge:'horizontal'},{type:'gable',ridge:'vertical'},{type:'shed'}] as Partial<RoofConfig>[]){
+  const es=generated(40,30,config);const r=rectangularRoof(es,ids(es));
+  assert.deepEqual(r.outer,outer);
+  assert.ok(Object.values(r.boundary).every(b=>b.edgeIds.length>0&&b.soffit==='unspecified'));
+ }
+ const flat=generated(40,30,{type:'flat',pitch:0});
+ assert.throws(()=>rectangularRoof(flat,ids(flat)),/Classify/);
+ const classified=flat.map(e=>e.kind==='roofEdge'?{...e,edgeType:'parapet' as const}:e);
+ assert.deepEqual(rectangularRoof(classified,ids(classified)).outer,outer);
+});
+test('R4 irregular, gapped, overlapping and unresolved roof selection refused',()=>{
+ const l=plane('l',[{x:0,y:0},{x:40,y:0},{x:40,y:15},{x:20,y:15},{x:20,y:30},{x:0,y:30}]);
+ assert.throws(()=>rectangularRoof([l],['l']),/fill a rectangle/);
+ const a=plane('a',rect(0,0,10,30)),b=plane('b',rect(20,0,20,30));
+ assert.throws(()=>rectangularRoof([a,b],['a','b']),/fill a rectangle/);
+ assert.throws(()=>rectangularRoof([a,plane('c',rect(5,0,20,30))],['a','c']),/Overlapping/);
+ assert.throws(()=>rectangularRoof([plane('p')],['p']),/Classify/);
+ assert.throws(()=>rectangularRoof([plane('p')],['p','p']),/distinct/);
+});
+test('R4 mixed soffit applicability is explicit; split side conflict refused',()=>{
+ const es=generated(40,30,{type:'gable',ridge:'horizontal'});
+ const exterior=es.filter(e=>e.kind==='roofEdge'&&e.planeIds.length===1);
+ const east=exterior.filter(e=>e.start.x===40&&e.end.x===40);
+ assert.equal(east.length,2);
+ const modified=es.map(e=>e.id===east[0].id&&e.kind==='roofEdge'?{...e,applicability:{...e.applicability,soffit:'included' as const}}:e);
+ assert.throws(()=>rectangularRoof(modified,ids(modified)),/Conflicting soffit applicability/);
+ const assigned=generated(40,30).map(e=>e.kind==='roofEdge'&&e.edgeType==='eave'?{...e,applicability:{...e.applicability,soffit:e.start.y===0&&e.end.y===0?'included' as const:'excluded' as const}}:e);
+ const r=rectangularRoof(assigned,ids(assigned));assert.equal(r.boundary.north.soffit,'included');assert.equal(r.boundary.east.soffit,'excluded');
+ near(insetRoof(r.outer,uniform(2)).pieces.filter(p=>r.boundary[p.side].soffit==='included').reduce((n,p)=>n+p.projectedSF,0),80);
+});
+test('R4 horizontal and hip deck insulation analytical quantities',()=>{
+ const es=generated(40,30);
+ const r=rectangularRoof(es,ids(es)),inset=insetRoof(r.outer,uniform(2));
+ const rs=thermalRectangles(inset.inner,[]);
+ const horizontal=thermalPieces(rs,r.planes,'horizontal');
+ near(horizontal.reduce((n,p)=>n+p.actualSF!,0),936);near(horizontal.reduce((n,p)=>n+p.actualSF!*6,0),5616);
+ near(horizontal.reduce((n,p)=>n+p.actualSF!*.5,0),468);
+ const sloped=thermalPieces(rs,r.planes,'sloped');
+ assert.equal(sloped.length,4);near(sloped.reduce((n,p)=>n+p.projectedSF,0),936);
+ near(sloped.reduce((n,p)=>n+p.actualSF!,0),936*Math.sqrt(1.25));
+ const surfaces:RoofEntity[]=sloped.map((p,i)=>({...base('thermal-'+i),kind:'roofSurface',purpose:'insulation',polygon:p.polygon,surfaceBasis:'sloped',pitchRise:p.pitchRise,insulationType:'closed cell foam',depthFt:.5}));
+ near(value(surfaces,'roof.insulation.sloped.volume'),936*Math.sqrt(1.25)*6);
+});
+test('R4 exclusions partition footprint without overlap and reject invalid exclusions',()=>{
+ const inner=insetRoof(outer,uniform(2)).inner;
+ const exclusion={xmin:18,ymin:8,xmax:38,ymax:18};
+ const rs=thermalRectangles(inner,[exclusion]);
+ const pieces=thermalPieces(rs,[],'horizontal');
+ near(pieces.reduce((n,p)=>n+p.projectedSF,0),736);
+ const surfaces:RoofEntity[]=pieces.map((p,i)=>({...base('thermal-'+i),kind:'roofSurface',purpose:'insulation',polygon:p.polygon,surfaceBasis:'horizontal',pitchRise:0,insulationType:'blown cellulose'}));
+ near(value(surfaces,'roof.insulation.horizontal'),736);
+ assert.throws(()=>thermalRectangles(inner,[exclusion,exclusion]),/overlap/);
+ assert.throws(()=>thermalRectangles(inner,[outer]),/inside/);
+ assert.throws(()=>thermalRectangles(inner,[inner]),/entire/);
+});
+test('R4 mixed roof pitches and missing pitch preserve individual clipped contributions',()=>{
+ const rs=thermalRectangles(insetRoof(outer,uniform(2)).inner,[]);
+ const a=plane('a',rect(0,0,20,30),4),b=plane('b',rect(20,0,20,30),8);
+ const ps=thermalPieces(rs,[a,b],'sloped');
+ assert.equal(ps.length,2);near(ps[0].projectedSF,468);near(ps[1].projectedSF,468);
+ near(ps.reduce((n,p)=>n+p.actualSF!,0),468*Math.sqrt(10/9)+468*Math.sqrt(13/9));
+ const pending=thermalPieces(rs,[a,{...b,pitchRise:null}],'sloped');
+ assert.equal(pending[1].actualSF,null);near(pending[1].projectedSF,468);
+ assert.throws(()=>thermalPieces(rs,[a],'sloped'),/cover/);
+});
+test('R4 sloped clipping rejects concave planes and overlapping thermal rectangles',()=>{
+ const l=plane('l',[{x:0,y:0},{x:40,y:0},{x:40,y:15},{x:20,y:15},{x:20,y:30},{x:0,y:30}]);
+ assert.throws(()=>thermalPieces([outer],[l],'sloped'),/convex/);
+ assert.throws(()=>thermalPieces([outer,outer],[plane('p')],'horizontal'),/overlap/);
+});
