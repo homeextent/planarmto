@@ -1,3 +1,5 @@
+import {v4 as uuidv4} from 'uuid';
+import {rectangularRoof,insetRoof,sides,replaceDerivedRoofGroup,removeDerivedRoofGroup,type Side,type Depths,type Bounds,type DerivationSpec} from '../engine/measurements/roofDerivation';
 import {roofAssemblyMembers} from '../engine/measurements/roofSelection';
 import React,{useMemo,useState} from 'react';
 import type {ActiveTool,SelectionState} from '../types';
@@ -63,9 +65,71 @@ function BulkAssemblies({entities,workspaceId,onChange,names}:{entities:RoofEnti
  {error&&<p role="alert" className="text-amber-300">{error}</p>}
  </section>
 }
+type Surface=Extract<RoofEntity,{kind:'roofSurface'}>;
+function DerivedSoffit({entities,planeIds,onChange}:{entities:RoofEntity[];planeIds:string[];onChange:(e:RoofEntity[])=>boolean}){
+ const matching=entities.filter((e):e is Surface=>e.kind==='roofSurface'&&e.purpose==='soffit'&&!!e.derivation&&e.derivation.planeIds.length===planeIds.length&&planeIds.every(id=>e.derivation!.planeIds.includes(id)));
+ const groupIds=[...new Set(matching.map(e=>e.derivation!.groupId))];
+ const existing=matching[0]?.derivation;
+ const [depths,setDepths]=useState<Record<Side,string>>(()=>Object.fromEntries(sides.map(side=>[side,existing?String(existing.depths[side]):''])) as Record<Side,string>);
+ const [uniform,setUniform]=useState('');
+ const [confirmed,setConfirmed]=useState(existing?.cornersConfirmed??false);
+ const [preview,setPreview]=useState<{source:RoofEntity[];next:RoofEntity[]|null;outer:Bounds;inner:Bounds;pieces:ReturnType<typeof insetRoof>['pieces'];statuses:Record<Side,Applicability>;interiorSF:number;interiorLF:number;overhangSF:number;includedSF:number;pendingSF:number}|null>(null);
+ const [error,setError]=useState('');
+ const reset=()=>{setPreview(null);setError('')};
+ const makePreview=()=>{
+  reset();
+  try{
+   if(groupIds.length>1)throw Error('Multiple derived soffit groups match this selection. Reconcile them before replacing.');
+   const r=rectangularRoof(entities,planeIds);
+   if(sides.some(side=>depths[side].trim()===''||!Number.isFinite(Number(depths[side]))||Number(depths[side])<0))throw Error('Enter a nonnegative horizontal depth in feet for each side, including explicit zero.');
+   const d=Object.fromEntries(sides.map(side=>[side,Number(depths[side])])) as Depths;
+   const inset=insetRoof(r.outer,d);
+   const statuses=Object.fromEntries(sides.map(side=>[side,r.boundary[side].soffit])) as Record<Side,Applicability>;
+   const includedSF=inset.pieces.filter(p=>statuses[p.side]==='included').reduce((n,p)=>n+p.projectedSF,0);
+   const pendingSF=inset.pieces.filter(p=>statuses[p.side]==='unspecified').reduce((n,p)=>n+p.projectedSF,0);
+   const mixed=new Set(inset.pieces.map(p=>statuses[p.side])).size>1;
+   const spec:DerivationSpec={version:1,groupId:existing?.groupId??'derived:'+uuidv4(),planeIds:[...planeIds],edgeIds:sides.flatMap(side=>r.boundary[side].edgeIds),depths:d,purpose:'soffit',basis:'horizontal',exclusions:[],boundaryConfirmed:false,cornersConfirmed:confirmed};
+   let next:RoofEntity[]|null=null;
+   if(pendingSF>0)setError('Resolve unspecified soffit applicability before applying. Pending strips are not included in measured area.');
+   else if(mixed&&!confirmed)setError('Confirm the mixed corner allocation before applying.');
+   else if(!includedSF)setError('No included soffit surface. No geometry will be created.');
+   else {try{next=replaceDerivedRoofGroup(entities,spec,uuidv4)}catch(err){setError(err instanceof Error?err.message:String(err))}}
+   setPreview({source:entities,next,outer:r.outer,inner:inset.inner,pieces:inset.pieces,statuses,interiorSF:inset.interiorSF,interiorLF:inset.interiorLF,overhangSF:inset.overhangSF,includedSF,pendingSF});
+  }catch(err){setError(err instanceof Error?err.message:String(err))}
+ };
+ return <section aria-label="Derive soffit surfaces" className="rounded border border-slate-700 p-2 space-y-2 text-xs">
+ <h3 className="font-semibold">Derive soffit surfaces</h3>
+ <p>{planeIds.length} source roof plane(s) · {existing?'Replace existing derivation':'New derivation'}</p>
+ <p className="text-slate-400">Rectangular classified roof only. Enter horizontal overhang depths in feet, not sloped lengths. For irregular or sloped soffits use Soffit area in the toolbar.</p>
+ <label className="block">Uniform overhang (ft)<input aria-label="Uniform overhang (ft)" type="number" min="0" step="any" className={field} value={uniform} onChange={e=>{setUniform(e.target.value);reset()}}/></label>
+ <button className="rounded bg-slate-700 px-2 py-1" disabled={uniform.trim()===''||!Number.isFinite(Number(uniform))||Number(uniform)<0} onClick={()=>{setDepths(Object.fromEntries(sides.map(side=>[side,uniform])) as Record<Side,string>);reset()}}>Use for all sides</button>
+ <div className="grid grid-cols-2 gap-1">{sides.map(side=><label key={side} className="block capitalize">{side} (ft)<input aria-label={side+' overhang (ft)'} type="number" min="0" step="any" className={field} value={depths[side]} onChange={e=>{setDepths(old=>({...old,[side]:e.target.value}));reset()}}/></label>)}</div>
+ <label className="flex gap-2 items-start"><input type="checkbox" checked={confirmed} onChange={e=>{setConfirmed(e.target.checked);reset()}}/>Confirm corner allocation: north/south own full-width corners; east/west stop at the inner boundary.</label>
+ <button className="rounded bg-sky-800 px-2 py-1" onClick={makePreview}>Preview soffit derivation</button>
+ {preview&&<div className="rounded border border-sky-700 p-2 space-y-1">
+ <p className="font-semibold">Review soffit derivation</p>
+ <svg role="img" aria-label="Soffit derivation plan" viewBox={[preview.outer.xmin,preview.outer.ymin,preview.outer.xmax-preview.outer.xmin,preview.outer.ymax-preview.outer.ymin].join(' ')} className="w-full max-h-48 bg-slate-950 rounded">
+ <rect x={preview.outer.xmin} y={preview.outer.ymin} width={preview.outer.xmax-preview.outer.xmin} height={preview.outer.ymax-preview.outer.ymin} fill="#334155"/>
+ {preview.pieces.map(p=><polygon key={p.side} points={p.polygon.map(q=>q.x+','+q.y).join(' ')} fill={preview.statuses[p.side]==='included'?'#2dd4bf':preview.statuses[p.side]==='excluded'?'#64748b':'#fbbf24'}/>)}
+ <rect x={preview.inner.xmin} y={preview.inner.ymin} width={preview.inner.xmax-preview.inner.xmin} height={preview.inner.ymax-preview.inner.ymin} fill="#0f172a" stroke="#cbd5e1" strokeWidth="1" vectorEffect="non-scaling-stroke"/>
+ </svg>
+ <p>Physical overhang: {preview.overhangSF.toFixed(2)} SF</p><p>Interior footprint: {preview.interiorSF.toFixed(2)} SF · {preview.interiorLF.toFixed(2)} LF perimeter (reference only, not confirmed thermal scope)</p>
+ {preview.pieces.map(p=><p key={p.side} className="capitalize">{p.side}: {p.projectedSF.toFixed(2)} SF · {preview.statuses[p.side]}</p>)}
+ <p className="font-semibold text-teal-300">Included soffit: {preview.includedSF.toFixed(2)} SF</p>
+ {preview.pendingSF>0&&<p className="text-amber-300">Pending applicability: {preview.pendingSF.toFixed(2)} SF (not counted)</p>}
+ <div className="flex flex-wrap gap-2"><button className="rounded bg-emerald-800 px-2 py-1 disabled:opacity-40" disabled={!preview.next||preview.source!==entities} onClick={()=>{if(preview.source!==entities||!preview.next)return;if(onChange(preview.next))reset();else setError('Derivation rejected. Review roof measurements.')}}>Apply soffit derivation</button><button className="rounded bg-slate-700 px-2 py-1" onClick={reset}>Cancel soffit derivation</button></div>
+ {preview.source!==entities&&<p className="text-amber-300">Roof changed. Preview again.</p>}
+ </div>}
+ {existing&&groupIds.length===1&&<button className="rounded bg-red-900 px-2 py-1" onClick={()=>{try{if(window.confirm('Remove this complete derived soffit group? Source roof geometry is preserved.')&&onChange(removeDerivedRoofGroup(entities,existing.groupId)))reset()}catch(err){setError(err instanceof Error?err.message:String(err))}}}>Remove derived soffit group</button>}
+ {error&&<p role="alert" className="text-amber-300">{error}</p>}
+ </section>;
+}
 export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,onDelete}:{workspaceId:string;entities:RoofEntity[];selection:SelectionState;onChange:(e:RoofEntity[])=>boolean;onSelect:(s:SelectionState)=>void;onDelete:()=>void}){
  const selectedIds=selection.type==='roof'?(selection.ids??(selection.id?[selection.id]:[])):[];
  const e=selectedIds.length===1?entities.find(e=>e.id===selectedIds[0]):undefined;
+ const sourceIds=e?.kind==='roofSurface'&&e.derivation?e.derivation.planeIds:entities.filter(q=>q.kind==='roofPlane'&&selectedIds.includes(q.id)).map(q=>q.id);
+ const sourceKey=JSON.stringify([...sourceIds].sort());
+
  const rectangle=(()=>{if(!e||!('polygon' in e)||e.polygon.length!==4)return null;const a=e.polygon[0],b=e.polygon[2],width=Math.abs(b.x-a.x),depth=Math.abs(b.y-a.y);try{resizeRectangle(e.polygon,width,depth);return {width,depth}}catch{return null}})();
  const resize=(w:number,d:number)=>{try{return !!e&&onChange(resizeRoofRectangle(entities,e.id,w,d))}catch(err){alert(err instanceof Error?err.message:String(err));return false}};
  const names=new Map(entities.map((q,i)=>[q.id,(q.kind==='roofPlane'?'Roof plane':q.kind==='roofEdge'?'Roof edge':q.kind==='roofOpening'?'Roof opening':q.purpose==='soffit'?'Soffit area':'Insulation area')+' '+(i+1)]));
@@ -118,6 +182,8 @@ export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,
  </>}
  <button className="rounded bg-red-900 px-2 py-1 text-xs" onClick={onDelete}>Delete selected</button></div>}
  <div key={workspaceId}><BulkAssemblies entities={entities} workspaceId={workspaceId} names={names} onChange={onChange}/></div>
+ {sourceIds.length>0?<DerivedSoffit key={workspaceId+sourceKey} entities={entities} planeIds={sourceIds} onChange={onChange}/>:<p className="text-xs text-slate-400">Select a roof plane or entire roof assembly to derive soffit surfaces. Use the toolbar for manual surfaces.</p>}
+
  <hr className="border-slate-700"/><h2 className="text-sm font-semibold">Roof quantities</h2><p className="text-xs text-slate-400">Raw measurements only — no rates or waste.</p>
  {[...totals].map(([code,x])=><React.Fragment key={code}><div className="flex justify-between gap-2 text-xs"><span>{labels[code]||code.replace('roof.','').replaceAll('.',' ')}</span><span className={x.missing?'text-amber-300':'text-slate-100'}>{x.missing?(x.qty?x.qty.toFixed(2)+' '+x.unit+' + pending':'Not quantified'):x.qty.toFixed(2)+' '+x.unit}</span></div>{x.missing>0&&<details className="text-xs text-amber-300"><summary>{labels[code]||code.replace('roof.','').replaceAll('.',' ')}: {x.missing} pending</summary>{x.reasons.map((reason,i)=><p key={i}>{reason}</p>)}</details>}</React.Fragment>)}
  {totals.has('roof.covering')&&!totals.get('roof.covering')!.missing&&<div className="text-xs">Roofing squares: {(totals.get('roof.covering')!.qty/100).toFixed(2)} SQ (same area)</div>}
