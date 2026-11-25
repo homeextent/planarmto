@@ -3331,18 +3331,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         <button disabled={!validPerimeterCandidate} className="bg-emerald-700 disabled:opacity-40 rounded p-2" onClick={()=>{if(validPerimeterCandidate&&foundationEntities&&onFoundationChange?.([...foundationEntities,...validPerimeterCandidate.members])){setPerimeterCandidate(null);setPerimeterOutline(null);onToolChange('select');onSelect({type:'foundation',ids:validPerimeterCandidate.members.map(m=>m.id)})}else setPerimeterError('Preview is stale or placement rejected')}}>Apply polygon perimeter</button>
         <button className="bg-slate-700 rounded p-2" onClick={()=>{setPerimeterCandidate(null);setPerimeterOutline(null);setPerimeterError('');onToolChange('select')}}>Cancel polygon perimeter</button></div>
       </section>}
-      {(polygonError||(!generationOutline&&generationError))&&<div role="alert" className="absolute top-16 left-1/2 -translate-x-1/2 z-20 bg-slate-900 border border-amber-600 text-amber-300 rounded p-3 text-xs">{polygonError||generationError}</div>}
       {generationOutline&&<section className="absolute top-20 left-4 z-20 bg-slate-900 border border-sky-600 rounded-lg p-4 text-xs space-y-3 w-64 shadow-xl"><h3 className="font-semibold text-sky-300">Generate Roof Skeleton</h3><p>Rectangular roof perimeter · preview only</p><label className="block">Configuration<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.type} onChange={e=>{setGenerationConfig(c=>({...c,type:e.target.value as RoofConfig['type']}));setGenerationPreview(null)}}>{['hip','gable','shed','flat'].map(t=><option key={t}>{t}</option>)}</select></label>{generationConfig.type!=='flat'&&<label className="block">Pitch rise per 12<input className="block w-full bg-slate-800 p-2 rounded" type="number" min="0.01" max="48" step="any" value={generationConfig.pitch} onChange={e=>{setGenerationConfig(c=>({...c,pitch:Number(e.target.value)}));setGenerationPreview(null)}}/></label>}{generationConfig.type==='gable'&&<label>Ridge orientation<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.ridge} onChange={e=>{setGenerationConfig(c=>({...c,ridge:e.target.value as RoofConfig['ridge']}));setGenerationPreview(null)}}><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>}{generationConfig.type==='shed'&&<label>Downslope direction<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.direction} onChange={e=>{setGenerationConfig(c=>({...c,direction:Number(e.target.value) as RoofConfig['direction']}));setGenerationPreview(null)}}>{[[0,'Right'],[90,'Down'],[180,'Left'],[270,'Up']].map(([v,n])=><option key={v} value={v}>{n}</option>)}</select></label>}<p className="text-slate-400">No automatic overhang or assembly allowances. Review against drawings.</p>{generationError&&<p role="alert" className="text-amber-300">{generationError}</p>}<div className="flex gap-2"><button className="bg-sky-700 rounded p-2" onClick={()=>{try{const next=generateRectangularRoof(generationOutline[0],generationOutline[2],generationConfig,uuidv4);validateRoofTopology([...generationBase(),...next]);setGenerationPreview(next);setGenerationError('');}catch(err){setGenerationPreview(null);setGenerationError(err instanceof Error?err.message:String(err));}}}>Preview</button><button disabled={!generationPreview} className="bg-emerald-700 disabled:opacity-40 rounded p-2" onClick={()=>{try{if(generationPreview){const next=[...generationBase(),...generationPreview];validateRoofTopology(next);if(onRoofChange?.(next)){setCorrection(null);onSelect({type:'none'});onToolChange('select');}}}catch(err){setGenerationError(err instanceof Error?err.message:String(err));}}}>Apply</button><button className="bg-slate-700 rounded p-2" onClick={()=>{setCorrection(null);onToolChange('select')}}>Cancel</button></div></section>}
-      <form className="absolute bottom-4 right-4 z-20 bg-slate-900 border border-slate-700 rounded p-2 text-xs shadow-xl" onSubmit={e=>{e.preventDefault();commitDimensions()}}>
-        <label className="flex items-center gap-2">Dimensions ({state.settings.unitSystem==='metric'?'m':'ft'})
-          <input aria-label="Dimensions" className="w-36 bg-slate-800 border rounded p-1" placeholder={(recent?.rectangle??rectangularDraft)?'Width,depth':'Length'} value={dimensionA} disabled={!recent&&!dimensionStart} onFocus={()=>{if(!draftDirection.current&&dimensionToward)draftDirection.current={...dimensionToward};}} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();setDimensionA('');setDimensionError('');draftDirection.current=null;e.currentTarget.blur();}}} onChange={e=>setDimensionA(e.target.value)}/>
-          <button type="submit" disabled={!dimensionA} className="bg-sky-700 disabled:opacity-40 rounded px-2 py-1">Apply</button>
-        </label>
-        {liveValue&&<p aria-label="Live drafting dimensions" className="text-sky-300">{recent?'Placement reference':'Live'}: {liveValue}</p>}
-        {nextFoundationLength&&<p aria-label="Next foundation segment dimensions" className="text-amber-300">Next segment: {nextFoundationLength} · click to place</p>}
-        <p>{recent?'Type dimensions to correct last placement':dimensionStart?'Type dimensions or click endpoint':'Ready'}</p>
-        {dimensionError&&<p role="alert" className="text-amber-300">{dimensionError}</p>}
-      </form>
       {/* Floating Canvas Overlays & Controls */}
       {/* Top Center Tool Info Banner */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-4 py-1.5 rounded-full text-xs text-slate-300 shadow-xl flex items-center gap-3">
@@ -3453,34 +3442,51 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
             End Sequence
           </button>
         )}
+        {(polygonError || (!generationOutline && generationError)) && (
+          <div role="alert" className="pointer-events-none absolute top-full mt-2 inset-x-0 z-20 bg-slate-900 border border-amber-600 text-amber-300 rounded p-3 text-xs">
+            {polygonError || generationError}
+          </div>
+        )}
       </div>
 
-      {/* Bottom Right Floating Zoom / Grid Overlay */}
-      <div className="absolute bottom-4 right-4 bg-slate-900/90 border border-slate-800 backdrop-blur-md p-1.5 rounded-xl shadow-2xl flex items-center gap-1">
-        <button
-          onClick={() => handleZoom(1.2)}
-          className="p-2 hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg transition-colors cursor-pointer"
-          title="Zoom In"
-        >
-          <ZoomIn className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => handleZoom(0.83)}
-          className="p-2 hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg transition-colors cursor-pointer"
-          title="Zoom Out"
-        >
-          <ZoomOut className="w-4 h-4" />
-        </button>
-        <button
-          onClick={handleZoomFit}
-          className="p-2 hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg transition-colors cursor-pointer"
-          title="Zoom to Fit"
-        >
-          <Maximize2 className="w-4 h-4" />
-        </button>
-        <div className="w-[1px] h-5 bg-slate-800 mx-1" />
-        <div className="px-2 text-[11px] font-mono text-slate-400">
-          {Math.round((transform.scale / 24) * 100)}%
+      {/* Drafting dimensions and zoom controls */}
+      <div className="absolute bottom-4 right-4 z-20 flex flex-col items-end gap-2">
+        <form className="bg-slate-900 border border-slate-700 rounded p-2 text-xs shadow-xl" onSubmit={e=>{e.preventDefault();commitDimensions()}}>
+          <label className="flex items-center gap-2">Dimensions ({state.settings.unitSystem==='metric'?'m':'ft'})
+            <input aria-label="Dimensions" className="w-36 bg-slate-800 border rounded p-1" placeholder={(recent?.rectangle??rectangularDraft)?'Width,depth':'Length'} value={dimensionA} disabled={!recent&&!dimensionStart} onFocus={()=>{if(!draftDirection.current&&dimensionToward)draftDirection.current={...dimensionToward};}} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();setDimensionA('');setDimensionError('');draftDirection.current=null;e.currentTarget.blur();}}} onChange={e=>setDimensionA(e.target.value)}/>
+            <button type="submit" disabled={!dimensionA} className="bg-sky-700 disabled:opacity-40 rounded px-2 py-1">Apply</button>
+          </label>
+          {liveValue&&<p aria-label="Live drafting dimensions" className="text-sky-300">{recent?'Placement reference':'Live'}: {liveValue}</p>}
+          {nextFoundationLength&&<p aria-label="Next foundation segment dimensions" className="text-amber-300">Next segment: {nextFoundationLength} · click to place</p>}
+          <p>{recent?'Type dimensions to correct last placement':dimensionStart?'Type dimensions or click endpoint':'Ready'}</p>
+          {dimensionError&&<p role="alert" className="text-amber-300">{dimensionError}</p>}
+        </form>
+        <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-md p-1.5 rounded-xl shadow-2xl flex items-center gap-1">
+          <button
+            onClick={() => handleZoom(1.2)}
+            className="p-2 hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg transition-colors cursor-pointer"
+            title="Zoom In"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => handleZoom(0.83)}
+            className="p-2 hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg transition-colors cursor-pointer"
+            title="Zoom Out"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleZoomFit}
+            className="p-2 hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg transition-colors cursor-pointer"
+            title="Zoom to Fit"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
+          <div className="w-[1px] h-5 bg-slate-800 mx-1" />
+          <div className="px-2 text-[11px] font-mono text-slate-400">
+            {Math.round((transform.scale / 24) * 100)}%
+          </div>
         </div>
       </div>
 
@@ -3488,9 +3494,9 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       {selection.type !== 'none' && (selection.id || (selection.ids && selection.ids.length > 0)) && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/95 border border-sky-500/30 backdrop-blur-md px-4 py-2 rounded-xl shadow-2xl flex items-center gap-3">
           <span className="text-xs font-semibold text-sky-400 uppercase tracking-wider">
-            {(selection.type === 'multiple'||(selection.type==='roof'&&selection.ids&&selection.ids.length>1)) 
-              ? `Selected: ${selection.ids?.length || 0} Items` 
-              : `Selected: ${selection.type} (${selection.id?.slice(0, 8)})`}
+            {(selection.type === 'multiple' || (selection.ids?.length ?? 0) > 1)
+              ? `Selected: ${selection.ids?.length || 0} Items`
+              : `Selected: ${selection.type} (${(selection.id ?? selection.ids?.[0])?.slice(0, 8)})`}
           </span>
 
           {selection.type === 'aperture' && (

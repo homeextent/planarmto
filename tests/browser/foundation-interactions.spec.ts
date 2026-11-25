@@ -83,6 +83,11 @@ test('rectangular foundation preview cancel and apply are atomic',async({page})=
  await page.getByRole('button',{name:'Apply perimeter',exact:true}).click();
  await expect(page.getByLabel('Foundation graphical preview')).toHaveCount(0);
  await expect(entities(page)).toHaveCount(5);
+ await page.getByLabel('Select foundation entity').selectOption({index:1});
+ await page.getByRole('button',{name:'Select entire foundation assembly',exact:true}).click();
+ await expect(page.getByText('Selected: 4 Items',{exact:true})).toBeVisible();
+ await expect(page.getByText('Selected scope: No explicit decision',{exact:true})).toBeVisible();
+ expect((await snapshot(page)).map(e=>e.scopeApplicability)).toEqual(Array(4).fill(undefined));
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
  await expect(entities(page)).toHaveCount(1);
 });
@@ -449,6 +454,28 @@ test('foundation focused dimensions cancel without geometry and subsequent canva
  await expect(page.getByLabel('Live drafting dimensions')).toHaveText('Placement reference: 30.00 ft');
  const e=(await snapshot(page))[0];if(e.kind!=='foundationWall')throw Error('Expected wall');expect(Math.hypot(e.end.x-e.start.x,e.end.y-e.start.y)).toBeCloseTo(30,6);
 });
+test('foundation zoom controls accept pointer clicks with the dimensions form present',async({page})=>{
+ const fit=page.getByTitle('Zoom to Fit',{exact:true});
+ const zoomReadout=fit.locator('..').getByText(/^\d+%$/);
+ await page.getByTitle('Zoom In',{exact:true}).click();
+ await expect(zoomReadout).toHaveText('120%');
+ await page.getByRole('button',{name:'Foundation wall',exact:true}).click();
+ const canvas=page.locator('canvas').first();
+ await canvas.click({position:{x:250,y:250}});
+ await canvas.hover({position:{x:550,y:250}});
+ const dimensions=page.getByLabel('Dimensions',{exact:true});
+ await dimensions.fill('40');
+ await expect(dimensions).toBeFocused();
+ await fit.click();
+ await expect(zoomReadout).toHaveText('100%');
+ await expect(dimensions).toHaveValue('40');
+ await dimensions.press('Escape');
+ await expect(dimensions).toHaveValue('');
+ await canvas.click({position:{x:550,y:250}});
+ await page.keyboard.type('30');
+ await page.keyboard.press('Enter');
+ await expect(page.getByLabel('Live drafting dimensions')).toHaveText('Placement reference: 30.00 ft');
+});
 test('continuous drafting displays next segment separately from last placement correction',async({page})=>{
  await page.getByRole('button',{name:'Foundation wall',exact:true}).click();await page.getByLabel('Continuous foundation drafting').check();
  const canvas=page.locator('canvas').first();await canvas.click({position:{x:250,y:250}});await canvas.click({position:{x:550,y:250}});
@@ -541,7 +568,9 @@ test('scope applicability editor reflects selected record instead of reusing pre
  await page.getByLabel('Foundation applicability',{exact:true}).selectOption('excluded');await page.getByLabel('Scope decision reason',{exact:true}).fill('Existing wall');
  await page.getByRole('button',{name:'Apply foundation applicability',exact:true}).click();
  await expect(page.getByLabel('Scope decision reason',{exact:true})).toHaveValue('Existing wall');
+ await expect(page.getByText('Selected scope: excluded',{exact:true})).toBeVisible();
  await page.getByLabel('Select foundation entity').selectOption({index:2});await expect(page.getByLabel('Foundation applicability',{exact:true})).toHaveValue('included');
+ await expect(page.getByText('Selected scope: No explicit decision',{exact:true})).toBeVisible();
  await expect(page.getByLabel('Scope decision reason',{exact:true})).toHaveCount(0);
  await page.getByLabel('Select foundation entity').selectOption({index:1});await expect(page.getByLabel('Foundation applicability',{exact:true})).toHaveValue('excluded');
  await expect(page.getByLabel('Scope decision reason',{exact:true})).toHaveValue('Existing wall');

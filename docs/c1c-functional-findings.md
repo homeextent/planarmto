@@ -35,3 +35,28 @@ Use existing docs/c1c-local-acceptance.md L01–L12 and tests as procedure; do n
 
 ## Quantity corrections
 Earlier conversational rectangular 24×6 in strip expectation 10.17 CY was wrong; 10.17 is for 12 in depth. Earlier integrated basement guide lists footing ring 20.3457 CY for 2×1 strip; formula 4×(70−2×8/12)/27 = 10.17283951 CY (not 20.3457). The latter typo must be corrected in the legacy local guide. No engine formula change implied.
+
+## R5.0A baseline stabilization
+
+The owner authorized four presentation and pointer fixes on draft PR #12. The assembly workflow in R5.1–R5.6 remains separately gated.
+
+| Finding | Cause and correction |
+|---|---|
+| Roof Finish polygon was blocked after diagonal closure | The independently positioned alert overlapped the drafting toolbar and intercepted pointer input. The alert now appears below the toolbar, remains visible and announced, and allows pointer input through its text. |
+| Foundation Zoom to Fit was blocked | The dimension form and zoom toolbar shared the same bottom-right anchor. They now stack in one container, with the zoom controls at the bottom and editable dimensions above. |
+| Foundation multi-selection displayed an undefined ID | The toolbar counted roof selections and expected a single ID for foundation selections. It now uses the selection count for multi-selection and supports a singleton ID array. |
+| Newly generated records displayed legacy scope | The inspector mapped absent applicability metadata directly to the legacy label. It now displays “No explicit decision” whenever the explicit field is absent. The engine continues to issue its existing legacy diagnostic. Stored applicability and reasons are preserved. |
+
+Five targeted Chromium cases passed. The original roof regression verifies that the alert appears, the draft remains uncommitted, and a pointer click on Finish commits the intended 50 SF plane. Foundation coverage verifies pointer zoom with the dimension form active, Escape and keyboard correction, assembly selection count, the scope display and absent applicability metadata in exported records.
+
+Full local validation under Node 22.23.5 passed 289/289 (212 Node and 77 Chromium). The locked install, TypeScript, production build, dependency audit (zero findings), PHP lint and PDF worker checks passed. Full output is under `/tmp/planarmto-r50a/validation.log`.
+
+The prior traces are under `/tmp/planarmto-c1c-192cff3/baseline-artifacts` and `/tmp/planarmto-c1c-192cff3/calibration-artifacts`. Stabilized interaction traces and targeted results are under `/tmp/planarmto-r50a/after-targeted` and `/tmp/planarmto-r50a/targeted.log`. Isolated WordPress remains unavailable locally because Docker is absent. Exact candidate CI and owner preview verification remain pending.
+
+### Owner production-preview checks
+
+Use Node 22, run `npm run build`, then run `npm run preview -- --host 127.0.0.1 --port 4173 --strictPort`. Open the loopback preview in a disposable browser profile and create synthetic roof and foundation workspaces.
+
+1. In the roof workspace, enable Ortho and draft a polygon with two perpendicular legs. Click its first vertex so the closing edge would be diagonal. Verify that the warning is visible and the draft is still uncommitted. Click **Finish polygon** and verify that the intended triangle is committed.
+2. In the foundation workspace, zoom in, start a wall, enter a value in **Dimensions** and pointer-click **Zoom to Fit**. Verify that the view fits and the entered value remains. Focus the dimension field, press Escape, and finish or cancel the draft.
+3. Generate an independent four-wall perimeter, select one wall and choose **Select entire foundation assembly**. Verify **Selected: 4 Items** and **No explicit decision**. Select an individual wall, apply an explicit exclusion with a reason, then reselect it and verify that both remain visible.
