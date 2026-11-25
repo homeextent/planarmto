@@ -10,7 +10,7 @@ Increment B, C.1A and C.1B are integrated into staging. See [ROADMAP.md](ROADMAP
 
 ## C.1C foundation feature and Codex transition
 
-Draft PR #12 contains R1–R4 foundation measurement, with 288/288 verified on pre-handoff CI #186. Owner verified calibration and basic rectangular/irregular wall and strip quantities. [R5.0A baseline stabilization](docs/c1c-functional-findings.md#r50a-baseline-stabilization) passed independent source review and owner acceptance at `cd782e7`. The [coordinated specification](docs/c1c-r5-coordinated-specification.md) authorizes R5.1–R5.2 and R5.3 design only. Contractor-workflow acceptance remains open. See [transition](docs/coding-agent-transition.md), [actual findings](docs/c1c-functional-findings.md) and [R5 proposal](docs/c1c-r5-contractor-workflow.md). No staging/production promotion.
+Draft PR #12 contains R1–R4 foundation measurement, with 288/288 verified on pre-handoff CI #186. Owner verified calibration and basic rectangular/irregular wall and strip quantities. [R5.0A baseline stabilization](docs/c1c-functional-findings.md#r50a-baseline-stabilization) passed independent source review and owner acceptance at `cd782e7`. The [coordinated specification](docs/c1c-r5-coordinated-specification.md) governs the [R5 technical candidate](docs/c1c-r5-technical-evidence.md). The revised R5.3 design at `1be740b` is approved. Contractor-workflow acceptance remains open. See [transition](docs/coding-agent-transition.md), [actual findings](docs/c1c-functional-findings.md) and [R5 proposal](docs/c1c-r5-contractor-workflow.md). No staging/production promotion.
 
 ## C.1B roof measurement (staging integrated)
 

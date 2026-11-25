@@ -1,6 +1,6 @@
 # C.1C R5.3 persistence and assembly-controller proposal
 
-Design for independent review. The coordinated specification authorizes this proposal. Implementation starts only after approval of this contract. Schema version stays 3.
+The revised design at `1be740b` passed independent review and received owner implementation authorization. This file records the approved proposal. See the [technical candidate register](c1c-r5-technical-evidence.md) for verification and implementation limits. Schema version stays 3.
 
 ## Storage and interfaces
 

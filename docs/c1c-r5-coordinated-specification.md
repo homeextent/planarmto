@@ -1,6 +1,6 @@
 # PlanarMTO — C.1C-R5 Coordinated Technical Specification
 
-**Status:** Five product specification packages approved by owner, 2026-11-25. R5.1–R5.2 implementation authorized through the accompanying instruction; R5.3 persistence design requires independent approval before implementation. R5.3–R5.6 product direction approved, execution remains gated as described below.
+**Status:** Five product specification packages approved by owner, 2026-11-25. R5.1–R5.2 implementation authorized through the accompanying instruction; R5.3 persistence design requires independent approval before implementation. The historical gates below record the original authorization. The revised R5.3 design at `1be740b` subsequently passed independent review. The owner authorized R5.3–R5.5 implementation and R5.6 automated verification. The [technical candidate register](c1c-r5-technical-evidence.md) identifies remaining coverage and independent and owner acceptance gates.
 
 **Repository:** `homeextent/planarmto` · branch `feature/c1c-foundation-measurement` · draft PR #12 → `staging`.
 

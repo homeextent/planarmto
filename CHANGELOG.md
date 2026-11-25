@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - R5.1 adds graphical foundation rectangles and explicit continuous perimeter tracing with endpoint/closure cues. R5.2 adds construction unit entry and context-sensitive materials inside the existing persisted contract. See [coverage and deferred requirements](docs/c1c-r5-1-r5-2-evidence.md).
 
+- R5.3–R5.5 candidate adds optional v3 foundation assemblies, local presets, source-linked regeneration and a contractor assembly inspector. See the [technical register and remaining acceptance gates](docs/c1c-r5-technical-evidence.md).
+
 ### C.1B — Staging integrated
 - Independent roof planes, pitch/direction, classified boundaries, opening deductions, soffit and insulation measurements; deterministic rectangular hip/gable/shed/flat preview and atomic application. No irregular automatic skeleton, inferred assembly applicability or consolidated pricing.
 - Keyboard-first exact floor/roof dimensions, guarded repeated correction, workspace-specific history, polygon closure and actionable geometry diagnostics. Fixed delayed viewport auto-fit following trace-supported investigation.
