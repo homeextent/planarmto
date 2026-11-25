@@ -1,22 +1,26 @@
 /** Initial C.1C measurement adapter. Rectangular compatible systems only for overlap reconciliation.
- * Not connected to the application inspector or persistence boundary until lifecycle contracts are complete.
+ * Shared explicit topology validation at the persistence boundary; inspector integration pending.
  */
-import {validateSpecialistEntities,validateContributionSet,type FoundationEntity,type QuantityContribution} from './measurementTypes';
+import {validateContributionSet,type FoundationEntity,type QuantityContribution} from './measurementTypes';
 import {simplePolygon,projectedArea} from './roofMeasurements';
 import {extendedStrip,reconcileRectangularPrisms,orthogonalPolygonPieces,polygonEnvelope,type Prism,type Bounds} from './foundationGeometry';
 import {foundationDetails} from './foundationDetails';
+import {validateFoundationTopology} from './foundationTopology';
 const intersects=(a:Bounds,b:Bounds)=>Math.min(a.xmax,b.xmax)>Math.max(a.xmin,b.xmin)&&Math.min(a.ymax,b.ymax)>Math.max(a.ymin,b.ymin);
 type Solid={entity:FoundationEntity;code:string;material:string;bounds:Bounds|null;prism:Prism|null;pieces:Bounds[]|null;area:number|null;details:ReturnType<typeof foundationDetails>;reason?:string};
 export type FoundationVolumeBreakdown={elementId:string;grossCY:number|null;deductionCY:number|null;additionalCY:number|null;netCY:number|null};
 export function measureFoundation(workspaceId:string,entities:FoundationEntity[]):{rows:QuantityContribution[];warnings:string[];detailBreakdown:FoundationVolumeBreakdown[]} {
- validateSpecialistEntities('foundation',entities);
+ validateFoundationTopology(entities);
  const rows:QuantityContribution[]=[],warnings:string[]=[],solids:Solid[]=[],detailBreakdown:FoundationVolumeBreakdown[]=[];
  const add=(e:FoundationEntity,code:string,unit:QuantityContribution['unit'],basis:string,value:number|null,reason='Missing or unconfirmed foundation input')=>{
   const base={workspaceId,elementId:e.id,physicalId:e.physicalId,assemblyId:e.assemblyId,source:e.source,code,unit,basis};
   rows.push(value===null?{...base,status:'unquantified',reason}:{...base,status:'measured',quantity:value});
  };
  for(const e of entities){
-  if('polygon' in e&&!simplePolygon(e.polygon))throw Error('Invalid foundation polygon: '+e.id);
+  if('polygon' in e&&!simplePolygon(e.polygon)){
+   if(e.foundation)throw Error('Invalid foundation polygon: '+e.id);
+   // Historical invalid geometry remains retained, but blocks potentially related quantities.
+  }
   if(e.kind==='foundationLine'){
    // Line surface/route ownership not yet established; never certify duplicate routes.
    add(e,e.purpose==='drainage'?'foundation.drainage.length':'foundation.waterproofing.area',e.purpose==='drainage'?'LF':'SF','explicit line (ownership pending)',null,'Line ownership and coverage validation pending');continue;
@@ -34,7 +38,7 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
    if(e.widthFt===null)reason='Missing width';
    else if(!e.foundation?.centrelineConfirmed)reason='Confirm centreline reference';
    else try{bounds=extendedStrip(e.start,e.end,e.widthFt,e.foundation.joinStartFt,e.foundation.joinEndFt);pieces=[bounds]}catch{reason='Unsupported strip footprint; reconcile explicitly'}
-  }else if('polygon' in e){bounds=polygonEnvelope(e.polygon);area=projectedArea(e.polygon);try{pieces=orthogonalPolygonPieces(e.polygon)}catch{/* Nonorthogonal polygon may be measured only without unresolved overlap. */}}
+  }else if('polygon' in e&&simplePolygon(e.polygon)){bounds=polygonEnvelope(e.polygon);area=projectedArea(e.polygon);try{pieces=orthogonalPolygonPieces(e.polygon)}catch{/* Nonorthogonal polygon may be measured only without unresolved overlap. */}}
   const height='start' in e?e.heightFt:e.depthFt;
   if(height===null)reason='Missing thickness or height';
   if(bounds&&!reason)prism={id:e.id,bounds,bottomFt:e.foundation?.baseElevationConfirmed?e.elevationFt:null,heightFt:height};

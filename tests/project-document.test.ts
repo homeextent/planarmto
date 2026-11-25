@@ -106,3 +106,58 @@ test('malformed documents and future versions are rejected, not blanked', () => 
   foreign.activeProjectId = 'other-project';
   assert.throws(() => replaceWorkspaceGeometry(doc, 'floor-a', foreign), /different project/);
 });
+
+import type {FoundationEntity} from '../src/engine/measurements/measurementTypes';
+import {measureFoundation} from '../src/engine/measurements/foundationMeasurements';
+import {selectWorkspace,replaceSpecialistEntities,restoreWorkspaceSnapshot,canReportProjectEstimate} from '../src/engine/workspaceController';
+const foundationWall=(id='w'):FoundationEntity=>({id,physicalId:id,assemblyId:'walls',source:{reference:'fixture'},kind:'foundationWall',start:{x:0,y:0},end:{x:40,y:0},widthFt:8/12,heightFt:8,elevationFt:0,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true,baseElevationConfirmed:true,wallOpenings:[{id:'o-'+id,offsetFt:5,widthFt:4,sillFt:2,heightFt:3}]}});
+const foundationDoc=()=>selectWorkspace(multi(),'foundation-a');
+test('foundation detail metadata survives save/reopen and recomputed quantities',()=>{
+ const doc=foundationDoc(),next=replaceSpecialistEntities(doc,'foundation-a',[foundationWall()]);
+ const restored=deserializeProjectDocument(serializeProjectDocument(next));
+ assert.deepEqual(restored,next);
+ const entities=restored.workspaces.find(w=>w.id==='foundation-a')!.measurements as FoundationEntity[];
+ const m=measureFoundation('foundation-a',entities);
+ assert.ok(Math.abs(m.detailBreakdown[0].netCY!-7.604938271604938)<1e-8);
+ assert.equal(canReportProjectEstimate(restored),false);
+});
+test('invalid opening edit rejected atomically at workspace replacement and serialization',()=>{
+ const doc=replaceSpecialistEntities(foundationDoc(),'foundation-a',[foundationWall()]);
+ const bad=foundationWall();bad.foundation!.wallOpenings![0].offsetFt=39;
+ assert.throws(()=>replaceSpecialistEntities(doc,'foundation-a',[bad]),/outside parent/);
+ assert.deepEqual(doc.workspaces.find(w=>w.id==='foundation-a')!.measurements,[foundationWall()]);
+ const corrupt=structuredClone(doc);corrupt.workspaces.find(w=>w.id==='foundation-a')!.measurements=[bad];
+ assert.throws(()=>serializeProjectDocument(corrupt),/outside parent/);
+ assert.throws(()=>readProjectDocument(corrupt),/outside parent/);
+});
+test('foundation snapshot restore validates details and leaves original unchanged',()=>{
+ const doc=replaceSpecialistEntities(foundationDoc(),'foundation-a',[foundationWall()]);
+ const bad=foundationWall();bad.foundation!.wallOpenings![0].offsetFt=0;
+ assert.throws(()=>restoreWorkspaceSnapshot(doc,'foundation-a',{view:workspaceFloorplan(doc),measurements:[bad]}),/junction/);
+ const cleared=restoreWorkspaceSnapshot(doc,'foundation-a',{view:workspaceFloorplan(doc),measurements:[]});
+ assert.equal(cleared.workspaces.find(w=>w.id==='foundation-a')!.measurements.length,0);
+ const restored=restoreWorkspaceSnapshot(cleared,'foundation-a',{view:workspaceFloorplan(doc),measurements:[foundationWall()]});
+ assert.deepEqual(restored,doc);
+});
+test('foundation detail IDs cannot collide across parents or with entity IDs',()=>{
+ const doc=foundationDoc(),a=foundationWall('a'),b=foundationWall('b');
+ b.foundation!.wallOpenings![0].id='o-a';
+ assert.throws(()=>replaceSpecialistEntities(doc,'foundation-a',[a,b]),/Duplicate foundation entity or detail ID/);
+ b.foundation!.wallOpenings![0].id='a';
+ assert.throws(()=>replaceSpecialistEntities(doc,'foundation-a',[a,b]),/Duplicate foundation entity or detail ID/);
+});
+test('historical foundation metadata is not inferred on roundtrip',()=>{
+ const e=foundationWall();delete e.foundation;
+ const doc=replaceSpecialistEntities(foundationDoc(),'foundation-a',[e]);
+ const restored=deserializeProjectDocument(serializeProjectDocument(doc));
+ assert.deepEqual(restored,doc);
+ assert.equal(measureFoundation('foundation-a',[e]).rows[0].status,'unquantified');
+});
+test('confirmed invalid foundation polygon cannot cross persistence boundary',()=>{
+ const bad:FoundationEntity={id:'s',physicalId:'s',assemblyId:'slabs',source:{reference:'fixture'},kind:'slab',polygon:[{x:0,y:0},{x:10,y:10},{x:0,y:10},{x:8,y:0}],depthFt:1,purpose:'concrete',elevationFt:0,foundation:{version:1,material:'poured concrete',baseElevationConfirmed:true}};
+ assert.throws(()=>replaceSpecialistEntities(foundationDoc(),'foundation-a',[bad]),/Invalid foundation polygon/);
+ delete bad.foundation;
+ const doc=replaceSpecialistEntities(foundationDoc(),'foundation-a',[bad]);
+ assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(doc)),doc);
+ assert.equal(measureFoundation('foundation-a',[bad]).rows[0].status,'unquantified');
+});
