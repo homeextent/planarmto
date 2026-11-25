@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — Increments B and C.1A (staging release train)
 
+### C.1B — Feature candidate, not integrated
+- Independent roof planes, pitch/direction, classified boundaries, opening deductions, soffit and insulation measurements; deterministic rectangular hip/gable/shed/flat preview and atomic application. No irregular automatic skeleton, inferred assembly applicability or consolidated pricing.
+- Keyboard-first exact floor/roof dimensions, guarded repeated correction, workspace-specific history, polygon closure and actionable geometry diagnostics. Fixed delayed viewport auto-fit following trace-supported investigation.
+- CI #84 at `b10f3ec` (run 45517372852) passed all validation stages including 22 Chromium tests. Six additional focus/quadrant/concavity/Ortho tests committed at `e091a3f`; final CI and owner acceptance pending. No staging merge or production release.
+
 ### C.1A — Schema v3 and specialist measurement architecture
 - Canonical explicit-only document, typed roof/foundation/site entities, quantity contracts and structural validation; assignment separated from completeness and exclusions require reason.
 - Retire legacy estimating authority without deleting historical records; bounded explicit v2 preview migration, separate v3 recovery slot and preservation of raw historical directory records. Unsupported records cannot be opened, renamed or duplicated; export retained.
