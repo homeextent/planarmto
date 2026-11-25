@@ -48,7 +48,10 @@ test('wall first anchor is transient and exact correction is one history entry',
   await exact(page,'15');
   const placed=await snapshot(page);
   expect(floor(placed).nodes).toHaveLength(2);
-  expect(lengths(placed)).toEqual([15]);
+  // CI #80: Math.hypot returned 14.999999999999998 for 15 ft.
+  // Preserve wall cardinality and verify canonical feet to six decimal places.
+  expect(floor(placed).walls).toHaveLength(1);
+  expect(lengths(placed)[0]).toBeCloseTo(15,6);
   await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
   expect(floor(await snapshot(page)).nodes).toHaveLength(0);
   await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();
