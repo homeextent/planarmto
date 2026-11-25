@@ -40,6 +40,7 @@ export function boundaryAt(p:Point,entities:RoofEntity[],tolerance:number){
 }
 export function moveRoofVertex(entities:RoofEntity[],id:string,index:number,next:Point):RoofEntity[]{
  const e=entities.find(e=>e.id===id);if(!e||!('polygon' in e)||!e.polygon[index])throw Error('Select a polygon vertex');
+ if(e.kind==='roofSurface'&&e.derivation)throw Error('Derived surfaces must be revised through their complete derivation group.');
  const p=e.polygon[index],same=(q:Point)=>Math.hypot(p.x-q.x,p.y-q.y)<1e-6;
  const moved=entities.map(q=>{
   if(q.id===id&&'polygon' in q){const polygon=q.polygon.map((v,i)=>i===index?next:v);if(q.kind==='roofPlane'&&index===0&&q.elevationFt!==null){const dz=verticalChange(p,next,q.pitchRise,q.slopeDegrees);if(dz===null)throw Error('Specify slope before moving the elevation reference vertex.');return {...q,polygon,elevationFt:q.elevationFt+dz};}return {...q,polygon};}
@@ -52,6 +53,7 @@ export function moveRoofVertex(entities:RoofEntity[],id:string,index:number,next
 export function resizeRoofRectangle(entities:RoofEntity[],id:string,width:number,depth:number):RoofEntity[]{
  const e=entities.find(q=>q.id===id);
  if(!e||!('polygon' in e))throw Error('Select a rectangular roof area.');
+ if(e.kind==='roofSurface'&&e.derivation)throw Error('Derived surfaces must be revised through their complete derivation group.');
  if(e.kind==='roofPlane'&&entities.some(q=>(q.kind==='roofEdge'&&q.planeIds.includes(id))||(q.kind==='roofOpening'&&q.planeId===id)))throw Error('Remove dependent edges/openings before resizing a roof plane.');
  const polygon=resizeRectangle(e.polygon,width,depth);
  const next=entities.map(q=>q.id===id?{...e,polygon}:q);
