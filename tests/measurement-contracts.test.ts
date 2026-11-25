@@ -9,7 +9,9 @@ const plane:RoofEntity={id:'p',physicalId:'roof-p',assemblyId:'shingles',source:
 const fresh=()=>createProjectDocument(createBlankProject(),'floor');
 test('specialist entities persist, retain missing values and reject wrong workspace types',()=>{
  const doc=addWorkspace(fresh(),'r','Roof','roof');
- const next=replaceSpecialistEntities(doc,'r',[plane,{...plane,id:'p2',physicalId:'roof-p2',pitchRise:null}]);
+ const second={...plane,id:'p2',physicalId:'roof-p2',pitchRise:null,polygon:plane.polygon.map(p=>({...p,x:p.x+20}))};
+ const next=replaceSpecialistEntities(doc,'r',[plane,second]);
+ assert.throws(()=>replaceSpecialistEntities(doc,'r',[plane,{...second,polygon:plane.polygon}]),/Overlapping roof planes/);
  assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(next)),next);
  assert.equal(doc.workspaces[1].measurements.length,0);
  assert.throws(()=>validateSpecialistEntities('foundation',[plane]),/incompatible/);

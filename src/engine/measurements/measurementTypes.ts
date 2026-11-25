@@ -3,11 +3,31 @@ export type Point = { x: number; y: number };
 export type SpecialistKind = 'roof' | 'foundation' | 'site';
 export type MeasurementSource = { reference: string; note?: string };
 type Identity = { id: string; physicalId: string; assemblyId: string; source: MeasurementSource };
+export type Applicability = 'included'|'excluded'|'unspecified';
+/** Additive v3 metadata. Group identity is independent of quantity identity. */
+export type RoofDerivationBounds={xmin:number;ymin:number;xmax:number;ymax:number};
+export type RoofDerivationMetadata={
+ version:1;
+ groupId:string;
+ planeIds:string[];
+ edgeIds:string[];
+ depths:Record<'north'|'east'|'south'|'west',number>;
+ purpose:'soffit'|'insulation';
+ basis:'horizontal'|'sloped';
+ exclusions:RoofDerivationBounds[];
+ boundaryConfirmed:boolean;
+ cornersConfirmed:boolean;
+ material?:string;
+ thicknessFt?:number;
+ pieceKey:string;
+ /** Omitted means included; unresolved soffit pieces retain geometry without measured quantity. */
+ pendingApplicability?:true;
+};
 export type RoofEntity = Identity & (
-  | { kind: 'roofPlane'; polygon: Point[]; pitchRise: number | null; slopeDegrees: number | null; elevationFt: number | null }
-  | { kind: 'roofEdge'; start: Point; end: Point; planeIds: string[]; edgeType: 'eave'|'rake'|'ridge'|'hip'|'valley'|'abutment'|'parapet'|'unclassified' }
-  | { kind: 'roofOpening'; polygon: Point[]; planeId: string }
-  | { kind: 'roofSurface'; polygon: Point[]; purpose: 'soffit'|'insulation'; pitchRise: number | null; depthFt?: number }
+  | { kind: 'roofPlane'; roofGroupId?: string; polygon: Point[]; pitchRise: number | null; slopeDegrees: number | null; elevationFt: number | null }
+  | { kind: 'roofEdge'; roofGroupId?: string; start: Point; end: Point; planeIds: string[]; applicability?: { fascia?: Applicability; gutter?: Applicability; soffit?: Applicability }; edgeType: 'eave'|'rake'|'ridge'|'hip'|'valley'|'abutment'|'parapet'|'unclassified' }
+  | { kind: 'roofOpening'; polygon: Point[]; planeId: string; deduction?: Applicability }
+  | { kind: 'roofSurface'; derivation?: RoofDerivationMetadata; polygon: Point[]; purpose: 'soffit'|'insulation'; pitchRise: number | null; depthFt?: number; insulationType?: string; surfaceBasis?: 'horizontal'|'sloped' }
 );
 export type FoundationEntity = Identity & (
   | { kind: 'foundationWall'|'stripFooting'; start: Point; end: Point; widthFt: number | null; heightFt: number | null; elevationFt: number | null }
@@ -38,6 +58,7 @@ const str = (x: unknown) => typeof x === 'string' && x.trim().length > 0;
 const num = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 const positiveOrMissing = (x: unknown) => x === null || (num(x) && x > 0);
 const finiteOrMissing = (x: unknown) => x === null || num(x);
+const applicability = (v: unknown) => v === undefined || ['included','excluded','unspecified'].includes(v as string);
 const pitch = (x: unknown) => x === null || (num(x) && x >= 0);
 const point = (x: unknown): x is Point => obj(x) && num(x.x) && num(x.y);
 function check(ok: unknown, msg: string): asserts ok { if (!ok) throw new Error('Invalid measurement: '+msg); }
@@ -61,11 +82,23 @@ export function validateSpecialistEntities(type: string, entities: unknown): ass
     check(!physicalKeys.has(key),'duplicate specialist physical identity'); physicalKeys.add(key);
     check(e.source.note===undefined||typeof e.source.note==='string','invalid source note');
     check(allowed[type as SpecialistKind].includes(e.kind),'entity incompatible with workspace');
+    if(e.roofGroupId!==undefined)check((e.kind==='roofPlane'||e.kind==='roofEdge')&&str(e.roofGroupId),'invalid roof group identity');
+    if(e.derivation!==undefined){
+      const d=e.derivation;
+      const refs=(v:unknown)=>Array.isArray(v)&&v.length>0&&v.every(str)&&new Set(v).size===v.length;
+      check(e.kind==='roofSurface'&&obj(d)&&d.version===1&&str(d.groupId)&&str(d.pieceKey)&&refs(d.planeIds)&&refs(d.edgeIds),'invalid roof derivation identity/references');
+      check(obj(d.depths)&&Object.keys(d.depths).length===4&&['north','east','south','west'].every(k=>num(d.depths[k])&&d.depths[k]>=0),'invalid derivation depths');
+      check(d.purpose===e.purpose&&d.basis===e.surfaceBasis&&['horizontal','sloped'].includes(d.basis)&&typeof d.boundaryConfirmed==='boolean'&&typeof d.cornersConfirmed==='boolean','invalid derivation purpose/basis');
+      check(Array.isArray(d.exclusions)&&d.exclusions.every(b=>obj(b)&&[b.xmin,b.ymin,b.xmax,b.ymax].every(num)&&b.xmax>b.xmin&&b.ymax>b.ymin),'invalid derivation exclusions');
+      check(d.pendingApplicability===undefined||(d.pendingApplicability===true&&d.purpose==='soffit'),'invalid derived pending applicability');
+      check(d.material===e.insulationType&&d.thicknessFt===e.depthFt,'derived surface material/thickness mismatch');
+      check(d.purpose==='soffit'?d.basis==='horizontal'&&d.exclusions.length===0&&d.material===undefined&&d.thicknessFt===undefined:d.boundaryConfirmed===true&&str(d.material),'invalid derivation confirmation');
+    }
     switch(e.kind) {
       case 'roofPlane': check(polygon(e.polygon)&&pitch(e.pitchRise)&&finiteOrMissing(e.elevationFt)&&(e.slopeDegrees===null||(num(e.slopeDegrees)&&e.slopeDegrees>=0&&e.slopeDegrees<360)),'roof plane'); break;
-      case 'roofEdge': check(line(e)&&Array.isArray(e.planeIds)&&e.planeIds.length>0&&e.planeIds.length<=2&&new Set(e.planeIds).size===e.planeIds.length&&['eave','rake','ridge','hip','valley','abutment','parapet','unclassified'].includes(e.edgeType),'roof edge'); break;
-      case 'roofOpening': check(polygon(e.polygon)&&str(e.planeId),'roof opening'); break;
-      case 'roofSurface': check(polygon(e.polygon)&&['soffit','insulation'].includes(e.purpose)&&pitch(e.pitchRise)&&(e.depthFt===undefined||num(e.depthFt)&&e.depthFt>0),'roof surface'); break;
+      case 'roofEdge': check(line(e)&&Array.isArray(e.planeIds)&&e.planeIds.length>0&&e.planeIds.length<=2&&new Set(e.planeIds).size===e.planeIds.length&&['eave','rake','ridge','hip','valley','abutment','parapet','unclassified'].includes(e.edgeType),'roof edge'); check(e.applicability===undefined||(obj(e.applicability)&&Object.keys(e.applicability).every(k=>['fascia','gutter','soffit'].includes(k))&&Object.values(e.applicability).every(applicability)),'edge applicability'); break;
+      case 'roofOpening': check(polygon(e.polygon)&&str(e.planeId),'roof opening'); check(applicability(e.deduction),'opening deduction'); break;
+      case 'roofSurface': check(polygon(e.polygon)&&['soffit','insulation'].includes(e.purpose)&&pitch(e.pitchRise)&&(e.depthFt===undefined||num(e.depthFt)&&e.depthFt>0),'roof surface'); check((e.insulationType===undefined||str(e.insulationType))&&(e.surfaceBasis===undefined||['horizontal','sloped'].includes(e.surfaceBasis))&&(e.surfaceBasis!=='horizontal'||e.pitchRise===0),'surface basis'); break;
       case 'foundationWall': case 'stripFooting': check(line(e)&&positiveOrMissing(e.widthFt)&&positiveOrMissing(e.heightFt)&&finiteOrMissing(e.elevationFt),'foundation line assembly'); break;
       case 'padFooting': case 'slab': case 'foundationRegion': check(polygon(e.polygon)&&positiveOrMissing(e.depthFt)&&finiteOrMissing(e.elevationFt)&&['concrete','insulation','excavation','backfill','granular'].includes(e.purpose)&&(!['padFooting','slab'].includes(e.kind)||e.purpose==='concrete'),'foundation region'); break;
       case 'foundationLine': check(line(e)&&['drainage','waterproofing'].includes(e.purpose)&&(e.heightFt===undefined||num(e.heightFt)&&e.heightFt>0),'foundation linear feature'); break;
@@ -75,7 +108,28 @@ export function validateSpecialistEntities(type: string, entities: unknown): ass
     }
   }
   const byId=new Map(entities.map(e=>[e.id,e]));
+  const quantityIds=new Set(entities.flatMap(e=>[e.id,e.physicalId,e.assemblyId]));
+  const roofGroups=new Set(entities.filter(e=>e.kind==='roofPlane'&&e.roofGroupId!==undefined).map(e=>e.roofGroupId));
+  const derivationPieces=new Set<string>();
+  const derivationSpecs=new Map<string,string>();
   for(const e of entities) {
+    if(e.roofGroupId!==undefined){
+      check(!quantityIds.has(e.roofGroupId),'roof group identity collides with quantity identity');
+      check(roofGroups.has(e.roofGroupId),'roof group has no plane');
+      if(e.kind==='roofEdge')check(e.planeIds.every((id:string)=>byId.get(id)?.roofGroupId===e.roofGroupId),'roof group edge crosses group ownership');
+    }
+    if(e.kind==='roofSurface'&&e.derivation!==undefined){
+      const d=e.derivation;
+      check(d.planeIds.every((id:string)=>byId.get(id)?.kind==='roofPlane')&&d.edgeIds.every((id:string)=>byId.get(id)?.kind==='roofEdge'&&byId.get(id).planeIds.every((p:string)=>d.planeIds.includes(p))),'missing derivation source reference');
+      check(!quantityIds.has(d.groupId),'derivation group identity collides with quantity identity');
+      check(!roofGroups.has(d.groupId),'roof and derivation group identities must be distinct');
+      const key=JSON.stringify([d.groupId,d.pieceKey]);
+      check(!derivationPieces.has(key),'duplicate derivation piece');derivationPieces.add(key);
+      const {pieceKey,...spec}=d;
+      const canonical=JSON.stringify([spec.version,spec.planeIds,spec.edgeIds,spec.depths.north,spec.depths.east,spec.depths.south,spec.depths.west,spec.purpose,spec.basis,spec.exclusions.map((b:RoofDerivationBounds)=>[b.xmin,b.ymin,b.xmax,b.ymax]),spec.boundaryConfirmed,spec.cornersConfirmed,spec.material,spec.thicknessFt]);
+      check(!derivationSpecs.has(d.groupId)||derivationSpecs.get(d.groupId)===canonical,'inconsistent derivation group parameters');
+      derivationSpecs.set(d.groupId,canonical);
+    }
     if(e.kind==='roofEdge') check(e.planeIds.every((id:string)=>byId.get(id)?.kind==='roofPlane'),'missing roof plane reference');
     if(e.kind==='roofOpening') check(byId.get(e.planeId)?.kind==='roofPlane','missing opening plane');
     if(e.kind==='siteLine'&&['ledger','railing','open'].includes(e.purpose)) {

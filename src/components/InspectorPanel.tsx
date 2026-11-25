@@ -1,4 +1,6 @@
 import React from 'react';
+import {parseDimension} from '../engine/precisionDrafting';
+import {resizeWallSegment} from '../engine/floorPrecision';
 import {
   FloorplanState,
   SelectionState,
@@ -137,14 +139,10 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                Length (Derived)
+                Length (centerline)
               </label>
-              <input
-                type="text"
-                disabled
-                value={geom ? `${geom.length.toFixed(2)} ft` : '-'}
-                className="w-full bg-slate-950/60 border border-slate-800/80 rounded-lg px-2 py-1 text-xs text-slate-400 font-mono"
-              />
+              <input key={wall.id+'-'+geom?.length} aria-label="Wall centerline length" defaultValue={geom?String(Number((state.settings.unitSystem==='metric'?geom.length*.3048:geom.length).toFixed(6))):''} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs" onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur()}} onBlur={e=>{const n=parseDimension(e.target.value,state.settings.unitSystem==='metric');if(n!==null&&geom&&Math.abs(n-geom.length)<1e-6)return;try{if(n===null)throw Error('Enter a positive dimension.');onChange(resizeWallSegment(state,wall.id,n));}catch(err){e.target.value=geom?String(Number((state.settings.unitSystem==='metric'?geom.length*.3048:geom.length).toFixed(6))):'';alert(err instanceof Error?err.message:String(err));}}}/>
+              <p className="text-[10px] text-slate-400">Start fixed; free end only.</p>
             </div>
             <div>
               <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">

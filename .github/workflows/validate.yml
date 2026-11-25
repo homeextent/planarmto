@@ -17,7 +17,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -36,10 +36,24 @@ jobs:
         run: npx --no-install tsx --test tests/workspace-controller.test.ts
       - name: Specialist measurement contract tests
         run: npx --no-install tsx --test tests/measurement-contracts.test.ts
+      - name: Roof measurement regression tests
+        run: npx --no-install tsx --test tests/roof-measurements.test.ts
       - name: Production build
         run: npm run build
       - name: Dependency audit
         run: npm audit --audit-level=high
+      - name: Install Chromium test browser
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Browser interaction regression tests
+        run: npx --no-install playwright test
+      - name: Upload browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failure-diagnostics
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: PHP syntax validation
         run: php -l planar-mto.php
       - name: Verify bundled PDF worker

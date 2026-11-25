@@ -502,6 +502,7 @@ export interface ProjectSettings {
 }
 
 export type ActiveTool =
+  | 'roof_generate' | 'roof_plane' | 'roof_edge' | 'roof_opening' | 'roof_soffit' | 'roof_insulation' | 'roof_vertex'
   | 'select'
   | 'wall_pen'
   | 'wall_rect'
@@ -550,7 +551,7 @@ export type ActiveTool =
   | 'calibrate_scale';
 
 export interface SelectionState {
-  type: 'none' | 'node' | 'wall' | 'aperture' | 'stamp' | 'room' | 'deck' | 'hardscape' | 'annotation' | 'underlay' | 'multiple';
+  type: 'roof' | 'none' | 'node' | 'wall' | 'aperture' | 'stamp' | 'room' | 'deck' | 'hardscape' | 'annotation' | 'underlay' | 'multiple';
   id?: string;
   ids?: string[];
 }

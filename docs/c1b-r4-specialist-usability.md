@@ -1,0 +1,114 @@
+# C.1B-R4 — Specialist measurement usability and thermal boundary
+
+## Authority and acceptance status
+
+Owner agreed to R4.1–R4.8 and clarified that roof perimeter includes overhangs, and that horizontal attic/ceiling insulation and sloped deck insulation should derive from a contractor-confirmed thermal boundary inside the overhang where appropriate. Owner then authorized preparation of the coordinated technical specification. The initial proposed contract below is retained as the approved implementation scope; see the R4-E status and acceptance record at the end. No authorization to merge is implied.
+
+Historical baseline feature 93a7786f3d1572696a8406a584fa35debf117255, CI #88 run 45518557365: 28/28 browser cases and all validation stages passed; retain 62 existing non-browser regressions. Owner reported 21/21 priority local checks passed. Specialist A05, A06, A09 (rectangular generation), A10 passed; A07 and A08 failed acceptance and remain open. Screenshots demonstrate 40 x 30 hip roof with 1200 SF projected, 1341.64 SF gross, 140 LF eaves, 90 LF hips, 10 LF ridge and 13.42 SQ; one explicitly included 30 LF eave gives partial assembly totals. L-shaped plane 300 SF lacks pitch/direction, so actual edge length is pending. Insulation tool activation without a drawn surface does not commit geometry. No evidence of incorrect hip mathematics. Preserve staging 0b55e6a and main 0423cb6; PR #10 draft, no merge until renewed owner acceptance and explicit authorization.
+
+## R4.1 Contextual workflow and carried R3 requirement
+
+Show tool-specific first/second click, polygon finish, exact dimensions, required properties and successful placement guidance. Edge classification should allow direct boundary click without requiring a selected parent; existing classified edge opens inspector instead of duplicating. Display selected edge/plane clearly. Insulation and soffit tools offer manual independent polygon and derived workflow; no implicit creation on activation. Persistent dimensions control shows live dimensions with units separately from editable typed values; preserve captured direction, focus isolation, history and error behavior.
+
+## R4.2 Generator limitations
+
+Rectangular generator remains unchanged in scope. For irregular or ineligible outline report that automatic skeleton generation supports rectangles only; offer manual planes and classified edges. Do not approximate a bounding rectangle or expand skeleton algorithms/dependencies.
+
+## R4.3 Edge dimensions and evidence
+
+Show projected LF independent of pitch, actual LF from directional slope, and named missing inputs for each parent plane. Missing pitch or positive pitch without direction remains unquantified for actual length; explicit zero pitch is flat. Do not infer horizontal solely from eave classification. For shared edges retain both owner references and junction checks. Keep projected reference distinct from actual assembly quantities; no silent substitution. Explain selection and included/excluded/unspecified.
+
+## R4.4 Explicit assembly assignment
+
+Preview a bulk operation by selected classification (default eaves when chosen, not automatic), list target edge identities/count and known LF/pending. Independently select fascia, gutter and soffit statuses; untouched fields remain unchanged. All changes one validated undoable transaction; cancel no mutation. Never assign hips/ridges simply because they exist; excluded or unspecified edges remain explicit. Existing non-target pending edges are not silently excluded: offer explicit exclusion of nonapplicable classifications with preview and confirmation. Show included subtotal plus pending counts/reasons; do not label partial totals complete.
+
+## R4.5 Bounded derived soffit geometry
+
+Initial implementation supports a single axis-aligned rectangular roof outline, either one rectangular plane or a verified tiled set of selected planes (hip/gable/shed/flat). Derive exterior outline from actual boundary segments and coverage reconciliation; bounding extent may be used only after proving exact rectangle coverage, nonoverlap and ownership. Reject irregular outline, gaps, disconnected islands, unsupported partial side segmentation and unresolved boundaries, with manual alternative. No new runtime dependency.
+
+Accept explicit horizontal overhang depth in canonical feet per full side (north/east/south/west), with uniform entry convenience. A side may be split into multiple classified exterior edges only if full side is reconciled and depth/applicability uniform; conflicting values refuse derivation, do not average. Zero depth is explicit; missing depth is unknown. Depth is horizontal roof perimeter to specified wall line, not thickness or sloped distance. Physical overhang can exist without soffit finish: depth and applicability are distinct. Require all four depths to derive the inner rectangle. For bounds [xmin,xmax] x [ymin,ymax], inner bounds [xmin+dW,xmax-dE] x [ymin+dN,ymax-dS]. Require positive interior extents; nonfinite/negative/collapsed inputs rejected.
+
+Partition ring into four nonoverlapping polygons, e.g. north/south span entire width, east/west span interior y extent; deterministic corner ownership visible in preview. Only included side strips contribute soffit area, excluded strips contribute none, unspecified strips remain pending. If adjacent applicability differs, corner allocation must be explicitly previewed/confirmed, never infer an extra finished corner. Horizontal soffit SF is sum of accepted disjoint strips, not perimeter times depth. Zero-depth strip omitted; no degenerate polygons. Soffit run LF remains actual edge length, independent of SF. Sloping soffit, partial side strips, irregular offsets and ambiguous corners use manual independent surface polygons. No inferred overhang from legacy project setting.
+
+## R4.6 Thermal boundary and insulation
+
+Preview inner rectangle as proposed exterior-wall footprint, never as automatically conditioned area. Contractor explicitly confirms or defines a separate manual boundary (e.g. garage/porch exclusion). Supported first derivation: confirmed rectangular inner footprint, or explicitly drawn simple manual boundary for independent surfaces. For derived boundary exclusions, support bounded axis-aligned rectangular exclusions fully within footprint, nonoverlapping; partition into disjoint rectangles before calculation. Unsupported complex exclusions use manual surfaces; no approximate subtraction. A manual boundary may differ from wall line for cantilevers, conditioned porches, roof deck termination etc. Do not automatically deduct soffit finish SF: subtract actual physical overhang zone via geometry, regardless of finish applicability. Do not infer conditioned space from roof geometry or import floor registration.
+
+Horizontal ceiling/attic basis: area of confirmed projected boundary minus explicit thermal exclusions, independent of roof pitch. Sloped deck basis: intersect confirmed boundary pieces with each selected roof plane; calculate projected intersection x hypot(1,pitchRise/12) for each, then sum. Initial clipping supports verified convex roof-plane polygons with rectangular boundary pieces; unsupported concave or disconnected intersections refuse with manual workflow. Verify conservation of projected area and nonoverlap; missing pitch leaves affected sloped contribution pending. Roof covering openings are not automatically thermal exclusions; explicit confirmation of relevant skylight/penetration/ceiling exclusions required. Never count both ceiling and deck as same thermal coverage by default; separately justified layers require future explicit policy or manual reconciliation.
+
+Material and basis separate: blown cellulose, blown fiberglass, fiberglass batt, mineral wool batt, open/closed-cell foam and other. Area SF for all; foam BF = actual insulated SF x thickness inches; nonfoam geometric volume CF = actual SF x thickness ft only if extending shared quantity unit contract is approved. Otherwise show CF as clearly labelled informational geometric value, not contribution; no bag count, R-value, waste, rate or procurement assumptions. Thickness missing means volume pending, not zero. Preserve manual 1000 SF x 6 in = 6000 BF fixture.
+
+## Source ownership, persistence and lifecycle
+
+Canonical source geometry remains authority. Proposed additive v3 metadata: explicit derivation group ID, source plane/edge IDs, four physical overhang depths, confirmed boundary/exclusion geometry, basis, material/depth and versioned derivation method; generated polygons have stable identities and provenance. Final exact shape to be reviewed against measurementTypes/projectDocument validation before implementation; no schema bump or silent migration. Existing records without metadata remain manual and unchanged. Persist parameters and source IDs, not authoritative derived totals. Validate on import, restore and mutation; deterministic recomputation or explicit stale/refusal on dependency change. Prefer bounded guard blocking geometry/pitch/edge deletion or replacement affecting derived group until explicit remove/rederive transaction; never leave stale quantities. Derived polygons not independently editable without explicit detach/reconciliation. Preview/cancel no mutation; Apply one atomic history entry across group, repeat rederive replaces group rather than appends. Keep unrelated geometry and settings. Enforce same-purpose projected overlap guard for manual/derived surfaces and group/source identity uniqueness; no automatic dedup by equal area. Do not double count cross-workspace authority; C.1E handles integrated ownership. Report pending, never silently zero. No rates/estimate/print until C.2.
+
+## R4.7 Diagnostics
+
+Per contribution display measured subtotal, unresolved count and human-readable reasons linked to named edge/plane/surface (pitch/direction, applicability, depth, basis, material, boundary confirmation). Distinguish explicit exclusion, no surface drafted, incomplete inputs and zero measured. Do not treat a 30 LF subtotal as complete. Rename gutter as Eavestrough (gutter); explain soffit run vs area. Keep geometry/topology rejection actionable, no UUID-only warnings. Selection and proposed geometry preview visible on canvas.
+
+## R4.8 Regression and acceptance matrix
+
+Preserve 62 + 28 baseline tests. Pure geometry tests use independent analytical expectations, browser tests exercise actual controls and export canonical JSON, inspect traces/screenshots/logs before corrections. No weakening tests, retries or sleep to hide defects. Required fixtures (canonical feet, six decimal precision where appropriate):
+- 40 x 30, uniform 2 ft inset: projected 1200 SF, eaves 140 LF, inner 36 x 26 = 936 SF, inner perimeter 124 LF, soffit ring 264 SF, not 280.
+- Uniform 6:12: gross 1200*hypot(1,.5)=1341.640786499874 SF; sloped thermal 936*hypot(1,.5)=1046.4798134699016 SF; 6 in foam horizontal 5616 BF, sloped 6278.878880819409 BF; horizontal nonfoam geometric volume 468 CF.
+- Nonuniform W=1/E=2/N=3/S=0: inner 37 x 27=999 SF; full ring 201 SF; no corner overlap; partial assignments reconcile disjoint strips.
+- Zero overhang explicit, missing depth pending, negative/excessive depth rejected, irregular/disconnected/gapped selection refused.
+- Multiple pitches: independent per-plane clipped area times each pitch factor; preserve area conservation; missing pitch pending; no inferred openings.
+- Thermal exclusion and manual fallback; overlap/manual-derived duplicate refusal; repeat apply, preview/cancel, undo/redo, dependency edit/delete, save/reopen/export/import, workspace isolation.
+- Edge classification and exact lengths; 30 LF partial status, all four eaves 140 LF after explicit assignment and explicit nonapplicable exclusions; no automatic assignment to internal hips/ridge; missing slope diagnostics.
+- Browser: direct edge selection, bulk preview/apply/cancel, manual insulation 40 x 25 horizontal foam 6 in, derived ring and thermal preview/apply with exact output, both thermal bases, focus/live dimensions, irregular generation message, persisted evidence and reporting gate. Verify all baseline regressions.
+- Local owner acceptance: retain previously passed 21 priority checks and A05/A06/A09/A10 as historical results; rerun affected regressions and A07/A08 with new controls, 40 x 30 hip fixtures and manual L-shape fallback; confirm limits and any deferred cases; exact successful final SHA. No staging merge before explicit authorization.
+
+## Delivery sequence
+
+R4-A: record acceptance and implement diagnostics/tool guidance/live dimensions + focused browser tests. R4-B: bulk assignments + tests. R4-C: pure bounded geometry derivation and validated persistence/dependency contract + analytical tests. R4-D: integrated preview/apply/manual fallback UI + browser tests. R4-E: final coverage/technical review, synchronized README/CHANGELOG/SYSTEM_BIBLE/DEVELOPER/milestone docs and renewed local acceptance. One feature branch, no runtime dependencies, no hosting or production changes. Decisions requiring owner confirmation: bounded rectangular derivation and manual fallback for unsupported shapes; explicit corner allocation for mixed soffit applicability; CF display-only versus additive contribution unit. No implementation claimed at this specification checkpoint.
+
+## Owner implementation authorization and R4.9 — 2026-11-24
+
+Owner approved R4-A through R4-E including the bounded derivation specification at dc2abef and requested implementation, with additional observation: a generated hip roof cannot be deleted as a whole without manually deleting dependent edges and openings. Screenshot confirms the existing protective deletion warning. Add R4.9 as part of the integrated candidate. Preserve staging and main; no additional preliminary approval needed for the approved work packages. Stop for renewed integrated owner acceptance before merge.
+
+R4.9: Generated roof grouping must be distinct from physicalId/assemblyId quantity identities. Add optional validated v3 roof group metadata with stable identity, no schema bump. Existing generated roofs without group metadata must not be automatically grouped from source label alone; offer explicit connected-component selection with review, or graphical selection. Select entire group from a selected member; individual plane/edge selection remains. Roof-only shift-click toggle and drag rectangle window (left-to-right fully contained) / crossing (right-to-left intersects or contains) selection; do not change floor selection or pan/zoom. Geometry hit testing in world coordinates, including polygon containment and segment intersection; no bounding-box-only false positives. Show count and highlight selected items. Escape clears; keyboard Delete must respect editable focus. Preview dependency closure and explicit confirmation before deleting: edges/openings referencing deleted planes, linked derived groups and surfaces, including shared edges; preserve unrelated planes, edges, independent surfaces, annotations and other workspaces. Never implicitly delete another plane merely because it shares an edge. If closure cannot be safely reconciled, refuse with named reasons. Individual deletion remains guarded. One validated atomic history transaction; cancel unchanged; Undo/Redo restores exact IDs and all affected geometry. Persist group metadata and validate references; no automatic grouping of old records. Browser tests: generated 4-plane/9-edge hip group selection and deletion, cancellation, Undo/Redo, unrelated geometry preservation, shared-edge dependency closure, window/crossing/shift selection, manual independent surfaces retained, linked derived group handling, JSON round trip, keyboard focus. Local owner acceptance includes graphical selection and whole-roof deletion. R4-A begins with contextual instructions, edge diagnostics and live dimensions; implement R4.9 alongside dependency contract and integrated UI in R4-C/D.
+
+
+## R4-E closeout status
+
+Owner authorized closeout after CI #124. Verified exact commit `73680daf5c7194bb57ba6e1e21493ec858b65f81`, [CI #124](https://github.com/homeextent/planarmto/actions/runs/45541929342), job 138962262468: 17 persistence, 8 architecture, 7 lifecycle, 5 specialist contract, 50 roof engine and 38 browser tests passed (125 total); TypeScript, build, audit, PHP syntax, bundled PDF worker and isolated WordPress integration passed. The six dedicated R4 browser workflows cover assembly deletion, directional selection, integrated soffit/deck derivation and group revision, pending soffit reload, thermal exclusions, and editable focus/independent surface preservation.
+
+R4-E changes: 6fb6ce7 refreshes the successful exact placement reference, 7125af0 distinguishes wholly pending perimeter lengths and insulation area/volume from measured zero, 3e85cd7 adds two browser tests and strengthens repeated correction assertions. Target 87 non-browser + 40 browser = 127. **Historical preparation checkpoint superseded by formal owner acceptance below; not yet integrated.** Derived plan previews are in the inspector. Source edits invalidating dependent groups are refused until explicit group removal/rederivation; no combined source-edit-and-rederive transaction or automatic legacy grouping. Conflicting soffit applicability on a split side requires manual soffit reconciliation; it does not block insulation derivation if the boundary is otherwise reconciled. General irregular skeletons, complex thermal exclusions and sloped/partial-side soffits remain manual. No rates, structural design, procurement or consolidated estimate/print. No new runtime dependencies or schema bump.
+
+## R4-E integrated owner acceptance
+
+Use disposable synthetic projects, not customer records. Verify clean feature checkout and exact successful final CI SHA before testing. Run npm ci, npm run lint, npm run build, npm run preview -- --host 127.0.0.1; open localhost:4173. Record commit, date, browser, outcome and evidence. Repeat affected R3.9 checks (especially floor precision, closure, generation, openings and workspace isolation). Record pass/fail/deferred/untested individually.
+
+- [ ] R4-L01: Floor and roof two-click placement; type exact dimensions, Enter, repeat correction. Live placement reference updates. Continue wall at corrected endpoint. Undo/Redo; editable focus safe; invalid dimensions refused; polygon closure and Ortho preserved.
+- [ ] R4-L02: Generate 40 x 30 ft hip at 6:12, preview/cancel then apply. Four planes, nine edges, projected 1200 SF, gross 1341.64 SF, 140 LF eaves, 90 LF hips, 10 LF ridge. Confirm no inferred assembly applicability; test other rectangular generators as needed.
+- [ ] R4-L03 (A07): Select/classify existing edge directly; no duplicate. Projected LF versus actual slope LF; named missing pitch/direction. Preview bulk eaves assignment; cancel unchanged, apply included fascia/eavestrough/soffit run and explicitly exclude internal edges. 140 LF each. Wholly unknown lengths not quantified, partial totals pending. Undo/Redo.
+- [ ] R4-L04 (A08): Select entire assembly, derive 2 ft uniform horizontal overhang. Preview physical ring 264 SF, interior 936 SF and 124 LF. Apply, rederive 3 ft (384 SF ring, 816 SF interior), stable IDs; cancel unchanged. Test nonuniform W1/E2/N3/S0 (201 SF ring, 999 SF inner). On fresh source with north unspecified, confirm mixed corners and apply: 184 SF measured + 80 SF pending, persist pending geometry. Resolve by removing/rederiving group, not unsafe source mutation.
+- [ ] R4-L05 (A08): Copy 2 ft depths explicitly, confirm thermal boundary, horizontal 936 SF; separately replace with sloped 6:12 1046.48 SF; foam 6 in 5616 BF horizontal or 6278.88 BF sloped. Do not count both. Confirm nonfoam CF informational, missing thickness/pitch pending, wholly pending area/volume not zero. Derived individual geometry/material controls protected.
+- [ ] R4-L06: Exclude 20 x 10 ft rectangular unconditioned area inside 36 x 26 ft footprint; horizontal 736 SF, 6 in nonfoam 368 CF reference only. Reject outside/overlap; require confirmation; preview/cancel no mutation.
+- [ ] R4-L07: Roof Shift-click toggles, left-to-right full containment, right-to-left crossing; visible selection count/highlight, Escape clears, pan/zoom unaffected. Floor marquee unchanged.
+- [ ] R4-L08: Whole-assembly selection and delete review; cancel unchanged, confirm dependent edges/openings/derived groups removed; unrelated independent surface, annotations and floor retained. Undo/Redo exact IDs. Delete while editing text never deletes geometry. Single-plane dependent deletion remains guarded.
+- [ ] R4-L09: L-shape automatic generator refusal actionable; manual polygon/edge/soffit/insulation workflow. No bounding rectangle approximation. Confirm irregular and other deferred scope.
+- [ ] R4-L10: Save/export/reopen/import, exact geometry/group metadata and pending quantities preserved. Independent floor and roof calibration/history/underlays; consolidated reporting blocked. Check visual usability, no runtime errors.
+
+The checklist above is retained as the test protocol; the owner-reported results are recorded below. PR #10 remains unmerged pending final documentation-only CI.
+
+
+## R4-E formal owner acceptance
+
+Owner reported all ten R4-L01–L10 local acceptance checks passed on candidate `fb60747f83183016694f4c54ac2dbc609087f5e5` (2026-11-24 Toronto local date); zero failures or deferred checks reported. A07 and A08 remediation accepted. [CI #129](https://github.com/homeextent/planarmto/actions/runs/45542671356), job 138964708488, passed 127/127 tests (87 engine/contract, 40 Chromium) and all validation stages on that exact commit. Owner authorized documentation-only closeout, staging integration and post-merge CI, subject to final exact-head CI and applicable protections. Production main/v2.15.1 remains separately gated. No application changes after owner-tested source are authorized.
+
+| Check | Owner result |
+|---|---|
+| R4-L01 — Precision drafting | Pass |
+| R4-L02 — Hip roof generation | Pass |
+| R4-L03 — Perimeter assemblies | Pass |
+| R4-L04 — Automatic soffit derivation | Pass |
+| R4-L05 — Insulation derivation | Pass |
+| R4-L06 — Thermal exclusions | Pass |
+| R4-L07 — Graphical selection | Pass |
+| R4-L08 — Complete roof deletion | Pass |
+| R4-L09 — Irregular roof workflow | Pass |
+| R4-L10 — Persistence and workspace isolation | Pass |
+
+Acceptance evidence is the owner's submitted register, not independently observed local sessions or per-step screenshots. No new defect reported. General irregular automatic skeletons and unsupported complex thermal/soffit geometry remain intentionally manual; C.1E and C.2 remain separately gated. Final documentation-only CI and post-merge staging CI pending.

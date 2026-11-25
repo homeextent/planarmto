@@ -1,4 +1,6 @@
 import type { FloorplanState, ProjectSettings } from '../types';
+import { validateRoofTopology } from './measurements/roofMeasurements';
+import type { RoofEntity } from './measurements/measurementTypes';
 import { validateSpecialistEntities } from './measurements/measurementTypes';
 import type { SpecialistEntity, ScopeAssignment } from './measurements/measurementTypes';
 export type { ScopeAssignment } from './measurements/measurementTypes';
@@ -113,6 +115,7 @@ function validateDocument(value: unknown): asserts value is ProjectDocument {
     ids.set(w.id, w.type as WorkspaceType);
     validateGeometry(w.geometry);
     validateSpecialistEntities(w.type as string, w.measurements);
+    if(w.type==='roof')validateRoofTopology(w.measurements as RoofEntity[]);
     requireValue(!('measurements' in w.geometry), 'specialist entities must be workspace-owned');
     requireValue(!('settings' in w.geometry) && !('activeProjectId' in w.geometry)
       && !('activeProjectName' in w.geometry), 'workspace contains project-owned fields');
