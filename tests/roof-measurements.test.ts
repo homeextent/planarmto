@@ -293,3 +293,53 @@ test('R4 derived metadata survives project JSON and history restoration; stale i
  assert.throws(()=>deserializeProjectDocument(JSON.stringify(corrupt)),/Stale/);
  assert.equal(canReportProjectEstimate(redo),false);
 });
+
+import {replaceDerivedRoofGroup,removeDerivedRoofGroup} from '../src/engine/measurements/roofDerivation';
+const groupSurfaces=(es:RoofEntity[],groupId:string)=>es.filter((e):e is DerivedSurface=>e.kind==='roofSurface'&&e.derivation?.groupId===groupId);
+test('R4 atomic creation and repeated derivation retain piece identities and replace quantities',()=>{
+ const source=sourceRoof(),{spec}=derivedFixture(source,'soffit');
+ const original=JSON.stringify(source);let n=0;const allocate=()=> 'atomic-'+ ++n;
+ const first=replaceDerivedRoofGroup(source,spec,allocate);
+ assert.equal(JSON.stringify(source),original);assert.equal(n,4);
+ near(value(first,'roof.soffit.area'),264);
+ const before=JSON.stringify(first);
+ const revised=replaceDerivedRoofGroup(first,{...spec,depths:uniform(3)},allocate);
+ assert.equal(JSON.stringify(first),before);assert.equal(n,4);
+ assert.equal(revised.length,first.length);
+ near(value(revised,'roof.soffit.area'),384);
+ assert.deepEqual(groupSurfaces(revised,spec.groupId).map(e=>[e.id,e.physicalId,e.assemblyId,e.derivation!.pieceKey]),groupSurfaces(first,spec.groupId).map(e=>[e.id,e.physicalId,e.assemblyId,e.derivation!.pieceKey]));
+ assert.deepEqual(revised.filter(e=>e.kind!=='roofSurface'),source);
+ const repeated=replaceDerivedRoofGroup(revised,{...spec,depths:uniform(3)},allocate);
+ assert.deepEqual(repeated,revised);assert.equal(n,4);
+});
+test('R4 atomic derivation rejects overlapping manual or duplicate groups and invalid replacement without mutation',()=>{
+ const source=sourceRoof(),{spec}=derivedFixture(source,'soffit');
+ let n=0;const allocate=()=> 'atomic-'+ ++n;
+ const first=replaceDerivedRoofGroup(source,spec,allocate),before=JSON.stringify(first);
+ assert.throws(()=>replaceDerivedRoofGroup(first,{...spec,groupId:'duplicate-soffit'},allocate),/Overlapping same-purpose/);
+ assert.throws(()=>replaceDerivedRoofGroup(first,{...spec,depths:uniform(20)},allocate),/positive interior/);
+ assert.throws(()=>replaceDerivedRoofGroup(first,{...spec,purpose:'insulation',material:'closed cell foam'},allocate),/Cannot change/);
+ assert.throws(()=>replaceDerivedRoofGroup(first,{...spec,depths:uniform(0)},allocate),/No included/);
+ assert.equal(JSON.stringify(first),before);
+ const manual:DerivedSurface={...base('manual'),kind:'roofSurface',purpose:'soffit',polygon:rect(0,0,10,2),surfaceBasis:'horizontal',pitchRise:0};
+ assert.throws(()=>replaceDerivedRoofGroup([...source,manual],spec,allocate),/Overlapping same-purpose/);
+});
+test('R4 complete derived removal preserves source and independent measurements; history restores exact identities',()=>{
+ const source=sourceRoof(),s=derivedFixture(source,'soffit'),i=derivedFixture(source,'insulation');
+ const manual:DerivedSurface={...base('independent'),kind:'roofSurface',purpose:'soffit',polygon:rect(50,0,10,2),surfaceBasis:'horizontal',pitchRise:0};
+ let n=0;const allocate=()=> 'atomic-'+ ++n;
+ const first=replaceDerivedRoofGroup([...source,manual],s.spec,allocate);
+ const both=replaceDerivedRoofGroup(first,i.spec,allocate);
+ const before=JSON.stringify(both);
+ const next=removeDerivedRoofGroup(both,s.spec.groupId);
+ assert.equal(JSON.stringify(both),before);
+ assert.deepEqual(next,[...source,manual,...groupSurfaces(both,i.spec.groupId)]);
+ near(value(next,'roof.soffit.area'),20);near(value(next,'roof.insulation.horizontal.volume'),5616);
+ assert.throws(()=>removeDerivedRoofGroup(next,s.spec.groupId),/not found/);
+ const doc=addWorkspace(createProjectDocument(createBlankProject(),'floor'),'roof','Roof','roof');
+ const applied=replaceSpecialistEntities(doc,'roof',both),removed=replaceSpecialistEntities(applied,'roof',next);
+ const undo=restoreWorkspaceSnapshot(removed,'roof',{view:workspaceRenderView(applied),measurements:both});
+ assert.deepEqual(undo.workspaces[1].measurements,both);
+ const redo=restoreWorkspaceSnapshot(undo,'roof',{view:workspaceRenderView(removed),measurements:next});
+ assert.deepEqual(redo.workspaces[1].measurements,next);
+});
