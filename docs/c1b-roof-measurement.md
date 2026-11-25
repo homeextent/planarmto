@@ -65,4 +65,4 @@ Use disposable synthetic projects only. Start from clean feature/c1b-roof-measur
 - [ ] A11 Visual review: stable viewport during first click; usable controls, snap feedback, dimensions, diagnostics, no runtime errors; record any unresolved usability defects.
 - [ ] A12 Confirm irregular automatic skeleton deferral, absence of new runtime dependencies and production changes; formal owner acceptance and separate staging merge authorization.
 
-Status: checklist prepared; final interaction CI and owner execution outstanding. C.1B not integrated; staging 0b55e6a and production 0423cb6 remain protected.
+Status: historical R3 acceptance record retained. Owner reported 21 priority checks passed; A05/A06/A09 (rectangular)/A10 passed, A07/A08 required R4 remediation. R4 implementation and 125/125 tests verified at `73680da` (CI #124); R4-E refinement candidate awaits exact-HEAD CI. Use the renewed [R4 integrated owner acceptance checklist](c1b-r4-specialist-usability.md#r4-e-integrated-owner-acceptance) and rerun affected R3 checks. C.1B not integrated; staging 0b55e6a and production 0423cb6 remain protected.
