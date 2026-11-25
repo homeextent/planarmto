@@ -1,4 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
+import {readFile} from 'node:fs/promises';
+import type {ProjectDocument} from '../../src/engine/projectDocument';
+import type {RoofEntity} from '../../src/engine/measurements/measurementTypes';
 
 async function roofWorkspace(page: Page) {
   await page.goto('/');
@@ -145,4 +148,82 @@ test('selected plane with a dependent classified boundary cannot be silently rep
   await page.getByRole('button',{name:'Generate roof skeleton',exact:true}).click();
   await expect(page.getByRole('alert').filter({hasText:/depend|edge|reference|replace/i})).toBeVisible();
   await expect(entities(page)).toHaveCount(3);
+});
+
+async function roofSnapshot(page:Page):Promise<ProjectDocument>{
+  const [download]=await Promise.all([page.waitForEvent('download'),page.getByTitle('Save Project JSON',{exact:true}).click()]);
+  const path=await download.path();
+  if(!path)throw Error('Missing JSON download');
+  return JSON.parse(await readFile(path,'utf8'));
+}
+const roofOf=(doc:ProjectDocument)=>doc.workspaces.find(w=>w.type==='roof')!.measurements as RoofEntity[];
+
+test('overlapping roof openings are rejected without changing existing geometry',async ({page})=>{
+  await rectangle(page);
+  await dimensions(page,'20,20');
+  await page.getByRole('button',{name:'Roof opening',exact:true}).click();
+  await clickCanvas(page,330,330);
+  await clickCanvas(page,450,450);
+  await expect(entities(page)).toHaveCount(3);
+  const before=await roofSnapshot(page);
+  await page.getByLabel('Select roof entity').selectOption({index:1});
+  await page.getByRole('button',{name:'Roof opening',exact:true}).click();
+  await clickCanvas(page,390,390);
+  await clickCanvas(page,510,510);
+  await expect(page.getByRole('alert').filter({hasText:/overlap/i})).toBeVisible();
+  expect(roofOf(await roofSnapshot(page))).toEqual(roofOf(before));
+});
+
+for(const [type,orientation,planeCount] of [
+  ['gable','horizontal',2],['gable','vertical',2],['shed','90',1],['flat','',1]
+] as const){
+  test('generator '+type+' '+orientation+' reconciles perimeter and pitch',async ({page})=>{
+    await rectangle(page);
+    await dimensions(page,'40,30');
+    await page.getByRole('button',{name:'6:12',exact:true}).click();
+    await page.getByRole('button',{name:'Generate roof skeleton',exact:true}).click();
+    const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Generate Roof Skeleton',exact:true})});
+    await panel.getByLabel('Configuration').selectOption(type);
+    if(type==='gable')await panel.getByLabel('Ridge orientation').selectOption(orientation);
+    if(type==='shed')await panel.getByLabel('Downslope direction').selectOption(orientation);
+    await panel.getByRole('button',{name:'Preview',exact:true}).click();
+    await expect(entities(page)).toHaveCount(2);
+    await panel.getByRole('button',{name:'Apply',exact:true}).click();
+    const roof=roofOf(await roofSnapshot(page));
+    const planes=roof.filter(e=>e.kind==='roofPlane');
+    const edges=roof.filter(e=>e.kind==='roofEdge');
+    expect(planes).toHaveLength(planeCount);
+    expect(edges).toHaveLength(type==='gable'?7:4);
+    expect(planes.reduce((sum,p)=>sum+Math.abs(p.polygon.reduce((a,q,i)=>{const n=p.polygon[(i+1)%p.polygon.length];return a+q.x*n.y-n.x*q.y;},0))/2,0)).toBeCloseTo(1200,6);
+    expect(planes.every(p=>p.pitchRise===(type==='flat'?0:6))).toBe(true);
+    if(type==='gable'){
+      const ridges=edges.filter(e=>e.edgeType==='ridge');
+      expect(ridges).toHaveLength(1);
+      expect(Math.hypot(ridges[0].start.x-ridges[0].end.x,ridges[0].start.y-ridges[0].end.y)).toBeCloseTo(orientation==='horizontal'?40:30,6);
+    }
+    if(type==='shed')expect(planes[0].slopeDegrees).toBe(90);
+  });
+}
+
+test('schema v3 JSON round trip restores roof geometry and blocks consolidated reporting',async ({page})=>{
+  await rectangle(page);
+  await dimensions(page,'40,30');
+  await page.getByRole('button',{name:'6:12',exact:true}).click();
+  const original=await roofSnapshot(page);
+  expect(original.schemaVersion).toBe(3);
+  expect(roofOf(original)).toHaveLength(1);
+  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
+  await expect(entities(page)).toHaveCount(1);
+  page.once('dialog',d=>d.accept());
+  await page.locator('[title="Import JSON Project"] input[type=file]').setInputFiles({name:'synthetic.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(original))});
+  await expect(entities(page)).toHaveCount(2);
+  expect((await roofSnapshot(page)).workspaces).toEqual(original.workspaces);
+  await expect(page.getByRole('status').filter({hasText:/consolidated pricing and reporting unavailable/i})).toBeVisible();
+  const message=page.waitForEvent('dialog');
+  const clicked=page.getByTitle('Print Floorplan & MTO Report (Ctrl+P)',{exact:true}).click();
+  const dialog=await message;
+  const text=dialog.message();
+  await dialog.accept();
+  await clicked;
+  expect(text).toMatch(/estimate and print reporting are unavailable/i);
 });
