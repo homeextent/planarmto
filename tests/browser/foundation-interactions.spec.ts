@@ -401,3 +401,32 @@ test('irregular perimeter drainage preview and apply preserves closed source-lin
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();await expect(entities(page)).toHaveCount(7);
  await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();await expect(entities(page)).toHaveCount(13);
 });
+
+test('continuous foundation drafting retains corrected endpoint and atomic per-segment history',async({page})=>{
+ await page.getByRole('button',{name:'Foundation wall',exact:true}).click();
+ await page.getByLabel('Continuous foundation drafting').check();
+ const canvas=page.locator('canvas').first();
+ await canvas.click({position:{x:250,y:250}});await canvas.click({position:{x:550,y:250}});
+ await page.keyboard.type('40');await page.keyboard.press('Enter');
+ await expect(entities(page)).toHaveCount(2);
+ await page.keyboard.type('30');await page.keyboard.press('Enter');
+ await expect(entities(page)).toHaveCount(2);
+ const first=(await snapshot(page))[0];if(first.kind!=='foundationWall')throw Error('Expected wall');
+ await canvas.click({position:{x:550,y:440}});
+ await expect(entities(page)).toHaveCount(3);
+ await page.keyboard.type('20');await page.keyboard.press('Enter');
+ const next=(await snapshot(page))[1];if(next.kind!=='foundationWall')throw Error('Expected wall');
+ expect(next.start).toEqual(first.end);expect(Math.hypot(next.end.x-next.start.x,next.end.y-next.start.y)).toBeCloseTo(20,6);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();await expect(entities(page)).toHaveCount(2);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();await expect(entities(page)).toHaveCount(1);
+});
+test('invalid exact face-reference placement retains actionable error and no geometry',async({page})=>{
+ await page.getByRole('button',{name:'Foundation wall',exact:true}).click();
+ await page.getByLabel('Foundation wall reference').selectOption('exterior-left');
+ const canvas=page.locator('canvas').first();await canvas.click({position:{x:250,y:250}});await canvas.hover({position:{x:550,y:250}});
+ await page.keyboard.type('40');await page.keyboard.press('Enter');
+ await expect(page.getByRole('alert')).toBeVisible();await expect(entities(page)).toHaveCount(1);
+ await page.getByLabel('Face reference wall thickness').fill('1');
+ await page.getByLabel('Dimensions',{exact:true}).fill('40');await page.getByLabel('Dimensions',{exact:true}).press('Enter');
+ await expect(entities(page)).toHaveCount(2);
+});

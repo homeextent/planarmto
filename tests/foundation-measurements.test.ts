@@ -346,3 +346,18 @@ test('irregular drainage rejects collapsed offsets, partial selection and stale 
  const source=walls[0];if(source.kind!=='foundationWall')throw Error('Expected wall');
  assert.throws(()=>qty([{...source,widthFt:2},...walls.slice(1),...d]));
 });
+
+import {nearestFoundationSnap} from '../src/engine/measurements/foundationSnap';
+test('foundation snapping selects nearest node independently of entity order and falls back to edge',()=>{
+ const a=wall('a',{x:0,y:0},{x:10,y:0}),b=wall('b',{x:0,y:2},{x:10,y:2});delete a.foundation;delete b.foundation;
+ for(const list of [[a,b],[b,a]]){
+  assert.deepEqual(nearestFoundationSnap({x:.1,y:1.8},list,2),{point:{x:0,y:2},kind:'node'});
+  assert.deepEqual(nearestFoundationSnap({x:5,y:.2},list,1),{point:{x:5,y:0},kind:'edge'});
+ }
+ assert.equal(nearestFoundationSnap({x:5,y:10},[a,b],1),null);
+});
+test('foundation snapping uses confirmed physical footprint and closed polygon edges',()=>{
+ const a=wall('a',{x:0,y:0},{x:10,y:0});if(a.kind!=='foundationWall')throw Error('Expected wall');a.widthFt=2;
+ assert.deepEqual(nearestFoundationSnap({x:5,y:1.1},[a],.2),{point:{x:5,y:1},kind:'edge'});
+ const s=region('s',box(0,0,10,10));assert.deepEqual(nearestFoundationSnap({x:-.1,y:5},[s],.2),{point:{x:0,y:5},kind:'edge'});
+});
