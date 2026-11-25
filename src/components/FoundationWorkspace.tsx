@@ -166,7 +166,7 @@ function DrainageGenerator({activePreview,entities,ids,onChange,onPreview}:{enti
  {preview&&<div className="space-y-2">{preview.removedIds.length>0&&<p className="text-amber-300">Replace {preview.removedIds.length} existing components with {preview.members.length} new components.</p>}<p>{preview.length.toFixed(4)} LF</p><button className="bg-emerald-800 rounded p-2" disabled={preview.source!==entities||preview.selection!==key} onClick={()=>{if(preview.source===entities&&preview.selection===key&&onChange(applyFoundationGeneration(entities,preview.members,preview.removedIds)))setPreview(null);else setError('Preview is stale or rejected')}}>Apply drainage</button><button className="bg-slate-700 rounded p-2" onClick={()=>setPreview(null)}>Cancel drainage</button></div>}{error&&<p role="alert" className="text-amber-300">{error}</p>}</details>
 }
 
-function CoordinatedRunEditor({entities,ids,onChange}:{entities:FoundationEntity[];ids:string[];onChange:(e:FoundationEntity[])=>boolean}){
+function CoordinatedRunEditor({entities,ids,onChange}:{key?:string;entities:FoundationEntity[];ids:string[];onChange:(e:FoundationEntity[])=>boolean}){
  const runs=entities.filter(e=>ids.includes(e.id)&&'widthFt' in e);
  const [values,setValues]=useState(()=>Object.fromEntries(runs.map(e=>[e.id,'widthFt' in e?[String(e.widthFt??''),String(e.heightFt??''),String(e.elevationFt??''),String(e.foundation?.joinStartFt??0),String(e.foundation?.joinEndFt??0)]:[]])));
  const [error,setError]=useState('');

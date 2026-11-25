@@ -430,7 +430,8 @@ test('coordinated run edit preserves identities and reconciles stepped junction 
  const edits=[{id:a.id,widthFt:2,heightFt:8,baseFt:0,joinStartFt:0,joinEndFt:0},{id:b.id,widthFt:1,heightFt:4,baseFt:2,joinStartFt:1,joinEndFt:0}];
  const next=editFoundationRuns(before,edits);assert.deepEqual(next.map(e=>[e.id,e.physicalId,e.assemblyId]),before.map(e=>[e.id,e.physicalId,e.assemblyId]));
  assert.ok(qty(next).every(r=>r.status==='measured'));near(qty(next).reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),360/27);
- assert.equal((before[0] as typeof a).widthFt,a.widthFt);
+ if(before[0].kind!=='foundationWall'||a.kind!=='foundationWall')throw Error('Expected foundation walls');
+ assert.equal(before[0].widthFt,a.widthFt);
  assert.throws(()=>editFoundationRuns(before,[edits[0],{...edits[1],heightFt:0}]),/positive dimensions/);
 });
 test('coordinated run edit refuses generated reference width changes and stale dependencies',()=>{
