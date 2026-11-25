@@ -4,6 +4,7 @@
  */
 import {validateSpecialistEntities,type FoundationEntity} from './measurementTypes';
 import {simplePolygon} from './roofMeasurements';
+import {validateDrainageSources} from './foundationDrainageDerivation';
 import {validateEnvelopeSources} from './foundationEnvelopeDerivation';
 import {validateStripSources} from './foundationDerivation';
 import {foundationDetails} from './foundationDetails';
@@ -11,6 +12,7 @@ export function validateFoundationTopology(entities:FoundationEntity[]):void {
  validateSpecialistEntities('foundation',entities);
  validateStripSources(entities);
  validateEnvelopeSources(entities);
+ validateDrainageSources(entities);
  const ids=new Set(entities.map(e=>e.id));
  for(const e of entities){
   if(!e.foundation)continue;

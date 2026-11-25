@@ -186,3 +186,21 @@ test('selected wall derives waterproofing coverage with atomic undo',async({page
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
  await expect(entities(page)).toHaveCount(2);
 });
+
+test('rectangular wall assembly derives exterior drainage with preview and undo',async({page})=>{
+ await page.getByText('Generate rectangular foundation',{exact:true}).click();
+ for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (ft)','0.6666666666666666'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Preview perimeter',exact:true}).click();
+ await page.getByRole('button',{name:'Apply perimeter',exact:true}).click();
+ await page.getByLabel('Select foundation entity').selectOption({index:1});
+ await page.getByRole('button',{name:'Select entire foundation assembly',exact:true}).click();
+ await page.getByText('Derive perimeter drainage',{exact:true}).click();
+ for(const [label,value] of [['Drainage exterior offset (ft)','2'],['Drainage material','pipe'],['Drainage layer identity','drain']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Preview drainage',exact:true}).click();
+ await expect(page.getByText('156.0000 LF',{exact:true})).toBeVisible();
+ await expect(entities(page)).toHaveCount(5);
+ await page.getByRole('button',{name:'Apply drainage',exact:true}).click();
+ await expect(entities(page)).toHaveCount(9);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
+ await expect(entities(page)).toHaveCount(5);
+});
