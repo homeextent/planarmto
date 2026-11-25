@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
-import { displayFoundationDimension, parseFoundationDimension, type FoundationUnit } from '../engine/measurements/foundationUnits';
+import { displayFoundationDimension, formatCompoundFeet, parseFoundationDimension, type FoundationUnit } from '../engine/measurements/foundationUnits';
 
 export const FoundationMetricContext = createContext(false);
 
@@ -10,20 +10,21 @@ interface Props {
   onChange: (feet: string) => void;
   className: string;
   section?: boolean;
+  compound?: boolean;
   metric?: boolean;
   hint?: string;
   accessibleLabel?: string;
 }
 
 /** The parent owns canonical feet. Unedited display rounding never feeds a save. */
-export function FoundationDimensionInput({ label, value, onChange, className, section, metric, hint, accessibleLabel }: Props) {
+export function FoundationDimensionInput({ label, value, onChange, className, section, compound, metric, hint, accessibleLabel }: Props) {
   const contextMetric = useContext(FoundationMetricContext);
   const useMetric = metric ?? contextMetric;
   const unit: FoundationUnit = section ? (useMetric ? 'mm' : 'in') : (useMetric ? 'm' : 'ft');
   const [edit, setEdit] = useState<{ text: string; canonical: string; unit: FoundationUnit }>();
   const text = edit?.canonical === value && edit.unit === unit
     ? edit.text
-    : value && Number.isFinite(Number(value)) ? displayFoundationDimension(Number(value), unit) : '';
+    : value && Number.isFinite(Number(value)) ? (unit==='ft'&&compound?formatCompoundFeet(Number(value)):displayFoundationDimension(Number(value), unit)) : '';
   const suffix = ` (${unit}${hint ? '; ' + hint : ''})`;
 
   return <label className="block">

@@ -74,6 +74,7 @@ interface CadCanvasProps {
   foundationPreview?: FoundationEntity[];
   foundationFilter?: string;
   onFoundationChange?: (entities:FoundationEntity[])=>boolean;
+  onApplyTracedAssembly?: (walls:FoundationEntity[])=>boolean;
   roofEntities?: RoofEntity[];
   commitDraftPlacement?: (token:string,next:FloorplanState|SpecialistEntity[],replace?:boolean)=>boolean;
   onRoofChange?: (entities: RoofEntity[]) => boolean;
@@ -209,6 +210,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   foundationPreview,
   foundationFilter='all',
   onFoundationChange,
+  onApplyTracedAssembly,
   roofEntities,
   onRoofChange,
   commitDraftPlacement,
@@ -3408,6 +3410,11 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           setPerimeterCandidate({source:foundationEntities,members,volume:rows.reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0)});setPerimeterError('');
         }catch(err){setPerimeterCandidate(null);setPerimeterError(err instanceof Error?err.message:String(err))}}}>{rectanglePerimeterTool?'Preview rectangle perimeter':'Preview polygon perimeter'}</button>
         <button disabled={!validPerimeterCandidate} className="bg-emerald-700 disabled:opacity-40 rounded p-2" onClick={()=>{if(validPerimeterCandidate&&foundationEntities&&onFoundationChange?.([...foundationEntities,...validPerimeterCandidate.members])){setPerimeterCandidate(null);setPerimeterOutline(null);onToolChange('select');onSelect({type:'foundation',ids:validPerimeterCandidate.members.map(m=>m.id)})}else setPerimeterError('Preview is stale or placement rejected')}}>{rectanglePerimeterTool?'Apply rectangle perimeter':'Apply polygon perimeter'}</button>
+        {onApplyTracedAssembly&&<button className="bg-sky-800 rounded p-2 disabled:opacity-40" disabled={!validPerimeterCandidate} onClick={()=>{
+          if(validPerimeterCandidate&&onApplyTracedAssembly(validPerimeterCandidate.members)){
+            setPerimeterCandidate(null);setPerimeterOutline(null);onToolChange('select');
+          }else setPerimeterError('The assembly could not be applied. Review the preview and diagnostics.');
+        }}>Apply as foundation assembly</button>}
         <button className="bg-slate-700 rounded p-2" onClick={()=>{setPerimeterCandidate(null);setPerimeterOutline(null);setPerimeterError('');onToolChange('select')}}>{rectanglePerimeterTool?'Cancel rectangle perimeter':'Cancel polygon perimeter'}</button></div>
       </section>}
       {generationOutline&&<section className="absolute top-20 left-4 z-20 bg-slate-900 border border-sky-600 rounded-lg p-4 text-xs space-y-3 w-64 shadow-xl"><h3 className="font-semibold text-sky-300">Generate Roof Skeleton</h3><p>Rectangular roof perimeter · preview only</p><label className="block">Configuration<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.type} onChange={e=>{setGenerationConfig(c=>({...c,type:e.target.value as RoofConfig['type']}));setGenerationPreview(null)}}>{['hip','gable','shed','flat'].map(t=><option key={t}>{t}</option>)}</select></label>{generationConfig.type!=='flat'&&<label className="block">Pitch rise per 12<input className="block w-full bg-slate-800 p-2 rounded" type="number" min="0.01" max="48" step="any" value={generationConfig.pitch} onChange={e=>{setGenerationConfig(c=>({...c,pitch:Number(e.target.value)}));setGenerationPreview(null)}}/></label>}{generationConfig.type==='gable'&&<label>Ridge orientation<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.ridge} onChange={e=>{setGenerationConfig(c=>({...c,ridge:e.target.value as RoofConfig['ridge']}));setGenerationPreview(null)}}><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>}{generationConfig.type==='shed'&&<label>Downslope direction<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.direction} onChange={e=>{setGenerationConfig(c=>({...c,direction:Number(e.target.value) as RoofConfig['direction']}));setGenerationPreview(null)}}>{[[0,'Right'],[90,'Down'],[180,'Left'],[270,'Up']].map(([v,n])=><option key={v} value={v}>{n}</option>)}</select></label>}<p className="text-slate-400">No automatic overhang or assembly allowances. Review against drawings.</p>{generationError&&<p role="alert" className="text-amber-300">{generationError}</p>}<div className="flex gap-2"><button className="bg-sky-700 rounded p-2" onClick={()=>{try{const next=generateRectangularRoof(generationOutline[0],generationOutline[2],generationConfig,uuidv4);validateRoofTopology([...generationBase(),...next]);setGenerationPreview(next);setGenerationError('');}catch(err){setGenerationPreview(null);setGenerationError(err instanceof Error?err.message:String(err));}}}>Preview</button><button disabled={!generationPreview} className="bg-emerald-700 disabled:opacity-40 rounded p-2" onClick={()=>{try{if(generationPreview){const next=[...generationBase(),...generationPreview];validateRoofTopology(next);if(onRoofChange?.(next)){setCorrection(null);onSelect({type:'none'});onToolChange('select');}}}catch(err){setGenerationError(err instanceof Error?err.message:String(err));}}}>Apply</button><button className="bg-slate-700 rounded p-2" onClick={()=>{setCorrection(null);onToolChange('select')}}>Cancel</button></div></section>}

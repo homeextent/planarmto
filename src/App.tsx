@@ -1,3 +1,6 @@
+import { assemblyFromSelection, FoundationAssemblyPanel } from './components/FoundationAssemblyPanel';
+import { applyAssemblyPreview, previewAssemblyChange } from './engine/measurements/foundationAssemblyController';
+import type { AssemblyPreview, FoundationPreset } from './engine/measurements/foundationAssemblyModel';
 import {planFoundationDeletion} from './engine/measurements/foundationDerivation';
 import {planRoofDeletion} from './engine/measurements/roofSelection';
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
@@ -42,7 +45,7 @@ import { FoundationToolbar, FoundationInspector } from './components/FoundationW
 import { RoofToolbar, RoofInspector } from './components/RoofWorkspace';
 import type { RoofEntity, FoundationEntity, SpecialistEntity } from './engine/measurements/measurementTypes';
 import { validateRoofTopology } from './engine/measurements/roofMeasurements';
-import { replaceSpecialistEntities, restoreWorkspaceSnapshot } from './engine/workspaceController';
+import { replaceFoundationPresets, replaceSpecialistEntities, restoreWorkspaceSnapshot } from './engine/workspaceController';
 import { WorkspaceBar } from './components/WorkspaceBar';
 import { createProjectDocument, workspaceRenderView, commitWorkspaceRenderView, serializeProjectDocument } from './engine/projectDocument';
 import type { ProjectDocument, WorkspaceType } from './engine/projectDocument';
@@ -187,7 +190,7 @@ function AppContent() {
         if(activeWorkspace.type!=='floor')return false;
         updated=commitWorkspaceRenderView(document,activeWorkspace.id,{...next,settings:document.settings},true);
       }
-      if(!replace)setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements}]);
+      if(!replace)setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements,foundationAssemblies:activeWorkspace.foundationAssemblies}]);
       setRedoStack([]);
       currentDocument.current=updated;placementRef.current={token,document:updated};
       setDocument(updated);setIsDirty(true);setStorageWarning('');return true;
@@ -200,7 +203,7 @@ function AppContent() {
     try {
       const updated = commitWorkspaceRenderView(document, document.activeWorkspaceId, newState, pushHistory);
       if (pushHistory) {
-        const snap = {view: historicalSnapshot || state, measurements: activeWorkspace.measurements};
+        const snap = {view: historicalSnapshot || state, measurements: activeWorkspace.measurements, foundationAssemblies: activeWorkspace.foundationAssemblies};
         setHistory(prev => [...prev.slice(-30), snap]);
         setRedoStack([]);
       }
@@ -213,14 +216,38 @@ function AppContent() {
     try {
       validateRoofTopology(entities);
       const updated=replaceSpecialistEntities(document,activeWorkspace.id,entities);
-      setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements}]);setRedoStack([]);
+      setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements,foundationAssemblies:activeWorkspace.foundationAssemblies}]);setRedoStack([]);
       currentDocument.current=updated;setDocument(updated);setIsDirty(true);setStorageWarning('');return true;
     }catch(err){setStorageWarning(err instanceof Error?err.message:String(err));return false;}
   },[document,activeWorkspace,state]);
   const handleFoundationChange = useCallback((entities:FoundationEntity[]):boolean=>{
     if(currentDocument.current!==document||activeWorkspace.type!=='foundation')return false;
-    try{const updated=replaceSpecialistEntities(document,activeWorkspace.id,entities);setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements}]);setRedoStack([]);currentDocument.current=updated;setDocument(updated);setIsDirty(true);setStorageWarning('');return true;}catch(err){setStorageWarning(err instanceof Error?err.message:String(err));return false;}
+    try{const updated=replaceSpecialistEntities(document,activeWorkspace.id,entities);setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements,foundationAssemblies:activeWorkspace.foundationAssemblies}]);setRedoStack([]);currentDocument.current=updated;setDocument(updated);setIsDirty(true);setStorageWarning('');return true;}catch(err){setStorageWarning(err instanceof Error?err.message:String(err));return false;}
   },[document,activeWorkspace,state]);
+  const handleAssemblyApply = (preview:AssemblyPreview):boolean => {
+    if(currentDocument.current!==document||activeWorkspace.type!=='foundation')return false;
+    try{
+      const updated=applyAssemblyPreview(document,preview);
+      if(updated===document)return false;
+      setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements,foundationAssemblies:activeWorkspace.foundationAssemblies}]);
+      setRedoStack([]);currentDocument.current=updated;setDocument(updated);setIsDirty(true);setStorageWarning('');
+      const parent=updated.workspaces.find(w=>w.id===activeWorkspace.id)?.foundationAssemblies?.find(a=>a.id===preview.assemblyId);
+      setSelection(parent?.children.length?{type:'foundation',ids:parent.children.map(c=>c.entityId)}:{type:'none'});
+      return true;
+    }catch(err){setStorageWarning(err instanceof Error?err.message:String(err));return false;}
+  };
+  const handleTracedAssembly = (walls:FoundationEntity[]):boolean => {
+    const draft=assemblyFromSelection(walls,walls[0]?.id);
+    if(!draft)return false;
+    return handleAssemblyApply(previewAssemblyChange(document,activeWorkspace.id,uuidv4(),null,{kind:'create',input:draft.input},uuidv4));
+  };
+  const handleFoundationPresets = (presets:FoundationPreset[]):boolean => {
+    if(currentDocument.current!==document)return false;
+    try{
+      const updated=replaceFoundationPresets(document,presets);
+      currentDocument.current=updated;setDocument(updated);setIsDirty(true);setStorageWarning('');return true;
+    }catch(err){setStorageWarning(err instanceof Error?err.message:String(err));return false;}
+  };
   const restoreSnapshot = (snapshot:WorkspaceSnapshot) => {
     const doc=currentDocument.current;
     const next=restoreWorkspaceSnapshot(doc,doc.activeWorkspaceId,snapshot);
@@ -230,14 +257,14 @@ function AppContent() {
     if (!history.length || currentDocument.current!==document) return;
     try{
       restoreSnapshot(history[history.length-1]);
-      setRedoStack(prev=>[{view:state,measurements:activeWorkspace.measurements},...prev]);setHistory(prev=>prev.slice(0,-1));
+      setRedoStack(prev=>[{view:state,measurements:activeWorkspace.measurements,foundationAssemblies:activeWorkspace.foundationAssemblies},...prev]);setHistory(prev=>prev.slice(0,-1));
     }catch(err){setStorageWarning(err instanceof Error?err.message:String(err))}
   },[history,state,document,activeWorkspace]);
   const handleRedo = useCallback(() => {
     if (!redoStack.length || currentDocument.current!==document) return;
     try{
       restoreSnapshot(redoStack[0]);
-      setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements}]);setRedoStack(prev=>prev.slice(1));
+      setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements,foundationAssemblies:activeWorkspace.foundationAssemblies}]);setRedoStack(prev=>prev.slice(1));
     }catch(err){setStorageWarning(err instanceof Error?err.message:String(err))}
   },[redoStack,state,document,activeWorkspace]);
 
@@ -759,6 +786,7 @@ function AppContent() {
           foundationPreview={foundationGhost?.workspaceId===activeWorkspace.id&&foundationGhost.source===foundationEntities?foundationGhost.members:undefined}
           foundationFilter={visibleFoundationKind}
           onFoundationChange={handleFoundationChange}
+          onApplyTracedAssembly={handleTracedAssembly}
           roofEntities={roofEntities}
           onRoofChange={handleRoofChange}
           commitDraftPlacement={commitDraftPlacement}
@@ -780,7 +808,10 @@ function AppContent() {
           }}
         />
 
-        {foundationEntities && <FoundationInspector metric={state.settings.unitSystem==='metric'} key={activeWorkspace.id} onPreview={members=>setFoundationGhost(members?{workspaceId:activeWorkspace.id,source:foundationEntities,members}:null)} filter={visibleFoundationKind} onFilter={kind=>{setFoundationFilter({workspaceId:activeWorkspace.id,kind});setSelection({type:'none'})}} workspaceId={activeWorkspace.id} entities={foundationEntities} selection={selection} onChange={handleFoundationChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
+        {foundationEntities && <FoundationInspector ownedComponentIds={new Set(activeWorkspace.foundationAssemblies?.flatMap(parent=>parent.children.map(child=>child.entityId)))} assemblyControls={<FoundationAssemblyPanel project={document} workspaceId={activeWorkspace.id}
+          selectedIds={selection.type==='foundation'?selection.ids:undefined} selectedId={selection.type==='foundation'?(selection.id??selection.ids?.[0]):undefined} metric={state.settings.unitSystem==='metric'}
+          onApply={handleAssemblyApply} onPresets={handleFoundationPresets} onPreview={members=>setFoundationGhost(members?{workspaceId:activeWorkspace.id,source:foundationEntities,members}:null)}
+          onSelectChildren={ids=>setSelection(ids.length?{type:'foundation',ids}:{type:'none'})}/>} metric={state.settings.unitSystem==='metric'} key={activeWorkspace.id} onPreview={members=>setFoundationGhost(members?{workspaceId:activeWorkspace.id,source:foundationEntities,members}:null)} filter={visibleFoundationKind} onFilter={kind=>{setFoundationFilter({workspaceId:activeWorkspace.id,kind});setSelection({type:'none'})}} workspaceId={activeWorkspace.id} entities={foundationEntities} selection={selection} onChange={handleFoundationChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
         {roofEntities && <RoofInspector workspaceId={activeWorkspace.id} entities={roofEntities} selection={selection} onChange={handleRoofChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
         {/* Right Real-time MTO Take-Off Matrix */}
         {reportable && <MtoMatrixPanel
