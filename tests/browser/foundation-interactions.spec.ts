@@ -326,3 +326,19 @@ test('foundation applicability excludes quantities without deleting geometry and
  await expect(entities(page)).toHaveCount(2);expect((await snapshot(page))[0].scopeApplicability).toEqual({status:'excluded',reason:'Existing wall retained'});
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();expect((await snapshot(page))[0].scopeApplicability).toBeUndefined();
 });
+
+test('under-slab derived layers persist explicit nonoverlapping vertical stack',async({page})=>{
+ await place(page,'Slab',{x:250,y:250},{x:550,y:450},'40,30');
+ for(const [label,value] of [['Material','poured concrete'],['Depth (ft)','0.3333333333333333'],['Base elevation (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ await page.getByText('Derive foundation envelope',{exact:true}).click();
+ await page.getByLabel('Derived layer type').selectOption('horizontalInsulation');
+ for(const [label,value] of [['Derived layer thickness (ft)','0.25'],['Layer top below slab base (ft)','0'],['Derived layer material','foam'],['Derived layer identity','foam']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Preview envelope',exact:true}).click();await page.getByRole('button',{name:'Apply envelope',exact:true}).click();
+ await page.getByLabel('Select foundation entity').selectOption({index:1});
+ await page.getByLabel('Derived layer type').selectOption('granular');
+ for(const [label,value] of [['Derived layer thickness (ft)','0.5'],['Layer top below slab base (ft)','0.25'],['Derived layer material','stone'],['Derived layer identity','stone']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Preview envelope',exact:true}).click();await page.getByRole('button',{name:'Apply envelope',exact:true}).click();
+ const saved=await snapshot(page),g=saved.find(e=>e.kind==='foundationRegion'&&e.purpose==='granular');
+ expect(g).toMatchObject({elevationFt:-.75,foundation:{granularLayerId:'stone',envelopeSource:{offsetBelowSlabFt:.25}}});
+});

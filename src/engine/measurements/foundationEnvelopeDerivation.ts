@@ -26,9 +26,12 @@ function geometry(source:FoundationEntity,s:FoundationEnvelopeSource,id:string,a
  }
  if(source.kind!=='slab'||!source.foundation||source.foundation.material!=='poured concrete'||!simplePolygon(source.polygon)||source.foundation.slabOpenings?.length||source.foundation.slabThickenings?.length)throw Error('Confirm an unexcluded, unthickened slab footprint; complex coverage must be drafted explicitly');
  if(!s.depthFt||s.depthFt<=0)throw Error('Specify positive layer thickness');
- const z=source.foundation.baseElevationConfirmed&&source.elevationFt!==null?source.elevationFt-s.depthFt:null;
+ const offset=s.offsetBelowSlabFt??0;
+ if(!Number.isFinite(offset)||offset<0)throw Error('Specify nonnegative below-slab offset');
+ const z=source.foundation.baseElevationConfirmed&&source.elevationFt!==null?source.elevationFt-offset-s.depthFt:null;
+ if(s.offsetBelowSlabFt!==undefined&&z===null)throw Error('Confirm slab base elevation for explicit layer placement');
  if(s.purpose==='granular'&&z===null)throw Error('Confirm slab base elevation for granular layer');
- return {...base,kind:'foundationRegion',purpose:s.purpose==='granular'?'granular':'insulation',polygon:source.polygon.map(p=>({...p})),depthFt:s.depthFt,elevationFt:z,foundation:{...foundation,...(z!==null?{baseElevationConfirmed:true as const}:{}),...(s.purpose==='horizontalInsulation'?{coverage:{layerId:s.layerId,confirmed:true as const,...(s.foam?{foam:true as const}:{})}}:{})}};
+ return {...base,kind:'foundationRegion',purpose:s.purpose==='granular'?'granular':'insulation',polygon:source.polygon.map(p=>({...p})),depthFt:s.depthFt,elevationFt:z,foundation:{...foundation,...(z!==null?{baseElevationConfirmed:true as const}:{}),...(s.purpose==='granular'&&s.offsetBelowSlabFt!==undefined?{granularLayerId:s.layerId}:{}),...(s.purpose==='horizontalInsulation'?{coverage:{layerId:s.layerId,confirmed:true as const,...(s.foam?{foam:true as const}:{})}}:{})}};
 }
 export function deriveFoundationEnvelope(entities:FoundationEntity[],ids:string[],config:Config,id:()=>string):FoundationEntity[]{
  if(!ids.length||new Set(ids).size!==ids.length||!config.material.trim()||!config.layerId.trim())throw Error('Select distinct sources and specify material and layer');
@@ -55,9 +58,9 @@ export function validateEnvelopeSources(entities:FoundationEntity[]):void{
  for(const e of entities){const s=e.foundation?.envelopeSource;if(!s)continue;const source=entities.find(q=>q.id===s.sourceId);if(!source)throw Error('Missing derived envelope source');
  const key=JSON.stringify([s.sourceId,s.purpose,s.layerId]);if(seen.has(key))throw Error('Duplicate derived envelope layer');seen.add(key);
  if(s.perimeterWallIds){const g=perimeters.get(s.groupId)??[];g.push(s);perimeters.set(s.groupId,g)}
- const spec=JSON.stringify([e.assemblyId,s.purpose,s.perimeterWallIds?null:s.side,s.heightFt,s.depthFt,s.material,s.layerId,s.foam,s.perimeterWallIds?[...s.perimeterWallIds].sort():null]);if(groups.has(s.groupId)&&groups.get(s.groupId)!==spec)throw Error('Inconsistent envelope group');groups.set(s.groupId,spec);
+ const spec=JSON.stringify([e.assemblyId,s.purpose,s.perimeterWallIds?null:s.side,s.heightFt,s.depthFt,s.offsetBelowSlabFt,s.material,s.layerId,s.foam,s.perimeterWallIds?[...s.perimeterWallIds].sort():null]);if(groups.has(s.groupId)&&groups.get(s.groupId)!==spec)throw Error('Inconsistent envelope group');groups.set(s.groupId,spec);
  const expected=geometry(source,s,e.id,e.assemblyId,entities);
- const signature=(q:FoundationEntity)=>JSON.stringify(['polygon' in q?q.polygon:[q.start,q.end],'depthFt' in q?q.depthFt:null,'heightFt' in q?q.heightFt:null,'elevationFt' in q?q.elevationFt:null,q.foundation?.material,q.foundation?.baseElevationConfirmed,q.foundation?.coverage?.layerId,q.foundation?.coverage?.confirmed,q.foundation?.coverage?.openingTreatment,q.foundation?.coverage?.foam,q.foundation?.coverage?.thicknessFt]);
+ const signature=(q:FoundationEntity)=>JSON.stringify(['polygon' in q?q.polygon:[q.start,q.end],'depthFt' in q?q.depthFt:null,'heightFt' in q?q.heightFt:null,'elevationFt' in q?q.elevationFt:null,q.foundation?.material,q.foundation?.baseElevationConfirmed,q.foundation?.coverage?.layerId,q.foundation?.coverage?.confirmed,q.foundation?.coverage?.openingTreatment,q.foundation?.coverage?.foam,q.foundation?.coverage?.thicknessFt,q.foundation?.granularLayerId]);
  if(signature(e)!==signature(expected))throw Error('Derived envelope is stale; remove or regenerate before editing source');
  }
  for(const g of perimeters.values())if(g.length!==4||new Set(g.map(s=>s.sourceId)).size!==4||g[0].perimeterWallIds!.some(id=>!g.some(s=>s.sourceId===id)))throw Error('Incomplete rectangular envelope group');

@@ -1,3 +1,4 @@
+import {foundationLayerConflicts} from './foundationLayers';
 /** Initial C.1C measurement adapter. Rectangular compatible systems only for overlap reconciliation.
  * Shared explicit topology validation at the persistence boundary; inspector integration pending.
  */
@@ -18,9 +19,11 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
  // Excluded geometry is retained in the project but does not participate in quantity ownership.
  // Pending geometry remains in overlap checks; its own contributions cannot be measured.
  entities=entities.filter(e=>e.scopeApplicability?.status!=='excluded');
+ const layerConflicts=foundationLayerConflicts(entities);
  const rows:QuantityContribution[]=[],warnings:string[]=[],solids:Solid[]=[],detailBreakdown:FoundationVolumeBreakdown[]=[],footprintReferences:FoundationFootprintReference[]=[];
  const add=(e:FoundationEntity,code:string,unit:QuantityContribution['unit'],basis:string,value:number|null,reason='Missing or unconfirmed foundation input')=>{
   const base={workspaceId,elementId:e.id,physicalId:e.physicalId,assemblyId:e.assemblyId,source:e.source,code,unit,basis};
+  if(layerConflicts.has(e.id)){value=null;reason=layerConflicts.get(e.id)!;}
   if(e.scopeApplicability?.status==='pending'){value=null;reason='Scope pending: '+e.scopeApplicability.reason;}
   rows.push(value===null?{...base,status:'unquantified',reason}:{...base,status:'measured',quantity:value});
  };
@@ -44,6 +47,7 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
   const height='start' in e?e.heightFt:e.depthFt;
   if(height===null)reason='Missing thickness or height';
   if(bounds&&!reason)prism={id:e.id,bounds,bottomFt:e.foundation?.baseElevationConfirmed?e.elevationFt:null,heightFt:height};
+  if(layerConflicts.has(e.id))reason=layerConflicts.get(e.id)!;
   if(e.scopeApplicability?.status==='pending')reason='Scope pending: '+e.scopeApplicability.reason;
   const details=foundationDetails(e);
   solids.push({entity:e,code,material,bounds,prism,pieces,area,details,reason});
@@ -108,5 +112,6 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
   if(reason)warnings.push(s.entity.id+': '+reason);
  }
  for(const c of foundationCoverage(entities)){add(c.entity,c.code,c.unit,c.basis,c.value,c.reason);if(c.value===null)warnings.push(c.entity.id+': '+c.reason)}
+ for(const [id,reason] of layerConflicts)if(!warnings.includes(id+': '+reason))warnings.push(id+': '+reason);
  validateContributionSet(rows);return {rows,warnings,detailBreakdown,footprintReferences,scopeDiagnostics};
 }

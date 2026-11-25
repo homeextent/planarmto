@@ -245,3 +245,24 @@ test('source-linked applicability refuses orphaned contributing derivations',()=
  const next=setFoundationApplicability([w,...f],[w.id,...f.map(e=>e.id)],{status:'excluded',reason:'Existing'});
  assert.equal(measureFoundation('f',next).rows.length,0);
 });
+
+test('explicit under-slab insulation and granular stack uses distinct physical intervals',()=>{
+ const s=region('slab-stack',box(0,0,40,30));let i=0;const id=()=> 'stack'+(++i);
+ const f=deriveFoundationEnvelope([s],[s.id],{purpose:'horizontalInsulation',material:'foam',layerId:'foam',depthFt:.25,foam:true,offsetBelowSlabFt:0},id);
+ const g=deriveFoundationEnvelope([s,...f],[s.id],{purpose:'granular',material:'stone',layerId:'stone',depthFt:.5,offsetBelowSlabFt:.25},id);
+ assert.equal('elevationFt' in f[0]&&f[0].elevationFt,-.25);assert.equal('elevationFt' in g[0]&&g[0].elevationFt,-.75);
+ const rows=qty([s,...f,...g]);for(const [code,value] of [['foundation.insulation.area',1200],['foundation.insulation.foam',3600],['foundation.granular.volume',600/27]] as const){const row=rows.find(r=>r.code===code)!;assert.equal(row.status,'measured');if(row.status==='measured')near(row.quantity,value)}
+});
+test('overlapping granular and insulation layers withhold both quantities even with distinct layer names',()=>{
+ const s=region('slab-stack',box(0,0,40,30));let i=0;const id=()=> 'stack'+(++i);
+ for(const offset of [undefined,0]){
+ const f=deriveFoundationEnvelope([s],[s.id],{purpose:'horizontalInsulation',material:'foam',layerId:'foam',depthFt:.25,foam:true,offsetBelowSlabFt:offset},id);
+ const g=deriveFoundationEnvelope([s],[s.id],{purpose:'granular',material:'stone',layerId:'stone',depthFt:.5,offsetBelowSlabFt:offset},id);
+ const rows=qty([s,...f,...g]).filter(r=>r.elementId!==s.id);assert.equal(rows.length,3);assert.ok(rows.every(r=>r.status==='unquantified'));
+ }
+});
+test('explicit below-slab placement requires confirmed datum and nonnegative offset',()=>{
+ const s=region('slab-stack',box(0,0,40,30));let i=0;const id=()=> 'stack'+(++i),config={purpose:'granular' as const,material:'stone',layerId:'stone',depthFt:.5};
+ assert.throws(()=>deriveFoundationEnvelope([s],[s.id],{...config,offsetBelowSlabFt:-1},id),/nonnegative/);
+ delete s.foundation!.baseElevationConfirmed;assert.throws(()=>deriveFoundationEnvelope([s],[s.id],{...config,offsetBelowSlabFt:0},id),/Confirm slab base/);
+});

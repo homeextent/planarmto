@@ -27,6 +27,7 @@ export function foundationCoverage(entities:FoundationEntity[]):{entity:Feature;
   for(const q of features){
    if(q===e||q.purpose!==e.purpose||q.kind!==e.kind)continue;
    const qc=q.foundation?.coverage;
+   if('polygon' in e&&'polygon' in q&&e.foundation?.baseElevationConfirmed&&q.foundation?.baseElevationConfirmed&&e.elevationFt!==null&&q.elevationFt!==null&&e.depthFt!==null&&q.depthFt!==null&&(e.elevationFt+e.depthFt<=q.elevationFt+1e-8||q.elevationFt+q.depthFt<=e.elevationFt+1e-8))continue;
    if(e.purpose!=='drainage'&&c&&qc&&c.layerId!==qc.layerId&&e.foundation?.material!==q.foundation?.material)continue;
    const conflict='start' in e&&'start' in q?lineOverlap(e.start,e.end,q.start,q.end):'polygon' in e&&'polygon' in q?regionOverlap(e.polygon,q.polygon):false;
    if(conflict)reason='Overlapping coverage or drainage route requires reconciliation';
