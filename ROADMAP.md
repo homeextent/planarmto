@@ -16,7 +16,7 @@ C.1B staging integration: owner accepted `fb60747f83183016694f4c54ac2dbc609087f5
 | B | Independent typed workspaces, calibration, histories and persistence | Staging complete |
 | C.1A | Canonical schema v3, explicit ownership and specialist contracts | Staging complete; [record](docs/c1a-measurement-architecture.md) |
 | C.1B | Independent roof drafting, measurement and R4 usability | Staging integrated; owner-confirmed post-merge CI #133; [record](docs/c1b-roof-measurement.md), [R4](docs/c1b-r4-specialist-usability.md) |
-| C.1C | Foundation drafting and measurement | Next: prepare specification for owner approval |
+| C.1C | Foundation drafting and measurement | Feature PR #12; R1–R4 automated 288/288, partial owner acceptance; R5 proposed contractor workflow; see [handoff](docs/coding-agent-transition.md) |
 | C.1D | Dedicated site drafting and measurement | Deferred beyond v2.16.0; separate future authorization |
 | C.1E | Integrated quantity ownership, completeness and duplicate prevention | After C.1C; independent of C.1D |
 | C.2 | Consolidated MTO, manual quantities, allowances, quotations, pricing and reporting | After C.1E; detailed contract and acceptance separately approved |
@@ -43,4 +43,4 @@ Use isolated feature/documentation branches and PRs to staging, exact-head CI, t
 
 ## Next authorized work
 
-Complete the current documentation-only reconciliation and staging integration. Then prepare C.1C technical specification with bounded geometry, explicit assembly inputs, analytical quantities, lifecycle and persistence safeguards, browser regressions and integrated owner acceptance. Implementation is not authorized by this roadmap alone.
+Transition to Codex on existing feature branch. Complete baseline reproduction and R5.0 decision review; R5 implementation requires bounded approval. C.1C remains unmerged pending owner contractor-workflow acceptance and explicit staging authorization. See [transition](docs/coding-agent-transition.md), [findings](docs/c1c-functional-findings.md) and [proposed R5](docs/c1c-r5-contractor-workflow.md). C.1E and C.2 separately gated.

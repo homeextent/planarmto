@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — Increments B, C.1A and C.1B (staging release train)
 
+### C.1C — Feature candidate and hybrid handoff (not staging integrated)
+- R1–R4 foundation geometry, quantities, source-linked assemblies, scope/layers, precision, replacement, persistence and bounded angled runs implemented in draft PR #12. CI #186 at e5e9748, run 45670433567/job 139403930112, 288/288 independently verified.
+- Owner calibration and basic rectangle/L walls and strip quantities passed; remaining functional and usability acceptance outstanding. Contractor-first R5 proposal and Codex transition recorded, no application changes in handoff. See docs/coding-agent-transition.md and docs/c1c-functional-findings.md. No merge/release authorization.
+
 ### C.1B — Staging integrated
 - Independent roof planes, pitch/direction, classified boundaries, opening deductions, soffit and insulation measurements; deterministic rectangular hip/gable/shed/flat preview and atomic application. No irregular automatic skeleton, inferred assembly applicability or consolidated pricing.
 - Keyboard-first exact floor/roof dimensions, guarded repeated correction, workspace-specific history, polygon closure and actionable geometry diagnostics. Fixed delayed viewport auto-fit following trace-supported investigation.

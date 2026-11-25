@@ -2,12 +2,12 @@
 
 ---
 
-## Architectural direction and governing principles — C.1B staging integrated
+## Architectural direction and governing principles — C.1B staging; C.1C feature candidate
 
 This section governs all subsequent development and takes precedence over older engine descriptions below. Production v2.15.1 is a separate baseline. Preserve valid historical floor formulas as regression references; do not infer roof, foundation or site quantities from floor gross area. Roof-specific measurement is integrated; generic CAD tools in foundation/site workspaces do not establish specialist measurement authority.
 
 - Four optional typed workspaces (floor, roof, foundation, site), each with independent geometry, calibration and source evidence; project-level settings and rates shared. No automatic cross-sheet spatial registration.
-- Floor retains existing valid framing, finishes, apertures, MEP and siding inputs. Roof owns independently drafted planes, classified edges, openings, soffit/fascia/eavestrough and roof thermal envelope quantities. Foundation owns explicit walls, footings, pads, slabs, building excavation, insulation, drainage and waterproofing. Site owns grading, hardscape, decks and site features. These are ownership boundaries; roof engine is integrated, foundation pending, dedicated site engine deferred.
+- Floor retains existing valid framing, finishes, apertures, MEP and siding inputs. Roof owns independently drafted planes, classified edges, openings, soffit/fascia/eavestrough and roof thermal envelope quantities. Foundation owns explicit walls, footings, pads, slabs, building excavation, insulation, drainage and waterproofing. Site owns grading, hardscape, decks and site features. These are ownership boundaries; roof engine is integrated, foundation R1–R4 implemented on feature branch pending contractor workflow acceptance, dedicated site engine deferred.
 - Persist source geometry and identities rather than authoritative derived totals. Canonical feet; pitch rise per 12. Quantities carry code, unit, basis, source and stable physical/assembly identity. Missing inputs remain unquantified; exclusions require reason; assignment is not completeness. Distinct layers may share physical features but duplicate contributions to the same assembly/code must be prevented. No structural design, automatic topographic modeling or unsupported geometric assumptions.
 - Specialist engines must identify unsupported topology or incomplete inputs rather than invent quantities. Integrated cross-workspace ownership and completeness are C.1E; consolidated rates, single application of waste and reporting are C.2.
 - Historical unsupported projects retained without automatic deletion; no further legacy compatibility development required. Preserve data safeguards. Project reports remain gated until C.2.
@@ -18,6 +18,10 @@ The authoritative milestone sequence and release gates are in [ROADMAP.md](ROADM
 C.1B staging integration: owner accepted `fb60747f83183016694f4c54ac2dbc609087f5e5` (10/10 local checks; CI #129, 127/127 tests). Documentation-only head `8d707902adbf7365ef6e78a64bdab90ce634732e` passed [CI #132](https://github.com/homeextent/planarmto/actions/runs/45544873706) (127/127, job 138971962757). [PR #10](https://github.com/homeextent/planarmto/pull/10) merged into staging at `3649f546cbf0a6e19b831753181cc8616330c22c`; owner confirmed clean synchronized local staging and successful post-merge CI #133. Merge and branch identity independently verified; CI #133 is owner-reported, with exact run ID/job logs not independently retrieved because the commit lookup omits push runs. No production promotion; main remains v2.15.1 at `0423cb6`.
 
 PR #8 merged into staging at `c1a0bf7` after documentation-only candidate `3d0830e` passed CI #40 ([run 45462442984](https://github.com/homeextent/planarmto/actions/runs/45462442984)). Post-merge staging push [run 45462698052](https://github.com/homeextent/planarmto/actions/runs/45462698052), job 138689310248, completed successfully; owner CLI and job details verified. C.1A formally complete. Production `main` remains v2.15.1 at `0423cb6`.
+
+## C.1C foundation candidate and contractor workflow boundary
+
+Feature PR #12 implements specialist foundation authority per [approved C.1C specification](docs/c1c-foundation-measurement.md). CI #186 verified 288/288; local acceptance incomplete. Contractor-first product direction: trace calibrated plans and configure construction specifications, with internal calculation complexity abstracted. [R5 proposal](docs/c1c-r5-contractor-workflow.md) is not implemented or blanket authorized. Preserve canonical feet, explicit geometry/reference, material ownership, validated physical overlaps, source links and atomic history. No silent structural assumptions; unsupported angled intersections pending, curved deferred; no consolidated pricing. New assembly orchestration must reuse current engine and preserve independent/manual scope. [Transition](docs/coding-agent-transition.md) governs current checkpoint.
 
 ## Typed project architecture — C.1A
 

@@ -78,3 +78,6 @@ CI #184 verified angled browser and persistence integration (286/286). Review id
 
 ### R4 local acceptance candidate
 CI #185 at 537b03f verified 288/288 including the residual scope selection and continuous nonwall drafting checks. See [C.1C local owner acceptance procedure](c1c-local-acceptance.md) for D01–D14, F01–F09, B01–B20 and L01–L12 traceability and supported boundaries. Local checks have not been executed; exact feature HEAD CI remains required after this documentation update. No integration or release authorization.
+
+### Hybrid transition and local findings
+CI #186 at e5e9748 verified 288/288. Owner partial functional findings supersede the prior not-run snapshot; see [findings](c1c-functional-findings.md). Contractor-first R5 direction endorsed, detailed [proposal](c1c-r5-contractor-workflow.md) requires bounded approval. Codex local baseline reproduction precedes R5. No staging merge or release.

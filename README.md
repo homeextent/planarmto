@@ -4,9 +4,13 @@
 
 ---
 
-## Development status — C.1B (staging integrated)
+## Development status — C.1B staging; C.1C feature candidate
 
-Increment B, C.1A and C.1B are integrated into staging. See [ROADMAP.md](ROADMAP.md) for the authoritative development sequence. C.1A establishes canonical schema v3, explicit-only scope assignments (unquantified, assigned, excluded with reason), specialist entity and quantity contracts, independent workspace geometry/calibration, shared settings/rates and validated complete-project persistence. Assignment is not measurement completeness. Historical legacy/unversioned projects are retired; unsupported saved records remain export-only, without automatic deletion. Bounded explicit v2 preview migration is supported without guessing specialist geometry. Existing floor formulas are retained; roof measurement is integrated, foundation C.1C is next, C.1D site drafting is deferred, integration safeguards follow in C.1E and consolidated reporting/pricing (including manual quantities and allowances) in C.2. The feature descriptions below include existing floor engine capabilities, not an assertion that consolidated reporting is currently enabled. See [C.1A specification and acceptance](docs/c1a-measurement-architecture.md). Production remains v2.15.1; v2.16.0 is separately gated.
+Increment B, C.1A and C.1B are integrated into staging. See [ROADMAP.md](ROADMAP.md) for the authoritative development sequence. C.1A establishes canonical schema v3, explicit-only scope assignments (unquantified, assigned, excluded with reason), specialist entity and quantity contracts, independent workspace geometry/calibration, shared settings/rates and validated complete-project persistence. Assignment is not measurement completeness. Historical legacy/unversioned projects are retired; unsupported saved records remain export-only, without automatic deletion. Bounded explicit v2 preview migration is supported without guessing specialist geometry. Existing floor formulas are retained; roof measurement is integrated, foundation C.1C is in feature development, C.1D site drafting is deferred, integration safeguards follow in C.1E and consolidated reporting/pricing (including manual quantities and allowances) in C.2. The feature descriptions below include existing floor engine capabilities, not an assertion that consolidated reporting is currently enabled. See [C.1A specification and acceptance](docs/c1a-measurement-architecture.md). Production remains v2.15.1; v2.16.0 is separately gated.
+
+## C.1C foundation feature and Codex transition
+
+Draft PR #12 contains R1–R4 foundation measurement, with 288/288 verified on pre-handoff CI #186. Owner verified calibration and basic rectangular/irregular wall and strip quantities; remaining functional testing and contractor UX acceptance outstanding. R5 assembly-driven workflow proposed, not implemented. See [transition](docs/coding-agent-transition.md), [actual findings](docs/c1c-functional-findings.md) and [R5 proposal](docs/c1c-r5-contractor-workflow.md). No staging/production promotion.
 
 ## C.1B roof measurement (staging integrated)
 
