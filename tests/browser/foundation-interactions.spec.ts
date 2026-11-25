@@ -314,3 +314,15 @@ test('manual wall assembly assignment preserves physical identities and undo red
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();expect((await snapshot(page)).map(e=>e.assemblyId)).toEqual(before.map(e=>e.assemblyId));
  await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();expect((await snapshot(page)).map(e=>e.assemblyId)).toEqual(after.map(e=>e.assemblyId));
 });
+
+test('foundation applicability excludes quantities without deleting geometry and undo restores scope',async({page})=>{
+ await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
+ for(const [label,value] of [['Material','poured concrete'],['Width (ft)','1'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByLabel('Confirm drafted centreline').check();await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ await page.getByLabel('Foundation applicability',{exact:true}).selectOption('excluded');
+ await page.getByLabel('Scope decision reason',{exact:true}).fill('Existing wall retained');
+ await page.getByRole('button',{name:'Apply foundation applicability',exact:true}).click();
+ await expect(page.getByLabel('Foundation scope decisions')).toContainText('Existing wall retained');
+ await expect(entities(page)).toHaveCount(2);expect((await snapshot(page))[0].scopeApplicability).toEqual({status:'excluded',reason:'Existing wall retained'});
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();expect((await snapshot(page))[0].scopeApplicability).toBeUndefined();
+});

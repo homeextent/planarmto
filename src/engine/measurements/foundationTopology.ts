@@ -13,6 +13,15 @@ export function validateFoundationTopology(entities:FoundationEntity[]):void {
  validateStripSources(entities);
  validateEnvelopeSources(entities);
  validateDrainageSources(entities);
+ // Derived geometry cannot contribute while its source is excluded or unresolved.
+ const byId=new Map(entities.map(e=>[e.id,e]));
+ for(const e of entities){
+  const f=e.foundation,sourceIds=[...(f?.stripSource?[f.stripSource.wallId]:[]),...(f?.envelopeSource?[f.envelopeSource.sourceId,...(f.envelopeSource.perimeterWallIds??[])]:[]),...(f?.drainageSource?.wallIds??[])];
+  if(e.scopeApplicability?.status==='excluded')continue;
+  for(const id of sourceIds){const status=byId.get(id)?.scopeApplicability?.status;
+   if(status==='excluded'||status==='pending'&&e.scopeApplicability?.status!=='pending')throw Error('Resolve applicability of source-linked components together');
+  }
+ }
  const ids=new Set(entities.map(e=>e.id));
  for(const e of entities){
   if(!e.foundation)continue;

@@ -38,7 +38,8 @@ export type FoundationStripSource={version:1;wallId:string;groupId:string;offset
 export type FoundationEnvelopeSource={perimeterWallIds?:string[];version:1;sourceId:string;groupId:string;purpose:'waterproofing'|'verticalInsulation'|'horizontalInsulation'|'granular';side?:'left'|'right';heightFt?:number;depthFt?:number;material:string;layerId:string;foam?:true};
 export type FoundationDrainageSource={version:1;wallIds:string[];groupId:string;edge:number;offsetFt:number;material:string;layerId:string};
 export type FoundationMetadata = { drainageSource?:FoundationDrainageSource; envelopeSource?:FoundationEnvelopeSource; stripSource?:FoundationStripSource; coverage?:FoundationCoverage; wallOpenings?:WallOpening[]; slabOpenings?:SlabOpening[]; slabThickenings?:SlabThickening[]; version:1; material:string; baseElevationConfirmed?:true; centrelineConfirmed?:true; joinStartFt?:number; joinEndFt?:number };
-export type FoundationEntity = Identity & { foundation?:FoundationMetadata } & (
+export type FoundationApplicability={status:'included'}|{status:'excluded'|'pending';reason:string};
+export type FoundationEntity = Identity & { foundation?:FoundationMetadata; scopeApplicability?:FoundationApplicability } & (
   | { kind: 'foundationWall'|'stripFooting'; start: Point; end: Point; widthFt: number | null; heightFt: number | null; elevationFt: number | null }
   | { kind: 'padFooting'|'slab'|'foundationRegion'; polygon: Point[]; depthFt: number | null; purpose: 'concrete'|'insulation'|'excavation'|'backfill'|'granular'; elevationFt: number | null }
   | { kind:'foundationTrench'; start:Point; end:Point; widthFt:number|null; heightFt:number|null; elevationFt:number|null }
@@ -92,6 +93,7 @@ export function validateSpecialistEntities(type: string, entities: unknown): ass
     check(!physicalKeys.has(key),'duplicate specialist physical identity'); physicalKeys.add(key);
     check(e.source.note===undefined||typeof e.source.note==='string','invalid source note');
     check(allowed[type as SpecialistKind].includes(e.kind),'entity incompatible with workspace');
+    if(e.scopeApplicability!==undefined){const a=e.scopeApplicability;check(type==='foundation'&&obj(a)&&(a.status==='included'?a.reason===undefined:['excluded','pending'].includes(a.status)&&str(a.reason)),'invalid foundation scope applicability');}
     if(e.roofGroupId!==undefined)check((e.kind==='roofPlane'||e.kind==='roofEdge')&&str(e.roofGroupId),'invalid roof group identity');
     if(e.derivation!==undefined){
       const d=e.derivation;

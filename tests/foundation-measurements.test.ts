@@ -222,3 +222,26 @@ test('multi-offset orthogonal perimeter retains exact ring and centred strip foo
  const f=deriveStripFootings(w,w.map(e=>e.id),2,1,id);
  const footing=qty([...w,...f]).filter(r=>r.code==='foundation.footing.strip.concrete');assert.equal(footing.length,10);assert.ok(footing.every(r=>r.status==='measured'));near(footing.reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),352/27);
 });
+
+import {setFoundationApplicability} from '../src/engine/measurements/foundationApplicability';
+test('excluded scope removes material contribution but preserves geometry and explicit reason',()=>{
+ const a=wall('a'),b=wall('b',{x:80,y:0},{x:120,y:0});
+ const next=setFoundationApplicability([a,b],[a.id],{status:'excluded',reason:'Existing wall retained'});
+ const m=measureFoundation('f',next);assert.equal(next.length,2);assert.equal(m.rows.length,1);assert.equal(m.rows[0].elementId,b.id);
+ assert.equal(m.scopeDiagnostics[0].status,'excluded');assert.equal(m.scopeDiagnostics[0].reason,'Existing wall retained');
+ assert.equal(a.scopeApplicability,undefined);assert.equal(m.scopeDiagnostics[1].status,'legacy');
+ assert.throws(()=>setFoundationApplicability(next,[a.id],{status:'excluded',reason:' '}),/reason/);
+});
+test('pending scope retains unquantified rows and blocks intersecting quantities',()=>{
+ const a=wall('a'),b=wall('b',{x:20,y:0},{x:60,y:0});
+ const next=setFoundationApplicability([a,b],[a.id],{status:'pending',reason:'Verify demolition'});
+ const m=measureFoundation('f',next);assert.equal(m.rows.length,2);assert.ok(m.rows.every(r=>r.status==='unquantified'));
+ assert.equal(m.scopeDiagnostics[0].status,'pending');
+ const restored=setFoundationApplicability(next,[a.id],{status:'included'});assert.ok(qty(restored).every(r=>r.status==='measured'));
+});
+test('source-linked applicability refuses orphaned contributing derivations',()=>{
+ const w=wall('w');let i=0;const f=deriveStripFootings([w],[w.id],2,1,()=> 'scope'+(++i));
+ assert.throws(()=>setFoundationApplicability([w,...f],[w.id],{status:'excluded',reason:'Existing'}),/source-linked/);
+ const next=setFoundationApplicability([w,...f],[w.id,...f.map(e=>e.id)],{status:'excluded',reason:'Existing'});
+ assert.equal(measureFoundation('f',next).rows.length,0);
+});
