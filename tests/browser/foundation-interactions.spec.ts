@@ -140,3 +140,15 @@ test('slab exclusion and thickening inspector report nonadditive breakdown',asyn
  await page.getByRole('button',{name:'Remove thickening 1',exact:true}).click();
  await expect(summary.getByText('14.0741 CY',{exact:true})).toBeVisible();
 });
+
+test('foundation window and crossing selection distinguish partial and complete geometry',async({page})=>{
+ await page.getByRole('button',{name:'Foundation wall',exact:true}).click();
+ const canvas=page.locator('canvas').first();
+ await canvas.click({position:{x:250,y:250}});await canvas.click({position:{x:550,y:250}});
+ await page.getByRole('button',{name:'Select',exact:true}).click();
+ const box=await canvas.boundingBox();if(!box)throw Error('Missing canvas');
+ const drag=async(x1:number,y1:number,x2:number,y2:number)=>{await page.mouse.move(box.x+x1,box.y+y1);await page.mouse.down();await page.mouse.move(box.x+x2,box.y+y2,{steps:5});await page.mouse.up()};
+ await drag(350,210,450,290);await expect(page.getByLabel('Select foundation entity')).toHaveValue('');
+ await drag(450,210,350,290);await expect(page.getByRole('button',{name:'Delete selected foundation components'})).toBeVisible();
+ await drag(200,200,600,300);await expect(page.getByRole('button',{name:'Delete selected foundation components'})).toBeVisible();
+});

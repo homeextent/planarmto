@@ -35,3 +35,13 @@ export function generateFoundationPerimeter(bounds:Bounds,reference:RectangleRef
  const rectangle=foundationRectangle(bounds,widthFt,reference),assemblyId=id();
  return rectangle.segments.map(segment=>{const entityId=id();return {id:entityId,physicalId:entityId,assemblyId,source:{reference:'Generated rectangular foundation — '+reference+' reference'},kind:'foundationWall',start:segment.start,end:segment.end,widthFt,heightFt,elevationFt:baseFt,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true,...(baseFt!==null?{baseElevationConfirmed:true as const}:{}),joinStartFt:segment.joinStartFt,joinEndFt:segment.joinEndFt}}});
 }
+
+/** Plan overlays are informational; openings above the base do not erase the wall footprint. */
+export function foundationDetailOutlines(e:FoundationEntity):{id:string;kind:'opening'|'thickening';points:Point[]}[]{
+ const f=e.foundation;if(!f)return [];
+ if(e.kind==='slab')return [...(f.slabOpenings??[]).map(o=>({id:o.id,kind:'opening' as const,points:o.polygon})),...(f.slabThickenings??[]).map(o=>({id:o.id,kind:'thickening' as const,points:o.polygon}))];
+ if(e.kind!=='foundationWall'||!('widthFt' in e)||e.widthFt===null||!f.centrelineConfirmed)return [];
+ const l=Math.hypot(e.end.x-e.start.x,e.end.y-e.start.y);if(l<=1e-8)return [];
+ const ux=(e.end.x-e.start.x)/l,uy=(e.end.y-e.start.y)/l,t=e.widthFt/2;
+ return (f.wallOpenings??[]).map(o=>{const a={x:e.start.x+ux*o.offsetFt,y:e.start.y+uy*o.offsetFt},b={x:a.x+ux*o.widthFt,y:a.y+uy*o.widthFt};return {id:o.id,kind:'opening',points:[{x:a.x-uy*t,y:a.y+ux*t},{x:b.x-uy*t,y:b.y+ux*t},{x:b.x+uy*t,y:b.y-ux*t},{x:a.x+uy*t,y:a.y-ux*t}]};});
+}
