@@ -38,3 +38,32 @@ export function assignFoundationAssembly(entities:FoundationEntity[],ids:string[
  if(result.rows.filter(r=>ids.includes(r.elementId)).some(r=>r.status!=='measured'))throw Error('Selected assembly has unresolved quantities or external overlaps');
  return next;
 }
+
+export type FoundationRunEdit={id:string;widthFt:number;heightFt:number;baseFt:number;joinStartFt:number;joinEndFt:number};
+/** Coordinated edits preserve identities and only change explicitly supplied run dimensions.
+ * All affected assemblies must be selected in full. Derived geometry remains subject to source validation.
+ */
+export function editFoundationRuns(entities:FoundationEntity[],edits:FoundationRunEdit[]):FoundationEntity[]{
+ const byId=new Map(edits.map(e=>[e.id,e]));
+ if(edits.length<2||byId.size!==edits.length)throw Error('Select at least two distinct foundation runs');
+ const selected=entities.filter(e=>byId.has(e.id));
+ if(selected.length!==edits.length)throw Error('Unknown foundation run');
+ const kind=selected[0].kind,assemblies=new Set(selected.map(e=>e.assemblyId));
+ if(entities.some(e=>assemblies.has(e.assemblyId)&&!byId.has(e.id)))throw Error('Select complete existing assemblies');
+ const next=entities.map(e=>{
+  const edit=byId.get(e.id);if(!edit)return e;
+  if(e.kind!==kind||!('widthFt' in e)||!e.foundation?.centrelineConfirmed||e.foundation.stripSource||e.foundation.envelopeSource||e.foundation.drainageSource)throw Error('Select compatible confirmed non-derived runs');
+  const {widthFt,heightFt,baseFt,joinStartFt,joinEndFt}=edit;
+  if(![widthFt,heightFt,baseFt,joinStartFt,joinEndFt].every(Number.isFinite)||widthFt<=0||heightFt<=0||joinStartFt<0||joinEndFt<0)throw Error('Enter positive dimensions, finite base and nonnegative junction extensions');
+  if(e.source.reference.startsWith('Generated ')&&(widthFt!==e.widthFt||joinStartFt!==(e.foundation.joinStartFt??0)||joinEndFt!==(e.foundation.joinEndFt??0)))throw Error('Generated perimeter reference requires regeneration before width or junction changes');
+  extendedStrip(e.start,e.end,widthFt,joinStartFt,joinEndFt);
+  return {...e,widthFt,heightFt,elevationFt:baseFt,foundation:{...e.foundation,baseElevationConfirmed:true as const,joinStartFt,joinEndFt}};
+ });
+ const old=measureFoundation('edit-preview',entities),result=measureFoundation('edit-preview',next);
+ for(const e of selected){const rows=result.rows.filter(r=>r.elementId===e.id);if(!rows.length||rows.some(r=>r.status!=='measured'))throw Error('Coordinated edit has unresolved quantities or excluded scope');}
+ for(const r of old.rows)if(!byId.has(r.elementId)&&r.status==='measured'){
+  const q=result.rows.find(q=>q.elementId===r.elementId&&q.code===r.code&&q.unit===r.unit);
+  if(!q||q.status!=='measured'||Math.abs(q.quantity-r.quantity)>1e-8*Math.max(1,Math.abs(r.quantity)))throw Error('Coordinated edit would change unrelated confirmed quantities');
+ }
+ return next;
+}

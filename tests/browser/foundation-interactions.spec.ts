@@ -483,3 +483,16 @@ test('explicit strip replacement previews cancels and commits one undoable trans
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();expect(await snapshot(page)).toEqual(before);
  await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();expect(await snapshot(page)).toEqual(after);
 });
+
+test('coordinated foundation run dimensions commit as one history transaction',async({page})=>{
+ await page.getByText('Generate rectangular foundation',{exact:true}).click();
+ for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (ft)','1'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Preview perimeter',exact:true}).click();await page.getByRole('button',{name:'Apply perimeter',exact:true}).click();
+ const before=await snapshot(page);await page.getByLabel('Select foundation entity').selectOption({index:1});await page.getByRole('button',{name:'Select entire foundation assembly',exact:true}).click();
+ await page.getByText('Coordinated run dimensions',{exact:true}).click();
+ await page.getByLabel('Run 1 Height / depth (ft)',{exact:true}).fill('6');await page.getByLabel('Run 2 Base elevation (ft)',{exact:true}).fill('-1');
+ await page.getByRole('button',{name:'Apply coordinated run dimensions',exact:true}).click();
+ const after=await snapshot(page);expect(after[0]).toMatchObject({heightFt:6});expect(after[1]).toMatchObject({elevationFt:-1});expect(after.map(e=>e.id)).toEqual(before.map(e=>e.id));
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();expect(await snapshot(page)).toEqual(before);
+ await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();expect(await snapshot(page)).toEqual(after);
+});

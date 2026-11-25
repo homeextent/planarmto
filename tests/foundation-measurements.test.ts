@@ -422,3 +422,22 @@ test('new independent envelope derivation manifest rejects missing members',()=>
  assert.throws(()=>qty([a,b,f[0]]),/Incomplete derived envelope group/);
  const legacy=structuredClone(f[0]);delete legacy.foundation!.envelopeSource!.sourceIds;assert.ok(qty([a,b,legacy]).every(r=>r.status==='measured'));
 });
+
+import {editFoundationRuns} from '../src/engine/measurements/foundationAssembly';
+test('coordinated run edit preserves identities and reconciles stepped junction atomically',()=>{
+ const a=wall('co-a',{x:0,y:0},{x:20,y:0}),b=wall('co-b',{x:10,y:0},{x:10,y:10});
+ const before=assignFoundationAssembly([a,b],[a.id,b.id],'co-joined');
+ const edits=[{id:a.id,widthFt:2,heightFt:8,baseFt:0,joinStartFt:0,joinEndFt:0},{id:b.id,widthFt:1,heightFt:4,baseFt:2,joinStartFt:1,joinEndFt:0}];
+ const next=editFoundationRuns(before,edits);assert.deepEqual(next.map(e=>[e.id,e.physicalId,e.assemblyId]),before.map(e=>[e.id,e.physicalId,e.assemblyId]));
+ assert.ok(qty(next).every(r=>r.status==='measured'));near(qty(next).reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),360/27);
+ assert.equal((before[0] as typeof a).widthFt,a.widthFt);
+ assert.throws(()=>editFoundationRuns(before,[edits[0],{...edits[1],heightFt:0}]),/positive dimensions/);
+});
+test('coordinated run edit refuses generated reference width changes and stale dependencies',()=>{
+ let n=0;const id=()=> 'co'+(++n),w=generateFoundationPerimeter({xmin:0,xmax:40,ymin:0,ymax:30},'exterior',1,8,0,id);
+ const edits=w.map(e=>({id:e.id,widthFt:2,heightFt:8,baseFt:0,joinStartFt:.5,joinEndFt:.5}));
+ assert.throws(()=>editFoundationRuns(w,edits),/requires regeneration/);
+ const valid=edits.map(e=>({...e,widthFt:1,baseFt:-1}));
+ const f=deriveStripFootings(w,w.map(e=>e.id),2,1,id);
+ assert.throws(()=>editFoundationRuns([...w,...f],valid),/stale/);
+});
