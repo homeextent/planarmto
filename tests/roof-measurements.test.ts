@@ -231,3 +231,65 @@ test('R4 sloped clipping rejects concave planes and overlapping thermal rectangl
  assert.throws(()=>thermalPieces([outer],[l],'sloped'),/convex/);
  assert.throws(()=>thermalPieces([outer,outer],[plane('p')],'horizontal'),/overlap/);
 });
+
+import {reconstructRoofSurfaces,type DerivationSpec} from '../src/engine/measurements/roofDerivation';
+type DerivedSurface=Extract<RoofEntity,{kind:'roofSurface'}>;
+const sourceRoof=(w=40,pitch=6):RoofEntity[]=>generated(w,30,{pitch}).map(e=>e.kind==='roofPlane'?{...e,roofGroupId:'roof-group'}:e.kind==='roofEdge'?{...e,roofGroupId:'roof-group',applicability:{...e.applicability,soffit:e.edgeType==='eave'?'included':'excluded'}}:e);
+function derivedFixture(source:RoofEntity[],purpose:'soffit'|'insulation',basis:'horizontal'|'sloped'='horizontal'){
+ const spec:DerivationSpec={version:1,groupId:'derived-'+purpose,planeIds:ids(source),edgeIds:source.filter(e=>e.kind==='roofEdge'&&e.planeIds.length===1).map(e=>e.id),depths:uniform(2),purpose,basis,exclusions:[],boundaryConfirmed:true,cornersConfirmed:true,...(purpose==='insulation'?{material:'closed cell foam',thicknessFt:.5}:{})};
+ const surfaces:DerivedSurface[]=reconstructRoofSurfaces(source,spec).map((p,i)=>({...base(spec.groupId+'-'+i),kind:'roofSurface',purpose,polygon:p.polygon,pitchRise:p.pitchRise,surfaceBasis:basis,insulationType:spec.material,depthFt:spec.thicknessFt,derivation:{...spec,pieceKey:p.pieceKey}}));
+ return {spec,surfaces};
+}
+test('R4 canonical derived hip surfaces preserve analytical quantities and separate identities',()=>{
+ const source=sourceRoof(),s=derivedFixture(source,'soffit'),i=derivedFixture(source,'insulation','sloped');
+ const all=[...source,...s.surfaces,...i.surfaces];
+ assert.equal(s.surfaces.length,4);assert.equal(i.surfaces.length,4);
+ validateRoofTopology(all);
+ near(value(all,'roof.soffit.area'),264);
+ near(value(all,'roof.insulation.sloped.volume'),936*Math.sqrt(1.25)*6);
+ assert.equal(new Set(all.map(e=>e.physicalId)).size,all.length);
+});
+test('R4 derived group rejects changed source extent and slope independently',()=>{
+ const source=sourceRoof(),i=derivedFixture(source,'insulation','sloped');
+ assert.throws(()=>validateRoofTopology([...sourceRoof(42),...i.surfaces]),/Stale|stale/);
+ assert.throws(()=>validateRoofTopology([...sourceRoof(40,8),...i.surfaces]),/Stale|stale/);
+});
+test('R4 derived group rejects missing piece, modified polygon and missing source reference',()=>{
+ const source=sourceRoof(),s=derivedFixture(source,'soffit');
+ assert.throws(()=>validateRoofTopology([...source,...s.surfaces.slice(1)]),/Incomplete/);
+ const first=s.surfaces[0];
+ const changed={...first,polygon:first.polygon.map(p=>({x:p.x+100,y:p.y}))};
+ assert.throws(()=>validateRoofTopology([...source,changed,...s.surfaces.slice(1)]),/Stale/);
+ assert.throws(()=>validateRoofTopology([...source.filter(e=>e.id!==s.spec.edgeIds[0]),...s.surfaces]),/missing derivation source reference/);
+});
+test('R4 soffit applicability change requires reconciliation; mixed corners require confirmation',()=>{
+ const source=sourceRoof(),s=derivedFixture(source,'soffit');
+ const changed=source.map(e=>e.kind==='roofEdge'&&e.id===s.spec.edgeIds[0]?{...e,applicability:{...e.applicability,soffit:'excluded' as const}}:e);
+ assert.throws(()=>validateRoofTopology([...changed,...s.surfaces]),/Incomplete/);
+ assert.throws(()=>reconstructRoofSurfaces(changed,{...s.spec,cornersConfirmed:false}),/Confirm mixed/);
+ const unresolved=source.map(e=>e.kind==='roofEdge'&&e.id===s.spec.edgeIds[0]?{...e,applicability:{...e.applicability,soffit:'unspecified' as const}}:e);
+ assert.throws(()=>reconstructRoofSurfaces(unresolved,s.spec),/Resolve soffit/);
+});
+test('R4 derived identity and consistent group parameters validated',()=>{
+ const source=sourceRoof(),s=derivedFixture(source,'soffit'),first=s.surfaces[0],second=s.surfaces[1];
+ assert.throws(()=>validateRoofTopology([...source,first,{...second,derivation:{...second.derivation!,pieceKey:first.derivation!.pieceKey}},...s.surfaces.slice(2)]),/duplicate derivation piece/);
+ assert.throws(()=>validateRoofTopology([...source,{...first,derivation:{...first.derivation!,depths:uniform(3)}},...s.surfaces.slice(1)]),/inconsistent derivation group parameters/);
+ assert.throws(()=>validateRoofTopology(source.map(e=>e.kind==='roofEdge'?{...e,roofGroupId:'missing-group'}:e)),/roof group has no plane/);
+});
+test('R4 derived metadata survives project JSON and history restoration; stale import and edit refused',()=>{
+ const blank=createProjectDocument(createBlankProject(),'floor'),doc=addWorkspace(blank,'roof','Roof','roof');
+ const source=sourceRoof(),i=derivedFixture(source,'insulation','sloped'),all=[...source,...i.surfaces];
+ const before=replaceSpecialistEntities(doc,'roof',source),after=replaceSpecialistEntities(before,'roof',all);
+ const saved=deserializeProjectDocument(serializeProjectDocument(after));
+ assert.deepEqual(saved.workspaces[1].measurements,JSON.parse(JSON.stringify(all)));
+ const undo=restoreWorkspaceSnapshot(saved,'roof',{view:workspaceRenderView(before),measurements:source});
+ assert.deepEqual(undo.workspaces[1].measurements,source);
+ const redo=restoreWorkspaceSnapshot(undo,'roof',{view:workspaceRenderView(after),measurements:all});
+ assert.deepEqual(redo.workspaces[1].measurements,all);
+ assert.deepEqual(redo.workspaces[0],blank.workspaces[0]);
+ const stale=[...sourceRoof(40,8),...i.surfaces];
+ assert.throws(()=>replaceSpecialistEntities(after,'roof',stale),/Stale/);
+ const corrupt={...after,workspaces:after.workspaces.map(w=>w.id==='roof'?{...w,measurements:stale}:w)};
+ assert.throws(()=>deserializeProjectDocument(JSON.stringify(corrupt)),/Stale/);
+ assert.equal(canReportProjectEstimate(redo),false);
+});
