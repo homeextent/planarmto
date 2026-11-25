@@ -2258,8 +2258,9 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       for (const e of [...roofEntities].sort((a,b)=>Number(a.kind==='roofEdge')-Number(b.kind==='roofEdge'))) {
         const points=roofPoints(e).map(p=>worldToScreen(p.x,p.y));
         const color=e.kind==='roofEdge'?({eave:'#4ade80',rake:'#a3e635',ridge:'#fbbf24',hip:'#38bdf8',valley:'#c084fc',abutment:'#fb923c',parapet:'#f472b6',unclassified:'#94a3b8'}[e.edgeType]):e.kind==='roofOpening'?'#f87171':e.kind==='roofSurface'?(e.purpose==='soffit'?'#2dd4bf':'#c084fc'):'#38bdf8';
-        ctx.strokeStyle=selection.id===e.id?'#ffffff':color;
-        ctx.lineWidth=selection.id===e.id?3:1.8;
+        const selected=selection.type==='roof'&&(selection.id===e.id||selection.ids?.includes(e.id));
+        ctx.strokeStyle=selected?'#ffffff':color;
+        ctx.lineWidth=selected?3:1.8;
         ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
         if ('polygon' in e) { ctx.closePath();ctx.globalAlpha=.13;ctx.fillStyle=color;ctx.fill();ctx.globalAlpha=1; }
         ctx.stroke();
@@ -2270,7 +2271,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           const t=e.slopeDegrees*Math.PI/180,dx=Math.cos(t),dy=Math.sin(t),x=center.x+dx*24,y=center.y+dy*24;
           ctx.beginPath();ctx.moveTo(center.x,center.y);ctx.lineTo(x,y);ctx.lineTo(x-dx*7-dy*5,y-dy*7+dx*5);ctx.moveTo(x,y);ctx.lineTo(x-dx*7+dy*5,y-dy*7-dx*5);ctx.stroke();
         }
-        if((selection.id===e.id||activeTool.startsWith('roof_'))&&'polygon' in e)for(const [i,p] of points.entries()){ctx.fillStyle=roofVertex===i?'#fbbf24':'#fff';ctx.fillRect(p.x-3,p.y-3,6,6);}
+        if((selected||activeTool.startsWith('roof_'))&&'polygon' in e)for(const [i,p] of points.entries()){ctx.fillStyle=roofVertex===i?'#fbbf24':'#fff';ctx.fillRect(p.x-3,p.y-3,6,6);}
       }
       if(generationOutline){ctx.save();ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.setLineDash([5,4]);ctx.beginPath();generationOutline.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.stroke();ctx.setLineDash([]);for(const e of generationPreview||[]){if(e.kind==='roofPlane'){ctx.beginPath();e.polygon.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fillStyle='rgba(56,189,248,.15)';ctx.fill();}else if(e.kind==='roofEdge'){const a=worldToScreen(e.start.x,e.start.y),b=worldToScreen(e.end.x,e.end.y);ctx.strokeStyle=e.edgeType==='ridge'?'#fbbf24':e.edgeType==='hip'?'#38bdf8':'#4ade80';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}}ctx.restore();}
       if(roofDraft.length){
