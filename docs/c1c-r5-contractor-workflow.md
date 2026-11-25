@@ -1,5 +1,7 @@
 # C.1C-R5 — Contractor-focused foundation assembly workflow
 
+The [owner-approved coordinated specification](c1c-r5-coordinated-specification.md) supersedes the proposed decisions below. Keep this record for UX01–UX14, CA01–CA12 and historical evidence. Current implementation authorization covers R5.1–R5.2 and R5.3 design only.
+
 Status: owner endorsed contractor-first direction and hybrid model; this is a proposed coordinated implementation specification for explicit review, not blanket authorization to implement. Preserve D01–D14, F01–F09 and measurement accuracy; amend only routine interaction/automation semantics. C.1C remains unmerged. No structural design, runtime dependencies, infrastructure, spending, schema bump or release.
 
 ## Product decisions (UX01–UX14)

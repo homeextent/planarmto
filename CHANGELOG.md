@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Owner calibration and basic rectangle/L walls and strip quantities passed; remaining functional and usability acceptance outstanding. Contractor-first R5 proposal and Codex transition recorded, no application changes in handoff. See docs/coding-agent-transition.md and docs/c1c-functional-findings.md. No merge/release authorization.
 - R5.0A restores pointer access to roof polygon completion and canvas zoom, displays the foundation selection count and describes missing explicit scope decisions while preserving stored applicability. Independent source review and owner tests A–C passed at `cd782e7f1728d3e6377853677e29cc9611f08497`. Local regression 289/289, targeted Chromium 5/5, and CI #188 (run 45692683476, job 139481964301, including isolated WordPress) passed. [Acceptance and remaining R5 observations](docs/c1c-functional-findings.md#r50a-formal-acceptance).
 
+- Registered the five [owner-approved R5 packages](docs/c1c-r5-coordinated-specification.md). R5.1–R5.2 are authorized, with a separate R5.3 persistence design review before implementation.
+
 ### C.1B — Staging integrated
 - Independent roof planes, pitch/direction, classified boundaries, opening deductions, soffit and insulation measurements; deterministic rectangular hip/gable/shed/flat preview and atomic application. No irregular automatic skeleton, inferred assembly applicability or consolidated pricing.
 - Keyboard-first exact floor/roof dimensions, guarded repeated correction, workspace-specific history, polygon closure and actionable geometry diagnostics. Fixed delayed viewport auto-fit following trace-supported investigation.
