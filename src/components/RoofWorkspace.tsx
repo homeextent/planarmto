@@ -113,7 +113,7 @@ export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,
  </>}
  </>}
  <button className="rounded bg-red-900 px-2 py-1 text-xs" onClick={onDelete}>Delete selected</button></div>}
- <BulkAssemblies key={workspaceId} entities={entities} workspaceId={workspaceId} names={names} onChange={onChange}/>
+ <div key={workspaceId}><BulkAssemblies entities={entities} workspaceId={workspaceId} names={names} onChange={onChange}/></div>
  <hr className="border-slate-700"/><h2 className="text-sm font-semibold">Roof quantities</h2><p className="text-xs text-slate-400">Raw measurements only — no rates or waste.</p>
  {[...totals].map(([code,x])=><React.Fragment key={code}><div className="flex justify-between gap-2 text-xs"><span>{labels[code]||code.replace('roof.','').replaceAll('.',' ')}</span><span className={x.missing?'text-amber-300':'text-slate-100'}>{x.missing?(x.qty?x.qty.toFixed(2)+' '+x.unit+' + pending':'Not quantified'):x.qty.toFixed(2)+' '+x.unit}</span></div>{x.missing>0&&<details className="text-xs text-amber-300"><summary>{labels[code]||code.replace('roof.','').replaceAll('.',' ')}: {x.missing} pending</summary>{x.reasons.map((reason,i)=><p key={i}>{reason}</p>)}</details>}</React.Fragment>)}
  {totals.has('roof.covering')&&!totals.get('roof.covering')!.missing&&<div className="text-xs">Roofing squares: {(totals.get('roof.covering')!.qty/100).toFixed(2)} SQ (same area)</div>}
