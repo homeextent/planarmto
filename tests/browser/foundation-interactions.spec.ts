@@ -342,3 +342,27 @@ test('under-slab derived layers persist explicit nonoverlapping vertical stack',
  const saved=await snapshot(page),g=saved.find(e=>e.kind==='foundationRegion'&&e.purpose==='granular');
  expect(g).toMatchObject({elevationFt:-.75,foundation:{granularLayerId:'stone',envelopeSource:{offsetBelowSlabFt:.25}}});
 });
+
+test('manual vertical insulation confirms explicit opening treatment and foam thickness',async({page})=>{
+ await place(page,'Vertical insulation',{x:250,y:250},{x:550,y:250},'40');
+ for(const [label,value] of [['Material','foam'],['Coverage height (ft)','8'],['Layer identity','wall foam'],['Insulation thickness (ft)','0.25']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByLabel('Confirm explicit route / net coverage, no remaining openings',{exact:true}).check();
+ await page.getByLabel('Calculate foam board feet',{exact:true}).check();
+ await page.getByLabel('Coverage opening treatment',{exact:true}).selectOption('alreadyDeducted');
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ expect((await snapshot(page))[0].foundation?.coverage?.openingTreatment).toBe('alreadyDeducted');
+ await page.getByLabel('Coverage opening treatment',{exact:true}).selectOption('none');
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ await expect(page.getByText('320.00 SF',{exact:true})).toBeVisible();
+ await expect(page.getByText('960.00 BF',{exact:true})).toBeVisible();
+ expect((await snapshot(page))[0].foundation?.coverage).toMatchObject({foam:true,thicknessFt:.25,openingTreatment:'none'});
+});
+test('manual horizontal insulation uses entered region depth for foam board feet',async({page})=>{
+ await place(page,'Horizontal insulation',{x:250,y:250},{x:550,y:450},'40,30');
+ for(const [label,value] of [['Material','foam'],['Depth (ft)','0.25'],['Base elevation (ft; blank unknown)','-0.25'],['Layer identity','slab foam']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByLabel('Confirm explicit route / net coverage, no remaining openings',{exact:true}).check();
+ await page.getByLabel('Calculate foam board feet',{exact:true}).check();
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ await expect(page.getByText('1200.00 SF',{exact:true})).toBeVisible();await expect(page.getByText('3600.00 BF',{exact:true})).toBeVisible();
+ expect((await snapshot(page))[0].foundation?.coverage).toMatchObject({layerId:'slab foam',confirmed:true,foam:true});
+});

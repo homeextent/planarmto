@@ -266,3 +266,25 @@ test('explicit below-slab placement requires confirmed datum and nonnegative off
  assert.throws(()=>deriveFoundationEnvelope([s],[s.id],{...config,offsetBelowSlabFt:-1},id),/nonnegative/);
  delete s.foundation!.baseElevationConfirmed;assert.throws(()=>deriveFoundationEnvelope([s],[s.id],{...config,offsetBelowSlabFt:0},id),/Confirm slab base/);
 });
+
+import {manualFoundationCoverage} from '../src/engine/measurements/foundationManualCoverage';
+test('manual vertical foam coverage explicitly measures SF and BF; missing thickness withholds BF only',()=>{
+ const e=feature('manual-foam','insulation');const input={layer:'foam',confirmed:true,foam:true,thicknessFt:.25,openingTreatment:'none' as const};
+ e.foundation!.coverage=manualFoundationCoverage(e,input);
+ const rows=qty([e]);assert.equal(rows.length,2);assert.ok(rows.every(r=>r.status==='measured'));
+ if(rows[0].status==='measured'&&rows[1].status==='measured'){near(rows[0].quantity,320);near(rows[1].quantity,960)}
+ e.foundation!.coverage=manualFoundationCoverage(e,{...input,thicknessFt:null});assert.equal(qty([e])[0].status,'measured');assert.equal(qty([e])[1].status,'unquantified');
+ assert.throws(()=>manualFoundationCoverage(e,{...input,thicknessFt:0}),/positive insulation thickness/);
+});
+test('manual coverage preserves legacy opening treatment and never implicitly confirms missing treatment',()=>{
+ const e=feature('legacy-coverage','waterproofing');const input={layer:'wp',confirmed:true,foam:false,thicknessFt:null,openingTreatment:'alreadyDeducted' as const};
+ e.foundation!.coverage=manualFoundationCoverage(e,input);assert.equal(e.foundation!.coverage!.openingTreatment,'alreadyDeducted');assert.equal(qty([e])[0].status,'unquantified');
+ e.foundation!.coverage=manualFoundationCoverage(e,{...input,openingTreatment:''});assert.equal(e.foundation!.coverage!.openingTreatment,undefined);assert.equal(qty([e])[0].status,'unquantified');
+ e.foundation!.coverage=manualFoundationCoverage(e,{...input,openingTreatment:'none'});assert.equal(qty([e])[0].status,'measured');
+ assert.throws(()=>manualFoundationCoverage(e,{...input,layer:' '}),/layer identity/);
+});
+test('manual horizontal foam uses canonical region depth and does not invent opening metadata',()=>{
+ const e:FoundationEntity={id:'manual-horizontal',physicalId:'manual-horizontal',assemblyId:'manual-horizontal',source:{reference:'fixture'},kind:'foundationRegion',polygon:box(0,0,40,30),purpose:'insulation',depthFt:.25,elevationFt:-.25,foundation:{version:1,material:'foam',baseElevationConfirmed:true}};
+ e.foundation!.coverage=manualFoundationCoverage(e,{layer:'foam',confirmed:true,foam:true,thicknessFt:1,openingTreatment:'none'});
+ assert.equal(e.foundation!.coverage!.openingTreatment,undefined);const rows=qty([e]);assert.ok(rows.every(r=>r.status==='measured'));if(rows[1].status==='measured')near(rows[1].quantity,3600);
+});

@@ -36,3 +36,6 @@ CI #166 at 5fc3437 passed 235/235, including stepped variable-width junctions, m
 
 ### R2 under-slab layer ownership
 CI #167 verified applicability (239/239). Explicit horizontal insulation and granular derivations record offsetBelowSlabFt (nonnegative distance from slab base to layer top); base = slab base - offset - thickness. New inspector derivations require confirmed slab datum. Manual granular records can carry granularLayerId. Legacy missing offsets retain existing stored geometry; no silent relocation. Cross-purpose overlapping layers withhold quantities, including legacy coincident layers. Explicit same-purpose layers also require disjoint vertical intervals where their footprints overlap. No structural design, density or compaction inference.
+
+### R2 manual coverage controls
+CI #168 verified under-slab ownership (243/243). Manual coverage editor preserves explicit layer, confirmed state, foam flag, vertical thickness and opening-treatment state. Missing treatment remains pending; historical alreadyDeducted remains pending until operator explicitly confirms actual net segments. No implicit reset to none. Horizontal foam BF uses canonical region depth, vertical foam BF uses explicit coverage thickness; missing thickness withholds BF independently of confirmed SF. Existing source-linked geometry validation remains authoritative.
