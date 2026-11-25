@@ -429,7 +429,10 @@ test('coordinated run edit preserves identities and reconciles stepped junction 
  const before=assignFoundationAssembly([a,b],[a.id,b.id],'co-joined');
  const edits=[{id:a.id,widthFt:2,heightFt:8,baseFt:0,joinStartFt:0,joinEndFt:0},{id:b.id,widthFt:1,heightFt:4,baseFt:2,joinStartFt:1,joinEndFt:0}];
  const next=editFoundationRuns(before,edits);assert.deepEqual(next.map(e=>[e.id,e.physicalId,e.assemblyId]),before.map(e=>[e.id,e.physicalId,e.assemblyId]));
- assert.ok(qty(next).every(r=>r.status==='measured'));near(qty(next).reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),360/27);
+ // A: 20 × 2 × 8 = 320 CF. B: (10 + 1 extension) × 1 × 4 = 44 CF.
+ // Shared footprint x=[9.5,10.5], y=[-1,1], z=[2,6]: 1 × 2 × 4 = 8 CF.
+ const expectedCF=20*2*8+(10+1)*1*4-1*2*4;
+ assert.ok(qty(next).every(r=>r.status==='measured'));near(qty(next).reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),expectedCF/27);
  if(before[0].kind!=='foundationWall'||a.kind!=='foundationWall')throw Error('Expected foundation walls');
  assert.equal(before[0].widthFt,a.widthFt);
  assert.throws(()=>editFoundationRuns(before,[edits[0],{...edits[1],heightFt:0}]),/positive dimensions/);
