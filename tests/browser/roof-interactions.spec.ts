@@ -212,6 +212,12 @@ test('schema v3 JSON round trip restores roof geometry and blocks consolidated r
   const original=await roofSnapshot(page);
   expect(original.schemaVersion).toBe(3);
   expect(roofOf(original)).toHaveLength(1);
+  expect(roofOf(original)[0]).toMatchObject({kind:'roofPlane',pitchRise:6});
+  // CI #83: pitch editing is a distinct history transaction (handleRoofChange).
+  // Verify both undo boundaries before exercising the import.
+  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
+  await expect(entities(page)).toHaveCount(2);
+  expect(roofOf(await roofSnapshot(page))[0]).toMatchObject({kind:'roofPlane',pitchRise:null});
   await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
   await expect(entities(page)).toHaveCount(1);
   page.once('dialog',d=>d.accept());
