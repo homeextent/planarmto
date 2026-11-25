@@ -161,3 +161,68 @@ test('confirmed invalid foundation polygon cannot cross persistence boundary',()
  assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(doc)),doc);
  assert.equal(measureFoundation('foundation-a',[bad]).rows[0].status,'unquantified');
 });
+
+import {generateFoundationPerimeter} from '../src/engine/measurements/foundationDrafting';
+import {deriveStripFootings,planFoundationDeletion} from '../src/engine/measurements/foundationDerivation';
+import {deriveFoundationEnvelope,deriveRectangularEnvelope} from '../src/engine/measurements/foundationEnvelopeDerivation';
+import {derivePerimeterDrainage} from '../src/engine/measurements/foundationDrainageDerivation';
+import {rectanglePoints} from '../src/engine/precisionDrafting';
+const closeQuantity=(actual:number,expected:number)=>assert.ok(Math.abs(actual-expected)<1e-7,actual+' != '+expected);
+function sumFoundation(entities:FoundationEntity[],code:string,expected:number){
+ const rows=measureFoundation('foundation-a',entities).rows.filter(r=>r.code===code);
+ assert.ok(rows.length>0,'Missing '+code);assert.ok(rows.every(r=>r.status==='measured'),'Pending '+code);
+ closeQuantity(rows.reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),expected);
+}
+function integratedBasement(){
+ let n=0;const id=()=> 'basement-'+(++n),t=8/12;
+ const walls=generateFoundationPerimeter({xmin:0,xmax:40,ymin:0,ymax:30},'exterior',t,8,0,id),ids=walls.map(w=>w.id);
+ const footings=deriveStripFootings(walls,ids,2,1,id);
+ const waterproof=deriveRectangularEnvelope(walls,ids,{purpose:'waterproofing',heightFt:6,material:'membrane',layerId:'wp'},id);
+ const insulation=deriveRectangularEnvelope(walls,ids,{purpose:'verticalInsulation',heightFt:6,depthFt:.25,material:'foam',layerId:'vertical',foam:true},id);
+ const drainage=derivePerimeterDrainage(walls,ids,2,'pipe','drain',id);
+ // Explicit interior slab clearance avoids overlap with the wall and footing volumes.
+ const slab:FoundationEntity={id:'basement-slab',physicalId:'basement-slab',assemblyId:'basement-slab',source:{reference:'Synthetic independent interior slab'},kind:'slab',purpose:'concrete',polygon:rectanglePoints({x:2,y:2},{x:38,y:28}),depthFt:4/12,elevationFt:0,foundation:{version:1,material:'poured concrete',baseElevationConfirmed:true}};
+ const granular=deriveFoundationEnvelope([slab],[slab.id],{purpose:'granular',material:'stone',layerId:'stone',depthFt:.5},id);
+ const excavation:FoundationEntity={id:'basement-exc',physicalId:'basement-exc',assemblyId:'basement-exc',source:{reference:'Explicit excavation fixture'},kind:'foundationRegion',purpose:'excavation',polygon:rectanglePoints({x:-2,y:-2},{x:42,y:32}),depthFt:9,elevationFt:-1,foundation:{version:1,material:'in-situ soil',baseElevationConfirmed:true}};
+ return {walls,footings,waterproof,insulation,drainage,slab,granular,excavation,entities:[...walls,...footings,...waterproof,...insulation,...drainage,slab,...granular,excavation]};
+}
+test('integrated basement quantities, canonical roundtrip, independent workspace and pricing gate',()=>{
+ const f=integratedBasement(),t=8/12,centreW=40-t,centreD=30-t;
+ const doc=replaceSpecialistEntities(foundationDoc(),'foundation-a',f.entities);
+ const restored=deserializeProjectDocument(serializeProjectDocument(doc));
+ assert.deepEqual(restored,doc);assert.deepEqual(restored.workspaces.find(w=>w.id==='floor-a'),doc.workspaces.find(w=>w.id==='floor-a'));
+ const e=restored.workspaces.find(w=>w.id==='foundation-a')!.measurements as FoundationEntity[];
+ assert.ok(measureFoundation('foundation-a',e).rows.every(r=>r.status==='measured'));
+ sumFoundation(e,'foundation.wall.concrete',(1200-(40-2*t)*(30-2*t))*8/27);
+ sumFoundation(e,'foundation.footing.strip.concrete',((centreW+2)*(centreD+2)-(centreW-2)*(centreD-2))/27);
+ sumFoundation(e,'foundation.slab.concrete',936/81);
+ sumFoundation(e,'foundation.granular.volume',936*.5/27);
+ sumFoundation(e,'foundation.excavation.volume',44*34*9/27);
+ sumFoundation(e,'foundation.waterproofing.area',840);
+ sumFoundation(e,'foundation.insulation.area',840);
+ sumFoundation(e,'foundation.insulation.foam',2520);
+ sumFoundation(e,'foundation.drainage.length',156);
+ assert.equal(canReportProjectEstimate(restored),false);
+});
+test('integrated basement dependency deletion and restoration preserve independent geometry',()=>{
+ const f=integratedBasement(),doc=replaceSpecialistEntities(foundationDoc(),'foundation-a',f.entities);
+ const plan=planFoundationDeletion(f.entities,[f.walls[0].id]);
+ assert.equal(plan.dependentCount,16);assert.equal(plan.remaining.length,6);
+ assert.ok(plan.remaining.some(e=>e.id===f.slab.id));
+ assert.ok(plan.remaining.some(e=>e.id===f.excavation.id));
+ const changed=replaceSpecialistEntities(doc,'foundation-a',plan.remaining);
+ const restored=restoreWorkspaceSnapshot(changed,'foundation-a',{view:workspaceFloorplan(doc),measurements:f.entities});
+ assert.deepEqual(restored,doc);
+ const corrupted=structuredClone(doc);corrupted.workspaces.find(w=>w.id==='foundation-a')!.measurements=f.entities.filter(e=>e.id!==f.drainage[0].id);
+ assert.throws(()=>readProjectDocument(corrupted),/Incomplete derived drainage group/);
+});
+test('integrated slab-on-grade net concrete, independent pad and explicit earthwork roundtrip',()=>{
+ const slab:FoundationEntity={id:'sg-slab',physicalId:'sg-slab',assemblyId:'sg-slab',source:{reference:'Synthetic slab-on-grade'},kind:'slab',purpose:'concrete',polygon:rectanglePoints({x:0,y:0},{x:40,y:30}),depthFt:4/12,elevationFt:0,foundation:{version:1,material:'poured concrete',baseElevationConfirmed:true,slabOpenings:[{id:'sg-opening',polygon:rectanglePoints({x:1,y:1},{x:7,y:11})}],slabThickenings:[{id:'sg-thick',polygon:rectanglePoints({x:20,y:10},{x:30,y:20}),depthFt:1.5,basis:'total'}]}};
+ const pad:FoundationEntity={id:'sg-pad',physicalId:'sg-pad',assemblyId:'sg-pad',source:{reference:'Independent pad'},kind:'padFooting',purpose:'concrete',polygon:rectanglePoints({x:42,y:0},{x:46,y:4}),depthFt:1,elevationFt:-1,foundation:{version:1,material:'poured concrete',baseElevationConfirmed:true}};
+ const backfill:FoundationEntity={id:'sg-fill',physicalId:'sg-fill',assemblyId:'sg-fill',source:{reference:'Explicit backfill'},kind:'foundationRegion',purpose:'backfill',polygon:rectanglePoints({x:0,y:32},{x:40,y:37}),depthFt:1,elevationFt:-1,foundation:{version:1,material:'fill',baseElevationConfirmed:true}};
+ const doc=replaceSpecialistEntities(foundationDoc(),'foundation-a',[slab,pad,backfill]),restored=deserializeProjectDocument(serializeProjectDocument(doc));
+ assert.deepEqual(restored,doc);const e=restored.workspaces.find(w=>w.id==='foundation-a')!.measurements as FoundationEntity[];
+ sumFoundation(e,'foundation.slab.concrete',(1140*4/12+100*14/12)/27);
+ sumFoundation(e,'foundation.footing.pad.concrete',16/27);sumFoundation(e,'foundation.footing.pad.count',1);sumFoundation(e,'foundation.backfill.volume',200/27);
+ assert.equal(canReportProjectEstimate(restored),false);
+});
