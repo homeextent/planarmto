@@ -58,3 +58,32 @@ export function reconcileRectangularPrisms(input:readonly Prism[]):PrismResult[]
  }
  return solids.map(p=>results.get(p.id)!);
 }
+
+export type RectangleReference='exterior'|'centreline'|'interior';
+/** Reference rectangle describes actual specified faces, not a bounding approximation. */
+export function foundationRectangle(reference:Bounds,widthFt:number,mode:RectangleReference) {
+ validateBounds(reference);
+ if(!finite(widthFt)||widthFt<=EPS)throw Error('Missing or invalid wall thickness');
+ if(!['exterior','centreline','interior'].includes(mode))throw Error('Invalid wall reference');
+ const delta=mode==='exterior'?-widthFt/2:mode==='interior'?widthFt/2:0;
+ const centre={xmin:reference.xmin-delta,xmax:reference.xmax+delta,ymin:reference.ymin-delta,ymax:reference.ymax+delta};
+ validateBounds(centre);
+ const h=widthFt/2;
+ validateBounds({xmin:centre.xmin+h,xmax:centre.xmax-h,ymin:centre.ymin+h,ymax:centre.ymax-h});
+ const {xmin,xmax,ymin,ymax}=centre;
+ const vertices=[{x:xmin,y:ymin},{x:xmax,y:ymin},{x:xmax,y:ymax},{x:xmin,y:ymax}];
+ return {centre,segments:vertices.map((start,i)=>({start,end:vertices[(i+1)%4],joinStartFt:h,joinEndFt:h}))};
+}
+/** Convert an explicitly oriented face line into a centreline. Left/right in stored XY coordinates. */
+export function faceToCentreline(start:Point,end:Point,widthFt:number,side:'left'|'right') {
+ const len=Math.hypot(end.x-start.x,end.y-start.y);
+ if(!finite(len)||len<=EPS||!finite(widthFt)||widthFt<=EPS||!['left','right'].includes(side))throw Error('Invalid face reference or thickness');
+ const sign=side==='left'?1:-1,dx=-(end.y-start.y)/len*widthFt/2*sign,dy=(end.x-start.x)/len*widthFt/2*sign;
+ return {start:{x:start.x+dx,y:start.y+dy},end:{x:end.x+dx,y:end.y+dy}};
+}
+export function extendedStrip(start:Point,end:Point,widthFt:number,joinStartFt=0,joinEndFt=0):Bounds {
+ const len=Math.hypot(end.x-start.x,end.y-start.y);
+ if(!finite(len)||len<=EPS||![joinStartFt,joinEndFt].every(x=>finite(x)&&x>=0))throw Error('Invalid junction extension');
+ const dx=(end.x-start.x)/len,dy=(end.y-start.y)/len;
+ return orthogonalStrip({x:start.x-dx*joinStartFt,y:start.y-dy*joinStartFt},{x:end.x+dx*joinEndFt,y:end.y+dy*joinEndFt},widthFt);
+}

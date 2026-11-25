@@ -17,3 +17,20 @@ test('duplicate physical solids and invalid dimensions rejected',()=>{assert.thr
 test('adjacent footprints with missing elevations remain measurable',()=>near(sum([p('a',0,4,0,4,null),p('b',4,8,0,4,null)]),32));
 test('rectangle boundary order and reversed winding',()=>{const q=[{x:0,y:0},{x:4,y:0},{x:4,y:3},{x:0,y:3}];assert.deepEqual(rectangleBounds(q),rectangleBounds([...q].reverse()));assert.throws(()=>rectangleBounds([q[0],q[2],q[1],q[3]]),/boundary order/)});
 test('orthogonal strips preserve exact width and endpoint extent',()=>{assert.deepEqual(orthogonalStrip({x:10,y:2},{x:0,y:2},2),{xmin:0,xmax:10,ymin:1,ymax:3});assert.throws(()=>orthogonalStrip({x:0,y:0},{x:1,y:1},2),/orthogonal/)});
+
+import {foundationRectangle,faceToCentreline,extendedStrip} from '../src/engine/measurements/foundationGeometry';
+import {measureFoundation} from '../src/engine/measurements/foundationMeasurements';
+import {validateSpecialistEntities,type FoundationEntity} from '../src/engine/measurements/measurementTypes';
+test('same physical rectangle from all three reference conventions',()=>{
+ const t=8/12,outer={xmin:0,xmax:40,ymin:0,ymax:30};
+ const rects=[foundationRectangle(outer,t,'exterior'),foundationRectangle({xmin:t/2,xmax:40-t/2,ymin:t/2,ymax:30-t/2},t,'centreline'),foundationRectangle({xmin:t,xmax:40-t,ymin:t,ymax:30-t},t,'interior')];
+ for(const rect of rects){const solids=rect.segments.map((s,i)=>({id:String(i),bounds:extendedStrip(s.start,s.end,t,s.joinStartFt,s.joinEndFt),bottomFt:0,heightFt:8}));near(sum(solids),(1200-(40-2*t)*(30-2*t))*8)}
+});
+test('face reference orientation and invalid collapsed rectangle',()=>{assert.deepEqual(faceToCentreline({x:0,y:0},{x:10,y:0},2,'left'),{start:{x:0,y:1},end:{x:10,y:1}});assert.throws(()=>foundationRectangle({xmin:0,xmax:1,ymin:0,ymax:1},1,'exterior'),/degenerate/)});
+const wall=(id:string,start={x:0,y:0},end={x:40,y:0}):FoundationEntity=>({id,physicalId:id,assemblyId:'walls',source:{reference:'fixture'},kind:'foundationWall',start,end,widthFt:8/12,heightFt:8,elevationFt:0,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true,baseElevationConfirmed:true}});
+test('foundation contributions retain source identity and canonical CY',()=>{const e=wall('wall');const r=measureFoundation('f',[e]).rows[0];assert.equal(r.elementId,'wall');assert.equal(r.unit,'CY');assert.equal(r.status,'measured');if(r.status==='measured')near(r.quantity,2560/324)});
+test('legacy unconfirmed foundation remains pending',()=>{const e=wall('old');delete e.foundation;assert.equal(measureFoundation('f',[e]).rows[0].status,'unquantified')});
+test('unknown width cannot certify overlapping same-purpose contribution',()=>{const a=wall('a'),b=wall('b');if(b.kind==='foundationWall')b.widthFt=null;assert.ok(measureFoundation('f',[a,b]).rows.every(r=>r.status==='unquantified'))});
+test('cross-assembly overlapping concrete cannot silently double count',()=>{const a=wall('a'),b={...wall('b'),assemblyId:'other'};assert.ok(measureFoundation('f',[a,b]).rows.every(r=>r.status==='unquantified'))});
+test('explicit metadata validation rejects negative junction extension',()=>{const e=wall('a');e.foundation!.joinStartFt=-1;assert.throws(()=>validateSpecialistEntities('foundation',[e]),/junction extension/)});
+test('confirmed compatible duplicate solid is rejected',()=>assert.throws(()=>measureFoundation('f',[wall('a'),wall('b')]),/Duplicate physical solid/));

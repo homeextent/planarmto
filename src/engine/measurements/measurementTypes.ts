@@ -29,7 +29,9 @@ export type RoofEntity = Identity & (
   | { kind: 'roofOpening'; polygon: Point[]; planeId: string; deduction?: Applicability }
   | { kind: 'roofSurface'; derivation?: RoofDerivationMetadata; polygon: Point[]; purpose: 'soffit'|'insulation'; pitchRise: number | null; depthFt?: number; insulationType?: string; surfaceBasis?: 'horizontal'|'sloped' }
 );
-export type FoundationEntity = Identity & (
+/** Explicit v3 foundation semantics; absent metadata on older records is not confirmation. */
+export type FoundationMetadata = { version:1; material:string; baseElevationConfirmed?:true; centrelineConfirmed?:true; joinStartFt?:number; joinEndFt?:number };
+export type FoundationEntity = Identity & { foundation?:FoundationMetadata } & (
   | { kind: 'foundationWall'|'stripFooting'; start: Point; end: Point; widthFt: number | null; heightFt: number | null; elevationFt: number | null }
   | { kind: 'padFooting'|'slab'|'foundationRegion'; polygon: Point[]; depthFt: number | null; purpose: 'concrete'|'insulation'|'excavation'|'backfill'|'granular'; elevationFt: number | null }
   | { kind: 'foundationLine'; start: Point; end: Point; purpose: 'drainage'|'waterproofing'; heightFt?: number }
@@ -93,6 +95,13 @@ export function validateSpecialistEntities(type: string, entities: unknown): ass
       check(d.pendingApplicability===undefined||(d.pendingApplicability===true&&d.purpose==='soffit'),'invalid derived pending applicability');
       check(d.material===e.insulationType&&d.thicknessFt===e.depthFt,'derived surface material/thickness mismatch');
       check(d.purpose==='soffit'?d.basis==='horizontal'&&d.exclusions.length===0&&d.material===undefined&&d.thicknessFt===undefined:d.boundaryConfirmed===true&&str(d.material),'invalid derivation confirmation');
+    }
+    if(e.foundation!==undefined){
+      const f=e.foundation;
+      check(type==='foundation'&&obj(f)&&f.version===1&&str(f.material),'invalid foundation metadata');
+      check(f.baseElevationConfirmed===undefined||f.baseElevationConfirmed===true,'invalid foundation datum confirmation');
+      check(f.centrelineConfirmed===undefined||((e.kind==='foundationWall'||e.kind==='stripFooting')&&f.centrelineConfirmed===true),'invalid foundation centreline confirmation');
+      for(const k of ['joinStartFt','joinEndFt'])check(f[k]===undefined||((e.kind==='foundationWall'||e.kind==='stripFooting')&&f.centrelineConfirmed===true&&num(f[k])&&f[k]>=0),'invalid foundation junction extension');
     }
     switch(e.kind) {
       case 'roofPlane': check(polygon(e.polygon)&&pitch(e.pitchRise)&&finiteOrMissing(e.elevationFt)&&(e.slopeDegrees===null||(num(e.slopeDegrees)&&e.slopeDegrees>=0&&e.slopeDegrees<360)),'roof plane'); break;
