@@ -233,3 +233,67 @@ test('schema v3 JSON round trip restores roof geometry and blocks consolidated r
   await clicked;
   expect(text).toMatch(/estimate and print reporting are unavailable/i);
 });
+
+test('inspector keyboard focus does not hijack dimensional entry',async ({page})=>{
+  await rectangle(page);
+  await dimensions(page,'40,30');
+  const source=page.getByLabel('Source reference');
+  await source.click();
+  await source.press('ControlOrMeta+a');
+  await page.keyboard.type('Sheet A-102');
+  await expect(source).toHaveValue('Sheet A-102');
+  await expect(page.getByLabel('Dimensions',{exact:true})).toHaveValue('');
+  await source.press('Tab');
+  const doc=await roofSnapshot(page);
+  expect(roofOf(doc)).toHaveLength(1);
+  expect(roofOf(doc)[0].source.reference).toBe('Sheet A-102');
+  await area(page,'1200.00');
+});
+
+for(const [dx,dy] of [[1,-1],[-1,1],[-1,-1]] as const){
+  test('rectangle correction preserves anchor and quadrant '+dx+','+dy,async ({page})=>{
+    await page.getByRole('button',{name:'Roof plane',exact:true}).click();
+    await clickCanvas(page,400,350);
+    await clickCanvas(page,400+dx*144,350+dy*144);
+    const before=roofOf(await roofSnapshot(page))[0];
+    if(before.kind!=='roofPlane')throw Error('Expected roof plane');
+    const input=page.getByLabel('Dimensions',{exact:true});
+    await input.fill('40,30');
+    await input.press('Enter');
+    const after=roofOf(await roofSnapshot(page))[0];
+    if(after.kind!=='roofPlane')throw Error('Expected roof plane');
+    expect(after.id).toBe(before.id);
+    expect(after.polygon).toHaveLength(4);
+    expect(after.polygon[0]).toEqual(before.polygon[0]);
+    expect(after.polygon[2].x-after.polygon[0].x).toBeCloseTo(dx*40,6);
+    expect(after.polygon[2].y-after.polygon[0].y).toBeCloseTo(dy*30,6);
+    await area(page,'1200.00');
+  });
+}
+
+test('manual concave orthogonal polygon closes without a duplicate vertex',async ({page})=>{
+  await page.getByRole('button',{name:'Roof plane',exact:true}).click();
+  await page.getByLabel('Roof drawing mode').selectOption('polygon');
+  for(const [x,y] of [[250,250],[490,250],[490,370],[370,370],[370,490],[250,490],[250,250]])await clickCanvas(page,x,y);
+  await expect(entities(page)).toHaveCount(2);
+  const plane=roofOf(await roofSnapshot(page))[0];
+  if(plane.kind!=='roofPlane')throw Error('Expected roof plane');
+  expect(plane.polygon).toHaveLength(6);
+  expect(new Set(plane.polygon.map(p=>p.x+','+p.y)).size).toBe(6);
+  await area(page,'75.00');
+});
+
+test('Ortho diagonal closure requires explicit Finish polygon',async ({page})=>{
+  expect((await roofSnapshot(page)).settings.orthoMode).toBe(true);
+  await page.getByRole('button',{name:'Roof plane',exact:true}).click();
+  await page.getByLabel('Roof drawing mode').selectOption('polygon');
+  for(const [x,y] of [[250,250],[490,250],[490,490],[250,250]])await clickCanvas(page,x,y);
+  await expect(page.getByRole('alert').filter({hasText:/Closing edge is diagonal/})).toBeVisible();
+  await expect(entities(page)).toHaveCount(1);
+  await page.getByRole('button',{name:'Finish polygon',exact:true}).click();
+  await expect(entities(page)).toHaveCount(2);
+  const plane=roofOf(await roofSnapshot(page))[0];
+  if(plane.kind!=='roofPlane')throw Error('Expected roof plane');
+  expect(plane.polygon).toHaveLength(3);
+  await area(page,'50.00');
+});
