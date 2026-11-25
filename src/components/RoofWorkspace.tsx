@@ -1,3 +1,4 @@
+import {roofAssemblyMembers} from '../engine/measurements/roofSelection';
 import React,{useMemo,useState} from 'react';
 import type {ActiveTool,SelectionState} from '../types';
 import type {RoofEntity,Applicability} from '../engine/measurements/measurementTypes';
@@ -63,7 +64,8 @@ function BulkAssemblies({entities,workspaceId,onChange,names}:{entities:RoofEnti
  </section>
 }
 export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,onDelete}:{workspaceId:string;entities:RoofEntity[];selection:SelectionState;onChange:(e:RoofEntity[])=>boolean;onSelect:(s:SelectionState)=>void;onDelete:()=>void}){
- const e=selection.type==='roof'?entities.find(e=>e.id===selection.id):undefined;
+ const selectedIds=selection.type==='roof'?(selection.ids??(selection.id?[selection.id]:[])):[];
+ const e=selectedIds.length===1?entities.find(e=>e.id===selectedIds[0]):undefined;
  const rectangle=(()=>{if(!e||!('polygon' in e)||e.polygon.length!==4)return null;const a=e.polygon[0],b=e.polygon[2],width=Math.abs(b.x-a.x),depth=Math.abs(b.y-a.y);try{resizeRectangle(e.polygon,width,depth);return {width,depth}}catch{return null}})();
  const resize=(w:number,d:number)=>{try{return !!e&&onChange(resizeRoofRectangle(entities,e.id,w,d))}catch(err){alert(err instanceof Error?err.message:String(err));return false}};
  const names=new Map(entities.map((q,i)=>[q.id,(q.kind==='roofPlane'?'Roof plane':q.kind==='roofEdge'?'Roof edge':q.kind==='roofOpening'?'Roof opening':q.purpose==='soffit'?'Soffit area':'Insulation area')+' '+(i+1)]));
@@ -79,6 +81,8 @@ export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,
  return <aside className="w-72 shrink-0 overflow-y-auto bg-slate-900 border-l border-slate-700 p-3 space-y-3 text-slate-200">
  <h2 className="text-sm font-semibold">Roof properties</h2>
  <select aria-label="Select roof entity" className={field} value={e?.id||''} onChange={ev=>onSelect(ev.target.value?{type:'roof',id:ev.target.value}:{type:'none'})}><option value="">Select entity</option>{entities.map((q,i)=><option key={q.id} value={q.id}>{names.get(q.id)}{q.kind==='roofEdge'?' · '+q.edgeType:''}</option>)}</select>
+ {selectedIds.length>1&&<section aria-label="Roof selection" className="rounded border border-sky-700 p-2 space-y-2 text-xs"><p className="font-semibold">{selectedIds.length} roof entities selected</p><div className="flex flex-wrap gap-2"><button className="rounded bg-red-900 px-2 py-1" onClick={onDelete}>Delete selected assembly</button><button className="rounded bg-slate-700 px-2 py-1" onClick={()=>onSelect({type:'none'})}>Clear selection</button></div></section>}
+ {e&&(e.kind==='roofPlane'||e.kind==='roofEdge')&&e.roofGroupId&&<button className="rounded bg-sky-800 px-2 py-1 text-xs" onClick={()=>onSelect({type:'roof',ids:roofAssemblyMembers(entities,e.id)})}>Select entire roof assembly</button>}
  {e&&<div key={JSON.stringify(e)} className="space-y-2">
  <label className="block text-xs">Source reference<input className={field} defaultValue={e.source.reference} onBlur={ev=>{if(!ev.target.value.trim()||(ev.target.value!==e.source.reference&&!update({source:{...e.source,reference:ev.target.value.trim()}})))ev.target.value=e.source.reference}}/></label>
  {'polygon' in e&&<div className="text-xs">Projected polygon: {projectedArea(e.polygon).toFixed(2)} SF</div>}
