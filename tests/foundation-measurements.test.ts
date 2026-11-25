@@ -71,3 +71,6 @@ test('distinct explicit material layers may share same coverage',()=>{const a=fe
 
 import {createFoundationDraft} from '../src/engine/measurements/foundationDrafting';
 test('foundation draft geometry starts without assumed dimensions or material',()=>{const w=createFoundationDraft('foundation_wall',{x:0,y:0},{x:40,y:0},'draft');assert.equal(w.kind,'foundationWall');assert.equal(w.foundation,undefined);assert.equal(qty([w])[0].status,'unquantified');const s=createFoundationDraft('foundation_slab',{x:0,y:0},{x:40,y:30},'slab');assert.equal(s.kind,'slab');assert.equal(qty([s])[0].status,'unquantified')});
+
+import {foundationFootprint} from '../src/engine/measurements/foundationDrafting';
+test('confirmed wall footprint uses actual width and explicit junction extensions',()=>{const e=wall('f');e.foundation!.joinStartFt=1;e.foundation!.joinEndFt=2;const p=foundationFootprint(e)!;assert.equal(p.length,4);near(Math.min(...p.map(v=>v.x)),-1);near(Math.max(...p.map(v=>v.x)),42);near(Math.max(...p.map(v=>v.y))-Math.min(...p.map(v=>v.y)),8/12);delete e.foundation;assert.equal(foundationFootprint(e),null)});

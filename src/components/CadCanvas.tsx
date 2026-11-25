@@ -1,6 +1,6 @@
 import {roofWindowSelection} from '../engine/measurements/roofSelection';
 import { v4 as uuidv4 } from 'uuid';
-import {foundationArea,foundationPoints,createFoundationDraft} from '../engine/measurements/foundationDrafting';
+import {foundationArea,foundationPoints,foundationFootprint,createFoundationDraft} from '../engine/measurements/foundationDrafting';
 import type { RoofEntity, FoundationEntity, SpecialistEntity } from '../engine/measurements/measurementTypes';
 import { generateRectangularRoof, type RoofConfig } from '../engine/measurements/roofGenerator';
 import { validateRoofTopology, polygonDraftError } from '../engine/measurements/roofMeasurements';
@@ -574,7 +574,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     for (const entity of roofEntities || []) for (const p of roofPoints(entity)) {
       minX = Math.min(minX,p.x); maxX = Math.max(maxX,p.x); minY = Math.min(minY,p.y); maxY = Math.max(maxY,p.y);
     }
-    for(const entity of foundationEntities||[])for(const p of foundationPoints(entity)){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);}
+    for(const entity of foundationEntities||[])for(const p of foundationFootprint(entity)??foundationPoints(entity)){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);}
     // Include nodes in bounding box
     if (state.nodes.length > 0) {
       state.nodes.forEach((n) => {
@@ -2269,7 +2269,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       ctx.restore();
     }
 
-    if(foundationEntities){ctx.save();for(const e of foundationEntities){const points=foundationPoints(e).map(p=>worldToScreen(p.x,p.y));const selected=selection.type==='foundation'&&(selection.id===e.id||selection.ids?.includes(e.id));ctx.strokeStyle=selected?'#ffffff':'#38bdf8';ctx.lineWidth=selected?3:2;ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if('polygon' in e){ctx.closePath();ctx.fillStyle='rgba(56,189,248,.13)';ctx.fill()}ctx.stroke();}if(foundationStart&&foundationCursor){const pts=foundationArea(activeTool)&&foundationStart.x!==foundationCursor.x&&foundationStart.y!==foundationCursor.y?rectanglePoints(foundationStart,foundationCursor):[foundationStart,foundationCursor];ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.beginPath();pts.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(pts.length===4)ctx.closePath();ctx.stroke();}ctx.restore();}
+    if(foundationEntities){ctx.save();for(const e of foundationEntities){const footprint=foundationFootprint(e);const points=(footprint??foundationPoints(e)).map(p=>worldToScreen(p.x,p.y));const selected=selection.type==='foundation'&&(selection.id===e.id||selection.ids?.includes(e.id));ctx.strokeStyle=selected?'#ffffff':'#38bdf8';ctx.lineWidth=selected?3:2;ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(footprint){ctx.closePath();ctx.fillStyle='rgba(56,189,248,.13)';ctx.fill()}ctx.stroke();if(footprint&&'start' in e){const a=worldToScreen(e.start.x,e.start.y),b=worldToScreen(e.end.x,e.end.y);ctx.save();ctx.setLineDash([5,4]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore()}}if(foundationStart&&foundationCursor){const pts=foundationArea(activeTool)&&foundationStart.x!==foundationCursor.x&&foundationStart.y!==foundationCursor.y?rectanglePoints(foundationStart,foundationCursor):[foundationStart,foundationCursor];ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.beginPath();pts.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(pts.length===4)ctx.closePath();ctx.stroke();}ctx.restore();}
     // Specialist entities share the calibrated CAD world transform.
     if (roofEntities) {
       ctx.save();
@@ -2587,7 +2587,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     if (e.button !== 0) return; // Only left click for drawing/selecting
     setCorrection(null);setDimensionA('');setDimensionError('');draftDirection.current=null;
 
-    if(foundationEntities&&(foundationTool||activeTool==='select')){if(foundationTool){const p=foundationSnap(rawWorld);if(!foundationStart)setFoundationStart(p);else placeFoundation(foundationStart,p);}else{const hit=[...foundationEntities].reverse().find(q=>'polygon' in q?isPointInPolygon(rawWorld,q.polygon):segmentDistance(rawWorld,q.start,q.end).distance<=10/transform.scale);if(hit&&e.shiftKey){const ids=new Set(selection.type==='foundation'?(selection.ids??(selection.id?[selection.id]:[])):[]);if(ids.has(hit.id))ids.delete(hit.id);else ids.add(hit.id);onSelect(ids.size?{type:'foundation',ids:[...ids],id:[...ids][0]}:{type:'none'});}else onSelect(hit?{type:'foundation',id:hit.id}:{type:'none'});}return;}
+    if(foundationEntities&&(foundationTool||activeTool==='select')){if(foundationTool){const p=foundationSnap(rawWorld);if(!foundationStart)setFoundationStart(p);else placeFoundation(foundationStart,p);}else{const hit=[...foundationEntities].reverse().find(q=>{const footprint=foundationFootprint(q);return !!(footprint&&isPointInPolygon(rawWorld,footprint))||('start' in q&&segmentDistance(rawWorld,q.start,q.end).distance<=10/transform.scale)});if(hit&&e.shiftKey){const ids=new Set(selection.type==='foundation'?(selection.ids??(selection.id?[selection.id]:[])):[]);if(ids.has(hit.id))ids.delete(hit.id);else ids.add(hit.id);onSelect(ids.size?{type:'foundation',ids:[...ids],id:[...ids][0]}:{type:'none'});}else onSelect(hit?{type:'foundation',id:hit.id}:{type:'none'});}return;}
     if (roofEntities && onRoofChange && (activeTool.startsWith('roof_') || activeTool==='select')) {
       const tolerance=10/transform.scale;
       if(generationOutline||(activeTool==='roof_generate'&&selection.type==='roof'))return;
