@@ -10,10 +10,11 @@ function expected(w:Wall,s:FoundationStripSource,entities:FoundationEntity[]){
  // Offset is signed along the left normal of the directed source in project XY.
  // Bounded to isolated orthogonal walls, not arbitrary joined or unsupported bearing geometry.
  const a=w.foundation.joinStartFt??0,b=w.foundation.joinEndFt??0;
+ // Offset-specific eligibility precedes general centred-junction validation.
+ if(s.offsetFt!==0&&(a!==0||b!==0||entities.some(e=>e.id!==w.id&&wall(e)&&e.assemblyId===w.assemblyId)))throw Error('Offset footing requires an isolated unjoined wall');
  if([a,b].some(v=>v!==0&&!near(v,w.widthFt!/2)))throw Error('Unsupported source junction extension');
  const joinStartFt=a===0?0:s.widthFt/2,joinEndFt=b===0?0:s.widthFt/2;
  if(s.offsetFt!==0){
-  if(a!==0||b!==0||entities.some(e=>e.id!==w.id&&wall(e)&&e.assemblyId===w.assemblyId))throw Error('Offset footing requires an isolated unjoined wall');
   if(Math.abs(s.offsetFt)+w.widthFt/2>s.widthFt/2+1e-8)throw Error('Offset footing must contain the source wall width; confirm bearing design separately');
   const source=extendedStrip(w.start,w.end,w.widthFt);
   for(const other of entities.filter(wall)){

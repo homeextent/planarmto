@@ -175,4 +175,5 @@ test('offset footing refuses joined walls and insufficient footprint',()=>{
  const q=wall('connected',{x:40,y:0},{x:40,y:10});q.assemblyId='other';
  assert.throws(()=>deriveStripFootings([w,q],[w.id],2,1,id,.5),/isolated unjoined wall/);
  w.foundation!.joinStartFt=.5;assert.throws(()=>deriveStripFootings([w],[w.id],2,1,id,.5),/isolated unjoined wall/);
+ assert.throws(()=>deriveStripFootings([w],[w.id],2,1,id,0),/Unsupported source junction extension/);
 });
