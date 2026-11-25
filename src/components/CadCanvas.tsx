@@ -609,11 +609,9 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   useEffect(() => {
     if (state.activeProjectId !== lastProjectId.current) {
       lastProjectId.current = state.activeProjectId;
-      // Delay slightly to ensure geometry is ready for bounding box calculation
-      const timer = setTimeout(() => {
-        handleZoomFit();
-      }, 150);
-      return () => clearTimeout(timer);
+      // Fit the committed workspace before the browser can accept drawing input.
+      // A delayed fit can move an already placed transient vertex under the pointer.
+      handleZoomFit();
     }
   }, [state.activeProjectId]);
 
