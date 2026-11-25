@@ -519,3 +519,30 @@ test('angled face-reference foundation wall preserves exact length, width, quant
  const group=page.getByRole('group',{name:'Select workspace'});await group.getByRole('button',{name:/· Floor$/}).first().click();await group.getByRole('button',{name:/Synthetic foundation/}).click();
  await expect(page.getByText('15.56 CY',{exact:true})).toBeVisible();expect(await snapshot(page)).toEqual(after);
 });
+
+test('continuous nonwall drafting remains active after face-reference wall tool selection',async({page})=>{
+ await page.getByRole('button',{name:'Foundation wall',exact:true}).click();
+ await page.getByLabel('Foundation wall reference').selectOption('exterior-left');
+ await page.getByRole('button',{name:'Drainage',exact:true}).click();
+ await page.getByLabel('Continuous foundation drafting').check();
+ const canvas=page.locator('canvas').first();await canvas.click({position:{x:250,y:250}});await canvas.click({position:{x:550,y:250}});
+ await page.keyboard.type('40');await page.keyboard.press('Enter');
+ const first=(await snapshot(page))[0];if(first.kind!=='foundationLine')throw Error('Expected drainage');
+ await canvas.click({position:{x:550,y:440}});
+ await expect(entities(page)).toHaveCount(3);
+ const next=(await snapshot(page))[1];if(next.kind!=='foundationLine')throw Error('Expected drainage');
+ expect(next.start).toEqual(first.end);
+});
+test('scope applicability editor reflects selected record instead of reusing previous decision',async({page})=>{
+ await page.getByText('Generate rectangular foundation',{exact:true}).click();
+ for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (ft)','1'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Preview perimeter',exact:true}).click();await page.getByRole('button',{name:'Apply perimeter',exact:true}).click();
+ await page.getByLabel('Select foundation entity').selectOption({index:1});
+ await page.getByLabel('Foundation applicability',{exact:true}).selectOption('excluded');await page.getByLabel('Scope decision reason',{exact:true}).fill('Existing wall');
+ await page.getByRole('button',{name:'Apply foundation applicability',exact:true}).click();
+ await expect(page.getByLabel('Scope decision reason',{exact:true})).toHaveValue('Existing wall');
+ await page.getByLabel('Select foundation entity').selectOption({index:2});await expect(page.getByLabel('Foundation applicability',{exact:true})).toHaveValue('included');
+ await expect(page.getByLabel('Scope decision reason',{exact:true})).toHaveCount(0);
+ await page.getByLabel('Select foundation entity').selectOption({index:1});await expect(page.getByLabel('Foundation applicability',{exact:true})).toHaveValue('excluded');
+ await expect(page.getByLabel('Scope decision reason',{exact:true})).toHaveValue('Existing wall');
+});
