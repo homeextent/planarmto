@@ -8,7 +8,7 @@ export function FoundationToolbar({activeTool,onSelectTool}:{activeTool:ActiveTo
  return <aside className="w-36 shrink-0 bg-slate-900 border-r border-slate-700 p-2 overflow-y-auto"><h2 className="text-xs uppercase text-slate-400 mb-3">Foundation tools</h2>{tools.map(([t,label])=><button key={t} onClick={()=>onSelectTool(t)} className={'block w-full text-left text-xs rounded p-2 mb-1 '+(activeTool===t?'bg-sky-700 text-white':'bg-slate-800 hover:bg-slate-700')}>{label}</button>)}</aside>;
 }
 const field='block w-full bg-slate-800 border border-slate-600 rounded p-1.5 text-xs';
-function Properties({entity,onSave}:{entity:FoundationEntity;onSave:(e:FoundationEntity)=>boolean}){
+function Properties({entity,onSave}:{key?:string;entity:FoundationEntity;onSave:(e:FoundationEntity)=>boolean}){
  const [material,setMaterial]=useState(entity.foundation?.material??'');
  const [width,setWidth]=useState('widthFt' in entity?String(entity.widthFt??''):'');
  const [height,setHeight]=useState('heightFt' in entity?String(entity.heightFt??''):'');
