@@ -1,3 +1,4 @@
+import {planFoundationDeletion} from './engine/measurements/foundationDerivation';
 import {planRoofDeletion} from './engine/measurements/roofSelection';
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -239,7 +240,7 @@ function AppContent() {
 
   // Handle Deleting Selected CAD Element
   const handleDeleteSelected = useCallback(() => {
-    if(selection.type==='foundation'&&foundationEntities){const ids=selection.ids??(selection.id?[selection.id]:[]);if(ids.length&&window.confirm('Delete '+ids.length+' selected foundation component(s), including their parent-owned details?')&&handleFoundationChange(foundationEntities.filter(e=>!ids.includes(e.id))))setSelection({type:'none'});return;}
+    if(selection.type==='foundation'&&foundationEntities){const ids=selection.ids??(selection.id?[selection.id]:[]);const plan=planFoundationDeletion(foundationEntities,ids);if(ids.length&&window.confirm('Delete '+ids.length+' selected foundation component(s) and '+plan.dependentCount+' additional dependent group members, including parent-owned details?')&&handleFoundationChange(plan.remaining))setSelection({type:'none'});return;}
     if(selection.type==='roof'&&roofEntities){
       if(selection.ids?.length){
         try{

@@ -34,7 +34,8 @@ export type WallOpening={id:string;offsetFt:number;widthFt:number;sillFt:number;
 export type SlabOpening={id:string;polygon:Point[]};
 export type SlabThickening={id:string;polygon:Point[];depthFt:number;basis:'total'|'additional'};
 export type FoundationCoverage = { layerId:string; confirmed:true; foam?:true; thicknessFt?:number; openingTreatment?:'none'|'alreadyDeducted' };
-export type FoundationMetadata = { coverage?:FoundationCoverage; wallOpenings?:WallOpening[]; slabOpenings?:SlabOpening[]; slabThickenings?:SlabThickening[]; version:1; material:string; baseElevationConfirmed?:true; centrelineConfirmed?:true; joinStartFt?:number; joinEndFt?:number };
+export type FoundationStripSource={version:1;wallId:string;groupId:string;offsetFt:number;widthFt:number;depthFt:number};
+export type FoundationMetadata = { stripSource?:FoundationStripSource; coverage?:FoundationCoverage; wallOpenings?:WallOpening[]; slabOpenings?:SlabOpening[]; slabThickenings?:SlabThickening[]; version:1; material:string; baseElevationConfirmed?:true; centrelineConfirmed?:true; joinStartFt?:number; joinEndFt?:number };
 export type FoundationEntity = Identity & { foundation?:FoundationMetadata } & (
   | { kind: 'foundationWall'|'stripFooting'; start: Point; end: Point; widthFt: number | null; heightFt: number | null; elevationFt: number | null }
   | { kind: 'padFooting'|'slab'|'foundationRegion'; polygon: Point[]; depthFt: number | null; purpose: 'concrete'|'insulation'|'excavation'|'backfill'|'granular'; elevationFt: number | null }
@@ -106,6 +107,7 @@ export function validateSpecialistEntities(type: string, entities: unknown): ass
       check(type==='foundation'&&obj(f)&&f.version===1&&str(f.material),'invalid foundation metadata');
       check(f.baseElevationConfirmed===undefined||f.baseElevationConfirmed===true,'invalid foundation datum confirmation');
       check(f.centrelineConfirmed===undefined||((e.kind==='foundationWall'||e.kind==='stripFooting'||e.kind==='foundationTrench')&&f.centrelineConfirmed===true),'invalid foundation centreline confirmation');
+      if(f.stripSource!==undefined){const s=f.stripSource;check(e.kind==='stripFooting'&&obj(s)&&s.version===1&&str(s.wallId)&&str(s.groupId)&&num(s.offsetFt)&&num(s.widthFt)&&s.widthFt>0&&num(s.depthFt)&&s.depthFt>0,'invalid strip footing derivation');}
       if(f.coverage!==undefined){
         const c=f.coverage;
         check((e.kind==='foundationLine'||e.kind==='foundationRegion'&&e.purpose==='insulation')&&obj(c)&&str(c.layerId)&&c.confirmed===true,'invalid foundation coverage');
