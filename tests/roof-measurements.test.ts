@@ -170,7 +170,7 @@ test('R4 irregular, gapped, overlapping and unresolved roof selection refused',(
 });
 test('R4 mixed soffit applicability is explicit; split side conflict refused',()=>{
  const es=generated(40,30,{type:'gable',ridge:'horizontal'});
- const exterior=es.filter(e=>e.kind==='roofEdge'&&e.planeIds.length===1);
+ const exterior=es.filter((e):e is Extract<RoofEntity,{kind:'roofEdge'}>=>e.kind==='roofEdge'&&e.planeIds.length===1);
  const east=exterior.filter(e=>e.start.x===40&&e.end.x===40);
  assert.equal(east.length,2);
  const modified=es.map(e=>e.id===east[0].id&&e.kind==='roofEdge'?{...e,applicability:{...e.applicability,soffit:'included' as const}}:e);
