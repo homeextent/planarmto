@@ -11,7 +11,8 @@ export function generateRectangularRoof(a:Point,b:Point,config:RoofConfig,id:()=
  const A={x,y},B={x:x+w,y},C={x:x+w,y:y+h},D={x,y:y+h};
  const planes:Plane[]=[];
  const pitch=config.type==='flat'?0:config.pitch;
- const identity=()=>{const key=id();return {id:key,physicalId:key,assemblyId:key,source:{reference:'Generated '+config.type+' roof',note:'User-confirmed parametric perimeter; relative elevation datum'}}};
+ const roofGroupId='roof-group:'+id();
+ const identity=()=>{const key=id();return {id:key,physicalId:key,assemblyId:key,roofGroupId,source:{reference:'Generated '+config.type+' roof',note:'User-confirmed parametric perimeter; relative elevation datum'}}};
  const plane=(polygon:Point[],direction:number,height:(p:Point)=>number)=>{
   planes.push({...identity(),kind:'roofPlane',polygon,pitchRise:pitch,slopeDegrees:direction,elevationFt:height(polygon[0])*pitch/12});
  };
