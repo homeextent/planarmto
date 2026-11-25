@@ -74,3 +74,7 @@ test('foundation draft geometry starts without assumed dimensions or material',(
 
 import {foundationFootprint} from '../src/engine/measurements/foundationDrafting';
 test('confirmed wall footprint uses actual width and explicit junction extensions',()=>{const e=wall('f');e.foundation!.joinStartFt=1;e.foundation!.joinEndFt=2;const p=foundationFootprint(e)!;assert.equal(p.length,4);near(Math.min(...p.map(v=>v.x)),-1);near(Math.max(...p.map(v=>v.x)),42);near(Math.max(...p.map(v=>v.y))-Math.min(...p.map(v=>v.y)),8/12);delete e.foundation;assert.equal(foundationFootprint(e),null)});
+
+import {generateFoundationPerimeter} from '../src/engine/measurements/foundationDrafting';
+test('generated exterior perimeter reconciles corners as a single assembly',()=>{let i=0;const e=generateFoundationPerimeter({xmin:0,xmax:40,ymin:0,ymax:30},'exterior',8/12,8,0,()=>String(++i));assert.equal(e.length,4);assert.equal(new Set(e.map(q=>q.assemblyId)).size,1);near(qty(e).reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),27.1275720164609)});
+test('foundation polygon draft rejects self intersection before commit',()=>assert.throws(()=>createFoundationDraft('foundation_slab',{x:0,y:0},{x:10,y:10},'p',[{x:0,y:0},{x:10,y:10},{x:0,y:10},{x:8,y:0}]),/polygon|edge|cross/i));

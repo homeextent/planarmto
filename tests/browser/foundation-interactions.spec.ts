@@ -59,3 +59,26 @@ test('foundation geometry remains isolated when switching to floor and back',asy
  await expect(entities(page)).toHaveCount(2);
  await expect(page.getByRole('status').filter({hasText:/consolidated pricing and reporting unavailable/i})).toBeVisible();
 });
+
+test('foundation polygon closes at first vertex',async({page})=>{
+ await page.getByRole('button',{name:'Slab',exact:true}).click();
+ await page.getByLabel('Foundation drawing mode').selectOption('polygon');
+ const canvas=page.locator('canvas').first();
+ for(const position of [{x:250,y:250},{x:550,y:250},{x:550,y:450},{x:250,y:450},{x:250,y:250}])await canvas.click({position});
+ await expect(entities(page)).toHaveCount(2);
+ const e=(await snapshot(page))[0];if(e.kind!=='slab')throw Error('Expected slab');expect(e.polygon).toHaveLength(4);
+});
+test('rectangular foundation preview cancel and apply are atomic',async({page})=>{
+ await page.getByText('Generate rectangular foundation',{exact:true}).click();
+ for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (ft)','0.6666666666666666'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Preview perimeter',exact:true}).click();
+ await expect(page.getByText('4 walls · 27.1276 CY',{exact:true})).toBeVisible();
+ await expect(entities(page)).toHaveCount(1);
+ await page.getByRole('button',{name:'Cancel perimeter',exact:true}).click();
+ await expect(entities(page)).toHaveCount(1);
+ await page.getByRole('button',{name:'Preview perimeter',exact:true}).click();
+ await page.getByRole('button',{name:'Apply perimeter',exact:true}).click();
+ await expect(entities(page)).toHaveCount(5);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
+ await expect(entities(page)).toHaveCount(1);
+});

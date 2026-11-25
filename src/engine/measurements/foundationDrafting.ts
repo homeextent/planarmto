@@ -1,6 +1,7 @@
 import type {ActiveTool} from '../../types';
 import type {FoundationEntity,Point} from './measurementTypes';
-import {extendedStrip} from './foundationGeometry';
+import {extendedStrip,foundationRectangle,type RectangleReference,type Bounds} from './foundationGeometry';
+import {polygonDraftError} from './roofMeasurements';
 import {rectanglePoints} from '../precisionDrafting';
 export const foundationTools = [
  ['foundation_wall','Foundation wall'],['foundation_strip','Strip footing'],['foundation_pad','Pad footing'],['foundation_slab','Slab'],
@@ -14,6 +15,7 @@ export function createFoundationDraft(tool:ActiveTool,start:Point,end:Point,id:s
  if(!polygon&&Math.hypot(end.x-start.x,end.y-start.y)<=1e-8)throw Error('Choose distinct drafting points');
  const base={id,physicalId:id,assemblyId:id,source:{reference:'Manual foundation draft'}};
  if(tool==='foundation_wall'||tool==='foundation_strip'||tool==='foundation_trench')return {...base,kind:tool==='foundation_wall'?'foundationWall':tool==='foundation_strip'?'stripFooting':'foundationTrench',start,end,widthFt:null,heightFt:null,elevationFt:null};
+ if(polygon){const error=polygonDraftError(polygon);if(error)throw Error(error);}
  if(foundationArea(tool))return {...base,kind:tool==='foundation_pad'?'padFooting':tool==='foundation_slab'?'slab':'foundationRegion',polygon:polygon??rectanglePoints(start,end),depthFt:null,elevationFt:null,purpose:tool==='foundation_excavation'?'excavation':tool==='foundation_backfill'?'backfill':tool==='foundation_granular'?'granular':tool==='foundation_insulation'?'insulation':'concrete'};
  return {...base,kind:'foundationLine',start,end,purpose:tool==='foundation_drainage'?'drainage':tool==='foundation_waterproofing'?'waterproofing':'insulation'};
 }
@@ -25,4 +27,11 @@ export function foundationFootprint(e:FoundationEntity):Point[]|null{
  if('polygon' in e)return e.polygon;
  if(!('widthFt' in e)||e.widthFt===null||!e.foundation?.centrelineConfirmed)return null;
  try{const b=extendedStrip(e.start,e.end,e.widthFt,e.foundation.joinStartFt,e.foundation.joinEndFt);return [{x:b.xmin,y:b.ymin},{x:b.xmax,y:b.ymin},{x:b.xmax,y:b.ymax},{x:b.xmin,y:b.ymax}]}catch{return null}
+}
+
+/** An explicit perimeter; four members share a physical reconciliation assembly. */
+export function generateFoundationPerimeter(bounds:Bounds,reference:RectangleReference,widthFt:number,heightFt:number,baseFt:number|null,id:()=>string):FoundationEntity[]{
+ if(!Number.isFinite(heightFt)||heightFt<=0||baseFt!==null&&!Number.isFinite(baseFt))throw Error('Specify positive wall height and valid base elevation');
+ const rectangle=foundationRectangle(bounds,widthFt,reference),assemblyId=id();
+ return rectangle.segments.map(segment=>{const entityId=id();return {id:entityId,physicalId:entityId,assemblyId,source:{reference:'Generated rectangular foundation — '+reference+' reference'},kind:'foundationWall',start:segment.start,end:segment.end,widthFt,heightFt,elevationFt:baseFt,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true,...(baseFt!==null?{baseElevationConfirmed:true as const}:{}),joinStartFt:segment.joinStartFt,joinEndFt:segment.joinEndFt}}});
 }

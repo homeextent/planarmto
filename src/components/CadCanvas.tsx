@@ -205,9 +205,11 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  const [foundationMode,setFoundationMode]=useState<'rectangle'|'polygon'>('rectangle');
+  const [foundationVertices,setFoundationVertices]=useState<Point2D[]>([]);
   const [foundationStart,setFoundationStart]=useState<Point2D|null>(null);
   const [foundationCursor,setFoundationCursor]=useState<Point2D|null>(null);
-  useEffect(()=>{setFoundationStart(null);setFoundationCursor(null)},[activeTool]);
+  useEffect(()=>{setFoundationStart(null);setFoundationCursor(null);setFoundationVertices([])},[activeTool,foundationMode]);
   const [roofDraft, setRoofDraft] = useState<Point2D[]>([]);
   const [roofCursor, setRoofCursor] = useState<Point2D | null>(null);
   const [generationSource,setGenerationSource]=useState<RoofEntity|null>(null);
@@ -2269,7 +2271,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       ctx.restore();
     }
 
-    if(foundationEntities){ctx.save();for(const e of foundationEntities){const footprint=foundationFootprint(e);const points=(footprint??foundationPoints(e)).map(p=>worldToScreen(p.x,p.y));const selected=selection.type==='foundation'&&(selection.id===e.id||selection.ids?.includes(e.id));ctx.strokeStyle=selected?'#ffffff':'#38bdf8';ctx.lineWidth=selected?3:2;ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(footprint){ctx.closePath();ctx.fillStyle='rgba(56,189,248,.13)';ctx.fill()}ctx.stroke();if(footprint&&'start' in e){const a=worldToScreen(e.start.x,e.start.y),b=worldToScreen(e.end.x,e.end.y);ctx.save();ctx.setLineDash([5,4]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore()}}if(foundationStart&&foundationCursor){const pts=foundationArea(activeTool)&&foundationStart.x!==foundationCursor.x&&foundationStart.y!==foundationCursor.y?rectanglePoints(foundationStart,foundationCursor):[foundationStart,foundationCursor];ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.beginPath();pts.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(pts.length===4)ctx.closePath();ctx.stroke();}ctx.restore();}
+    if(foundationEntities){ctx.save();for(const e of foundationEntities){const footprint=foundationFootprint(e);const points=(footprint??foundationPoints(e)).map(p=>worldToScreen(p.x,p.y));const selected=selection.type==='foundation'&&(selection.id===e.id||selection.ids?.includes(e.id));ctx.strokeStyle=selected?'#ffffff':'#38bdf8';ctx.lineWidth=selected?3:2;ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(footprint){ctx.closePath();ctx.fillStyle='rgba(56,189,248,.13)';ctx.fill()}ctx.stroke();if(footprint&&'start' in e){const a=worldToScreen(e.start.x,e.start.y),b=worldToScreen(e.end.x,e.end.y);ctx.save();ctx.setLineDash([5,4]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore()}}if(foundationVertices.length){ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.beginPath();[...foundationVertices,...(foundationCursor?[foundationCursor]:[])].map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();for(const p of foundationVertices){const q=worldToScreen(p.x,p.y);ctx.fillStyle='#fbbf24';ctx.fillRect(q.x-3,q.y-3,6,6)}}else if(foundationStart&&foundationCursor){const pts=foundationArea(activeTool)&&foundationStart.x!==foundationCursor.x&&foundationStart.y!==foundationCursor.y?rectanglePoints(foundationStart,foundationCursor):[foundationStart,foundationCursor];ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.beginPath();pts.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(pts.length===4)ctx.closePath();ctx.stroke();}ctx.restore();}
     // Specialist entities share the calibrated CAD world transform.
     if (roofEntities) {
       ctx.save();
@@ -2347,7 +2349,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     roomSnapFeedback,
     marqueeStart,
     marqueeEnd,
-    foundationEntities,foundationStart,foundationCursor,
+    foundationEntities,foundationStart,foundationCursor,foundationVertices,
     roofEntities, roofDraft, roofCursor, roofVertex, roofMode, roofTarget, generationOutline, generationPreview, roofMarquee,
   ]);
 
@@ -2500,11 +2502,14 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     }catch(err){setDimensionError(err instanceof Error?err.message:String(err));}
   };
   const foundationTool=!!foundationEntities&&activeTool.startsWith('foundation_');
-  const foundationSnap=(raw:Point2D)=>{const points=(foundationEntities||[]).flatMap(foundationPoints);const near=points.find(p=>distance(p,raw)<=12/transform.scale);const q=near??(state.settings.gridSnap?snapPointToGrid(raw,state.settings.gridSnapSize):raw);return foundationStart&&state.settings.orthoMode&&!foundationArea(activeTool)?orthoPoint(foundationStart,q):q;};
+  const foundationPolygon=foundationTool&&foundationArea(activeTool)&&foundationMode==='polygon';
+  const foundationSnap=(raw:Point2D)=>{if(foundationPolygon&&foundationVertices.length>=3&&distance(raw,foundationVertices[0])<=12/transform.scale)return foundationVertices[0];const points=(foundationEntities||[]).flatMap(foundationPoints);const near=points.find(p=>distance(p,raw)<=12/transform.scale);const q=near??(state.settings.gridSnap?snapPointToGrid(raw,state.settings.gridSnapSize):raw);return foundationStart&&state.settings.orthoMode&&!foundationArea(activeTool)?orthoPoint(foundationStart,q):q;};
   const placeFoundation=(start:Point2D,end:Point2D)=>{if(!foundationEntities||!commitDraftPlacement)return;const before=foundationEntities,id=uuidv4(),token=uuidv4(),tool=activeTool;const build=(p:Point2D)=>[...before,createFoundationDraft(tool,start,p,id)];try{if(!commitDraftPlacement(token,build(end)))throw Error('Foundation placement rejected');setFoundationStart(null);setFoundationCursor(null);onSelect({type:'foundation',id});setCorrection({token,start,toward:end,rectangle:foundationArea(tool),correct:q=>{if(!placementHandler.current?.(token,build(q),true))throw Error('Correction rejected or placement changed');}});}catch(err){setDimensionError(err instanceof Error?err.message:String(err));}};
+  const finishFoundationPolygon=()=>{if(!foundationEntities||!onFoundationChange||foundationVertices.length<3)return;try{const id=uuidv4(),entity=createFoundationDraft(activeTool,foundationVertices[0],foundationVertices[1],id,foundationVertices);if(!onFoundationChange([...foundationEntities,entity]))throw Error('Foundation polygon rejected');setFoundationVertices([]);setFoundationCursor(null);setDimensionError('');onSelect({type:'foundation',id});}catch(err){setDimensionError(err instanceof Error?err.message:String(err));}};
+  const addFoundationVertex=(p:Point2D)=>{if(foundationVertices.length>=3&&distance(p,foundationVertices[0])<=1e-8){finishFoundationPolygon();return}if(foundationVertices.some(v=>distance(v,p)<=1e-8)){setDimensionError('Choose a different polygon vertex');return}setFoundationVertices(v=>[...v,p]);setDimensionError('');};
   const roofAreaTool=['roof_plane','roof_opening','roof_soffit','roof_insulation','roof_generate'].includes(activeTool);
-  const rectangularDraft=(foundationTool&&foundationArea(activeTool))||activeTool==='roof_generate'||activeTool==='wall_rect'||activeTool==='room_box'||(roofAreaTool&&roofMode==='rectangle');
-  const dimensionStart=foundationTool?foundationStart:roofAreaTool?roofDraft[roofDraft.length-1]:activeTool==='wall_pen'?(state.nodes.find(n=>n.id===activeWallStartNodeId)||pendingWallStart):rectangularDraft?roomBoxStart:null;
+  const rectangularDraft=(foundationTool&&foundationArea(activeTool)&&!foundationPolygon)||activeTool==='roof_generate'||activeTool==='wall_rect'||activeTool==='room_box'||(roofAreaTool&&roofMode==='rectangle');
+  const dimensionStart=foundationTool?(foundationPolygon?foundationVertices[foundationVertices.length-1]:foundationStart):roofAreaTool?roofDraft[roofDraft.length-1]:activeTool==='wall_pen'?(state.nodes.find(n=>n.id===activeWallStartNodeId)||pendingWallStart):rectangularDraft?roomBoxStart:null;
   const dimensionToward=foundationTool?foundationCursor:roofAreaTool?roofCursor:draftMousePos;
   const liveStart=recent?.start||dimensionStart;
   const liveEnd=recent?.toward||draftDirection.current||dimensionToward;
@@ -2526,6 +2531,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         last.correct(end);
         if(recentRef.current?.token===last.token)setCorrection({...last,toward:end});
       }
+      else if(foundationPolygon)addFoundationVertex(end);
       else if(foundationTool&&start)placeFoundation(start,end);
       else if(roofAreaTool)addRoofPoint(end);
       else if(rectangle){if(!commitFloorRectangle(start,end,true))return;setRoomBoxStart(null);onToolChange('select');}
@@ -2587,7 +2593,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     if (e.button !== 0) return; // Only left click for drawing/selecting
     setCorrection(null);setDimensionA('');setDimensionError('');draftDirection.current=null;
 
-    if(foundationEntities&&(foundationTool||activeTool==='select')){if(foundationTool){const p=foundationSnap(rawWorld);if(!foundationStart)setFoundationStart(p);else placeFoundation(foundationStart,p);}else{const hit=[...foundationEntities].reverse().find(q=>{const footprint=foundationFootprint(q);return !!(footprint&&isPointInPolygon(rawWorld,footprint))||('start' in q&&segmentDistance(rawWorld,q.start,q.end).distance<=10/transform.scale)});if(hit&&e.shiftKey){const ids=new Set(selection.type==='foundation'?(selection.ids??(selection.id?[selection.id]:[])):[]);if(ids.has(hit.id))ids.delete(hit.id);else ids.add(hit.id);onSelect(ids.size?{type:'foundation',ids:[...ids],id:[...ids][0]}:{type:'none'});}else onSelect(hit?{type:'foundation',id:hit.id}:{type:'none'});}return;}
+    if(foundationEntities&&(foundationTool||activeTool==='select')){if(foundationTool){const p=foundationSnap(rawWorld);if(foundationPolygon)addFoundationVertex(p);else if(!foundationStart)setFoundationStart(p);else placeFoundation(foundationStart,p);}else{const hit=[...foundationEntities].reverse().find(q=>{const footprint=foundationFootprint(q);return !!(footprint&&isPointInPolygon(rawWorld,footprint))||('start' in q&&segmentDistance(rawWorld,q.start,q.end).distance<=10/transform.scale)});if(hit&&e.shiftKey){const ids=new Set(selection.type==='foundation'?(selection.ids??(selection.id?[selection.id]:[])):[]);if(ids.has(hit.id))ids.delete(hit.id);else ids.add(hit.id);onSelect(ids.size?{type:'foundation',ids:[...ids],id:[...ids][0]}:{type:'none'});}else onSelect(hit?{type:'foundation',id:hit.id}:{type:'none'});}return;}
     if (roofEntities && onRoofChange && (activeTool.startsWith('roof_') || activeTool==='select')) {
       const tolerance=10/transform.scale;
       if(generationOutline||(activeTool==='roof_generate'&&selection.type==='roof'))return;
@@ -3290,7 +3296,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-4 py-1.5 rounded-full text-xs text-slate-300 shadow-xl flex items-center gap-3">
         <span className={`flex items-center gap-1.5 font-medium ${activeTool === 'wall_pen' || activeTool === 'wall_rect' || activeTool === 'room_box' ? 'text-amber-200' : 'text-sky-400'}`}>
           <Compass className="w-3.5 h-3.5" />
-          {foundationTool?(foundationStart?'Click endpoint or enter exact dimensions':'Click first foundation point'):activeTool.startsWith('roof_') ? (activeTool==='roof_generate'?(generationOutline?'Configure roof skeleton':selection.type==='roof'?'Selected roof outline':'Draw rectangular roof outline'):activeTool==='roof_edge'?'Click a roof boundary or existing edge':activeTool==='roof_vertex'?'Select vertex, then click new position':`${activeTool==='roof_soffit'?'Draw soffit surface':activeTool==='roof_insulation'?'Draw insulation surface':activeTool==='roof_opening'?'Draw opening in selected plane':'Draw roof plane'} · ${roofMode==='rectangle'?(roofDraft.length?'Click opposite corner or type width,depth':'Click first corner'):'Click vertices; close at first or Finish polygon'}`) : activeTool === 'wall_pen'
+          {foundationTool?(foundationPolygon?'Click vertices; close at first or Finish polygon':foundationStart?'Click endpoint or enter exact dimensions':'Click first foundation point'):activeTool.startsWith('roof_') ? (activeTool==='roof_generate'?(generationOutline?'Configure roof skeleton':selection.type==='roof'?'Selected roof outline':'Draw rectangular roof outline'):activeTool==='roof_edge'?'Click a roof boundary or existing edge':activeTool==='roof_vertex'?'Select vertex, then click new position':`${activeTool==='roof_soffit'?'Draw soffit surface':activeTool==='roof_insulation'?'Draw insulation surface':activeTool==='roof_opening'?'Draw opening in selected plane':'Draw roof plane'} · ${roofMode==='rectangle'?(roofDraft.length?'Click opposite corner or type width,depth':'Click first corner'):'Click vertices; close at first or Finish polygon'}`) : activeTool === 'wall_pen'
             ? activeWallStartNodeId
               ? 'Click to place next wall node (Double-click / ESC to finish)'
               : 'Click to drop start node for wall'
@@ -3309,6 +3315,8 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
             : foundationEntities?'Select foundation components · Shift-click toggles':roofEntities?'Select roof entities · Shift-click toggles · drag left/right for window/crossing':'Select & Move (Click wall, node, room, stamp, or note)'}
         </span>
         <div className="w-[1px] h-3.5 bg-slate-700 mx-1" />
+        {foundationPolygon&&foundationVertices.length>=3&&<button className="bg-sky-700 px-2 py-1 rounded" onClick={finishFoundationPolygon}>Finish foundation polygon</button>}
+        {foundationTool&&foundationArea(activeTool)&&<select aria-label="Foundation drawing mode" value={foundationMode} onChange={e=>setFoundationMode(e.target.value as 'rectangle'|'polygon')} className="bg-slate-800 rounded px-2 py-1"><option value="rectangle">Rectangle</option><option value="polygon">Polygon</option></select>}
         {roofDraft.length>=3&&<button className="bg-sky-700 px-2 py-1 rounded" onClick={()=>finishRoofPolygon()}>Finish polygon</button>}
         {roofAreaTool&&activeTool!=='roof_generate'&&<select aria-label="Roof drawing mode" value={roofMode} onChange={e=>setRoofMode(e.target.value as 'rectangle'|'polygon')} className="bg-slate-800 rounded px-2 py-1"><option value="rectangle">Rectangle</option><option value="polygon">Polygon</option></select>}
         {/* Precision Grid Snapping Selector */}
