@@ -2508,7 +2508,10 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       const a=parseDimension(fields[0]||'',metric),b=parseDimension(fields[1]||'',metric);
       if(a===null||(rectangle?(b===null||fields.length!==2):fields.length!==1))throw Error(rectangle?'Enter positive width,depth.':'Enter one positive length.');
       const end=rectangle?exactRectangleCorner(start,toward,a,b!):exactEndpoint(start,toward,a);
-      if(last)last.correct(end);
+      if(last){
+        last.correct(end);
+        if(recentRef.current?.token===last.token)setCorrection({...last,toward:end});
+      }
       else if(roofAreaTool)addRoofPoint(end);
       else if(rectangle){if(!commitFloorRectangle(start,end,true))return;setRoomBoxStart(null);onToolChange('select');}
       else commitFloorSegment({point:end,type:'none'});
