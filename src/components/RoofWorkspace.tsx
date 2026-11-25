@@ -14,6 +14,54 @@ function Numeric({label,value,onCommit,min,max}:{label:string;value:number|null;
  return <label className="block text-xs text-slate-400">{label}<input className={field} type="number" step="any" min={min} max={max} value={draft} placeholder="Not specified" onChange={e=>setDraft(e.target.value)} onBlur={()=>{const n=draft.trim()===''?null:Number(draft);if(n!==null&&(!Number.isFinite(n)||(min!==undefined&&n<min)||(max!==undefined&&n>max))){setDraft(value===null?'':String(value));return;}if(n!==value&&!onCommit(n))setDraft(value===null?'':String(value))}} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur()}}/></label>;
 }
 const options:Applicability[]=['unspecified','included','excluded'];
+type Edge=Extract<RoofEntity,{kind:'roofEdge'}>;
+const assemblyKeys=['fascia','gutter','soffit'] as const;
+type AssemblyKey=typeof assemblyKeys[number];
+type BulkPatch=Record<AssemblyKey,Applicability|'unchanged'>;
+const emptyPatch=():BulkPatch=>({fascia:'unchanged',gutter:'unchanged',soffit:'unchanged'});
+function BulkAssemblies({entities,workspaceId,onChange,names}:{entities:RoofEntity[];workspaceId:string;onChange:(e:RoofEntity[])=>boolean;names:Map<string,string>}){
+ const [classification,setClassification]=useState<Edge['edgeType']>('eave');
+ const [patch,setPatch]=useState<BulkPatch>(emptyPatch);
+ const [excludeOther,setExcludeOther]=useState(false);
+ const [preview,setPreview]=useState<{source:RoofEntity[];next:RoofEntity[];targets:Edge[];others:Edge[]}|null>(null);
+ const [error,setError]=useState('');
+ const edges=entities.filter((e):e is Edge=>e.kind==='roofEdge');
+ const targets=edges.filter(e=>e.edgeType===classification);
+ const others=excludeOther?edges.filter(e=>e.edgeType!==classification&&e.edgeType!=='unclassified'):[];
+ const changed=assemblyKeys.filter(k=>patch[k]!=='unchanged');
+ const result=useMemo(()=>{try{return measureRoof(workspaceId,entities).rows}catch{return []}},[workspaceId,entities]);
+ const actual=(e:Edge)=>result.find(r=>r.elementId===e.id&&r.code==='roof.edge.'+e.edgeType);
+ const length=(list:Edge[])=>{const rows=list.map(actual);return rows.reduce((n,r)=>n+(r?.status==='measured'?r.quantity:0),0).toFixed(2)+' LF'+(rows.some(r=>r?.status!=='measured')?' + pending':'')};
+ const reset=()=>{setPreview(null);setError('')};
+ if(!edges.length)return null;
+ return <section aria-label="Bulk perimeter assemblies" className="rounded border border-slate-700 p-2 space-y-2 text-xs">
+ <h3 className="font-semibold">Bulk perimeter assemblies</h3>
+ <label className="block">Target classification<select className={field} value={classification} onChange={e=>{setClassification(e.target.value as Edge['edgeType']);reset()}}>{['eave','rake','ridge','hip','valley','abutment','parapet'].map(v=><option key={v}>{v}</option>)}</select></label>
+ <p>{targets.length} target edges · {length(targets)}</p>
+ {assemblyKeys.map(k=><label key={k} className="block">Bulk {k==='gutter'?'eavestrough':k==='soffit'?'soffit run':k}<select className={field} value={patch[k]} onChange={e=>{setPatch(old=>({...old,[k]:e.target.value}));reset()}}>{['unchanged',...options].map(v=><option key={v}>{v}</option>)}</select></label>)}
+ <label className="flex items-start gap-2"><input type="checkbox" checked={excludeOther} onChange={e=>{setExcludeOther(e.target.checked);reset()}}/>Explicitly exclude changed assemblies on other classified edges</label>
+ <p className="text-slate-400">Unclassified edges remain pending. Existing assignments on non-target edges remain unchanged unless explicitly excluded above.</p>
+ <button className="rounded bg-sky-800 px-2 py-1 disabled:opacity-40" disabled={!targets.length||!changed.length} onClick={()=>{
+  const targetIds=new Set(targets.map(e=>e.id)),otherIds=new Set(others.map(e=>e.id));
+  const next=entities.map(e=>{
+   if(e.kind!=='roofEdge'||(!targetIds.has(e.id)&&!otherIds.has(e.id)))return e;
+   const applicability={...e.applicability};
+   for(const k of changed)applicability[k]=otherIds.has(e.id)?'excluded':patch[k] as Applicability;
+   return {...e,applicability};
+  });
+  try{measureRoof(workspaceId,next);setPreview({source:entities,next,targets,others});setError('')}catch(err){setError(err instanceof Error?err.message:String(err))}
+ }}>Preview assignments</button>
+ {preview&&<div className="border border-sky-700 rounded p-2 space-y-1">
+ <p className="font-semibold">Review assignment changes</p>
+ <p>{preview.targets.length} target edges · {length(preview.targets)}</p>
+ {preview.targets.map(e=><p key={e.id}>{names.get(e.id)} · {e.edgeType}</p>)}
+ {changed.map(k=><p key={k}>{k}: {patch[k]}</p>)}
+ {preview.others.length>0&&<><p>Explicit exclusions: {preview.others.length} other classified edges</p>{preview.others.map(e=><p key={e.id}>{names.get(e.id)} · {e.edgeType}</p>)}</>}
+ <div className="flex gap-2"><button className="bg-sky-700 rounded px-2 py-1" onClick={()=>{if(preview.source!==entities){setError('Roof changed. Preview assignments again.');setPreview(null);return;}if(onChange(preview.next)){reset();setPatch(emptyPatch());setExcludeOther(false)}else setError('Assignment rejected. Review roof measurements.')}}>Apply assignments</button><button className="bg-slate-700 rounded px-2 py-1" onClick={reset}>Cancel assignments</button></div>
+ </div>}
+ {error&&<p role="alert" className="text-amber-300">{error}</p>}
+ </section>
+}
 export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,onDelete}:{workspaceId:string;entities:RoofEntity[];selection:SelectionState;onChange:(e:RoofEntity[])=>boolean;onSelect:(s:SelectionState)=>void;onDelete:()=>void}){
  const e=selection.type==='roof'?entities.find(e=>e.id===selection.id):undefined;
  const rectangle=(()=>{if(!e||!('polygon' in e)||e.polygon.length!==4)return null;const a=e.polygon[0],b=e.polygon[2],width=Math.abs(b.x-a.x),depth=Math.abs(b.y-a.y);try{resizeRectangle(e.polygon,width,depth);return {width,depth}}catch{return null}})();
@@ -65,6 +113,7 @@ export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,
  </>}
  </>}
  <button className="rounded bg-red-900 px-2 py-1 text-xs" onClick={onDelete}>Delete selected</button></div>}
+ <BulkAssemblies key={workspaceId} entities={entities} workspaceId={workspaceId} names={names} onChange={onChange}/>
  <hr className="border-slate-700"/><h2 className="text-sm font-semibold">Roof quantities</h2><p className="text-xs text-slate-400">Raw measurements only — no rates or waste.</p>
  {[...totals].map(([code,x])=><React.Fragment key={code}><div className="flex justify-between gap-2 text-xs"><span>{labels[code]||code.replace('roof.','').replaceAll('.',' ')}</span><span className={x.missing?'text-amber-300':'text-slate-100'}>{x.missing?(x.qty?x.qty.toFixed(2)+' '+x.unit+' + pending':'Not quantified'):x.qty.toFixed(2)+' '+x.unit}</span></div>{x.missing>0&&<details className="text-xs text-amber-300"><summary>{labels[code]||code.replace('roof.','').replaceAll('.',' ')}: {x.missing} pending</summary>{x.reasons.map((reason,i)=><p key={i}>{reason}</p>)}</details>}</React.Fragment>)}
  {totals.has('roof.covering')&&!totals.get('roof.covering')!.missing&&<div className="text-xs">Roofing squares: {(totals.get('roof.covering')!.qty/100).toFixed(2)} SQ (same area)</div>}
