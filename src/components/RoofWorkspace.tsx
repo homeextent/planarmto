@@ -1,5 +1,5 @@
 import {v4 as uuidv4} from 'uuid';
-import {rectangularRoof,insetRoof,sides,replaceDerivedRoofGroup,removeDerivedRoofGroup,type Side,type Depths,type Bounds,type DerivationSpec} from '../engine/measurements/roofDerivation';
+import {rectangularRoof,insetRoof,sides,thermalRectangles,thermalPieces,type ThermalPiece,replaceDerivedRoofGroup,removeDerivedRoofGroup,type Side,type Depths,type Bounds,type DerivationSpec} from '../engine/measurements/roofDerivation';
 import {roofAssemblyMembers} from '../engine/measurements/roofSelection';
 import React,{useMemo,useState} from 'react';
 import type {ActiveTool,SelectionState} from '../types';
@@ -124,6 +124,92 @@ function DerivedSoffit({entities,planeIds,onChange}:{entities:RoofEntity[];plane
  {error&&<p role="alert" className="text-amber-300">{error}</p>}
  </section>;
 }
+const insulationMaterials=['blown cellulose','blown fiberglass','fiberglass batt','mineral wool batt','closed cell foam','open cell foam','other'];
+type ExclusionDraft=Record<'x'|'y'|'width'|'depth',string>;
+function DerivedInsulation({entities,planeIds,onChange}:{entities:RoofEntity[];planeIds:string[];onChange:(e:RoofEntity[])=>boolean}){
+ const sameScope=(e:RoofEntity):e is Surface=>e.kind==='roofSurface'&&!!e.derivation&&e.derivation.planeIds.length===planeIds.length&&planeIds.every(id=>e.derivation!.planeIds.includes(id));
+ const matching=entities.filter(sameScope).filter(e=>e.purpose==='insulation');
+ const groupIds=[...new Set(matching.map(e=>e.derivation!.groupId))];
+ const existing=matching[0]?.derivation;
+ const soffit=entities.filter(sameScope).find(e=>e.purpose==='soffit')?.derivation;
+ const [depths,setDepths]=useState<Record<Side,string>>(()=>Object.fromEntries(sides.map(side=>[side,existing?String(existing.depths[side]):''])) as Record<Side,string>);
+ const [uniform,setUniform]=useState('');
+ const [basis,setBasis]=useState<''|'horizontal'|'sloped'>(existing?.basis??'');
+ const [material,setMaterial]=useState(existing?.material??'');
+ const [thickness,setThickness]=useState(existing?.thicknessFt===undefined?'':String(existing.thicknessFt*12));
+ const [confirmed,setConfirmed]=useState(existing?.boundaryConfirmed??false);
+ const [exclusions,setExclusions]=useState<ExclusionDraft[]>(()=>{
+  if(!existing)return [];
+  try{const r=rectangularRoof(entities,planeIds),inner=insetRoof(r.outer,existing.depths).inner;return existing.exclusions.map(b=>({x:String(b.xmin-inner.xmin),y:String(b.ymin-inner.ymin),width:String(b.xmax-b.xmin),depth:String(b.ymax-b.ymin)}));}catch{return []}
+ });
+ const [preview,setPreview]=useState<{source:RoofEntity[];next:RoofEntity[]|null;outer:Bounds;inner:Bounds;exclusions:Bounds[];pieces:ThermalPiece[];projected:number;measured:number;pending:number;excluded:number}|null>(null);
+ const [error,setError]=useState('');
+ const reset=()=>{setPreview(null);setError('');setConfirmed(false)};
+ const makePreview=()=>{
+  setPreview(null);setError('');
+  try{
+   if(groupIds.length>1)throw Error('Multiple insulation groups match this scope. Reconcile before replacing.');
+   const r=rectangularRoof(entities,planeIds);
+   if(sides.some(side=>depths[side].trim()===''||!Number.isFinite(Number(depths[side]))||Number(depths[side])<0))throw Error('Enter a nonnegative horizontal depth for each side, including zero.');
+   if(!basis||!material)throw Error('Choose an explicit insulation surface basis and material.');
+   const depthFt=thickness.trim()===''?undefined:Number(thickness)/12;
+   if(depthFt!==undefined&&(!Number.isFinite(depthFt)||depthFt<=0))throw Error('Enter positive thickness in inches or leave unspecified.');
+   const d=Object.fromEntries(sides.map(side=>[side,Number(depths[side])])) as Depths;
+   const inset=insetRoof(r.outer,d),inner=inset.inner;
+   const boxes=exclusions.map(b=>{
+    if(Object.values(b).some(v=>v.trim()===''||!Number.isFinite(Number(v))))throw Error('Complete every thermal exclusion dimension.');
+    const x=inner.xmin+Number(b.x),y=inner.ymin+Number(b.y);
+    return {xmin:x,ymin:y,xmax:x+Number(b.width),ymax:y+Number(b.depth)};
+   });
+   const rects=thermalRectangles(inner,boxes),pieces=thermalPieces(rects,r.planes,basis);
+   const projected=pieces.reduce((n,p)=>n+p.projectedSF,0),measured=pieces.reduce((n,p)=>n+(p.actualSF??0),0),pending=pieces.filter(p=>p.actualSF===null).length;
+   const spec:DerivationSpec={version:1,groupId:existing?.groupId??'derived:'+uuidv4(),planeIds:[...planeIds],edgeIds:sides.flatMap(side=>r.boundary[side].edgeIds),depths:d,purpose:'insulation',basis,exclusions:boxes,boundaryConfirmed:confirmed,cornersConfirmed:false,material,thicknessFt:depthFt};
+   let next:RoofEntity[]|null=null;
+   if(!confirmed)setError('Review the footprint and explicitly confirm the thermal boundary before applying.');
+   else try{next=replaceDerivedRoofGroup(entities,spec,uuidv4)}catch(err){setError(err instanceof Error?err.message:String(err))}
+   setPreview({source:entities,next,outer:r.outer,inner,exclusions:boxes,pieces,projected,measured,pending,excluded:inset.interiorSF-projected});
+  }catch(err){setError(err instanceof Error?err.message:String(err))}
+ };
+ const updateExclusion=(index:number,key:keyof ExclusionDraft,value:string)=>{setExclusions(old=>old.map((b,i)=>i===index?{...b,[key]:value}:b));reset()};
+ return <section aria-label="Derive insulation surfaces" className="rounded border border-slate-700 p-2 space-y-2 text-xs">
+ <h3 className="font-semibold">Derive insulation surfaces</h3>
+ <p>{planeIds.length} source roof plane(s) · {existing?'Replace existing derivation':'New derivation'}</p>
+ <p className="text-slate-400">Confirm actual thermal limits. Physical overhangs do not depend on finished soffit applicability. Roof openings are not automatic thermal exclusions. Use manual insulation surfaces for irregular thermal boundaries.</p>
+ {soffit&&<button className="rounded bg-slate-700 px-2 py-1" onClick={()=>{setDepths(Object.fromEntries(sides.map(side=>[side,String(soffit.depths[side])])) as Record<Side,string>);reset()}}>Copy physical overhang depths from soffit</button>}
+ <label className="block">Uniform thermal inset (ft)<input aria-label="Uniform thermal inset (ft)" type="number" min="0" step="any" className={field} value={uniform} onChange={e=>{setUniform(e.target.value);reset()}}/></label>
+ <button className="rounded bg-slate-700 px-2 py-1" disabled={uniform.trim()===''||!Number.isFinite(Number(uniform))||Number(uniform)<0} onClick={()=>{setDepths(Object.fromEntries(sides.map(side=>[side,uniform])) as Record<Side,string>);reset()}}>Use thermal inset for all sides</button>
+ <div className="grid grid-cols-2 gap-1">{sides.map(side=><label key={side} className="block capitalize">{side} inset (ft)<input aria-label={side+' thermal inset (ft)'} type="number" min="0" step="any" className={field} value={depths[side]} onChange={e=>{setDepths(old=>({...old,[side]:e.target.value}));reset()}}/></label>)}</div>
+ <label className="block">Insulation surface basis<select aria-label="Derived insulation basis" className={field} value={basis} onChange={e=>{setBasis(e.target.value as typeof basis);reset()}}><option value="">Choose basis</option><option value="horizontal">Horizontal ceiling / attic</option><option value="sloped">Sloped roof deck</option></select></label>
+ <label className="block">Insulation material<select aria-label="Derived insulation material" className={field} value={material} onChange={e=>{setMaterial(e.target.value);reset()}}><option value="">Choose material</option>{insulationMaterials.map(m=><option key={m}>{m}</option>)}</select></label>
+ <label className="block">Thickness (inches, optional)<input aria-label="Derived insulation thickness (inches)" type="number" min="0.000001" step="any" className={field} value={thickness} onChange={e=>{setThickness(e.target.value);reset()}}/></label>
+ <p className="text-slate-400">Material does not determine measurement basis. Foam board feet require thickness; missing thickness remains pending.</p>
+ <h4 className="font-semibold">Thermal exclusions</h4>
+ <p className="text-slate-400">Rectangles located in feet from the inner footprint's upper-left corner, x right and y down. Confirm garages, porches and other unconditioned areas against drawings.</p>
+ {exclusions.map((b,i)=><div key={i} className="rounded border border-slate-700 p-1 space-y-1"><div className="grid grid-cols-2 gap-1">{(['x','y','width','depth'] as const).map(k=><label key={k} className="capitalize">{k} (ft)<input aria-label={'Exclusion '+(i+1)+' '+k+' (ft)'} type="number" min="0" step="any" className={field} value={b[k]} onChange={e=>updateExclusion(i,k,e.target.value)}/></label>)}</div><button className="text-red-300" onClick={()=>{setExclusions(old=>old.filter((_,j)=>i!==j));reset()}}>Remove exclusion {i+1}</button></div>)}
+ <button className="rounded bg-slate-700 px-2 py-1" onClick={()=>{setExclusions(old=>[...old,{x:'',y:'',width:'',depth:''}]);reset()}}>Add thermal exclusion</button>
+ <label className="flex gap-2 items-start"><input type="checkbox" aria-label="Confirm thermal boundary" checked={confirmed} onChange={e=>{setConfirmed(e.target.checked);setPreview(null);setError('')}}/>Confirm the thermal footprint, exclusions and selected basis against the project drawings.</label>
+ <button className="rounded bg-sky-800 px-2 py-1" onClick={makePreview}>Preview insulation derivation</button>
+ {preview&&<div className="rounded border border-sky-700 p-2 space-y-1">
+ <p className="font-semibold">Review insulation derivation</p>
+ <svg role="img" aria-label="Insulation derivation plan" viewBox={[preview.outer.xmin,preview.outer.ymin,preview.outer.xmax-preview.outer.xmin,preview.outer.ymax-preview.outer.ymin].join(' ')} className="w-full max-h-48 bg-slate-950 rounded">
+ <rect x={preview.outer.xmin} y={preview.outer.ymin} width={preview.outer.xmax-preview.outer.xmin} height={preview.outer.ymax-preview.outer.ymin} fill="#334155"/>
+ {preview.pieces.map((p,i)=><polygon key={i} points={p.polygon.map(q=>q.x+','+q.y).join(' ')} fill={p.actualSF===null?'#fbbf24':'#c084fc'} stroke="#0f172a" strokeWidth=".6" vectorEffect="non-scaling-stroke"/>)}
+ {preview.exclusions.map((b,i)=><rect key={i} x={b.xmin} y={b.ymin} width={b.xmax-b.xmin} height={b.ymax-b.ymin} fill="#64748b"/>)}
+ <rect x={preview.inner.xmin} y={preview.inner.ymin} width={preview.inner.xmax-preview.inner.xmin} height={preview.inner.ymax-preview.inner.ymin} fill="none" stroke="#cbd5e1" strokeWidth="1" vectorEffect="non-scaling-stroke"/>
+ </svg>
+ <p>Excluded thermal footprint: {preview.excluded.toFixed(2)} SF</p><p>Net projected footprint: {preview.projected.toFixed(2)} SF</p>
+ <p className="font-semibold text-purple-300">{basis==='horizontal'?'Horizontal':'Sloped'} insulation: {preview.pending&&preview.measured===0?'Not quantified':preview.measured.toFixed(2)+' SF'}{preview.pending?' + pending':''}</p>
+ {preview.pending>0&&<p className="text-amber-300">{preview.pending} surface piece(s) require source roof pitch.</p>}
+ {material.includes('foam')?<p>Foam: {thickness.trim()===''||preview.pending&&preview.measured===0?'Not quantified':(preview.measured*Number(thickness)).toFixed(2)+' BF'}{preview.pending&&thickness.trim()!==''&&preview.measured>0?' + pending':''}</p>:thickness.trim()!==''&&<p>Geometric volume (reference only): {(preview.measured*Number(thickness)/12).toFixed(2)} CF{preview.pending?' + pending':''}; no procurement or R-value calculation.</p>}
+ <p>{preview.pieces.length} derived surface piece(s)</p>
+ <div className="flex flex-wrap gap-2"><button className="rounded bg-emerald-800 px-2 py-1 disabled:opacity-40" disabled={!preview.next||preview.source!==entities} onClick={()=>{if(!preview.next||preview.source!==entities)return;if(onChange(preview.next)){setPreview(null);setError('')}else setError('Derivation rejected. Review roof measurements.')}}>Apply insulation derivation</button><button className="rounded bg-slate-700 px-2 py-1" onClick={()=>{setPreview(null);setError('')}}>Cancel insulation derivation</button></div>
+ {preview.source!==entities&&<p className="text-amber-300">Roof changed. Preview again.</p>}
+ </div>}
+ {existing&&groupIds.length===1&&<button className="rounded bg-red-900 px-2 py-1" onClick={()=>{try{if(window.confirm('Remove this complete derived insulation group? Source roof geometry is preserved.')&&onChange(removeDerivedRoofGroup(entities,existing.groupId)))reset()}catch(err){setError(err instanceof Error?err.message:String(err))}}}>Remove derived insulation group</button>}
+ {error&&<p role="alert" className="text-amber-300">{error}</p>}
+ </section>;
+}
+
 export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,onDelete}:{workspaceId:string;entities:RoofEntity[];selection:SelectionState;onChange:(e:RoofEntity[])=>boolean;onSelect:(s:SelectionState)=>void;onDelete:()=>void}){
  const selectedIds=selection.type==='roof'?(selection.ids??(selection.id?[selection.id]:[])):[];
  const e=selectedIds.length===1?entities.find(e=>e.id===selectedIds[0]):undefined;
@@ -176,7 +262,7 @@ export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,
  <label className="block text-xs">Surface basis<select className={field} value={e.surfaceBasis||''} onChange={ev=>update({surfaceBasis:ev.target.value as 'horizontal'|'sloped',pitchRise:ev.target.value==='horizontal'?0:null})}><option value="" disabled>Not specified</option><option value="horizontal">Horizontal</option><option value="sloped">Sloped</option></select></label>
  {e.surfaceBasis==='sloped'&&<Numeric label="Surface pitch rise per 12" value={e.pitchRise} min={0} onCommit={pitchRise=>update({pitchRise})}/>}
  {e.purpose==='insulation'&&<>
- <label className="block text-xs">Insulation type<select className={field} value={e.insulationType||''} onChange={ev=>update({insulationType:ev.target.value||undefined})}><option value="">Not specified</option>{['blown cellulose','fiberglass batt','mineral wool batt','closed cell foam','open cell foam','other'].map(v=><option key={v}>{v}</option>)}</select></label>
+ <label className="block text-xs">Insulation type<select className={field} value={e.insulationType||''} onChange={ev=>update({insulationType:ev.target.value||undefined})}><option value="">Not specified</option>{insulationMaterials.map(v=><option key={v}>{v}</option>)}</select></label>
  <Numeric label="Thickness (inches)" value={e.depthFt===undefined?null:e.depthFt*12} min={0.000001} onCommit={v=>update({depthFt:v===null?undefined:v/12})}/>
  </>}
  </>}
@@ -184,6 +270,7 @@ export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,
  <div key={workspaceId}><BulkAssemblies entities={entities} workspaceId={workspaceId} names={names} onChange={onChange}/></div>
  {sourceIds.length>0?<div key={workspaceId+sourceKey}><DerivedSoffit entities={entities} planeIds={sourceIds} onChange={onChange}/></div>:<p className="text-xs text-slate-400">Select a roof plane or entire roof assembly to derive soffit surfaces. Use the toolbar for manual surfaces.</p>}
 
+ {sourceIds.length>0&&<div key={workspaceId+sourceKey+'-insulation'}><DerivedInsulation entities={entities} planeIds={sourceIds} onChange={onChange}/></div>}
  <hr className="border-slate-700"/><h2 className="text-sm font-semibold">Roof quantities</h2><p className="text-xs text-slate-400">Raw measurements only — no rates or waste.</p>
  {[...totals].map(([code,x])=><React.Fragment key={code}><div className="flex justify-between gap-2 text-xs"><span>{labels[code]||code.replace('roof.','').replaceAll('.',' ')}</span><span className={x.missing?'text-amber-300':'text-slate-100'}>{x.missing?(x.qty?x.qty.toFixed(2)+' '+x.unit+' + pending':'Not quantified'):x.qty.toFixed(2)+' '+x.unit}</span></div>{x.missing>0&&<details className="text-xs text-amber-300"><summary>{labels[code]||code.replace('roof.','').replaceAll('.',' ')}: {x.missing} pending</summary>{x.reasons.map((reason,i)=><p key={i}>{reason}</p>)}</details>}</React.Fragment>)}
  {totals.has('roof.covering')&&!totals.get('roof.covering')!.missing&&<div className="text-xs">Roofing squares: {(totals.get('roof.covering')!.qty/100).toFixed(2)} SQ (same area)</div>}
