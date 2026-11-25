@@ -74,3 +74,17 @@ npm run build:zip creates ../../builds/planar-mto.zip relative to the repository
 PR #8 merged into staging at `c1a0bf7` after documentation-only candidate `3d0830e` passed CI #40 ([run 45462442984](https://github.com/homeextent/planarmto/actions/runs/45462442984)). Post-merge staging push [run 45462698052](https://github.com/homeextent/planarmto/actions/runs/45462698052), job 138689310248, completed successfully; owner CLI and job details verified. C.1A formally complete. Production `main` remains v2.15.1 at `0423cb6`.
 
 Next: C.1B roof drafting and measurement after documentation synchronization. No production promotion or C.1B implementation as part of this housekeeping.
+
+## Evidence-driven debugging and browser regression protocol
+
+Owner-approved governing standard (C.1B-R3.8, 2026-11-24). Applies to all future increments and all developers/AI agents.
+
+1. Reproduce reported interactive defects in a disposable browser context with synthetic project data where possible. Record exact source commit, workflow/run, browser and reproduction sequence.
+2. Capture relevant evidence: Playwright trace, screenshot, validation messages, console/page errors, persisted source geometry and event sequence as applicable. Inspect evidence before selecting a functional correction. Distinguish a failing assertion from a confirmed product defect; document test-fixture defects separately.
+3. State the evidence-supported cause and make a bounded correction. When evidence is insufficient, use a clearly identified diagnostic experiment rather than present a speculative change as a verified fix.
+4. Preserve the original regression assertion. Never skip, weaken, retry away or artificially delay a test solely to obtain green CI. Legitimate fixture corrections require documented evidence and equivalent or stronger assertions.
+5. Verify the original regression and broader suite on the exact final commit; record unresolved cases and limitations. Browser CI complements, not replaces, owner local acceptance and production-specific smoke tests.
+
+Playwright is an exact-pinned development-only dependency. Chromium runs against a built Vite preview; use fresh contexts and synthetic data. Run locally with npm ci, npm run build, npx --no-install playwright install chromium (when needed), then npx --no-install playwright test. CI installs Chromium with OS dependencies and retains failure screenshots/traces for seven days. Do not capture customer drawings, production credentials or private project records in CI artifacts.
+
+Reference baseline: feature commit f5d8bef9e0ce8f5e53444b87cfb13ce9f5d7b162, CI #78 / run 45515709731, nine browser tests passed, all validation stages passed. The trace-supported delayed auto-fit correction resolved the previously failing first-vertex closure test without relaxing its assertion. This is a feature baseline, not staging integration or owner acceptance. R3.8 coverage expansion remains pending validation.
