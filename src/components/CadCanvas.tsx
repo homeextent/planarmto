@@ -7,7 +7,7 @@ import { generateRectangularRoof, type RoofConfig } from '../engine/measurements
 import { validateRoofTopology, polygonDraftError } from '../engine/measurements/roofMeasurements';
 import { parseDimension, exactEndpoint, exactRectangleCorner, rectanglePoints, orthoPoint, resizeRectangle } from '../engine/precisionDrafting';
 import { roofPoints, roofSnap, type RoofSnap, boundaryAt, moveRoofVertex, segmentDistance } from '../engine/measurements/roofEditing';
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   FloorplanState,
   ActiveTool,

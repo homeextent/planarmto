@@ -146,7 +146,7 @@ export function FoundationInspector({workspaceId,entities,selection,onChange,onS
  const ids=selection.type==='foundation'?(selection.ids??(selection.id?[selection.id]:[])):[],selected=ids.length===1?entities.find(e=>e.id===ids[0]):undefined;
  const result=useMemo(()=>{try{return measureFoundation(workspaceId,entities)}catch(err){return {rows:[],warnings:[err instanceof Error?err.message:String(err)],detailBreakdown:[]}}},[workspaceId,entities]);
  const [activeGenerator,setActiveGenerator]=useState('');
- const sink=(owner:string):PreviewSink=>members=>{if(members){setActiveGenerator(owner)onPreview(members)}else if(activeGenerator===owner)onPreview(null)};
+ const sink=(owner:string):PreviewSink=>members=>{if(members){setActiveGenerator(owner);onPreview(members)}else if(activeGenerator===owner)onPreview(null)};
  const filterKind=(e:FoundationEntity)=>e.kind==='foundationLine'||e.kind==='foundationRegion'?e.kind+':'+e.purpose:e.kind;
  const breakdown=result.detailBreakdown.find(b=>b.elementId===selected?.id);
  const totals=new Map<string,{qty:number;unit:string;pending:number;known:number}>();
