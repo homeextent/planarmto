@@ -58,7 +58,7 @@ test('polygon closes at the first draft vertex without adding duplicate vertex',
   await clickCanvas(page,490,490);
   await clickCanvas(page,250,490);
   await clickCanvas(page,250,250);
-  await expect(entities(page)).toHaveCount(2);
+  await expect(entities(page), 'Closure diagnostic: '+await page.getByRole('alert').allTextContents()).toHaveCount(2);
   await expect(page.getByText(/Projected polygon:/)).toBeVisible();
 });
 
