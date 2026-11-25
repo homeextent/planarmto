@@ -3,7 +3,7 @@ import type {ActiveTool,SelectionState} from '../types';
 import type {RoofEntity,Applicability} from '../engine/measurements/measurementTypes';
 import {resizeRoofRectangle} from '../engine/measurements/roofEditing';
 import {resizeRectangle} from '../engine/precisionDrafting';
-import {measureRoof,projectedArea} from '../engine/measurements/roofMeasurements';
+import {measureRoof,projectedArea,edgeLength} from '../engine/measurements/roofMeasurements';
 const tools:[ActiveTool,string][]=[['select','Select'],['roof_generate','Generate roof skeleton'],['roof_plane','Roof plane'],['roof_edge','Classify edge'],['roof_opening','Roof opening'],['roof_soffit','Soffit area'],['roof_insulation','Insulation area'],['roof_vertex','Edit vertex'],['ruler_measure','Measure'],['calibrate_scale','Calibrate scale'],['text_label','Annotation']];
 export function RoofToolbar({activeTool,onSelectTool}:{activeTool:ActiveTool;onSelectTool:(t:ActiveTool)=>void}){
  return <aside className="w-36 shrink-0 bg-slate-900 border-r border-slate-700 p-2 overflow-y-auto"><h2 className="text-xs uppercase text-slate-400 mb-3">Roof tools</h2>{tools.map(([t,label])=><button key={t} onClick={()=>onSelectTool(t)} className={'block w-full text-left text-xs rounded p-2 mb-1 '+(activeTool===t?'bg-sky-700 text-white':'bg-slate-800 hover:bg-slate-700')}>{label}</button>)}</aside>;
@@ -21,8 +21,12 @@ export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,
  const names=new Map(entities.map((q,i)=>[q.id,(q.kind==='roofPlane'?'Roof plane':q.kind==='roofEdge'?'Roof edge':q.kind==='roofOpening'?'Roof opening':q.purpose==='soffit'?'Soffit area':'Insulation area')+' '+(i+1)]));
  const result=useMemo(()=>{try{return measureRoof(workspaceId,entities)}catch(err){return {rows:[],warnings:[err instanceof Error?err.message:String(err)]}}},[workspaceId,entities]);
  const update=(patch:Partial<RoofEntity>)=>{if(e)return onChange(entities.map(q=>q.id===e.id?{...q,...patch} as RoofEntity:q))};
- const totals=new Map<string,{unit:string;qty:number;missing:number}>();
- for(const r of result.rows){const x=totals.get(r.code)||{unit:r.unit,qty:0,missing:0};if(r.status==='measured')x.qty+=r.quantity;else x.missing++;totals.set(r.code,x)}
+ const selectedEdge=e?.kind==='roofEdge'?e:null;
+ const edgeParents=selectedEdge?entities.filter((q):q is Extract<RoofEntity,{kind:'roofPlane'}>=>q.kind==='roofPlane'&&selectedEdge.planeIds.includes(q.id)):[];
+ const edgePending=edgeParents.flatMap(p=>p.pitchRise===null?[names.get(p.id)+': specify pitch']:p.pitchRise>0&&p.slopeDegrees===null?[names.get(p.id)+': specify downslope direction']:[]);
+ const actualEdge=selectedEdge&&edgeParents.length===selectedEdge.planeIds.length&&!edgePending.length?edgeLength(selectedEdge.start,selectedEdge.end,edgeParents[0].pitchRise,edgeParents[0].slopeDegrees):null;
+ const totals=new Map<string,{unit:string;qty:number;missing:number;reasons:string[]}>();
+ for(const r of result.rows){const x=totals.get(r.code)||{unit:r.unit,qty:0,missing:0,reasons:[]};if(r.status==='measured')x.qty+=r.quantity;else {x.missing++;x.reasons.push((names.get(r.elementId)||'Measurement')+': '+r.reason);}totals.set(r.code,x)}
  const labels:Record<string,string>={'roof.projected':'Projected gross area','roof.gross':'Gross sloped area','roof.deduction':'Opening deductions','roof.covering':'Net covering','roof.fascia':'Fascia','roof.gutter':'Eavestrough','roof.soffit.run':'Soffit run','roof.soffit.area':'Soffit area'};
  return <aside className="w-72 shrink-0 overflow-y-auto bg-slate-900 border-l border-slate-700 p-3 space-y-3 text-slate-200">
  <h2 className="text-sm font-semibold">Roof properties</h2>
@@ -39,11 +43,20 @@ export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,
  <Numeric label="Elevation at first vertex (ft, optional)" value={e.elevationFt} onCommit={elevationFt=>update({elevationFt})}/>
  </>}
  {e.kind==='roofEdge'&&<>
+ <div className="rounded border border-slate-700 p-2 space-y-1 text-xs">
+ <p>Projected edge length: {Math.hypot(e.end.x-e.start.x,e.end.y-e.start.y).toFixed(2)} LF</p>
+ <p>Actual edge length: {actualEdge===null?'Not quantified':actualEdge.toFixed(2)+' LF'}</p>
+ {edgePending.map(reason=><p key={reason} className="text-amber-300">{reason}</p>)}
+ {e.edgeType==='unclassified'&&<p className="text-amber-300">Choose a classification before assigning assemblies.</p>}
+ <p className="text-slate-400">Projected length is a reference, not a substitute for actual sloped length.</p>
+ </div>
  <label className="block text-xs">Classification<select className={field} value={e.edgeType} onChange={ev=>update({edgeType:ev.target.value as typeof e.edgeType})}>{['unclassified','eave','rake','ridge','hip','valley','abutment','parapet'].map(v=><option key={v}>{v}</option>)}</select></label>
- {(['fascia','gutter','soffit'] as const).map(k=><label key={k} className="block text-xs">{k}<select className={field} value={e.applicability?.[k]||'unspecified'} onChange={ev=>update({applicability:{...e.applicability,[k]:ev.target.value as Applicability}})}>{options.map(v=><option key={v}>{v}</option>)}</select></label>)}
+ <p className="text-xs text-slate-400">Included counts toward the assembly; excluded does not; unspecified remains pending. Soffit run is linear length, not surface area.</p>
+ {(['fascia','gutter','soffit'] as const).map(k=><label key={k} className="block text-xs">{k==='gutter'?'Eavestrough (gutter)':k==='soffit'?'Soffit run':k}<select className={field} value={e.applicability?.[k]||'unspecified'} onChange={ev=>update({applicability:{...e.applicability,[k]:ev.target.value as Applicability}})}>{options.map(v=><option key={v}>{v}</option>)}</select></label>)}
  </>}
  {e.kind==='roofOpening'&&<label className="block text-xs">Deduction treatment<select className={field} value={e.deduction||'unspecified'} onChange={ev=>update({deduction:ev.target.value as Applicability})}>{options.map(v=><option key={v}>{v}</option>)}</select></label>}
  {e.kind==='roofSurface'&&<>
+ <p className="text-xs text-slate-400">Choose the actual surface basis. For horizontal surfaces use zero pitch; for sloped surfaces specify pitch. Insulation requires material and foam volume requires thickness.</p>
  <label className="block text-xs">Surface basis<select className={field} value={e.surfaceBasis||''} onChange={ev=>update({surfaceBasis:ev.target.value as 'horizontal'|'sloped',pitchRise:ev.target.value==='horizontal'?0:null})}><option value="" disabled>Not specified</option><option value="horizontal">Horizontal</option><option value="sloped">Sloped</option></select></label>
  {e.surfaceBasis==='sloped'&&<Numeric label="Surface pitch rise per 12" value={e.pitchRise} min={0} onCommit={pitchRise=>update({pitchRise})}/>}
  {e.purpose==='insulation'&&<>
@@ -53,7 +66,7 @@ export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,
  </>}
  <button className="rounded bg-red-900 px-2 py-1 text-xs" onClick={onDelete}>Delete selected</button></div>}
  <hr className="border-slate-700"/><h2 className="text-sm font-semibold">Roof quantities</h2><p className="text-xs text-slate-400">Raw measurements only — no rates or waste.</p>
- {[...totals].map(([code,x])=><div key={code} className="flex justify-between gap-2 text-xs"><span>{labels[code]||code.replace('roof.','').replaceAll('.',' ')}</span><span className={x.missing?'text-amber-300':'text-slate-100'}>{x.missing?(x.qty?x.qty.toFixed(2)+' '+x.unit+' + pending':'Not quantified'):x.qty.toFixed(2)+' '+x.unit}</span></div>)}
+ {[...totals].map(([code,x])=><React.Fragment key={code}><div className="flex justify-between gap-2 text-xs"><span>{labels[code]||code.replace('roof.','').replaceAll('.',' ')}</span><span className={x.missing?'text-amber-300':'text-slate-100'}>{x.missing?(x.qty?x.qty.toFixed(2)+' '+x.unit+' + pending':'Not quantified'):x.qty.toFixed(2)+' '+x.unit}</span></div>{x.missing>0&&<details className="text-xs text-amber-300"><summary>{labels[code]||code.replace('roof.','').replaceAll('.',' ')}: {x.missing} pending</summary>{x.reasons.map((reason,i)=><p key={i}>{reason}</p>)}</details>}</React.Fragment>)}
  {totals.has('roof.covering')&&!totals.get('roof.covering')!.missing&&<div className="text-xs">Roofing squares: {(totals.get('roof.covering')!.qty/100).toFixed(2)} SQ (same area)</div>}
  {result.warnings.some(w=>!w.includes('explicitly excluded'))&&<details open><summary className="text-xs text-amber-300">Measurement checks</summary>{result.warnings.filter(w=>!w.includes('explicitly excluded')).map((w,i)=><p key={i} className="text-xs text-amber-300">{entities.reduce((s,q)=>s.replace(q.id,names.get(q.id)||q.id),w).replace(/^Plane Roof plane/,'Roof plane').replace(/^Edge Roof edge/,'Roof edge')}</p>)}</details>}{result.warnings.some(w=>w.includes('explicitly excluded'))&&<details><summary className="text-xs text-slate-400">Explicit exclusions</summary>{result.warnings.filter(w=>w.includes('explicitly excluded')).map((w,i)=><p key={i} className="text-xs text-slate-400">{entities.reduce((s,q)=>s.replace(q.id,names.get(q.id)||q.id),w)}</p>)}</details>}
  </aside>;
