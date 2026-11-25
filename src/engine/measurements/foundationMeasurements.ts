@@ -5,6 +5,7 @@ import {validateContributionSet,type FoundationEntity,type QuantityContribution}
 import {simplePolygon,projectedArea} from './roofMeasurements';
 import {extendedStrip,reconcileRectangularPrisms,orthogonalPolygonPieces,polygonEnvelope,type Prism,type Bounds} from './foundationGeometry';
 import {foundationDetails} from './foundationDetails';
+import {foundationCoverage} from './foundationCoverage';
 import {validateFoundationTopology} from './foundationTopology';
 const intersects=(a:Bounds,b:Bounds)=>Math.min(a.xmax,b.xmax)>Math.max(a.xmin,b.xmin)&&Math.min(a.ymax,b.ymax)>Math.max(a.ymin,b.ymin);
 type Solid={entity:FoundationEntity;code:string;material:string;bounds:Bounds|null;prism:Prism|null;pieces:Bounds[]|null;area:number|null;details:ReturnType<typeof foundationDetails>;reason?:string};
@@ -21,16 +22,10 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
    if(e.foundation)throw Error('Invalid foundation polygon: '+e.id);
    // Historical invalid geometry remains retained, but blocks potentially related quantities.
   }
-  if(e.kind==='foundationLine'){
-   // Line surface/route ownership not yet established; never certify duplicate routes.
-   add(e,e.purpose==='drainage'?'foundation.drainage.length':'foundation.waterproofing.area',e.purpose==='drainage'?'LF':'SF','explicit line (ownership pending)',null,'Line ownership and coverage validation pending');continue;
-  }
-  if('polygon' in e&&e.purpose==='insulation'){
-   add(e,'foundation.insulation.area','SF','explicit region (ownership pending)',null,'Insulation layer ownership validation pending');continue;
-  }
+  if(e.kind==='foundationLine'||'polygon' in e&&e.purpose==='insulation')continue;
   const line='start' in e;
-  const code=e.kind==='foundationWall'?'foundation.wall.concrete':e.kind==='stripFooting'?'foundation.footing.strip.concrete':e.kind==='padFooting'?'foundation.footing.pad.concrete':e.kind==='slab'?'foundation.slab.concrete':'purpose' in e&&e.purpose==='concrete'?'foundation.region.concrete':'foundation.'+('purpose' in e?e.purpose:'unknown')+'.volume';
-  const material=code.endsWith('.concrete')?'concrete':e.kind==='foundationRegion'?e.purpose:'concrete';
+  const code=e.kind==='foundationTrench'?'foundation.excavation.volume':e.kind==='foundationWall'?'foundation.wall.concrete':e.kind==='stripFooting'?'foundation.footing.strip.concrete':e.kind==='padFooting'?'foundation.footing.pad.concrete':e.kind==='slab'?'foundation.slab.concrete':'purpose' in e&&e.purpose==='concrete'?'foundation.region.concrete':'foundation.'+('purpose' in e?e.purpose:'unknown')+'.volume';
+  const material=e.kind==='foundationTrench'?'excavation':code.endsWith('.concrete')?'concrete':e.kind==='foundationRegion'?e.purpose:'concrete';
   let bounds:Bounds|null=null,prism:Prism|null=null,pieces:Bounds[]|null=null,area:number|null=null,reason:string|undefined;
   if(!e.foundation?.material)reason='Confirm material and foundation source semantics';
   else if(material==='concrete'&&e.foundation.material!=='poured concrete')reason='Unsupported concrete construction system';
@@ -93,5 +88,6 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
 
   if(reason)warnings.push(s.entity.id+': '+reason);
  }
+ for(const c of foundationCoverage(entities)){add(c.entity,c.code,c.unit,c.basis,c.value,c.reason);if(c.value===null)warnings.push(c.entity.id+': '+c.reason)}
  validateContributionSet(rows);return {rows,warnings,detailBreakdown};
 }

@@ -33,11 +33,13 @@ export type RoofEntity = Identity & (
 export type WallOpening={id:string;offsetFt:number;widthFt:number;sillFt:number;heightFt:number};
 export type SlabOpening={id:string;polygon:Point[]};
 export type SlabThickening={id:string;polygon:Point[];depthFt:number;basis:'total'|'additional'};
-export type FoundationMetadata = { wallOpenings?:WallOpening[]; slabOpenings?:SlabOpening[]; slabThickenings?:SlabThickening[]; version:1; material:string; baseElevationConfirmed?:true; centrelineConfirmed?:true; joinStartFt?:number; joinEndFt?:number };
+export type FoundationCoverage = { layerId:string; confirmed:true; foam?:true; thicknessFt?:number; openingTreatment?:'none'|'alreadyDeducted' };
+export type FoundationMetadata = { coverage?:FoundationCoverage; wallOpenings?:WallOpening[]; slabOpenings?:SlabOpening[]; slabThickenings?:SlabThickening[]; version:1; material:string; baseElevationConfirmed?:true; centrelineConfirmed?:true; joinStartFt?:number; joinEndFt?:number };
 export type FoundationEntity = Identity & { foundation?:FoundationMetadata } & (
   | { kind: 'foundationWall'|'stripFooting'; start: Point; end: Point; widthFt: number | null; heightFt: number | null; elevationFt: number | null }
   | { kind: 'padFooting'|'slab'|'foundationRegion'; polygon: Point[]; depthFt: number | null; purpose: 'concrete'|'insulation'|'excavation'|'backfill'|'granular'; elevationFt: number | null }
-  | { kind: 'foundationLine'; start: Point; end: Point; purpose: 'drainage'|'waterproofing'; heightFt?: number }
+  | { kind:'foundationTrench'; start:Point; end:Point; widthFt:number|null; heightFt:number|null; elevationFt:number|null }
+  | { kind: 'foundationLine'; start: Point; end: Point; purpose: 'drainage'|'waterproofing'|'insulation'; heightFt?: number }
 );
 export type SiteEntity = Identity & (
   | { kind: 'siteRegion'; polygon: Point[]; purpose: 'hardscape'|'excavation'|'fill'|'deck'|'landscape'|'reference'; depthFt: number | null; elevationFt: number | null }
@@ -55,7 +57,7 @@ export type ScopeAssignment = { status: 'unquantified' } | { status: 'excluded';
 export const specialistKinds = ['roof','foundation','site'] as const;
 const allowed = {
   roof: ['roofPlane','roofEdge','roofOpening','roofSurface'],
-  foundation: ['foundationWall','stripFooting','padFooting','slab','foundationRegion','foundationLine'],
+  foundation: ['foundationWall','stripFooting','padFooting','slab','foundationRegion','foundationLine','foundationTrench'],
   site: ['siteRegion','siteLine','siteCount']
 };
 const obj = (x: unknown): x is Record<string, any> => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -103,22 +105,29 @@ export function validateSpecialistEntities(type: string, entities: unknown): ass
       const f=e.foundation;
       check(type==='foundation'&&obj(f)&&f.version===1&&str(f.material),'invalid foundation metadata');
       check(f.baseElevationConfirmed===undefined||f.baseElevationConfirmed===true,'invalid foundation datum confirmation');
-      check(f.centrelineConfirmed===undefined||((e.kind==='foundationWall'||e.kind==='stripFooting')&&f.centrelineConfirmed===true),'invalid foundation centreline confirmation');
+      check(f.centrelineConfirmed===undefined||((e.kind==='foundationWall'||e.kind==='stripFooting'||e.kind==='foundationTrench')&&f.centrelineConfirmed===true),'invalid foundation centreline confirmation');
+      if(f.coverage!==undefined){
+        const c=f.coverage;
+        check((e.kind==='foundationLine'||e.kind==='foundationRegion'&&e.purpose==='insulation')&&obj(c)&&str(c.layerId)&&c.confirmed===true,'invalid foundation coverage');
+        check(c.foam===undefined||c.foam===true&&e.purpose==='insulation','invalid foam coverage');
+        check(c.thicknessFt===undefined||e.purpose==='insulation'&&num(c.thicknessFt)&&c.thicknessFt>0,'invalid coverage thickness');
+        check(c.openingTreatment===undefined||e.kind==='foundationLine'&&e.purpose!=='drainage'&&['none','alreadyDeducted'].includes(c.openingTreatment),'invalid coverage opening treatment');
+      }
       if(f.wallOpenings!==undefined)check(e.kind==='foundationWall'&&Array.isArray(f.wallOpenings)&&f.wallOpenings.every(o=>obj(o)&&str(o.id)&&num(o.offsetFt)&&o.offsetFt>=0&&num(o.widthFt)&&o.widthFt>0&&num(o.sillFt)&&o.sillFt>=0&&num(o.heightFt)&&o.heightFt>0),'invalid wall openings');
       if(f.slabOpenings!==undefined)check(e.kind==='slab'&&Array.isArray(f.slabOpenings)&&f.slabOpenings.every(o=>obj(o)&&str(o.id)&&polygon(o.polygon)),'invalid slab openings');
       if(f.slabThickenings!==undefined)check(e.kind==='slab'&&Array.isArray(f.slabThickenings)&&f.slabThickenings.every(o=>obj(o)&&str(o.id)&&polygon(o.polygon)&&num(o.depthFt)&&o.depthFt>0&&['total','additional'].includes(o.basis)),'invalid slab thickening');
       const detailIds=[...(f.wallOpenings??[]),...(f.slabOpenings??[]),...(f.slabThickenings??[])].map(o=>o.id);
       check(new Set(detailIds).size===detailIds.length,'duplicate foundation detail ID');
-      for(const k of ['joinStartFt','joinEndFt'])check(f[k]===undefined||((e.kind==='foundationWall'||e.kind==='stripFooting')&&f.centrelineConfirmed===true&&num(f[k])&&f[k]>=0),'invalid foundation junction extension');
+      for(const k of ['joinStartFt','joinEndFt'])check(f[k]===undefined||((e.kind==='foundationWall'||e.kind==='stripFooting'||e.kind==='foundationTrench')&&f.centrelineConfirmed===true&&num(f[k])&&f[k]>=0),'invalid foundation junction extension');
     }
     switch(e.kind) {
       case 'roofPlane': check(polygon(e.polygon)&&pitch(e.pitchRise)&&finiteOrMissing(e.elevationFt)&&(e.slopeDegrees===null||(num(e.slopeDegrees)&&e.slopeDegrees>=0&&e.slopeDegrees<360)),'roof plane'); break;
       case 'roofEdge': check(line(e)&&Array.isArray(e.planeIds)&&e.planeIds.length>0&&e.planeIds.length<=2&&new Set(e.planeIds).size===e.planeIds.length&&['eave','rake','ridge','hip','valley','abutment','parapet','unclassified'].includes(e.edgeType),'roof edge'); check(e.applicability===undefined||(obj(e.applicability)&&Object.keys(e.applicability).every(k=>['fascia','gutter','soffit'].includes(k))&&Object.values(e.applicability).every(applicability)),'edge applicability'); break;
       case 'roofOpening': check(polygon(e.polygon)&&str(e.planeId),'roof opening'); check(applicability(e.deduction),'opening deduction'); break;
       case 'roofSurface': check(polygon(e.polygon)&&['soffit','insulation'].includes(e.purpose)&&pitch(e.pitchRise)&&(e.depthFt===undefined||num(e.depthFt)&&e.depthFt>0),'roof surface'); check((e.insulationType===undefined||str(e.insulationType))&&(e.surfaceBasis===undefined||['horizontal','sloped'].includes(e.surfaceBasis))&&(e.surfaceBasis!=='horizontal'||e.pitchRise===0),'surface basis'); break;
-      case 'foundationWall': case 'stripFooting': check(line(e)&&positiveOrMissing(e.widthFt)&&positiveOrMissing(e.heightFt)&&finiteOrMissing(e.elevationFt),'foundation line assembly'); break;
+      case 'foundationWall': case 'stripFooting': case 'foundationTrench': check(line(e)&&positiveOrMissing(e.widthFt)&&positiveOrMissing(e.heightFt)&&finiteOrMissing(e.elevationFt),'foundation line assembly'); break;
       case 'padFooting': case 'slab': case 'foundationRegion': check(polygon(e.polygon)&&positiveOrMissing(e.depthFt)&&finiteOrMissing(e.elevationFt)&&['concrete','insulation','excavation','backfill','granular'].includes(e.purpose)&&(!['padFooting','slab'].includes(e.kind)||e.purpose==='concrete'),'foundation region'); break;
-      case 'foundationLine': check(line(e)&&['drainage','waterproofing'].includes(e.purpose)&&(e.heightFt===undefined||num(e.heightFt)&&e.heightFt>0),'foundation linear feature'); break;
+      case 'foundationLine': check(line(e)&&['drainage','waterproofing','insulation'].includes(e.purpose)&&(e.heightFt===undefined||num(e.heightFt)&&e.heightFt>0),'foundation linear feature'); break;
       case 'siteRegion': check(polygon(e.polygon)&&positiveOrMissing(e.depthFt)&&finiteOrMissing(e.elevationFt)&&['hardscape','excavation','fill','deck','landscape','reference'].includes(e.purpose),'site region'); break;
       case 'siteLine': check(line(e)&&['fence','curb','drainage','ledger','railing','open','retainingWall'].includes(e.purpose)&&(e.heightFt===undefined||num(e.heightFt)&&e.heightFt>0)&&(e.widthFt===undefined||num(e.widthFt)&&e.widthFt>0),'site line'); break;
       case 'siteCount': check(point(e.point)&&Number.isSafeInteger(e.count)&&e.count>0&&['post','bollard','catchBasin'].includes(e.purpose),'site count'); break;
