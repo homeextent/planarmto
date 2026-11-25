@@ -64,6 +64,8 @@ import { useProject } from '../context/ProjectContext';
 
 interface CadCanvasProps {
   foundationEntities?: FoundationEntity[];
+  foundationPreview?: FoundationEntity[];
+  foundationFilter?: string;
   onFoundationChange?: (entities:FoundationEntity[])=>boolean;
   roofEntities?: RoofEntity[];
   commitDraftPlacement?: (token:string,next:FloorplanState|SpecialistEntity[],replace?:boolean)=>boolean;
@@ -197,6 +199,8 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   activeWallPreset,
   onContextMenu,
   foundationEntities,
+  foundationPreview,
+  foundationFilter='all',
   onFoundationChange,
   roofEntities,
   onRoofChange,
@@ -206,6 +210,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  const visibleFoundation=useMemo(()=>foundationEntities?.filter(e=>foundationFilter==='all'||(e.kind==='foundationLine'||e.kind==='foundationRegion'?e.kind+':'+e.purpose:e.kind)===foundationFilter),[foundationEntities,foundationFilter]);
   const [wallReference,setWallReference]=useState<WallDraftReference>('centreline');
   const [wallReferenceWidth,setWallReferenceWidth]=useState('');
   const [foundationMode,setFoundationMode]=useState<'rectangle'|'polygon'>('rectangle');
@@ -304,7 +309,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   const foundationDrag=useRef<{start:Point2D;screen:Point2D;hitId?:string;shift:boolean}|null>(null);
   const [foundationMarquee,setFoundationMarquee]=useState<{start:Point2D;end:Point2D}|null>(null);
   const clearFoundationDrag=()=>{foundationDrag.current=null;setFoundationMarquee(null);};
-  useEffect(()=>{clearFoundationDrag()},[activeTool,foundationEntities]);
+  useEffect(()=>{clearFoundationDrag()},[activeTool,foundationEntities,foundationFilter]);
   const roofDrag=useRef<{start:Point2D;screen:Point2D;hitId?:string;shift:boolean}|null>(null);
   const [roofMarquee,setRoofMarquee]=useState<{start:Point2D;end:Point2D}|null>(null);
   const clearRoofDrag=()=>{roofDrag.current=null;setRoofMarquee(null);};
@@ -583,7 +588,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     for (const entity of roofEntities || []) for (const p of roofPoints(entity)) {
       minX = Math.min(minX,p.x); maxX = Math.max(maxX,p.x); minY = Math.min(minY,p.y); maxY = Math.max(maxY,p.y);
     }
-    for(const entity of foundationEntities||[])for(const p of foundationFootprint(entity)??foundationPoints(entity)){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);}
+    for(const entity of visibleFoundation||[])for(const p of foundationFootprint(entity)??foundationPoints(entity)){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);}
     // Include nodes in bounding box
     if (state.nodes.length > 0) {
       state.nodes.forEach((n) => {
@@ -2278,7 +2283,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       ctx.restore();
     }
 
-    if(foundationEntities){ctx.save();for(const e of foundationEntities){const footprint=foundationFootprint(e);const points=(footprint??foundationPoints(e)).map(p=>worldToScreen(p.x,p.y));const selected=selection.type==='foundation'&&(selection.id===e.id||selection.ids?.includes(e.id));ctx.strokeStyle=selected?'#ffffff':'#38bdf8';ctx.lineWidth=selected?3:2;ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(footprint){ctx.closePath();ctx.fillStyle='rgba(56,189,248,.13)';ctx.fill()}ctx.stroke();if(footprint&&'start' in e){const a=worldToScreen(e.start.x,e.start.y),b=worldToScreen(e.end.x,e.end.y);ctx.save();ctx.setLineDash([5,4]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore()}}for(const e of foundationEntities)for(const detail of foundationDetailOutlines(e)){ctx.save();ctx.strokeStyle=detail.kind==='opening'?'#fbbf24':'#c084fc';ctx.fillStyle=detail.kind==='opening'?'rgba(251,191,36,.14)':'rgba(192,132,252,.18)';ctx.lineWidth=2;ctx.setLineDash(detail.kind==='opening'?[5,3]:[]);ctx.beginPath();detail.points.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();}if(foundationMarquee){const a=worldToScreen(foundationMarquee.start.x,foundationMarquee.start.y),b=worldToScreen(foundationMarquee.end.x,foundationMarquee.end.y),crossing=foundationMarquee.start.x>foundationMarquee.end.x;ctx.save();ctx.strokeStyle=crossing?'#4ade80':'#38bdf8';ctx.fillStyle=crossing?'rgba(74,222,128,.10)':'rgba(56,189,248,.10)';ctx.lineWidth=1.5;ctx.setLineDash(crossing?[5,4]:[]);ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.restore();}if(foundationVertices.length){ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.beginPath();[...foundationVertices,...(foundationCursor?[foundationCursor]:[])].map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();for(const p of foundationVertices){const q=worldToScreen(p.x,p.y);ctx.fillStyle='#fbbf24';ctx.fillRect(q.x-3,q.y-3,6,6)}}else if(foundationStart&&foundationCursor){const pts=foundationArea(activeTool)&&foundationStart.x!==foundationCursor.x&&foundationStart.y!==foundationCursor.y?rectanglePoints(foundationStart,foundationCursor):[foundationStart,foundationCursor];ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.beginPath();pts.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(pts.length===4)ctx.closePath();ctx.stroke();if(activeTool==='foundation_wall'&&wallReference!=='centreline'){try{const candidate=createReferencedWall(foundationStart,foundationCursor,'preview',wallReference,parseDimension(wallReferenceWidth,state.settings.unitSystem==='metric')),outline=foundationFootprint(candidate);if(outline){ctx.strokeStyle='#4ade80';ctx.fillStyle='rgba(74,222,128,.12)';ctx.beginPath();outline.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();ctx.stroke();}}catch{/* Invalid or incomplete reference remains uncommitted. */}}}ctx.restore();}
+    if(visibleFoundation){ctx.save();for(const e of visibleFoundation){const footprint=foundationFootprint(e);const points=(footprint??foundationPoints(e)).map(p=>worldToScreen(p.x,p.y));const selected=selection.type==='foundation'&&(selection.id===e.id||selection.ids?.includes(e.id));ctx.strokeStyle=selected?'#ffffff':'#38bdf8';ctx.lineWidth=selected?3:2;ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(footprint){ctx.closePath();ctx.fillStyle='rgba(56,189,248,.13)';ctx.fill()}ctx.stroke();if(footprint&&'start' in e){const a=worldToScreen(e.start.x,e.start.y),b=worldToScreen(e.end.x,e.end.y);ctx.save();ctx.setLineDash([5,4]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore()}}for(const e of visibleFoundation)for(const detail of foundationDetailOutlines(e)){ctx.save();ctx.strokeStyle=detail.kind==='opening'?'#fbbf24':'#c084fc';ctx.fillStyle=detail.kind==='opening'?'rgba(251,191,36,.14)':'rgba(192,132,252,.18)';ctx.lineWidth=2;ctx.setLineDash(detail.kind==='opening'?[5,3]:[]);ctx.beginPath();detail.points.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();}for(const e of foundationPreview??[]){const footprint=foundationFootprint(e),pts=(footprint??foundationPoints(e)).map(p=>worldToScreen(p.x,p.y));ctx.save();ctx.strokeStyle='#4ade80';ctx.fillStyle='rgba(74,222,128,.13)';ctx.lineWidth=2;ctx.setLineDash([7,4]);ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(footprint){ctx.closePath();ctx.fill()}ctx.stroke();ctx.restore();}if(foundationMarquee){const a=worldToScreen(foundationMarquee.start.x,foundationMarquee.start.y),b=worldToScreen(foundationMarquee.end.x,foundationMarquee.end.y),crossing=foundationMarquee.start.x>foundationMarquee.end.x;ctx.save();ctx.strokeStyle=crossing?'#4ade80':'#38bdf8';ctx.fillStyle=crossing?'rgba(74,222,128,.10)':'rgba(56,189,248,.10)';ctx.lineWidth=1.5;ctx.setLineDash(crossing?[5,4]:[]);ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.restore();}if(foundationVertices.length){ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.beginPath();[...foundationVertices,...(foundationCursor?[foundationCursor]:[])].map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();for(const p of foundationVertices){const q=worldToScreen(p.x,p.y);ctx.fillStyle='#fbbf24';ctx.fillRect(q.x-3,q.y-3,6,6)}}else if(foundationStart&&foundationCursor){const pts=foundationArea(activeTool)&&foundationStart.x!==foundationCursor.x&&foundationStart.y!==foundationCursor.y?rectanglePoints(foundationStart,foundationCursor):[foundationStart,foundationCursor];ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.beginPath();pts.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(pts.length===4)ctx.closePath();ctx.stroke();if(activeTool==='foundation_wall'&&wallReference!=='centreline'){try{const candidate=createReferencedWall(foundationStart,foundationCursor,'preview',wallReference,parseDimension(wallReferenceWidth,state.settings.unitSystem==='metric')),outline=foundationFootprint(candidate);if(outline){ctx.strokeStyle='#4ade80';ctx.fillStyle='rgba(74,222,128,.12)';ctx.beginPath();outline.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();ctx.stroke();}}catch{/* Invalid or incomplete reference remains uncommitted. */}}}ctx.restore();}
     // Specialist entities share the calibrated CAD world transform.
     if (roofEntities) {
       ctx.save();
@@ -2356,7 +2361,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     roomSnapFeedback,
     marqueeStart,
     marqueeEnd,
-    foundationEntities,foundationStart,foundationCursor,foundationVertices,foundationMarquee,wallReference,wallReferenceWidth,
+    foundationEntities,visibleFoundation,foundationPreview,foundationStart,foundationCursor,foundationVertices,foundationMarquee,wallReference,wallReferenceWidth,
     roofEntities, roofDraft, roofCursor, roofVertex, roofMode, roofTarget, generationOutline, generationPreview, roofMarquee,
   ]);
 
@@ -2510,7 +2515,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   };
   const foundationTool=!!foundationEntities&&activeTool.startsWith('foundation_');
   const foundationPolygon=foundationTool&&foundationArea(activeTool)&&foundationMode==='polygon';
-  const foundationSnap=(raw:Point2D)=>{if(foundationPolygon&&foundationVertices.length>=3&&distance(raw,foundationVertices[0])<=12/transform.scale)return foundationVertices[0];const points=(foundationEntities||[]).flatMap(foundationPoints);const near=points.find(p=>distance(p,raw)<=12/transform.scale);const q=near??(state.settings.gridSnap?snapPointToGrid(raw,state.settings.gridSnapSize):raw);return foundationStart&&state.settings.orthoMode&&!foundationArea(activeTool)?orthoPoint(foundationStart,q):q;};
+  const foundationSnap=(raw:Point2D)=>{if(foundationPolygon&&foundationVertices.length>=3&&distance(raw,foundationVertices[0])<=12/transform.scale)return foundationVertices[0];const points=(visibleFoundation||[]).flatMap(foundationPoints);const near=points.find(p=>distance(p,raw)<=12/transform.scale);const q=near??(state.settings.gridSnap?snapPointToGrid(raw,state.settings.gridSnapSize):raw);return foundationStart&&state.settings.orthoMode&&!foundationArea(activeTool)?orthoPoint(foundationStart,q):q;};
   const placeFoundation=(start:Point2D,end:Point2D)=>{if(!foundationEntities||!commitDraftPlacement)return;const before=foundationEntities,id=uuidv4(),token=uuidv4(),tool=activeTool;const reference=wallReference,width=parseDimension(wallReferenceWidth,state.settings.unitSystem==='metric');const build=(p:Point2D)=>[...before,tool==='foundation_wall'&&reference!=='centreline'?createReferencedWall(start,p,id,reference,width):createFoundationDraft(tool,start,p,id)];try{if(!commitDraftPlacement(token,build(end)))throw Error('Foundation placement rejected');setFoundationStart(null);setFoundationCursor(null);onSelect({type:'foundation',id});setCorrection({token,start,toward:end,rectangle:foundationArea(tool),correct:q=>{if(!placementHandler.current?.(token,build(q),true))throw Error('Correction rejected or placement changed');}});}catch(err){setDimensionError(err instanceof Error?err.message:String(err));}};
   const finishFoundationPolygon=()=>{if(!foundationEntities||!onFoundationChange||foundationVertices.length<3)return;try{const id=uuidv4(),entity=createFoundationDraft(activeTool,foundationVertices[0],foundationVertices[1],id,foundationVertices);if(!onFoundationChange([...foundationEntities,entity]))throw Error('Foundation polygon rejected');setFoundationVertices([]);setFoundationCursor(null);setDimensionError('');onSelect({type:'foundation',id});}catch(err){setDimensionError(err instanceof Error?err.message:String(err));}};
   const addFoundationVertex=(p:Point2D)=>{if(foundationVertices.length>=3&&distance(p,foundationVertices[0])<=1e-8){finishFoundationPolygon();return}if(foundationVertices.some(v=>distance(v,p)<=1e-8)){setDimensionError('Choose a different polygon vertex');return}setFoundationVertices(v=>[...v,p]);setDimensionError('');};
@@ -2600,7 +2605,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     if (e.button !== 0) return; // Only left click for drawing/selecting
     setCorrection(null);setDimensionA('');setDimensionError('');draftDirection.current=null;
 
-    if(foundationEntities&&(foundationTool||activeTool==='select')){if(foundationTool){const p=foundationSnap(rawWorld);if(foundationPolygon)addFoundationVertex(p);else if(!foundationStart)setFoundationStart(p);else placeFoundation(foundationStart,p);}else{const hit=[...foundationEntities].reverse().find(q=>{const footprint=foundationFootprint(q);return !!(footprint&&isPointInPolygon(rawWorld,footprint))||('start' in q&&segmentDistance(rawWorld,q.start,q.end).distance<=10/transform.scale)});foundationDrag.current={start:rawWorld,screen:{x:clientX,y:clientY},hitId:hit?.id,shift:e.shiftKey};}return;}
+    if(foundationEntities&&(foundationTool||activeTool==='select')){if(foundationTool){const p=foundationSnap(rawWorld);if(foundationPolygon)addFoundationVertex(p);else if(!foundationStart)setFoundationStart(p);else placeFoundation(foundationStart,p);}else{const hit=[...(visibleFoundation??[])].reverse().find(q=>{const footprint=foundationFootprint(q);return !!(footprint&&isPointInPolygon(rawWorld,footprint))||('start' in q&&segmentDistance(rawWorld,q.start,q.end).distance<=10/transform.scale)});foundationDrag.current={start:rawWorld,screen:{x:clientX,y:clientY},hitId:hit?.id,shift:e.shiftKey};}return;}
     if (roofEntities && onRoofChange && (activeTool.startsWith('roof_') || activeTool==='select')) {
       const tolerance=10/transform.scale;
       if(generationOutline||(activeTool==='roof_generate'&&selection.type==='roof'))return;
@@ -3140,7 +3145,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
   // Handle Mouse Up
   const handleMouseUp = (e: React.MouseEvent) => {
-    if(foundationDrag.current&&foundationEntities&&e.button===0){const drag=foundationDrag.current,rect=canvasRef.current?.getBoundingClientRect();clearFoundationDrag();if(!rect)return;const screen={x:e.clientX-rect.left,y:e.clientY-rect.top},end=screenToWorld(screen.x,screen.y);const hits=distance(drag.screen,screen)>=4?foundationWindowSelection(foundationEntities,drag.start,end):drag.hitId?[drag.hitId]:[];const ids=new Set(drag.shift&&selection.type==='foundation'?(selection.ids??(selection.id?[selection.id]:[])):[]);for(const id of hits){if(drag.shift&&ids.has(id))ids.delete(id);else ids.add(id);}const list=[...ids];onSelect(list.length===0?{type:'none'}:list.length===1?{type:'foundation',id:list[0]}:{type:'foundation',ids:list});return;}
+    if(foundationDrag.current&&foundationEntities&&e.button===0){const drag=foundationDrag.current,rect=canvasRef.current?.getBoundingClientRect();clearFoundationDrag();if(!rect)return;const screen={x:e.clientX-rect.left,y:e.clientY-rect.top},end=screenToWorld(screen.x,screen.y);const hits=distance(drag.screen,screen)>=4?foundationWindowSelection(visibleFoundation??[],drag.start,end):drag.hitId?[drag.hitId]:[];const ids=new Set(drag.shift&&selection.type==='foundation'?(selection.ids??(selection.id?[selection.id]:[])):[]);for(const id of hits){if(drag.shift&&ids.has(id))ids.delete(id);else ids.add(id);}const list=[...ids];onSelect(list.length===0?{type:'none'}:list.length===1?{type:'foundation',id:list[0]}:{type:'foundation',ids:list});return;}
     if(roofDrag.current&&roofEntities&&e.button===0){
       const drag=roofDrag.current,rect=canvasRef.current?.getBoundingClientRect();
       clearRoofDrag();
@@ -3267,6 +3272,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       ref={containerRef}
       className={`relative flex-1 w-full h-full bg-slate-950 overflow-hidden select-none ${cursorClass}`}
     >
+      {foundationPreview?.length? <div role="status" aria-label="Foundation graphical preview" className="absolute top-12 left-3 z-10 pointer-events-none rounded bg-emerald-950 px-2 py-1 text-xs text-emerald-200">Preview — {foundationPreview.length} uncommitted components</div>:null}
       <canvas
         ref={canvasRef}
         className="w-full h-full block"

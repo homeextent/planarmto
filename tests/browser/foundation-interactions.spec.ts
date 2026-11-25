@@ -74,11 +74,14 @@ test('rectangular foundation preview cancel and apply are atomic',async({page})=
  for(const [label,value] of [['Origin X (ft)','0'],['Origin Y (ft)','0'],['Perimeter width (ft)','40'],['Perimeter depth (ft)','30'],['Perimeter wall thickness (ft)','0.6666666666666666'],['Perimeter wall height (ft)','8'],['Perimeter base (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
  await page.getByRole('button',{name:'Preview perimeter',exact:true}).click();
  await expect(page.getByText('4 walls · 27.1276 CY',{exact:true})).toBeVisible();
+ await expect(page.getByLabel('Foundation graphical preview')).toHaveText('Preview — 4 uncommitted components');
  await expect(entities(page)).toHaveCount(1);
  await page.getByRole('button',{name:'Cancel perimeter',exact:true}).click();
+ await expect(page.getByLabel('Foundation graphical preview')).toHaveCount(0);
  await expect(entities(page)).toHaveCount(1);
  await page.getByRole('button',{name:'Preview perimeter',exact:true}).click();
  await page.getByRole('button',{name:'Apply perimeter',exact:true}).click();
+ await expect(page.getByLabel('Foundation graphical preview')).toHaveCount(0);
  await expect(entities(page)).toHaveCount(5);
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
  await expect(entities(page)).toHaveCount(1);
@@ -203,4 +206,14 @@ test('rectangular wall assembly derives exterior drainage with preview and undo'
  await expect(entities(page)).toHaveCount(9);
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
  await expect(entities(page)).toHaveCount(5);
+});
+
+test('foundation component visibility filters selection without changing saved quantities',async({page})=>{
+ await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
+ for(const [label,value] of [['Material','poured concrete'],['Width (ft)','0.6666666666666666'],['Height / depth (ft)','8'],['Base elevation (ft; blank unknown)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByLabel('Confirm drafted centreline').check();await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ await page.getByRole('button',{name:'Slab',exact:true}).click();const canvas=page.locator('canvas').first();await canvas.click({position:{x:250,y:350}});await canvas.click({position:{x:550,y:450}});
+ await expect(entities(page)).toHaveCount(3);
+ await page.getByLabel('Foundation component filter').selectOption('slab');await expect(entities(page)).toHaveCount(2);await expect(page.getByText('7.90 CY',{exact:true})).toBeVisible();expect(await snapshot(page)).toHaveLength(2);
+ await page.getByLabel('Foundation component filter').selectOption('all');await expect(entities(page)).toHaveCount(3);
 });

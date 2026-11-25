@@ -2,7 +2,7 @@ import {derivePerimeterDrainage} from '../engine/measurements/foundationDrainage
 import {deriveFoundationEnvelope} from '../engine/measurements/foundationEnvelopeDerivation';
 import type {FoundationEnvelopeSource} from '../engine/measurements/measurementTypes';
 import {deriveStripFootings,foundationAssemblyIds} from '../engine/measurements/foundationDerivation';
-import React,{useMemo,useState} from 'react';
+import React,{useMemo,useState,useEffect} from 'react';
 import type {ActiveTool,SelectionState} from '../types';
 import type {FoundationEntity,FoundationMetadata} from '../engine/measurements/measurementTypes';
 import {v4 as uuidv4} from 'uuid';
@@ -39,10 +39,21 @@ function Properties({entity,onSave}:{key?:string;entity:FoundationEntity;onSave:
  <button className="bg-sky-700 rounded px-2 py-1" type="submit">Apply foundation properties</button>{error&&<p role="alert" className="text-amber-300">{error}</p>}</form>;
 }
 
-function Perimeter({entities,onChange}:{entities:FoundationEntity[];onChange:(e:FoundationEntity[])=>boolean}){
+type GhostPreview={source:FoundationEntity[];members:FoundationEntity[];selection?:string};
+type PreviewSink=(members:FoundationEntity[]|null)=>void;
+function useGhostPreview<T extends GhostPreview>(entities:FoundationEntity[],selection:string|undefined,onPreview:PreviewSink,activePreview:boolean){
+ const [preview,store]=useState<T|null>(null);
+ const valid=activePreview&&preview&&preview.source===entities&&(preview.selection===undefined||preview.selection===selection)?preview:null;
+ // Parent clears all preview state when switching generator; local inputs own only their current candidate.
+ const setPreview=(next:T|null)=>{store(next);onPreview(next?.members??null)};
+ useEffect(()=>{if(preview&&!valid){store(null);onPreview(null)}},[preview,valid]);
+ return [valid,setPreview] as const;
+}
+
+function Perimeter({activePreview,entities,onChange,onPreview}:{entities:FoundationEntity[];onChange:(e:FoundationEntity[])=>boolean;onPreview:PreviewSink;activePreview:boolean}){
  const [x,setX]=useState(''),[y,setY]=useState(''),[w,setW]=useState(''),[d,setD]=useState(''),[t,setT]=useState(''),[height,setHeight]=useState(''),[z,setZ]=useState('');
  const [reference,setReference]=useState<RectangleReference>('exterior');
- const [preview,setPreview]=useState<{source:FoundationEntity[];members:FoundationEntity[];volume:number}|null>(null),[error,setError]=useState('');
+ const [preview,setPreview]=useGhostPreview<{source:FoundationEntity[];members:FoundationEntity[];volume:number}>(entities,undefined,onPreview,activePreview),[error,setError]=useState('');
  const input=(label:string,value:string,set:(v:string)=>void)=><label className="block">{label}<input aria-label={label} className={field} value={value} onChange={e=>{set(e.target.value);setPreview(null)}}/></label>;
  const required=(v:string)=>{if(!v.trim()||!Number.isFinite(Number(v)))throw Error('Enter explicit finite dimensions and origin');return Number(v)};
  return <details className="space-y-2 text-xs"><summary className="font-semibold">Generate rectangular foundation</summary><p className="text-slate-400">Specify project coordinates and wall dimensions in feet. Preview only until Apply.</p>
@@ -53,8 +64,8 @@ function Perimeter({entities,onChange}:{entities:FoundationEntity[];onChange:(e:
 }
 
 
-function StripGenerator({entities,ids,onChange}:{entities:FoundationEntity[];ids:string[];onChange:(e:FoundationEntity[])=>boolean}){
- const [width,setWidth]=useState(''),[depth,setDepth]=useState(''),[error,setError]=useState(''),[preview,setPreview]=useState<{source:FoundationEntity[];selection:string;members:FoundationEntity[];volume:number}|null>(null);
+function StripGenerator({activePreview,entities,ids,onChange,onPreview}:{entities:FoundationEntity[];ids:string[];onChange:(e:FoundationEntity[])=>boolean;onPreview:PreviewSink;activePreview:boolean}){
+ const [width,setWidth]=useState(''),[depth,setDepth]=useState(''),[error,setError]=useState(''),[preview,setPreview]=useGhostPreview<{source:FoundationEntity[];selection:string;members:FoundationEntity[];volume:number}>(entities,JSON.stringify([...ids].sort()),onPreview,activePreview);
  const key=JSON.stringify([...ids].sort());
  return <details className="space-y-2 text-xs"><summary className="font-semibold">Derive strip footings</summary><p>Selected walls: {ids.length}. Centred footing only; top at confirmed wall base. Specify width and depth in feet.</p>
  <label className="block">Footing width (ft)<input aria-label="Footing width (ft)" className={field} value={width} onChange={e=>{setWidth(e.target.value);setPreview(null)}}/></label>
@@ -104,9 +115,9 @@ function DetailEditor({entity,entities,onChange}:{key?:string;entity:FoundationE
 }
 
 
-function EnvelopeGenerator({entities,ids,onChange}:{entities:FoundationEntity[];ids:string[];onChange:(e:FoundationEntity[])=>boolean}){
+function EnvelopeGenerator({activePreview,entities,ids,onChange,onPreview}:{entities:FoundationEntity[];ids:string[];onChange:(e:FoundationEntity[])=>boolean;onPreview:PreviewSink;activePreview:boolean}){
  const [purpose,setPurpose]=useState<FoundationEnvelopeSource['purpose']>('waterproofing'),[side,setSide]=useState<'left'|'right'>('left'),[height,setHeight]=useState(''),[depth,setDepth]=useState(''),[material,setMaterial]=useState(''),[layer,setLayer]=useState(''),[foam,setFoam]=useState(false),[error,setError]=useState('');
- const [preview,setPreview]=useState<{source:FoundationEntity[];selection:string;members:FoundationEntity[];summary:string}|null>(null);
+ const [preview,setPreview]=useGhostPreview<{source:FoundationEntity[];selection:string;members:FoundationEntity[];summary:string}>(entities,JSON.stringify([...ids].sort()),onPreview,activePreview);
  const key=JSON.stringify([...ids].sort()),vertical=purpose==='waterproofing'||purpose==='verticalInsulation',insulation=purpose==='verticalInsulation'||purpose==='horizontalInsulation';
  const input=(label:string,value:string,set:(v:string)=>void)=><label className="block">{label}<input aria-label={label} className={field} value={value} onChange={e=>{set(e.target.value);setPreview(null)}}/></label>;
  return <details className="space-y-2 text-xs"><summary className="font-semibold">Derive foundation envelope</summary><p>Selected sources: {ids.length}. Isolated wall face or confirmed slab footprint only. Confirm actual scope before applying.</p>
@@ -120,9 +131,9 @@ function EnvelopeGenerator({entities,ids,onChange}:{entities:FoundationEntity[];
 }
 
 
-function DrainageGenerator({entities,ids,onChange}:{entities:FoundationEntity[];ids:string[];onChange:(e:FoundationEntity[])=>boolean}){
+function DrainageGenerator({activePreview,entities,ids,onChange,onPreview}:{entities:FoundationEntity[];ids:string[];onChange:(e:FoundationEntity[])=>boolean;onPreview:PreviewSink;activePreview:boolean}){
  const [offset,setOffset]=useState(''),[material,setMaterial]=useState(''),[layer,setLayer]=useState(''),[error,setError]=useState('');
- const [preview,setPreview]=useState<{source:FoundationEntity[];selection:string;members:FoundationEntity[];length:number}|null>(null);
+ const [preview,setPreview]=useGhostPreview<{source:FoundationEntity[];selection:string;members:FoundationEntity[];length:number}>(entities,JSON.stringify([...ids].sort()),onPreview,activePreview);
  const key=JSON.stringify([...ids].sort());
  const input=(label:string,value:string,set:(v:string)=>void)=><label className="block">{label}<input aria-label={label} className={field} value={value} onChange={e=>{set(e.target.value);setPreview(null)}}/></label>;
  return <details className="space-y-2 text-xs"><summary className="font-semibold">Derive perimeter drainage</summary><p>Select all four walls of one verified rectangular assembly. Offset measured from exterior concrete face to route centreline. Plan LF only.</p>
@@ -131,11 +142,14 @@ function DrainageGenerator({entities,ids,onChange}:{entities:FoundationEntity[];
  {preview&&<div className="space-y-2"><p>{preview.length.toFixed(4)} LF</p><button className="bg-emerald-800 rounded p-2" disabled={preview.source!==entities||preview.selection!==key} onClick={()=>{if(preview.source===entities&&preview.selection===key&&onChange([...entities,...preview.members]))setPreview(null);else setError('Preview is stale or rejected')}}>Apply drainage</button><button className="bg-slate-700 rounded p-2" onClick={()=>setPreview(null)}>Cancel drainage</button></div>}{error&&<p role="alert" className="text-amber-300">{error}</p>}</details>
 }
 
-export function FoundationInspector({workspaceId,entities,selection,onChange,onSelect,onDelete}:{workspaceId:string;entities:FoundationEntity[];selection:SelectionState;onChange:(e:FoundationEntity[])=>boolean;onSelect:(s:SelectionState)=>void;onDelete:()=>void}){
+export function FoundationInspector({workspaceId,entities,selection,onChange,onSelect,onDelete,onPreview,filter,onFilter}:{key?:string;workspaceId:string;entities:FoundationEntity[];selection:SelectionState;onChange:(e:FoundationEntity[])=>boolean;onSelect:(s:SelectionState)=>void;onDelete:()=>void;onPreview:PreviewSink;filter:string;onFilter:(kind:string)=>void}){
  const ids=selection.type==='foundation'?(selection.ids??(selection.id?[selection.id]:[])):[],selected=ids.length===1?entities.find(e=>e.id===ids[0]):undefined;
  const result=useMemo(()=>{try{return measureFoundation(workspaceId,entities)}catch(err){return {rows:[],warnings:[err instanceof Error?err.message:String(err)],detailBreakdown:[]}}},[workspaceId,entities]);
+ const [activeGenerator,setActiveGenerator]=useState('');
+ const sink=(owner:string):PreviewSink=>members=>{if(members){setActiveGenerator(owner)onPreview(members)}else if(activeGenerator===owner)onPreview(null)};
+ const filterKind=(e:FoundationEntity)=>e.kind==='foundationLine'||e.kind==='foundationRegion'?e.kind+':'+e.purpose:e.kind;
  const breakdown=result.detailBreakdown.find(b=>b.elementId===selected?.id);
  const totals=new Map<string,{qty:number;unit:string;pending:number;known:number}>();
  for(const r of result.rows){const t=totals.get(r.code)??{qty:0,unit:r.unit,pending:0,known:0};if(r.status==='measured'){t.qty+=r.quantity;t.known++}else t.pending++;totals.set(r.code,t)}
- return <aside className="w-72 shrink-0 bg-slate-900 border-l border-slate-700 p-3 overflow-y-auto space-y-3"><h2 className="text-sm font-semibold">Foundation properties</h2><select aria-label="Select foundation entity" className={field} value={selected?.id??''} onChange={e=>onSelect(e.target.value?{type:'foundation',id:e.target.value}:{type:'none'})}><option value="">Select component</option>{entities.map((e,i)=><option key={e.id} value={e.id}>{e.kind} {'purpose' in e?e.purpose:''} {i+1}</option>)}</select>{ids.length>0&&<button className="bg-red-900 rounded px-2 py-1 text-xs" onClick={onDelete}>Delete selected foundation components</button>}{selected&&<button className="bg-slate-700 rounded p-2 text-xs" onClick={()=>onSelect({type:'foundation',ids:foundationAssemblyIds(entities,selected.id)})}>Select entire foundation assembly</button>}{ids.length>1&&<p className="text-xs">{ids.length} foundation components selected</p>}{selected&&<Properties key={'properties:'+JSON.stringify(selected)} entity={selected} onSave={e=>onChange(entities.map(q=>q.id===e.id?e:q))}/>}{selected&&<DetailEditor key={'details:'+JSON.stringify(selected)} entity={selected} entities={entities} onChange={onChange}/>} {breakdown&&(selected?.foundation?.wallOpenings?.length||selected?.foundation?.slabOpenings?.length||selected?.foundation?.slabThickenings?.length)?<section aria-label="Selected concrete volume breakdown" className="text-xs space-y-1 border border-slate-700 rounded p-2"><h3 className="font-semibold">Selected concrete volume</h3><p className="text-slate-400">Reference breakdown only — net is the material quantity.</p>{([['Gross concrete',breakdown.grossCY],['Opening deduction',breakdown.deductionCY],['Additional thickening',breakdown.additionalCY],['Net concrete',breakdown.netCY]] as const).map(([label,value])=><div key={label} className="flex justify-between gap-2"><span>{label}</span><span>{value===null?'Pending':value.toFixed(4)+' CY'}</span></div>)}</section>:null}<Perimeter entities={entities} onChange={onChange}/><StripGenerator entities={entities} ids={ids} onChange={onChange}/><EnvelopeGenerator entities={entities} ids={ids} onChange={onChange}/><DrainageGenerator entities={entities} ids={ids} onChange={onChange}/><hr className="border-slate-700"/><h2 className="text-sm font-semibold">Foundation quantities</h2><p className="text-xs text-slate-400">Raw quantities only. Missing inputs remain pending.</p>{[...totals].map(([code,t])=><div key={code} className="flex justify-between gap-2 text-xs"><span>{code.replace('foundation.','').replaceAll('.',' ')}</span><span>{t.known?t.qty.toFixed(2)+' '+t.unit+(t.pending?' + pending':''):'Not quantified'}</span></div>)}{result.warnings.length>0&&<details><summary className="text-xs text-amber-300">Measurement checks</summary>{result.warnings.map((w,i)=><p key={i} className="text-xs text-amber-300 break-words">{w}</p>)}</details>}</aside>;
+ return <aside className="w-72 shrink-0 bg-slate-900 border-l border-slate-700 p-3 overflow-y-auto space-y-3"><h2 className="text-sm font-semibold">Foundation properties</h2><label className="block text-xs">Visible components<select aria-label="Foundation component filter" className={field} value={filter} onChange={e=>onFilter(e.target.value)}><option value="all">All components</option>{[...new Set(entities.map(filterKind))].sort().map(k=><option key={k} value={k}>{k.replace(':',' · ')}</option>)}</select></label><p className="text-xs text-slate-400">Visibility affects canvas selection only, never quantities.</p><select aria-label="Select foundation entity" className={field} value={selected?.id??''} onChange={e=>onSelect(e.target.value?{type:'foundation',id:e.target.value}:{type:'none'})}><option value="">Select component</option>{entities.filter(e=>filter==='all'||filterKind(e)===filter).map((e,i)=><option key={e.id} value={e.id}>{e.kind} {'purpose' in e?e.purpose:''} {i+1}</option>)}</select>{ids.length>0&&<button className="bg-red-900 rounded px-2 py-1 text-xs" onClick={onDelete}>Delete selected foundation components</button>}{selected&&<button className="bg-slate-700 rounded p-2 text-xs" onClick={()=>onSelect({type:'foundation',ids:foundationAssemblyIds(entities,selected.id)})}>Select entire foundation assembly</button>}{ids.length>1&&<p className="text-xs">{ids.length} foundation components selected</p>}{selected&&<Properties key={'properties:'+JSON.stringify(selected)} entity={selected} onSave={e=>onChange(entities.map(q=>q.id===e.id?e:q))}/>}{selected&&<DetailEditor key={'details:'+JSON.stringify(selected)} entity={selected} entities={entities} onChange={onChange}/>} {breakdown&&(selected?.foundation?.wallOpenings?.length||selected?.foundation?.slabOpenings?.length||selected?.foundation?.slabThickenings?.length)?<section aria-label="Selected concrete volume breakdown" className="text-xs space-y-1 border border-slate-700 rounded p-2"><h3 className="font-semibold">Selected concrete volume</h3><p className="text-slate-400">Reference breakdown only — net is the material quantity.</p>{([['Gross concrete',breakdown.grossCY],['Opening deduction',breakdown.deductionCY],['Additional thickening',breakdown.additionalCY],['Net concrete',breakdown.netCY]] as const).map(([label,value])=><div key={label} className="flex justify-between gap-2"><span>{label}</span><span>{value===null?'Pending':value.toFixed(4)+' CY'}</span></div>)}</section>:null}<Perimeter activePreview={activeGenerator==='perimeter'} entities={entities} onChange={onChange} onPreview={sink('perimeter')}/><StripGenerator activePreview={activeGenerator==='strip'} entities={entities} ids={ids} onChange={onChange} onPreview={sink('strip')}/><EnvelopeGenerator activePreview={activeGenerator==='envelope'} entities={entities} ids={ids} onChange={onChange} onPreview={sink('envelope')}/><DrainageGenerator activePreview={activeGenerator==='drainage'} entities={entities} ids={ids} onChange={onChange} onPreview={sink('drainage')}/><hr className="border-slate-700"/><h2 className="text-sm font-semibold">Foundation quantities</h2><p className="text-xs text-slate-400">Raw quantities only. Missing inputs remain pending.</p>{[...totals].map(([code,t])=><div key={code} className="flex justify-between gap-2 text-xs"><span>{code.replace('foundation.','').replaceAll('.',' ')}</span><span>{t.known?t.qty.toFixed(2)+' '+t.unit+(t.pending?' + pending':''):'Not quantified'}</span></div>)}{result.warnings.length>0&&<details><summary className="text-xs text-amber-300">Measurement checks</summary>{result.warnings.map((w,i)=><p key={i} className="text-xs text-amber-300 break-words">{w}</p>)}</details>}</aside>;
 }

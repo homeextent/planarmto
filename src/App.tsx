@@ -70,6 +70,9 @@ function AppContent() {
   const [recovery, setRecovery] = useState(() => getAutoSaveState());
   const activeWorkspace = document.workspaces.find(w => w.id === document.activeWorkspaceId)!;
   const foundationEntities = activeWorkspace.type === 'foundation' ? activeWorkspace.measurements as FoundationEntity[] : undefined;
+  const [foundationGhost,setFoundationGhost]=useState<{workspaceId:string;source:FoundationEntity[];members:FoundationEntity[]}|null>(null);
+  const [foundationFilter,setFoundationFilter]=useState<{workspaceId:string;kind:string}>({workspaceId:'',kind:'all'});
+  const visibleFoundationKind=foundationFilter.workspaceId===activeWorkspace.id?foundationFilter.kind:'all';
   const roofEntities = activeWorkspace.type === 'roof' ? activeWorkspace.measurements as RoofEntity[] : undefined;
   const reportable = canReportProjectEstimate(document);
   // Internal CAD views use immutable shared references; persisted documents remain canonical.
@@ -753,6 +756,8 @@ function AppContent() {
         <CadCanvas
           key={workspaceEpoch}
           foundationEntities={foundationEntities}
+          foundationPreview={foundationGhost?.workspaceId===activeWorkspace.id&&foundationGhost.source===foundationEntities?foundationGhost.members:undefined}
+          foundationFilter={visibleFoundationKind}
           onFoundationChange={handleFoundationChange}
           roofEntities={roofEntities}
           onRoofChange={handleRoofChange}
@@ -775,7 +780,7 @@ function AppContent() {
           }}
         />
 
-        {foundationEntities && <FoundationInspector workspaceId={activeWorkspace.id} entities={foundationEntities} selection={selection} onChange={handleFoundationChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
+        {foundationEntities && <FoundationInspector key={activeWorkspace.id} onPreview={members=>setFoundationGhost(members?{workspaceId:activeWorkspace.id,source:foundationEntities,members}:null)} filter={visibleFoundationKind} onFilter={kind=>{setFoundationFilter({workspaceId:activeWorkspace.id,kind});setSelection({type:'none'})}} workspaceId={activeWorkspace.id} entities={foundationEntities} selection={selection} onChange={handleFoundationChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
         {roofEntities && <RoofInspector workspaceId={activeWorkspace.id} entities={roofEntities} selection={selection} onChange={handleRoofChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
         {/* Right Real-time MTO Take-Off Matrix */}
         {reportable && <MtoMatrixPanel
