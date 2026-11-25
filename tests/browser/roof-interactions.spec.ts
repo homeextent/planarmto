@@ -302,3 +302,96 @@ test('Ortho diagonal closure requires explicit Finish polygon',async ({page})=>{
   expect(plane.polygon).toHaveLength(3);
   await area(page,'50.00');
 });
+
+test('R4 direct edge selection reports missing slope and does not duplicate existing edge',async ({page})=>{
+  await rectangle(page);
+  await page.getByRole('button',{name:'Classify edge',exact:true}).click();
+  await clickCanvas(page,400,250);
+  await expect(entities(page)).toHaveCount(3);
+  await page.getByLabel('Classification',{exact:true}).selectOption('eave');
+  await expect(page.getByText(/Projected edge length:.*LF/)).toBeVisible();
+  await expect(page.getByText('Actual edge length: Not quantified',{exact:true})).toBeVisible();
+  await expect(page.getByText('Roof plane 1: specify pitch',{exact:true})).toBeVisible();
+  await page.getByLabel('Select roof entity').selectOption({index:1});
+  await page.getByRole('button',{name:'6:12',exact:true}).click();
+  await page.getByLabel('Select roof entity').selectOption({index:2});
+  await expect(page.getByText('Roof plane 1: specify downslope direction',{exact:true})).toBeVisible();
+  await page.getByLabel('Select roof entity').selectOption({index:1});
+  await page.getByRole('button',{name:'Down 90°',exact:true}).click();
+  await page.getByRole('button',{name:'Classify edge',exact:true}).click();
+  await clickCanvas(page,400,250);
+  await expect(entities(page)).toHaveCount(3);
+  const roof=roofOf(await roofSnapshot(page));
+  const edge=roof.find(e=>e.kind==='roofEdge')!;
+  expect(edge.edgeType).toBe('eave');
+  const length=Math.hypot(edge.end.x-edge.start.x,edge.end.y-edge.start.y);
+  await expect(page.getByText('Actual edge length: '+length.toFixed(2)+' LF',{exact:true})).toBeVisible();
+});
+
+test('R4 irregular generator explains rectangular-only scope without mutating outline',async ({page})=>{
+  await page.getByRole('button',{name:'Roof plane',exact:true}).click();
+  await page.getByLabel('Roof drawing mode').selectOption('polygon');
+  for(const [x,y] of [[250,250],[490,250],[490,370],[370,370],[370,490],[250,490],[250,250]])await clickCanvas(page,x,y);
+  const before=roofOf(await roofSnapshot(page));
+  await page.getByRole('button',{name:'Generate roof skeleton',exact:true}).click();
+  await expect(page.getByRole('alert').filter({hasText:/Automatic roof skeleton generation requires a rectangular outline/})).toBeVisible();
+  expect(roofOf(await roofSnapshot(page))).toEqual(before);
+});
+
+test('R4 manual insulation surface has contextual guidance and 1000 SF / 6000 BF',async ({page})=>{
+  await page.getByRole('button',{name:'Insulation area',exact:true}).click();
+  await expect(page.getByText(/Draw insulation surface.*Click first corner/)).toBeVisible();
+  await clickCanvas(page,250,250);
+  const canvas=page.locator('canvas').first();
+  const bounds=await canvas.boundingBox();
+  if(!bounds)throw Error('Canvas unavailable');
+  await page.mouse.move(bounds.x+490,bounds.y+490);
+  await expect(page.getByLabel('Live drafting dimensions')).toHaveText('Live: 10.00 × 10.00 ft');
+  await clickCanvas(page,490,490);
+  await dimensions(page,'40,25');
+  await area(page,'1000.00');
+  await page.getByLabel('Surface basis').selectOption('horizontal');
+  await page.getByLabel('Insulation type').selectOption('closed cell foam');
+  await page.getByLabel('Thickness (inches)').fill('6');
+  await page.getByLabel('Thickness (inches)').press('Enter');
+  await expect(page.getByText('1000.00 SF',{exact:true})).toBeVisible();
+  await expect(page.getByText('6000.00 BF',{exact:true})).toBeVisible();
+  expect(roofOf(await roofSnapshot(page))[0]).toMatchObject({kind:'roofSurface',purpose:'insulation',surfaceBasis:'horizontal',pitchRise:0,insulationType:'closed cell foam',depthFt:0.5});
+});
+
+test('R4 bulk eaves assignment previews, cancels, applies and undoes atomically',async ({page})=>{
+  await rectangle(page);
+  await dimensions(page,'40,30');
+  await page.getByRole('button',{name:'6:12',exact:true}).click();
+  await page.getByRole('button',{name:'Generate roof skeleton',exact:true}).click();
+  const generator=page.locator('section').filter({has:page.getByRole('heading',{name:'Generate Roof Skeleton',exact:true})});
+  await generator.getByRole('button',{name:'Preview',exact:true}).click();
+  await generator.getByRole('button',{name:'Apply',exact:true}).click();
+  await expect(entities(page)).toHaveCount(14);
+  const before=roofOf(await roofSnapshot(page));
+  const bulk=page.getByRole('region',{name:'Bulk perimeter assemblies'});
+  await expect(bulk.getByText('4 target edges · 140.00 LF',{exact:true})).toBeVisible();
+  for(const label of ['Bulk fascia','Bulk eavestrough','Bulk soffit run'])await bulk.getByLabel(label,{exact:true}).selectOption('included');
+  await bulk.getByRole('checkbox',{name:/Explicitly exclude/}).check();
+  await bulk.getByRole('button',{name:'Preview assignments'}).click();
+  await expect(bulk.getByText('Explicit exclusions: 5 other classified edges',{exact:true})).toBeVisible();
+  expect(roofOf(await roofSnapshot(page))).toEqual(before);
+  await bulk.getByRole('button',{name:'Cancel assignments'}).click();
+  expect(roofOf(await roofSnapshot(page))).toEqual(before);
+  await bulk.getByRole('button',{name:'Preview assignments'}).click();
+  await bulk.getByRole('button',{name:'Apply assignments'}).click();
+  const after=roofOf(await roofSnapshot(page));
+  expect(after).toHaveLength(13);
+  for(const e of after)if(e.kind==='roofEdge'){
+    const status=e.edgeType==='eave'?'included':'excluded';
+    expect(e.applicability).toEqual({fascia:status,gutter:status,soffit:status});
+  }
+  for(const name of ['Fascia','Eavestrough','Soffit run']){
+    const row=page.locator('div.flex.justify-between').filter({has:page.getByText(name,{exact:true})});
+    await expect(row).toHaveText(name+'140.00 LF');
+  }
+  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
+  expect(roofOf(await roofSnapshot(page))).toEqual(before);
+  await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();
+  expect(roofOf(await roofSnapshot(page))).toEqual(after);
+});
