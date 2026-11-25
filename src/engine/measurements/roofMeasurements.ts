@@ -152,7 +152,7 @@ export function measureRoof(workspaceId:string,entities:RoofEntity[]):{rows:Quan
    }
   }else if(e.kind==='roofSurface'){
    const area=e.surfaceBasis===undefined||e.pitchRise===null?null:projectedArea(e.polygon)*slopeFactor(e.pitchRise);
-   if(e.purpose==='soffit')add(e,'roof.soffit.area','SF','explicit soffit surface',area);
+   if(e.purpose==='soffit')add(e,'roof.soffit.area','SF','explicit soffit surface',e.derivation?.pendingApplicability?null:area,e.derivation?.pendingApplicability?'Soffit applicability unspecified':'Surface basis or pitch missing');
    else {
     const code='roof.insulation.'+(e.surfaceBasis||'unspecified');
     add(e,code,'SF','explicit insulation surface',e.insulationType?area:null,'Surface basis, pitch or insulation type missing');
