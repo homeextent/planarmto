@@ -34,3 +34,15 @@ test('unknown width cannot certify overlapping same-purpose contribution',()=>{c
 test('cross-assembly overlapping concrete cannot silently double count',()=>{const a=wall('a'),b={...wall('b'),assemblyId:'other'};assert.ok(measureFoundation('f',[a,b]).rows.every(r=>r.status==='unquantified'))});
 test('explicit metadata validation rejects negative junction extension',()=>{const e=wall('a');e.foundation!.joinStartFt=-1;assert.throws(()=>validateSpecialistEntities('foundation',[e]),/junction extension/)});
 test('confirmed compatible duplicate solid is rejected',()=>assert.throws(()=>measureFoundation('f',[wall('a'),wall('b')]),/Duplicate physical solid/));
+
+import {orthogonalPolygonPieces} from '../src/engine/measurements/foundationGeometry';
+const region=(id:string,polygon:{x:number;y:number}[]):FoundationEntity=>({id,physicalId:id,assemblyId:'slabs',source:{reference:'fixture'},kind:'slab',polygon,depthFt:4/12,purpose:'concrete',elevationFt:0,foundation:{version:1,material:'poured concrete',baseElevationConfirmed:true}});
+const lshape=[{x:0,y:0},{x:10,y:0},{x:10,y:4},{x:4,y:4},{x:4,y:10},{x:0,y:10}];
+const qty=(e:FoundationEntity[])=>measureFoundation('f',e).rows;
+test('concave orthogonal slab uses actual 64 SF footprint, not 100 SF envelope',()=>{const r=qty([region('l',lshape)])[0];assert.equal(r.status,'measured');if(r.status==='measured')near(r.quantity,64/81)});
+test('orthogonal decomposition conserves area and winding',()=>{for(const poly of [lshape,[...lshape].reverse()])near(orthogonalPolygonPieces(poly).reduce((a,b)=>a+(b.xmax-b.xmin)*(b.ymax-b.ymin),0),64)});
+test('isolated triangular slab uses true polygon area',()=>{const r=qty([region('t',[{x:0,y:0},{x:10,y:0},{x:0,y:6}])])[0];assert.equal(r.status,'measured');if(r.status==='measured')near(r.quantity,30/81)});
+test('slab in concave notch is independent despite envelope overlap',()=>{const r=qty([region('l',lshape),region('n',[{x:5,y:5},{x:9,y:5},{x:9,y:9},{x:5,y:9}])]);assert.ok(r.every(x=>x.status==='measured'));near(r.reduce((n,x)=>n+(x.status==='measured'?x.quantity:0),0),80/81)});
+test('overlapping irregular slabs remain pending instead of approximated',()=>{const r=qty([region('l',lshape),region('o',[{x:2,y:2},{x:6,y:2},{x:6,y:6},{x:2,y:6}])]);assert.ok(r.every(x=>x.status==='unquantified'))});
+test('invalid polygon rejected by foundation measurement boundary',()=>assert.throws(()=>qty([region('bad',[{x:0,y:0},{x:10,y:10},{x:0,y:10},{x:8,y:0}])]),/Invalid foundation polygon/));
+test('duplicate concave footprint rejected regardless of winding',()=>assert.throws(()=>qty([region('l',lshape),region('dup',[...lshape].reverse())]),/Duplicate physical solid/));

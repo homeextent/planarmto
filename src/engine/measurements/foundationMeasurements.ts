@@ -2,10 +2,10 @@
  * Not connected to the application inspector or persistence boundary until lifecycle contracts are complete.
  */
 import {validateSpecialistEntities,validateContributionSet,type FoundationEntity,type QuantityContribution} from './measurementTypes';
-import {simplePolygon} from './roofMeasurements';
-import {rectangleBounds,extendedStrip,reconcileRectangularPrisms,type Prism,type Bounds} from './foundationGeometry';
+import {simplePolygon,projectedArea} from './roofMeasurements';
+import {extendedStrip,reconcileRectangularPrisms,orthogonalPolygonPieces,polygonEnvelope,type Prism,type Bounds} from './foundationGeometry';
 const intersects=(a:Bounds,b:Bounds)=>Math.min(a.xmax,b.xmax)>Math.max(a.xmin,b.xmin)&&Math.min(a.ymax,b.ymax)>Math.max(a.ymin,b.ymin);
-type Solid={entity:FoundationEntity;code:string;material:string;bounds:Bounds|null;prism:Prism|null;reason?:string};
+type Solid={entity:FoundationEntity;code:string;material:string;bounds:Bounds|null;prism:Prism|null;pieces:Bounds[]|null;area:number|null;reason?:string};
 export function measureFoundation(workspaceId:string,entities:FoundationEntity[]):{rows:QuantityContribution[];warnings:string[]} {
  validateSpecialistEntities('foundation',entities);
  const rows:QuantityContribution[]=[],warnings:string[]=[],solids:Solid[]=[];
@@ -25,41 +25,59 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
   const line='start' in e;
   const code=e.kind==='foundationWall'?'foundation.wall.concrete':e.kind==='stripFooting'?'foundation.footing.strip.concrete':e.kind==='padFooting'?'foundation.footing.pad.concrete':e.kind==='slab'?'foundation.slab.concrete':'purpose' in e&&e.purpose==='concrete'?'foundation.region.concrete':'foundation.'+('purpose' in e?e.purpose:'unknown')+'.volume';
   const material=code.endsWith('.concrete')?'concrete':e.kind==='foundationRegion'?e.purpose:'concrete';
-  let bounds:Bounds|null=null,prism:Prism|null=null,reason:string|undefined;
+  let bounds:Bounds|null=null,prism:Prism|null=null,pieces:Bounds[]|null=null,area:number|null=null,reason:string|undefined;
   if(!e.foundation?.material)reason='Confirm material and foundation source semantics';
   else if(material==='concrete'&&e.foundation.material!=='poured concrete')reason='Unsupported concrete construction system';
   if(line){
    if(e.widthFt===null)reason='Missing width';
    else if(!e.foundation?.centrelineConfirmed)reason='Confirm centreline reference';
-   else try{bounds=extendedStrip(e.start,e.end,e.widthFt,e.foundation.joinStartFt,e.foundation.joinEndFt)}catch{reason='Unsupported strip footprint; reconcile explicitly'}
-  }else if('polygon' in e)try{bounds=rectangleBounds(e.polygon)}catch{reason='Nonrectangular volume reconciliation not yet supported'}
+   else try{bounds=extendedStrip(e.start,e.end,e.widthFt,e.foundation.joinStartFt,e.foundation.joinEndFt);pieces=[bounds]}catch{reason='Unsupported strip footprint; reconcile explicitly'}
+  }else if('polygon' in e){bounds=polygonEnvelope(e.polygon);area=projectedArea(e.polygon);try{pieces=orthogonalPolygonPieces(e.polygon)}catch{/* Nonorthogonal polygon may be measured only without unresolved overlap. */}}
   const height='start' in e?e.heightFt:e.depthFt;
   if(height===null)reason='Missing thickness or height';
   if(bounds&&!reason)prism={id:e.id,bounds,bottomFt:e.foundation?.baseElevationConfirmed?e.elevationFt:null,heightFt:height};
-  solids.push({entity:e,code,material,bounds,prism,reason});
+  solids.push({entity:e,code,material,bounds,prism,pieces,area,reason});
  }
- // Unknown footprint can overlap any same-purpose solid. Conservative until arbitrary polygon ownership is available.
+ // Unknown footprint can overlap any same-purpose solid. Envelopes are only broad-phase rejection, never quantity authority.
+ const planOverlap=(a:Solid,b:Solid)=>!a.bounds||!b.bounds||intersects(a.bounds,b.bounds)&&(!a.pieces||!b.pieces||a.pieces.some(x=>b.pieces!.some(y=>intersects(x,y))));
+ const verticalDisjoint=(a:Solid,b:Solid)=>{const p=a.prism,q=b.prism;return !!p&&!!q&&p.bottomFt!==null&&q.bottomFt!==null&&p.heightFt!==null&&q.heightFt!==null&&(p.bottomFt+p.heightFt<=q.bottomFt||q.bottomFt+q.heightFt<=p.bottomFt)};
  // Distinct concrete codes are not interchangeable for attribution: cross-code overlap is pending.
  for(const s of solids){
   if(!s.prism)continue;
   for(const q of solids){
    if(s===q||s.material!==q.material)continue;
-   if(q.bounds&&!intersects(s.bounds!,q.bounds))continue;
-   if(q.prism&&s.prism.bottomFt!==null&&q.prism.bottomFt!==null&&s.prism.heightFt!==null&&q.prism.heightFt!==null&&(s.prism.bottomFt+s.prism.heightFt<=q.prism.bottomFt||q.prism.bottomFt+q.prism.heightFt<=s.prism.bottomFt))continue;
-   if(!q.prism||s.code!==q.code||s.entity.assemblyId!==q.entity.assemblyId||s.entity.foundation?.material!==q.entity.foundation?.material){
+   if(!planOverlap(s,q))continue;
+   if(verticalDisjoint(s,q))continue;
+   if(q.prism&&s.pieces&&q.pieces&&s.prism.bottomFt!==null&&s.prism.bottomFt===q.prism.bottomFt&&s.prism.heightFt===q.prism.heightFt){
+    const area=(p:Bounds)=>(p.xmax-p.xmin)*(p.ymax-p.ymin),a=s.pieces.reduce((n,p)=>n+area(p),0),b=q.pieces.reduce((n,p)=>n+area(p),0);
+    const shared=s.pieces.reduce((n,p)=>n+q.pieces!.reduce((m,v)=>m+Math.max(0,Math.min(p.xmax,v.xmax)-Math.max(p.xmin,v.xmin))*Math.max(0,Math.min(p.ymax,v.ymax)-Math.max(p.ymin,v.ymin)),0),0);
+    if(s.code===q.code&&s.entity.assemblyId===q.entity.assemblyId&&Math.abs(a-shared)<1e-8&&Math.abs(b-shared)<1e-8)throw Error('Duplicate physical solid: '+s.entity.id+' / '+q.entity.id);
+   }
+   if(!q.prism||s.prism.bottomFt===null||q.prism.bottomFt===null||!s.pieces||!q.pieces||s.pieces.length>1||q.pieces.length>1||s.code!==q.code||s.entity.assemblyId!==q.entity.assemblyId||s.entity.foundation?.material!==q.entity.foundation?.material){
     s.reason='Unresolved overlapping physical material or assembly';break;
    }
   }
  }
  // Propagate blocked state through overlapping compatible components.
- let changed=true;while(changed){changed=false;for(const s of solids)if(s.prism&&!s.reason&&solids.some(q=>q!==s&&q.reason&&q.material===s.material&&(!q.bounds||intersects(s.bounds!,q.bounds)))){s.reason='Connected overlap requires reconciliation';changed=true}}
+ let changed=true;while(changed){changed=false;for(const s of solids)if(s.prism&&!s.reason&&solids.some(q=>q!==s&&q.reason&&q.material===s.material&&planOverlap(s,q)&&!verticalDisjoint(s,q))){s.reason='Connected overlap requires reconciliation';changed=true}}
  const groups=new Map<string,Solid[]>();
  for(const s of solids)if(s.prism&&!s.reason){const key=JSON.stringify([s.code,s.entity.assemblyId,s.entity.foundation?.material]);const g=groups.get(key)||[];g.push(s);groups.set(key,g)}
  const results=new Map<string,{volumeCF:number|null;reason?:string}>();
- for(const group of groups.values())for(const v of reconcileRectangularPrisms(group.map(s=>s.prism!)))results.set(v.id,v);
+ for(const group of groups.values()){
+  const rects:Prism[]=[],owners=new Map<string,string>();
+  for(const s of group){
+   if(!s.pieces){results.set(s.entity.id,{volumeCF:s.area!*s.prism!.heightFt!});continue}
+   // Prefix with original stable ID, encoded to avoid collision with piece suffix.
+   s.pieces.forEach((bounds,i)=>{const id=JSON.stringify([s.entity.id,i]);owners.set(id,s.entity.id);rects.push({...s.prism!,id,bounds})});
+  }
+  for(const v of reconcileRectangularPrisms(rects)){
+   const owner=owners.get(v.id)!,old=results.get(owner);
+   results.set(owner,{volumeCF:v.volumeCF===null||old?.volumeCF===null?null:(old?.volumeCF??0)+v.volumeCF,reason:v.reason||old?.reason});
+  }
+ }
  for(const s of solids){
   const result=results.get(s.entity.id),reason=s.reason||result?.reason;
-  add(s.entity,s.code,'CY','reconciled rectangular solid, geometric installed volume',result?.volumeCF==null?null:result.volumeCF/27,reason);
+  add(s.entity,s.code,'CY','validated footprint and geometric installed volume',result?.volumeCF==null?null:result.volumeCF/27,reason);
   if(reason)warnings.push(s.entity.id+': '+reason);
  }
  validateContributionSet(rows);return {rows,warnings};

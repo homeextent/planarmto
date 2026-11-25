@@ -87,3 +87,27 @@ export function extendedStrip(start:Point,end:Point,widthFt:number,joinStartFt=0
  const dx=(end.x-start.x)/len,dy=(end.y-start.y)/len;
  return orthogonalStrip({x:start.x-dx*joinStartFt,y:start.y-dy*joinStartFt},{x:end.x+dx*joinEndFt,y:end.y+dy*joinEndFt},widthFt);
 }
+
+/** Exact decomposition of a simple orthogonal polygon into disjoint rectangular strips.
+ * Caller validates simple topology. No snapping or bounding-box approximation.
+ */
+export function orthogonalPolygonPieces(points:Point[]):Bounds[]{
+ if(points.length<4||points.some(p=>!finite(p.x)||!finite(p.y)))throw Error('Invalid orthogonal polygon');
+ const edges=points.map((p,i)=>[p,points[(i+1)%points.length]] as const);
+ if(edges.some(([a,b])=>(a.x===b.x)===(a.y===b.y)))throw Error('Nonorthogonal polygon');
+ const xs=cuts(points.map(p=>p.x)), pieces:Bounds[]=[];
+ if(xs.length*edges.length>200000)throw Error('Polygon decomposition exceeds bounded complexity');
+ for(let i=1;i<xs.length;i++){
+  const xmin=xs[i-1],xmax=xs[i],x=xmin+(xmax-xmin)/2;
+  const ys=edges.filter(([a,b])=>a.y===b.y&&x>Math.min(a.x,b.x)&&x<Math.max(a.x,b.x)).map(([a])=>a.y).sort((a,b)=>a-b);
+  if(ys.length%2)throw Error('Invalid polygon scanline');
+  for(let j=0;j<ys.length;j+=2){const b={xmin,xmax,ymin:ys[j],ymax:ys[j+1]};validateBounds(b);pieces.push(b)}
+ }
+ if(!pieces.length)throw Error('Empty polygon decomposition');
+ return pieces;
+}
+export function polygonEnvelope(points:Point[]):Bounds{
+ const b={xmin:Infinity,xmax:-Infinity,ymin:Infinity,ymax:-Infinity};
+ for(const p of points){b.xmin=Math.min(b.xmin,p.x);b.xmax=Math.max(b.xmax,p.x);b.ymin=Math.min(b.ymin,p.y);b.ymax=Math.max(b.ymax,p.y)}
+ validateBounds(b);return b;
+}
