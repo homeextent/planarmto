@@ -382,3 +382,22 @@ test('irregular exterior envelope previews and applies one component per source 
  const saved=await snapshot(page),derived=saved.filter(e=>e.foundation?.envelopeSource);expect(derived).toHaveLength(6);expect(new Set(derived.map(e=>e.foundation?.envelopeSource?.sourceId)).size).toBe(6);
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();await expect(entities(page)).toHaveCount(7);
 });
+
+test('irregular perimeter drainage preview and apply preserves closed source-linked route and undo',async({page})=>{
+ await page.getByRole('button',{name:'Polygon foundation perimeter',exact:true}).click();
+ const canvas=page.locator('canvas').first();
+ for(const p of [{x:200,y:200},{x:500,y:200},{x:500,y:320},{x:380,y:320},{x:380,y:440},{x:200,y:440}])await canvas.click({position:p});
+ await page.getByRole('button',{name:'Finish foundation polygon',exact:true}).click();
+ for(const [label,value] of [['Polygon wall thickness (ft)','1'],['Polygon wall height (ft)','8'],['Polygon wall base (ft)','0']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Preview polygon perimeter',exact:true}).click();await page.getByRole('button',{name:'Apply polygon perimeter',exact:true}).click();
+ await page.getByLabel('Select foundation entity').selectOption({index:1});await page.getByRole('button',{name:'Select entire foundation assembly',exact:true}).click();
+ await page.getByText('Derive perimeter drainage',{exact:true}).click();
+ for(const [label,value] of [['Drainage exterior offset (ft)','2'],['Drainage material','pipe'],['Drainage layer identity','drain']])await page.getByLabel(label,{exact:true}).fill(value);
+ await page.getByRole('button',{name:'Preview drainage',exact:true}).click();
+ await expect(page.getByLabel('Foundation graphical preview')).toHaveText('Preview — 6 uncommitted components');await expect(entities(page)).toHaveCount(7);
+ await page.getByRole('button',{name:'Apply drainage',exact:true}).click();await expect(entities(page)).toHaveCount(13);
+ const saved=await snapshot(page),drain=saved.filter(e=>e.foundation?.drainageSource).sort((a,b)=>a.foundation!.drainageSource!.edge-b.foundation!.drainageSource!.edge);
+ expect(drain).toHaveLength(6);for(let i=0;i<drain.length;i++){const a=drain[i],b=drain[(i+1)%drain.length];if(a.kind!=='foundationLine'||b.kind!=='foundationLine')throw Error('Expected drainage line');expect(a.end).toEqual(b.start);expect(a.foundation!.drainageSource!.wallIds).toHaveLength(6)}
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();await expect(entities(page)).toHaveCount(7);
+ await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();await expect(entities(page)).toHaveCount(13);
+});

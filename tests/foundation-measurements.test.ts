@@ -312,3 +312,37 @@ test('irregular envelope rejects partial loop and inconsistent confirmed elevati
  assert.throws(()=>deriveRectangularEnvelope(walls,ids.slice(1),config,id));
  const changed=walls.map((e,i)=>i===0?{...e,elevationFt:-1}:e);assert.throws(()=>deriveRectangularEnvelope(changed,ids,config,id),/equal confirmed wall bases/);
 });
+
+test('irregular perimeter drainage follows exact exterior offset for L T U and multi-offset loops',()=>{
+ const shapes=[
+ [{x:0,y:0},{x:40,y:0},{x:40,y:20},{x:20,y:20},{x:20,y:40},{x:0,y:40}],
+ [{x:0,y:0},{x:40,y:0},{x:40,y:10},{x:25,y:10},{x:25,y:40},{x:15,y:40},{x:15,y:10},{x:0,y:10}],
+ [{x:0,y:0},{x:40,y:0},{x:40,y:40},{x:30,y:40},{x:30,y:10},{x:10,y:10},{x:10,y:40},{x:0,y:40}],
+ [{x:0,y:0},{x:40,y:0},{x:40,y:10},{x:50,y:10},{x:50,y:30},{x:30,y:30},{x:30,y:40},{x:10,y:40},{x:10,y:30},{x:0,y:30}]
+ ];
+ let i=0;const id=()=> 'irrdr'+(++i);
+ for(const original of shapes)for(const outline of [original,[...original].reverse()]){
+  const walls=generateOrthogonalFoundationPerimeter(outline,'exterior',1,8,-8,id),ids=walls.map(e=>e.id);
+  const perimeter=outline.reduce((n,a,j)=>n+Math.hypot(a.x-outline[(j+1)%outline.length].x,a.y-outline[(j+1)%outline.length].y),0);
+  for(const offset of [0,2]){
+   const d=derivePerimeterDrainage(walls,[...ids].reverse(),offset,'pipe','drain',id),rows=qty([...walls,...d]).filter(r=>r.code==='foundation.drainage.length');
+   assert.equal(rows.length,ids.length);assert.ok(rows.every(r=>r.status==='measured'));near(rows.reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),perimeter+8*offset);
+   for(let j=0;j<d.length;j++){const a=d[j],b=d[(j+1)%d.length];if(a.kind!=='foundationLine'||b.kind!=='foundationLine')throw Error('Expected drainage line');assert.deepEqual(a.end,b.start)}
+   assert.throws(()=>qty([...walls,...d.slice(1)]),/Incomplete/);
+   assert.throws(()=>derivePerimeterDrainage([...walls,...d],ids,offset,'pipe','drain',id),/Remove existing/);
+   assert.equal(planFoundationDeletion([...walls,...d],[walls[0].id]).remaining.length,walls.length-1);
+  }
+ }
+});
+test('irregular drainage rejects collapsed offsets, partial selection and stale route geometry',()=>{
+ const outline=[{x:0,y:0},{x:40,y:0},{x:40,y:40},{x:30,y:40},{x:30,y:10},{x:10,y:10},{x:10,y:40},{x:0,y:40}];
+ let i=0;const id=()=> 'irrdr'+(++i),walls=generateOrthogonalFoundationPerimeter(outline,'exterior',1,8,0,id),ids=walls.map(e=>e.id);
+ assert.throws(()=>derivePerimeterDrainage(walls,ids,11,'pipe','drain',id));
+ assert.throws(()=>derivePerimeterDrainage(walls,ids.slice(1),2,'pipe','drain',id));
+ assert.throws(()=>derivePerimeterDrainage(walls,ids,-1,'pipe','drain',id));
+ const d=derivePerimeterDrainage(walls,ids,2,'pipe','drain',id),first=d[0];
+ if(first.kind!=='foundationLine')throw Error('Expected drainage line');
+ assert.throws(()=>qty([...walls,{...first,start:{x:first.start.x+.1,y:first.start.y}},...d.slice(1)]),/stale/);
+ const source=walls[0];if(source.kind!=='foundationWall')throw Error('Expected wall');
+ assert.throws(()=>qty([{...source,widthFt:2},...walls.slice(1),...d]));
+});

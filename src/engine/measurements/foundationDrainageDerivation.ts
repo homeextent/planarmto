@@ -1,3 +1,4 @@
+import {orthogonalExteriorEdges} from './foundationExteriorRoute';
 import type {FoundationEntity,FoundationDrainageSource,Point} from './measurementTypes';
 import {foundationRectangle,extendedStrip} from './foundationGeometry';
 const near=(a:number,b:number)=>Math.abs(a-b)<1e-8;
@@ -17,21 +18,25 @@ export function rectangularExteriorRoute(entities:FoundationEntity[],ids:string[
  if(p.some(q=>!Number.isFinite(q.x)||!Number.isFinite(q.y)))throw Error('Invalid drainage route extent');
  return p;
 }
+/** Keep the historical four-edge ordering for saved rectangles. Irregular loops use deterministic source traversal. */
+function perimeterRoute(entities:FoundationEntity[],ids:string[],offset:number):Point[]{
+ return ids.length===4?rectangularExteriorRoute(entities,ids,offset):orthogonalExteriorEdges(entities,ids,offset).map(e=>e.start);
+}
 export function derivePerimeterDrainage(entities:FoundationEntity[],ids:string[],offsetFt:number,material:string,layerId:string,id:()=>string):FoundationEntity[]{
  if(!material.trim()||!layerId.trim())throw Error('Specify drainage material and layer identity');
- const wallIds=[...ids].sort(),p=rectangularExteriorRoute(entities,wallIds,offsetFt);
+ const wallIds=[...ids].sort(),p=perimeterRoute(entities,wallIds,offsetFt);
  if(entities.some(e=>e.foundation?.drainageSource?.wallIds.some(v=>wallIds.includes(v))))throw Error('Remove existing derived perimeter drainage before regenerating');
  const groupId=id(),assemblyId=id();
- return p.map((start,edge)=>{const entityId=id(),drainageSource:FoundationDrainageSource={version:1,wallIds,groupId,edge,offsetFt,material,layerId};return {id:entityId,physicalId:entityId,assemblyId,source:{reference:'Derived rectangular exterior drainage'},kind:'foundationLine',purpose:'drainage',start,end:p[(edge+1)%4],foundation:{version:1,material,coverage:{confirmed:true,layerId},drainageSource}}});
+ return p.map((start,edge)=>{const entityId=id(),drainageSource:FoundationDrainageSource={version:1,wallIds,groupId,edge,offsetFt,material,layerId};return {id:entityId,physicalId:entityId,assemblyId,source:{reference:wallIds.length===4?'Derived rectangular exterior drainage':'Derived orthogonal exterior drainage'},kind:'foundationLine',purpose:'drainage',start,end:p[(edge+1)%p.length],foundation:{version:1,material,coverage:{confirmed:true,layerId},drainageSource}}});
 }
 export function validateDrainageSources(entities:FoundationEntity[]):void{
  const groups=new Map<string,FoundationEntity[]>(),owners=new Map<string,string>();
  for(const e of entities){const s=e.foundation?.drainageSource;if(!s)continue;for(const id of s.wallIds){if(owners.has(id)&&owners.get(id)!==s.groupId)throw Error('Duplicate derived perimeter drainage source');owners.set(id,s.groupId)}const g=groups.get(s.groupId)??[];g.push(e);groups.set(s.groupId,g)}
  for(const g of groups.values()){
- const first=g[0],s=first.foundation!.drainageSource!,p=rectangularExteriorRoute(entities,s.wallIds,s.offsetFt);
- if(g.length!==4||new Set(g.map(e=>e.foundation!.drainageSource!.edge)).size!==4)throw Error('Incomplete derived drainage group');
+ const first=g[0],s=first.foundation!.drainageSource!,p=perimeterRoute(entities,s.wallIds,s.offsetFt);
+ if(g.length!==p.length||new Set(g.map(e=>e.foundation!.drainageSource!.edge)).size!==p.length||g.some(e=>{const edge=e.foundation!.drainageSource!.edge;return !Number.isInteger(edge)||edge<0||edge>=p.length}))throw Error('Incomplete derived drainage group');
  for(const e of g){const d=e.foundation!.drainageSource!;
- if(e.kind!=='foundationLine'||e.purpose!=='drainage'||e.assemblyId!==first.assemblyId||JSON.stringify([...d.wallIds].sort())!==JSON.stringify([...s.wallIds].sort())||d.offsetFt!==s.offsetFt||d.material!==s.material||d.layerId!==s.layerId||!same(e.start,p[d.edge])||!same(e.end,p[(d.edge+1)%4])||e.foundation?.material!==s.material||e.foundation.coverage?.layerId!==s.layerId||!e.foundation.coverage.confirmed)throw Error('Derived drainage is stale; remove or regenerate the group before editing its source');
+ if(e.kind!=='foundationLine'||e.purpose!=='drainage'||e.assemblyId!==first.assemblyId||JSON.stringify([...d.wallIds].sort())!==JSON.stringify([...s.wallIds].sort())||d.offsetFt!==s.offsetFt||d.material!==s.material||d.layerId!==s.layerId||!same(e.start,p[d.edge])||!same(e.end,p[(d.edge+1)%p.length])||e.foundation?.material!==s.material||e.foundation.coverage?.layerId!==s.layerId||!e.foundation.coverage.confirmed)throw Error('Derived drainage is stale; remove or regenerate the group before editing its source');
  }
  }
 }
