@@ -51,7 +51,7 @@ Five targeted Chromium cases passed. The original roof regression verifies that 
 
 Full local validation under Node 22.23.5 passed 289/289 (212 Node and 77 Chromium). The locked install, TypeScript, production build, dependency audit (zero findings), PHP lint and PDF worker checks passed. Full output is under `/tmp/planarmto-r50a/validation.log`.
 
-The prior traces are under `/tmp/planarmto-c1c-192cff3/baseline-artifacts` and `/tmp/planarmto-c1c-192cff3/calibration-artifacts`. Stabilized interaction traces and targeted results are under `/tmp/planarmto-r50a/after-targeted` and `/tmp/planarmto-r50a/targeted.log`. Isolated WordPress remains unavailable locally because Docker is absent. Exact candidate CI and owner preview verification remain pending.
+The prior traces are under `/tmp/planarmto-c1c-192cff3/baseline-artifacts` and `/tmp/planarmto-c1c-192cff3/calibration-artifacts`. Stabilized interaction traces and targeted results are under `/tmp/planarmto-r50a/after-targeted` and `/tmp/planarmto-r50a/targeted.log`. Isolated WordPress remains unavailable locally because Docker is absent. See formal acceptance below for exact-candidate CI and owner preview results.
 
 ### Owner production-preview checks
 
@@ -60,3 +60,28 @@ Use Node 22, run `npm run build`, then run `npm run preview -- --host 127.0.0.1 
 1. In the roof workspace, enable Ortho and draft a polygon with two perpendicular legs. Click its first vertex so the closing edge would be diagonal. Verify that the warning is visible and the draft is still uncommitted. Click **Finish polygon** and verify that the intended triangle is committed.
 2. In the foundation workspace, zoom in, start a wall, enter a value in **Dimensions** and pointer-click **Zoom to Fit**. Verify that the view fits and the entered value remains. Focus the dimension field, press Escape, and finish or cancel the draft.
 3. Generate an independent four-wall perimeter, select one wall and choose **Select entire foundation assembly**. Verify **Selected: 4 Items** and **No explicit decision**. Select an individual wall, apply an explicit exclusion with a reason, then reselect it and verify that both remain visible.
+
+### R5.0A formal acceptance
+
+Independent source review and owner production-preview acceptance passed on `cd782e7f1728d3e6377853677e29cc9611f08497`. Local regression results were 289/289 (212 Node and 77 Chromium), with 5/5 targeted Chromium checks. [CI #188, run 45692683476, job 139481964301](https://github.com/homeextent/planarmto/actions/runs/45692683476/job/139481964301) passed all required validation, including isolated WordPress integration. Docker was unavailable for the local WordPress run.
+
+| Owner check | Result |
+|---|---|
+| A — Roof warning and Finish polygon pointer interaction | PASS |
+| B — Foundation Zoom to Fit with the dimension form active | PASS |
+| C — Foundation assembly selection and scope | PASS, supported by owner screenshots. Four walls displayed **4 Items**, **No explicit decision**, and **27.13 CY** of wall concrete. The individual exclusion and reason were retained, with the revised wall concrete total at **21.47 CY**. |
+
+Acceptance covers the four reproduced R5.0A interaction and presentation defects documented above. Full contractor-workflow acceptance remains open. The accepted application SHA remains the evidence anchor for R5.0A. The next gate is owner approval of the coordinated R5.0 specification after independent architectural review.
+
+### Owner usability observations for R5 planning
+
+The owner reported the following workflow observations during acceptance. They enter R5 specification review as usability findings and requirements. Independent reproduction as functional defects has not been established.
+
+1. Existing foundation wall endpoints need to be easier to see and discover when starting an independent wall from an existing endpoint.
+2. Continuous foundation wall drafting needs a more intuitive way to close a perimeter.
+3. Provide direct graphical rectangle drafting.
+4. Keep standard foundation tracing free of X/Y-coordinate entry.
+5. Present construction section dimensions in familiar contractor units.
+6. Simplify the inspector and reduce exposure of internal assembly controls.
+
+Review items 1–4 with R5.1 canvas tracing, item 5 with R5.2 units, and item 6 with R5.2 and R5.5 inspector design. Specific interaction and data contracts remain subject to coordinated R5.0 approval.

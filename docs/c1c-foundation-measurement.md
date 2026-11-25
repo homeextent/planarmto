@@ -81,3 +81,7 @@ CI #185 at 537b03f verified 288/288 including the residual scope selection and c
 
 ### Hybrid transition and local findings
 CI #186 at e5e9748 verified 288/288. Owner partial functional findings supersede the prior not-run snapshot; see [findings](c1c-functional-findings.md). Contractor-first R5 direction endorsed, detailed [proposal](c1c-r5-contractor-workflow.md) requires bounded approval. Codex local baseline reproduction precedes R5. No staging merge or release.
+
+### R5.0A stabilization closeout
+
+Independent review and owner acceptance passed on `cd782e7`, with 289/289 local regressions and successful CI #188. The accepted changes cover pointer interaction and selection and scope presentation. Geometry, quantity and applicability contracts remain governed by this specification. See [formal acceptance](c1c-functional-findings.md#r50a-formal-acceptance) and the [R5 proposal](c1c-r5-contractor-workflow.md) for the coordinated specification approval gate.

@@ -56,7 +56,7 @@ Remote audit confirmed PR #12 only open; all other listed PRs merged and all ten
 | release/v2.15.0 | a2c36ec3ad9c58e728881ffc00c8e8b504a6604e | 2 |
 
 ## Remaining roadmap / stop gates
-1. Codex baseline reproduction and functional register; distinguish confirmed engine defects from wrong selection and usability. Return evidence and R5.0 implementation plan for approval. No R5 code before approved detailed defaults/contract.
+1. Baseline reproduction and R5.0A stabilization are complete. [R5.0A acceptance](c1c-functional-findings.md#r50a-formal-acceptance) records accepted application SHA `cd782e7`, CI #188 and owner findings. Obtain coordinated R5.0 specification approval before implementing R5.1–R5.6.
 2. R5.1–6 contractor workflow on same feature branch; technical checks and new CA01–12, real plan owner acceptance. Reconcile five docs, explicitly authorized merge #12, postmerge CI.
 3. C.1E separate specification: cross-workspace ownership/physical identity, completeness independent of assignment, included/excluded/pending, duplicate prevention, reference areas nonadditive, measured vs manual/allowance/quote provenance; optional site not required. No consolidated pricing until C.2. Owner approval then branch from validated staging.
 4. C.2 separate specification: consolidated MTO, contractor manual quantities and allowances/quotes, pricing/rates, waste applied once, completeness/reporting gates, traceable unit and cost basis, existing floor costs protected but not automatically authoritative. No site cost exclusion just because site engine deferred.

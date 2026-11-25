@@ -10,7 +10,7 @@ Increment B, C.1A and C.1B are integrated into staging. See [ROADMAP.md](ROADMAP
 
 ## C.1C foundation feature and Codex transition
 
-Draft PR #12 contains R1–R4 foundation measurement, with 288/288 verified on pre-handoff CI #186. Owner verified calibration and basic rectangular/irregular wall and strip quantities. [R5.0A baseline stabilization](docs/c1c-functional-findings.md#r50a-baseline-stabilization) is at local review. Contractor-workflow acceptance and approval of the proposed assembly workflow remain pending. See [transition](docs/coding-agent-transition.md), [actual findings](docs/c1c-functional-findings.md) and [R5 proposal](docs/c1c-r5-contractor-workflow.md). No staging/production promotion.
+Draft PR #12 contains R1–R4 foundation measurement, with 288/288 verified on pre-handoff CI #186. Owner verified calibration and basic rectangular/irregular wall and strip quantities. [R5.0A baseline stabilization](docs/c1c-functional-findings.md#r50a-baseline-stabilization) passed independent source review and owner acceptance at `cd782e7`. The next gate is coordinated R5.0 specification approval. Contractor-workflow acceptance remains open. See [transition](docs/coding-agent-transition.md), [actual findings](docs/c1c-functional-findings.md) and [R5 proposal](docs/c1c-r5-contractor-workflow.md). No staging/production promotion.
 
 ## C.1B roof measurement (staging integrated)
 

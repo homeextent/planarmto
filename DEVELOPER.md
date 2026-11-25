@@ -73,7 +73,7 @@ npm run build:zip creates ../../builds/planar-mto.zip relative to the repository
 
 PR #8 merged into staging at `c1a0bf7` after documentation-only candidate `3d0830e` passed CI #40 ([run 45462442984](https://github.com/homeextent/planarmto/actions/runs/45462442984)). Post-merge staging push [run 45462698052](https://github.com/homeextent/planarmto/actions/runs/45462698052), job 138689310248, completed successfully; owner CLI and job details verified. C.1A formally complete. Production `main` remains v2.15.1 at `0423cb6`.
 
-Current feature work is [R5.0A baseline stabilization](docs/c1c-functional-findings.md#r50a-baseline-stabilization) on draft PR #12. Independent review, owner acceptance and authorization of the R5 assembly workflow remain pending. C.1D is deferred. See [ROADMAP.md](ROADMAP.md).
+[R5.0A baseline stabilization](docs/c1c-functional-findings.md#r50a-formal-acceptance) passed independent review and owner acceptance at `cd782e7` on draft PR #12. The next gate is coordinated R5.0 specification approval. C.1D is deferred. See [ROADMAP.md](ROADMAP.md).
 
 ## Evidence-driven debugging and browser regression protocol
 

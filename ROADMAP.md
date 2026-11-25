@@ -43,4 +43,4 @@ Use isolated feature/documentation branches and PRs to staging, exact-head CI, t
 
 ## Next authorized work
 
-Review the local R5.0A baseline stabilization candidate on the existing feature branch. R5.1–R5.6 require separate bounded approval. C.1C remains unmerged pending owner contractor-workflow acceptance and explicit staging authorization. See [R5.0A evidence and owner checks](docs/c1c-functional-findings.md#r50a-baseline-stabilization) and [proposed R5](docs/c1c-r5-contractor-workflow.md). C.1E and C.2 are separately gated.
+R5.0A is accepted at `cd782e7` on the existing feature branch. Obtain coordinated R5.0 specification approval before R5.1–R5.6 implementation. C.1C remains unmerged pending owner contractor-workflow acceptance and explicit staging authorization. See [R5.0A evidence and owner checks](docs/c1c-functional-findings.md#r50a-formal-acceptance) and [proposed R5](docs/c1c-r5-contractor-workflow.md). C.1E and C.2 are separately gated.
