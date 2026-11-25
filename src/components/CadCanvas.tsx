@@ -226,6 +226,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           if(selected.kind!=='roofPlane')throw Error('Select a rectangular roof plane, or clear selection to draw a new outline.');
           const p=selected.polygon;
           resizeRectangle(p,Math.abs(p[2]?.x-p[0]?.x),Math.abs(p[2]?.y-p[0]?.y));
+          if(roofEntities?.some(e=>(e.kind==='roofEdge'&&e.planeIds.includes(selected.id))||(e.kind==='roofOpening'&&e.planeId===selected.id)))throw Error('Selected roof plane has dependent edges or openings. Review those dependencies before replacement.');
           setGenerationOutline(p);setGenerationSource(selected);
           setGenerationConfig(c=>({...c,pitch:selected.pitchRise??0,type:selected.pitchRise===0?'flat':c.type==='flat'?'hip':c.type}));
         }catch(err){setGenerationError(err instanceof Error?err.message:String(err));}
