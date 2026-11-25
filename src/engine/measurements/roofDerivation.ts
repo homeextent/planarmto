@@ -161,3 +161,41 @@ export function validateDerivedRoofSurfaces(entities:RoofEntity[]):void{
   }
  }
 }
+
+/** Pure transaction candidate. Caller commits the returned array as one history entry.
+ * Existing groups may be replaced only by an explicitly matching group ID.
+ * Retain identities for unchanged piece keys; never mutate the input array.
+ */
+export function replaceDerivedRoofGroup(entities:RoofEntity[],spec:DerivationSpec,id:()=>string):RoofEntity[]{
+ validateRoofTopology(entities);
+ const previous=entities.filter((e):e is Surface=>e.kind==='roofSurface'&&e.derivation?.groupId===spec.groupId);
+ if(previous.length&&previous[0].purpose!==spec.purpose)throw Error('Cannot change a derived group purpose. Remove it explicitly first.');
+ const remaining=entities.filter(e=>!(e.kind==='roofSurface'&&e.derivation?.groupId===spec.groupId));
+ const expected=reconstructRoofSurfaces(remaining,spec);
+ if(!expected.length)throw Error('No included derived surfaces. Remove the existing group explicitly if required.');
+ const retained=new Map(previous.map(e=>[e.derivation!.pieceKey,e]));
+ const generated:Surface[]=expected.map(p=>{
+  const prior=retained.get(p.pieceKey);
+  const key=prior?.id??id();
+  return {
+   id:key,physicalId:prior?.physicalId??key,assemblyId:prior?.assemblyId??key,
+   source:prior?.source??{reference:'Derived '+spec.purpose,note:'Confirmed rectangular roof derivation v1'},
+   kind:'roofSurface',purpose:spec.purpose,surfaceBasis:spec.basis,
+   polygon:p.polygon.map(q=>({...q})),pitchRise:p.pitchRise,
+   ...(spec.material!==undefined?{insulationType:spec.material}:{}),
+   ...(spec.thicknessFt!==undefined?{depthFt:spec.thicknessFt}:{}),
+   derivation:{...spec,planeIds:[...spec.planeIds],edgeIds:[...spec.edgeIds],depths:{...spec.depths},exclusions:spec.exclusions.map(b=>({...b})),pieceKey:p.pieceKey}
+  };
+ });
+ const next=[...remaining,...generated];
+ validateRoofTopology(next);
+ return next;
+}
+/** Explicit complete group removal, preserving independent surfaces and source geometry. */
+export function removeDerivedRoofGroup(entities:RoofEntity[],groupId:string):RoofEntity[]{
+ validateRoofTopology(entities);
+ const next=entities.filter(e=>!(e.kind==='roofSurface'&&e.derivation?.groupId===groupId));
+ if(next.length===entities.length)throw Error('Derived roof group not found.');
+ validateRoofTopology(next);
+ return next;
+}
