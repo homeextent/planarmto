@@ -226,3 +226,70 @@ test('integrated slab-on-grade net concrete, independent pad and explicit earthw
  sumFoundation(e,'foundation.footing.pad.concrete',16/27);sumFoundation(e,'foundation.footing.pad.count',1);sumFoundation(e,'foundation.backfill.volume',200/27);
  assert.equal(canReportProjectEstimate(restored),false);
 });
+
+import {generateOrthogonalFoundationPerimeter} from '../src/engine/measurements/foundationDrafting';
+import {setFoundationApplicability} from '../src/engine/measurements/foundationApplicability';
+function integratedIrregularR2(){
+ let n=0;const id=()=> 'r2-'+(++n);
+ const outline=[{x:0,y:0},{x:40,y:0},{x:40,y:20},{x:20,y:20},{x:20,y:40},{x:0,y:40}];
+ const walls=generateOrthogonalFoundationPerimeter(outline,'exterior',1,8,0,id),ids=walls.map(e=>e.id);
+ const footings=deriveStripFootings(walls,ids,2,1,id);
+ const waterproof=deriveRectangularEnvelope(walls,ids,{purpose:'waterproofing',heightFt:6,material:'membrane',layerId:'wp'},id);
+ const vertical=deriveRectangularEnvelope(walls,ids,{purpose:'verticalInsulation',heightFt:6,depthFt:.25,material:'foam',layerId:'vertical',foam:true},id);
+ const drainage=derivePerimeterDrainage(walls,ids,2,'pipe','drain',id);
+ const slab:FoundationEntity={id:'r2-slab',physicalId:'r2-slab',assemblyId:'r2-slab',source:{reference:'Explicit independent interior slab'},kind:'slab',purpose:'concrete',polygon:[{x:2,y:2},{x:38,y:2},{x:38,y:18},{x:18,y:18},{x:18,y:38},{x:2,y:38}],depthFt:4/12,elevationFt:0,foundation:{version:1,material:'poured concrete',baseElevationConfirmed:true}};
+ const horizontal=deriveFoundationEnvelope([slab],[slab.id],{purpose:'horizontalInsulation',material:'foam',layerId:'horizontal',depthFt:.25,foam:true,offsetBelowSlabFt:0},id);
+ const granular=deriveFoundationEnvelope([slab,...horizontal],[slab.id],{purpose:'granular',material:'stone',layerId:'stone',depthFt:.5,offsetBelowSlabFt:.25},id);
+ const pad:FoundationEntity={id:'r2-existing-pad',physicalId:'r2-existing-pad',assemblyId:'r2-pad',source:{reference:'Existing isolated pad'},kind:'padFooting',purpose:'concrete',polygon:rectanglePoints({x:45,y:0},{x:49,y:4}),depthFt:1,elevationFt:-1,foundation:{version:1,material:'poured concrete',baseElevationConfirmed:true},scopeApplicability:{status:'excluded',reason:'Existing pad retained'}};
+ const fill:FoundationEntity={id:'r2-fill',physicalId:'r2-fill',assemblyId:'r2-fill',source:{reference:'Explicit provisional fill'},kind:'foundationRegion',purpose:'backfill',polygon:rectanglePoints({x:45,y:10},{x:55,y:20}),depthFt:1,elevationFt:-1,foundation:{version:1,material:'fill',baseElevationConfirmed:true},scopeApplicability:{status:'pending',reason:'Confirm fill extent'}};
+ const entities=[...walls,...footings,...waterproof,...vertical,...drainage,slab,...horizontal,...granular,pad,fill];
+ return {walls,footings,waterproof,vertical,drainage,slab,horizontal,granular,pad,fill,entities};
+}
+test('R2 integrated irregular foundation retains scope, envelope, layer ownership and reference areas across roundtrip',()=>{
+ const f=integratedIrregularR2(),doc=replaceSpecialistEntities(foundationDoc(),'foundation-a',f.entities);
+ const restored=deserializeProjectDocument(serializeProjectDocument(doc));assert.deepEqual(restored,doc);
+ const e=restored.workspaces.find(w=>w.id==='foundation-a')!.measurements as FoundationEntity[],m=measureFoundation('foundation-a',e);
+ const slabSF=36*16+16*20;
+ sumFoundation(e,'foundation.wall.concrete',156*8/27);
+ sumFoundation(e,'foundation.footing.strip.concrete',312/27);
+ sumFoundation(e,'foundation.slab.concrete',slabSF/81);
+ sumFoundation(e,'foundation.waterproofing.area',960);
+ sumFoundation(e,'foundation.insulation.area',960+slabSF);
+ sumFoundation(e,'foundation.insulation.foam',(960+slabSF)*3);
+ sumFoundation(e,'foundation.granular.volume',slabSF*.5/27);
+ sumFoundation(e,'foundation.drainage.length',176);
+ assert.ok(m.rows.every(r=>r.elementId===f.fill.id?r.status==='unquantified':r.status==='measured'));
+ assert.ok(!m.rows.some(r=>r.elementId===f.pad.id));
+ assert.equal(m.scopeDiagnostics.find(r=>r.elementId===f.pad.id)?.reason,'Existing pad retained');
+ assert.equal(m.scopeDiagnostics.find(r=>r.elementId===f.fill.id)?.status,'pending');
+ closeQuantity(m.footprintReferences.find(r=>r.elementId===f.slab.id)!.netSF!,slabSF);
+ assert.equal(canReportProjectEstimate(restored),false);
+});
+test('R2 integrated scope transactions and dependency deletion preserve unrelated material ownership',()=>{
+ const f=integratedIrregularR2(),doc=replaceSpecialistEntities(foundationDoc(),'foundation-a',f.entities);
+ assert.throws(()=>setFoundationApplicability(f.entities,[f.slab.id],{status:'excluded',reason:'Existing slab'}),/source-linked/);
+ const slabGroup=[f.slab.id,...f.horizontal.map(e=>e.id),...f.granular.map(e=>e.id)];
+ const excluded=setFoundationApplicability(f.entities,slabGroup,{status:'excluded',reason:'Existing assembly'});
+ const changed=replaceSpecialistEntities(doc,'foundation-a',excluded);
+ const m=measureFoundation('foundation-a',excluded);assert.ok(!m.rows.some(r=>slabGroup.includes(r.elementId)));
+ sumFoundation(excluded,'foundation.wall.concrete',156*8/27);sumFoundation(excluded,'foundation.drainage.length',176);
+ assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(changed)),changed);
+ const plan=planFoundationDeletion(f.entities,[f.walls[0].id]);assert.equal(plan.dependentCount,24);
+ assert.ok(slabGroup.every(id=>plan.remaining.some(e=>e.id===id)));
+ const deleted=replaceSpecialistEntities(doc,'foundation-a',plan.remaining);
+ assert.deepEqual(restoreWorkspaceSnapshot(deleted,'foundation-a',{view:workspaceFloorplan(doc),measurements:f.entities}),doc);
+ assert.equal(f.entities.find(e=>e.id===f.slab.id)?.scopeApplicability,undefined);
+});
+test('R2 integrated coincident layer conflict remains pending across persistence without changing unrelated quantities',()=>{
+ const f=integratedIrregularR2();let n=0;
+ const conflict=deriveFoundationEnvelope([f.slab],[f.slab.id],{purpose:'granular',material:'stone',layerId:'stone',depthFt:.5,offsetBelowSlabFt:0},()=> 'r2-conflict-'+(++n));
+ const entities=[...f.entities.filter(e=>!f.granular.some(g=>g.id===e.id)),...conflict];
+ const doc=replaceSpecialistEntities(foundationDoc(),'foundation-a',entities);
+ const restored=deserializeProjectDocument(serializeProjectDocument(doc));assert.deepEqual(restored,doc);
+ const saved=restored.workspaces.find(w=>w.id==='foundation-a')!.measurements as FoundationEntity[];
+ const m=measureFoundation('foundation-a',saved),blocked=[...f.horizontal,...conflict].map(e=>e.id);
+ assert.equal(m.rows.filter(r=>blocked.includes(r.elementId)).length,3);
+ assert.ok(m.rows.filter(r=>blocked.includes(r.elementId)).every(r=>r.status==='unquantified'));
+ sumFoundation(saved,'foundation.drainage.length',176);sumFoundation(saved,'foundation.slab.concrete',896/81);
+ assert.equal(canReportProjectEstimate(restored),false);
+});
