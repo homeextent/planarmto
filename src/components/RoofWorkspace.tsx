@@ -215,7 +215,8 @@ export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,
  const sourceIds=e?.kind==='roofSurface'&&e.derivation?e.derivation.planeIds:entities.filter(q=>q.kind==='roofPlane'&&selectedIds.includes(q.id)).map(q=>q.id);
  const sourceKey=JSON.stringify([...sourceIds].sort());
 
- const rectangle=(()=>{if(!e||!('polygon' in e)||e.polygon.length!==4)return null;const a=e.polygon[0],b=e.polygon[2],width=Math.abs(b.x-a.x),depth=Math.abs(b.y-a.y);try{resizeRectangle(e.polygon,width,depth);return {width,depth}}catch{return null}})();
+ const derived=e?.kind==='roofSurface'?e.derivation:undefined;
+ const rectangle=(()=>{if(derived||!e||!('polygon' in e)||e.polygon.length!==4)return null;const a=e.polygon[0],b=e.polygon[2],width=Math.abs(b.x-a.x),depth=Math.abs(b.y-a.y);try{resizeRectangle(e.polygon,width,depth);return {width,depth}}catch{return null}})();
  const resize=(w:number,d:number)=>{try{return !!e&&onChange(resizeRoofRectangle(entities,e.id,w,d))}catch(err){alert(err instanceof Error?err.message:String(err));return false}};
  const names=new Map(entities.map((q,i)=>[q.id,(q.kind==='roofPlane'?'Roof plane':q.kind==='roofEdge'?'Roof edge':q.kind==='roofOpening'?'Roof opening':q.purpose==='soffit'?'Soffit area':'Insulation area')+' '+(i+1)]));
  const result=useMemo(()=>{try{return measureRoof(workspaceId,entities)}catch(err){return {rows:[],warnings:[err instanceof Error?err.message:String(err)]}}},[workspaceId,entities]);
@@ -256,7 +257,8 @@ export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,
  {(['fascia','gutter','soffit'] as const).map(k=><label key={k} className="block text-xs">{k==='gutter'?'Eavestrough (gutter)':k==='soffit'?'Soffit run':k}<select aria-label={k==='gutter'?'Eavestrough (gutter)':k==='soffit'?'Soffit run':'Fascia'} className={field} value={e.applicability?.[k]||'unspecified'} onChange={ev=>update({applicability:{...e.applicability,[k]:ev.target.value as Applicability}})}>{options.map(v=><option key={v}>{v}</option>)}</select></label>)}
  </>}
  {e.kind==='roofOpening'&&<label className="block text-xs">Deduction treatment<select className={field} value={e.deduction||'unspecified'} onChange={ev=>update({deduction:ev.target.value as Applicability})}>{options.map(v=><option key={v}>{v}</option>)}</select></label>}
- {e.kind==='roofSurface'&&<>
+ {derived&&<div className="rounded border border-sky-700 p-2 space-y-1 text-xs"><p className="font-semibold">Derived surface — group controlled</p><p>Revise dimensions, basis, material and thickness using the complete derivation controls below. Individual geometry edits are unavailable.</p>{derived.pendingApplicability&&<p className="text-amber-300">Soffit applicability pending — quantity unquantified.</p>}</div>}
+ {e.kind==='roofSurface'&&!derived&&<>
  <p className="text-xs text-slate-400">Choose the actual surface basis. For horizontal surfaces use zero pitch; for sloped surfaces specify pitch. Insulation requires material and foam volume requires thickness.</p>
  <label className="block text-xs">Surface basis<select className={field} value={e.surfaceBasis||''} onChange={ev=>update({surfaceBasis:ev.target.value as 'horizontal'|'sloped',pitchRise:ev.target.value==='horizontal'?0:null})}><option value="" disabled>Not specified</option><option value="horizontal">Horizontal</option><option value="sloped">Sloped</option></select></label>
  {e.surfaceBasis==='sloped'&&<Numeric label="Surface pitch rise per 12" value={e.pitchRise} min={0} onCommit={pitchRise=>update({pitchRise})}/>}
@@ -265,7 +267,7 @@ export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,
  <Numeric label="Thickness (inches)" value={e.depthFt===undefined?null:e.depthFt*12} min={0.000001} onCommit={v=>update({depthFt:v===null?undefined:v/12})}/>
  </>}
  </>}
- <button className="rounded bg-red-900 px-2 py-1 text-xs" onClick={onDelete}>Delete selected</button></div>}
+ {!derived&&<button className="rounded bg-red-900 px-2 py-1 text-xs" onClick={onDelete}>Delete selected</button>}</div>}
  <div key={workspaceId}><BulkAssemblies entities={entities} workspaceId={workspaceId} names={names} onChange={onChange}/></div>
  {sourceIds.length>0?<div key={workspaceId+sourceKey}><DerivedSoffit entities={entities} planeIds={sourceIds} onChange={onChange}/></div>:<p className="text-xs text-slate-400">Select a roof plane or entire roof assembly to derive soffit surfaces. Use the toolbar for manual surfaces.</p>}
 
