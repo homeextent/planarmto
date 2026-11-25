@@ -34,7 +34,7 @@ function BulkAssemblies({entities,workspaceId,onChange,names}:{entities:RoofEnti
  const changed=assemblyKeys.filter(k=>patch[k]!=='unchanged');
  const result=useMemo(()=>{try{return measureRoof(workspaceId,entities).rows}catch{return []}},[workspaceId,entities]);
  const actual=(e:Edge)=>result.find(r=>r.elementId===e.id&&r.code==='roof.edge.'+e.edgeType);
- const length=(list:Edge[])=>{const rows=list.map(actual);return rows.reduce((n,r)=>n+(r?.status==='measured'?r.quantity:0),0).toFixed(2)+' LF'+(rows.some(r=>r?.status!=='measured')?' + pending':'')};
+ const length=(list:Edge[])=>{const rows=list.map(actual);const measured=rows.filter(r=>r?.status==='measured');const pending=rows.length-measured.length;return pending&&!measured.length?'Not quantified ('+pending+' pending)':rows.reduce((n,r)=>n+(r?.status==='measured'?r.quantity:0),0).toFixed(2)+' LF'+(pending?' + pending':'')};
  const reset=()=>{setPreview(null);setError('')};
  if(!edges.length)return null;
  return <section aria-label="Bulk perimeter assemblies" className="rounded border border-slate-700 p-2 space-y-2 text-xs">
@@ -197,9 +197,9 @@ function DerivedInsulation({entities,planeIds,onChange}:{entities:RoofEntity[];p
  <rect x={preview.inner.xmin} y={preview.inner.ymin} width={preview.inner.xmax-preview.inner.xmin} height={preview.inner.ymax-preview.inner.ymin} fill="none" stroke="#cbd5e1" strokeWidth="1" vectorEffect="non-scaling-stroke"/>
  </svg>
  <p>Excluded thermal footprint: {preview.excluded.toFixed(2)} SF</p><p>Net projected footprint: {preview.projected.toFixed(2)} SF</p>
- <p className="font-semibold text-purple-300">{basis==='horizontal'?'Horizontal':'Sloped'} insulation: {preview.pending&&preview.measured===0?'Not quantified':preview.measured.toFixed(2)+' SF'}{preview.pending?' + pending':''}</p>
+ <p className="font-semibold text-purple-300">{basis==='horizontal'?'Horizontal':'Sloped'} insulation: {preview.pending===preview.pieces.length?'Not quantified':preview.measured.toFixed(2)+' SF'}{preview.pending&&preview.pending<preview.pieces.length?' + pending':''}</p>
  {preview.pending>0&&<p className="text-amber-300">{preview.pending} surface piece(s) require source roof pitch.</p>}
- {material.includes('foam')?<p>Foam: {thickness.trim()===''||preview.pending&&preview.measured===0?'Not quantified':(preview.measured*Number(thickness)).toFixed(2)+' BF'}{preview.pending&&thickness.trim()!==''&&preview.measured>0?' + pending':''}</p>:thickness.trim()!==''&&<p>Geometric volume (reference only): {(preview.measured*Number(thickness)/12).toFixed(2)} CF{preview.pending?' + pending':''}; no procurement or R-value calculation.</p>}
+ {material.includes('foam')?<p>Foam: {thickness.trim()===''||preview.pending===preview.pieces.length?'Not quantified':(preview.measured*Number(thickness)).toFixed(2)+' BF'}{preview.pending&&thickness.trim()!==''&&preview.measured>0?' + pending':''}</p>:thickness.trim()!==''&&<p>Geometric volume (reference only): {preview.pending===preview.pieces.length?'Not quantified':(preview.measured*Number(thickness)/12).toFixed(2)+' CF'}{preview.pending&&preview.pending<preview.pieces.length?' + pending':''}; no procurement or R-value calculation.</p>}
  <p>{preview.pieces.length} derived surface piece(s)</p>
  <div className="flex flex-wrap gap-2"><button className="rounded bg-emerald-800 px-2 py-1 disabled:opacity-40" disabled={!preview.next||preview.source!==entities} onClick={()=>{if(!preview.next||preview.source!==entities)return;if(onChange(preview.next)){setPreview(null);setError('')}else setError('Derivation rejected. Review roof measurements.')}}>Apply insulation derivation</button><button className="rounded bg-slate-700 px-2 py-1" onClick={()=>{setPreview(null);setError('')}}>Cancel insulation derivation</button></div>
  {preview.source!==entities&&<p className="text-amber-300">Roof changed. Preview again.</p>}
