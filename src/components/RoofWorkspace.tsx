@@ -36,9 +36,9 @@ function BulkAssemblies({entities,workspaceId,onChange,names}:{entities:RoofEnti
  if(!edges.length)return null;
  return <section aria-label="Bulk perimeter assemblies" className="rounded border border-slate-700 p-2 space-y-2 text-xs">
  <h3 className="font-semibold">Bulk perimeter assemblies</h3>
- <label className="block">Target classification<select className={field} value={classification} onChange={e=>{setClassification(e.target.value as Edge['edgeType']);reset()}}>{['eave','rake','ridge','hip','valley','abutment','parapet'].map(v=><option key={v}>{v}</option>)}</select></label>
+ <label className="block">Target classification<select aria-label="Target classification" className={field} value={classification} onChange={e=>{setClassification(e.target.value as Edge['edgeType']);reset()}}>{['eave','rake','ridge','hip','valley','abutment','parapet'].map(v=><option key={v}>{v}</option>)}</select></label>
  <p>{targets.length} target edges · {length(targets)}</p>
- {assemblyKeys.map(k=><label key={k} className="block">Bulk {k==='gutter'?'eavestrough':k==='soffit'?'soffit run':k}<select className={field} value={patch[k]} onChange={e=>{setPatch(old=>({...old,[k]:e.target.value}));reset()}}>{['unchanged',...options].map(v=><option key={v}>{v}</option>)}</select></label>)}
+ {assemblyKeys.map(k=><label key={k} className="block">Bulk {k==='gutter'?'eavestrough':k==='soffit'?'soffit run':k}<select aria-label={'Bulk '+(k==='gutter'?'eavestrough':k==='soffit'?'soffit run':k)} className={field} value={patch[k]} onChange={e=>{setPatch(old=>({...old,[k]:e.target.value}));reset()}}>{['unchanged',...options].map(v=><option key={v}>{v}</option>)}</select></label>)}
  <label className="flex items-start gap-2"><input type="checkbox" checked={excludeOther} onChange={e=>{setExcludeOther(e.target.checked);reset()}}/>Explicitly exclude changed assemblies on other classified edges</label>
  <p className="text-slate-400">Unclassified edges remain pending. Existing assignments on non-target edges remain unchanged unless explicitly excluded above.</p>
  <button className="rounded bg-sky-800 px-2 py-1 disabled:opacity-40" disabled={!targets.length||!changed.length} onClick={()=>{
@@ -98,9 +98,9 @@ export function RoofInspector({workspaceId,entities,selection,onChange,onSelect,
  {e.edgeType==='unclassified'&&<p className="text-amber-300">Choose a classification before assigning assemblies.</p>}
  <p className="text-slate-400">Projected length is a reference, not a substitute for actual sloped length.</p>
  </div>
- <label className="block text-xs">Classification<select className={field} value={e.edgeType} onChange={ev=>update({edgeType:ev.target.value as typeof e.edgeType})}>{['unclassified','eave','rake','ridge','hip','valley','abutment','parapet'].map(v=><option key={v}>{v}</option>)}</select></label>
+ <label className="block text-xs">Classification<select aria-label="Classification" className={field} value={e.edgeType} onChange={ev=>update({edgeType:ev.target.value as typeof e.edgeType})}>{['unclassified','eave','rake','ridge','hip','valley','abutment','parapet'].map(v=><option key={v}>{v}</option>)}</select></label>
  <p className="text-xs text-slate-400">Included counts toward the assembly; excluded does not; unspecified remains pending. Soffit run is linear length, not surface area.</p>
- {(['fascia','gutter','soffit'] as const).map(k=><label key={k} className="block text-xs">{k==='gutter'?'Eavestrough (gutter)':k==='soffit'?'Soffit run':k}<select className={field} value={e.applicability?.[k]||'unspecified'} onChange={ev=>update({applicability:{...e.applicability,[k]:ev.target.value as Applicability}})}>{options.map(v=><option key={v}>{v}</option>)}</select></label>)}
+ {(['fascia','gutter','soffit'] as const).map(k=><label key={k} className="block text-xs">{k==='gutter'?'Eavestrough (gutter)':k==='soffit'?'Soffit run':k}<select aria-label={k==='gutter'?'Eavestrough (gutter)':k==='soffit'?'Soffit run':'Fascia'} className={field} value={e.applicability?.[k]||'unspecified'} onChange={ev=>update({applicability:{...e.applicability,[k]:ev.target.value as Applicability}})}>{options.map(v=><option key={v}>{v}</option>)}</select></label>)}
  </>}
  {e.kind==='roofOpening'&&<label className="block text-xs">Deduction treatment<select className={field} value={e.deduction||'unspecified'} onChange={ev=>update({deduction:ev.target.value as Applicability})}>{options.map(v=><option key={v}>{v}</option>)}</select></label>}
  {e.kind==='roofSurface'&&<>
