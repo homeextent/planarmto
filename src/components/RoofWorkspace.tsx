@@ -156,8 +156,8 @@ function DerivedInsulation({entities,planeIds,onChange}:{entities:RoofEntity[];p
    if(depthFt!==undefined&&(!Number.isFinite(depthFt)||depthFt<=0))throw Error('Enter positive thickness in inches or leave unspecified.');
    const d=Object.fromEntries(sides.map(side=>[side,Number(depths[side])])) as Depths;
    const inset=insetRoof(r.outer,d),inner=inset.inner;
-   const boxes=exclusions.map(b=>{
-    if(Object.values(b).some(v=>v.trim()===''||!Number.isFinite(Number(v))))throw Error('Complete every thermal exclusion dimension.');
+   const boxes=exclusions.map((b:ExclusionDraft)=>{
+    if([b.x,b.y,b.width,b.depth].some(v=>v.trim()===''||!Number.isFinite(Number(v))))throw Error('Complete every thermal exclusion dimension.');
     const x=inner.xmin+Number(b.x),y=inner.ymin+Number(b.y);
     return {xmin:x,ymin:y,xmax:x+Number(b.width),ymax:y+Number(b.depth)};
    });
