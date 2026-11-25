@@ -53,7 +53,7 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
    if(q.prism&&s.pieces&&q.pieces&&s.prism.bottomFt!==null&&s.prism.bottomFt===q.prism.bottomFt&&s.prism.heightFt===q.prism.heightFt){
     const area=(p:Bounds)=>(p.xmax-p.xmin)*(p.ymax-p.ymin),a=s.pieces.reduce((n,p)=>n+area(p),0),b=q.pieces.reduce((n,p)=>n+area(p),0);
     const shared=s.pieces.reduce((n,p)=>n+q.pieces!.reduce((m,v)=>m+Math.max(0,Math.min(p.xmax,v.xmax)-Math.max(p.xmin,v.xmin))*Math.max(0,Math.min(p.ymax,v.ymax)-Math.max(p.ymin,v.ymin)),0),0);
-    if(s.code===q.code&&s.entity.assemblyId===q.entity.assemblyId&&Math.abs(a-shared)<1e-8&&Math.abs(b-shared)<1e-8)throw Error('Duplicate physical solid: '+s.entity.id+' / '+q.entity.id);
+    if(s.code===q.code&&s.entity.foundation?.material===q.entity.foundation?.material&&!s.details.hasDetails&&!q.details.hasDetails&&Math.abs(a-shared)<1e-8&&Math.abs(b-shared)<1e-8)throw Error('Duplicate physical solid: '+s.entity.id+' / '+q.entity.id);
    }
    if(s.details.hasDetails||q.details.hasDetails||!q.prism||s.prism.bottomFt===null||q.prism.bottomFt===null||!s.pieces||!q.pieces||s.pieces.length>1||q.pieces.length>1||s.code!==q.code||s.entity.assemblyId!==q.entity.assemblyId||s.entity.foundation?.material!==q.entity.foundation?.material){
     s.reason='Unresolved overlapping physical material or assembly';break;

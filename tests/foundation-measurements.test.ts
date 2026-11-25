@@ -127,3 +127,33 @@ test('orthogonal perimeter refuses collapsed recess and nonorthogonal geometry',
  const u=irregularFixtures[2].points;assert.throws(()=>offsetOrthogonalPerimeter(u,9));
  assert.throws(()=>orthogonalWallPerimeter([{x:0,y:0},{x:10,y:0},{x:8,y:10},{x:0,y:10}],1,'exterior'));
 });
+
+import {assignFoundationAssembly,foundationBaseElevation} from '../src/engine/measurements/foundationAssembly';
+test('manual L junction assignment reconciles physical overlap and preserves identity',()=>{
+ const a=wall('manual-a',{x:0,y:0},{x:10,y:0}),b=wall('manual-b',{x:0,y:0},{x:0,y:10});
+ if(a.kind!=='foundationWall'||b.kind!=='foundationWall')throw Error('Expected walls');a.assemblyId='a';b.assemblyId='b';a.widthFt=1;b.widthFt=1;
+ a.foundation!.joinStartFt=.5;b.foundation!.joinStartFt=.5;
+ assert.ok(qty([a,b]).every(r=>r.status==='unquantified'));
+ const next=assignFoundationAssembly([a,b],[a.id,b.id],'joined');
+ assert.deepEqual(next.map(e=>e.physicalId),[a.physicalId,b.physicalId]);
+ assert.ok(qty(next).every(r=>r.status==='measured'));
+ near(qty(next).reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0),20*8/27);
+ assert.equal(a.assemblyId,'a');
+});
+test('confirmed duplicate solid rejected even across separate assemblies',()=>{
+ const a=wall('duplicate-a'),b=wall('duplicate-b');a.assemblyId='a';b.assemblyId='b';
+ assert.throws(()=>qty([a,b]),/Duplicate physical solid/);
+});
+test('top datum conversion preserves negative and zero bases and refuses unknown thickness',()=>{
+ assert.equal(foundationBaseElevation(0,'top',8),-8);
+ assert.equal(foundationBaseElevation(8,'top',8),0);
+ assert.equal(foundationBaseElevation(0,'base',null),0);
+ assert.equal(foundationBaseElevation(null,'top',null),null);
+ assert.throws(()=>foundationBaseElevation(0,'top',null),/positive height/);
+});
+test('assembly reassignment refuses partial source assemblies and derived dependencies',()=>{
+ const a=wall('a'),b=wall('b',{x:0,y:0},{x:0,y:10}),c=wall('c',{x:80,y:0},{x:90,y:0});c.assemblyId='c';
+ assert.throws(()=>assignFoundationAssembly([a,b,c],[a.id,c.id],'new'),/complete existing assemblies/);
+ let i=0;const f=deriveStripFootings([a,b],[a.id],2,1,()=> 'dep'+(++i));
+ assert.throws(()=>assignFoundationAssembly([a,b,...f],[a.id,b.id],'new'),/dependent derived/);
+});

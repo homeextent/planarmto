@@ -246,3 +246,16 @@ test('irregular polygon perimeter previews six walls and commits one undoable as
  await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();await expect(entities(page)).toHaveCount(1);
  await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();await expect(entities(page)).toHaveCount(7);
 });
+
+test('foundation inspector converts top elevation into canonical base',async({page})=>{
+ await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
+ await page.getByLabel('Material',{exact:true}).fill('poured concrete');
+ await page.getByLabel('Width (ft)',{exact:true}).fill('1');
+ await page.getByLabel('Height / depth (ft)',{exact:true}).fill('8');
+ await page.getByLabel('Elevation reference',{exact:true}).selectOption('top');
+ await page.getByLabel('Top elevation (ft; blank unknown)',{exact:true}).fill('0');
+ await page.getByLabel('Confirm drafted centreline').check();
+ await page.getByRole('button',{name:'Apply foundation properties',exact:true}).click();
+ const e=(await snapshot(page))[0];if(e.kind!=='foundationWall')throw Error('Expected wall');
+ expect(e.elevationFt).toBe(-8);expect(e.foundation?.baseElevationConfirmed).toBe(true);
+});
