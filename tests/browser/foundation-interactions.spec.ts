@@ -1248,7 +1248,7 @@ test('layered inspector preserves a draft, visual previews and exterior material
  await page.screenshot({path:info.outputPath('08-independent-wall-1366.png')});
 });
 
-test('independent wall construction validates previews and edits source-linked layers atomically',async({page},info)=>{
+test('independent wall construction validates previews and edits source-linked layers atomically',async({page,browser},info)=>{
  await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'25');
  const wall=page.getByRole('form',{name:'Independent wall construction'});
  const panel=page.getByRole('region',{name:'Independent wall layers'});
@@ -1325,11 +1325,18 @@ test('independent wall construction validates previews and edits source-linked l
  await preview.click();await apply.click();
  const removed=await projectSnapshot(page);
  expect(removed.workspaces.find(w=>w.type==='foundation')!.measurements).toHaveLength(3);
- await page.reload();
- await page.getByRole('button',{name:'Continue with blank project'}).click();
- await page.getByTitle('Import JSON Project').locator('input').setInputFiles({name:'wall.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(removed))});
- await expect(page.getByRole('heading',{name:'Foundation tools'})).toBeVisible();
- expect(await projectSnapshot(page)).toEqual(removed);
+ const reopened=await browser.newPage();
+ try{
+   const reopenErrors:string[]=[];
+   reopened.on('pageerror',error=>reopenErrors.push(error.message));
+   await reopened.goto(page.url());
+   await reopened.getByTitle('Import JSON Project').locator('input').setInputFiles({name:'wall.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(removed))});
+   await expect(reopened.getByRole('heading',{name:'Foundation tools'})).toBeVisible();
+   expect(await projectSnapshot(reopened)).toEqual(removed);
+   expect(reopenErrors).toEqual([]);
+ }finally{
+   await reopened.close();
+ }
 });
 
 test('standalone slab defaults and applicable layers produce the controlled material totals',async({page})=>{
