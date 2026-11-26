@@ -2,6 +2,18 @@
 
 ---
 
+## Governing product design philosophy
+
+PlanarMTO is a contractor-focused, drawing-driven material takeoff and estimating application for residential construction. It helps contractors interpret, trace and quantify specified construction efficiently, accurately and consistently. Architectural drafting, structural engineering and general-purpose CAD are outside its product remit.
+
+**Expose the inputs that determine material quantities. Automate conventional geometric relationships. Request additional information only when it affects measurement accuracy, scope or the physical interpretation of the construction.**
+
+All current and future measurement workspaces and subsequent estimating functionality follow this direction. The standard workflow starts with importing and calibrating architectural drawings, then tracing or identifying construction geometry, specifying materials, dimensions and applicable scope, applying confirmed conventional relationships, and reviewing traceable quantities. Contractors should be able to revise construction specifications without unnecessary redrafting or duplicate quantities.
+
+Keep coordinates, relative elevations, component identities, mathematical offsets, topology, source relationships and measurement reconciliation internal wherever practical. The contractor describes what is being built. PlanarMTO manages the underlying geometry and calculations. Prioritize conventional residential construction in the standard interface and keep advanced tools accessible for unusual geometry, engineered details and construction requiring explicit relationships.
+
+Automation requires confirmed conventional relationships and supplied construction specifications. Preserve architect-specified geometry and dimensions, confirmed specifications and estimating assumptions, independent material quantities and unresolved specification status. Preserve measurement accuracy, overlap protection, component ownership, duplicate prevention, historical records, source geometry and provenance. Explicitly refuse unsupported conditions and surface the reason to the contractor. Implementation remains subject to the applicable scope and authorization gates.
+
 ## Architectural direction and governing principles — C.1B staging; C.1C feature candidate
 
 This section governs all subsequent development and takes precedence over older engine descriptions below. Production v2.15.1 is a separate baseline. Preserve valid historical floor formulas as regression references; do not infer roof, foundation or site quantities from floor gross area. Roof-specific measurement is integrated; generic CAD tools in foundation/site workspaces do not establish specialist measurement authority.

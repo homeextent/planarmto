@@ -2,6 +2,8 @@
 
 R5.3–R5.5 implementation against the approved coordinated specification and the revised v3 persistence design at `1be740b`. The 296-test R5.1–R5.2 candidate remains the regression baseline. Review applies to draft PR #12. Actual-plan owner acceptance and staging approval remain separate.
 
+The owner withheld full R5 acceptance after practical use of R5.6A candidate `eb5624c00a29ec3c91f325333f6743d6936e01a0` (CI #193 and 311/311 reported local checks). The [R5.6B usability plan](c1c-r5-6b-usability-plan.md) records the incomplete practical acceptance items, an unresolved owner-reported footing visibility concern that the synthetic Chromium check did not reproduce, and the proposed contractor workflow and relationship changes. Independent approval of the plan is the next gate.
+
 ## Implementation and boundaries
 
 - `foundationAssemblyModel.ts` implements the approved optional v3 records. `foundationAssemblyValidation.ts` validates structural fields, trace and route order, role ownership, generated child agreement, retained references, catalogue entries, snapshots and caps. `projectDocument.ts` validates optional additions at read and serialize boundaries. Existing documents without the fields remain on the existing path.

@@ -13,6 +13,8 @@ Applies to every developer and AI agent. Read README, ROADMAP, SYSTEM_BIBLE, DEV
 7. Revalidate exact final HEAD, check staging baseline and mergeability, then merge PR into staging only with owner authorization. Verify post-merge push CI and synchronize local staging.
 8. Production promotion requires separate explicit authorization, release PR to main, successful CI, approved version/tag as applicable, deployment verification and live smoke tests. Never bypass protections or push directly to main. Do not trigger deployment manually from feature or staging branches.
 
+For measurement and estimating changes, use the [governing product design philosophy](SYSTEM_BIBLE.md#governing-product-design-philosophy) to review proposed contractor inputs, automation boundaries and advanced workflows within the approved scope.
+
 ## Local commands
 
 Repository: homeextent/planarmto. Local path: /media/jeremy/MEDIA/dev/repos/planarmto. Use Node 22 (CI parity). Stop previous dev/preview process with Ctrl+C before dependency installation or builds.
