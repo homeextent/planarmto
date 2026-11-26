@@ -199,3 +199,11 @@ The [R5.10 specification and practical acceptance procedure](c1c-r5-10-primary-c
 Local validation on Node 22 covered 238 Node cases and 97 Chromium cases across the foundation and floor/roof batches. TypeScript, locked install, production build, audit, PHP syntax and the PDF worker checks passed. Local isolated WordPress integration could not run because Docker was unavailable. The final trace selector guard and expanded pad depth-edit coverage use a rebuilt production preview. Evidence and logs are under `/tmp/planarmto-r510/final/`. Independent implementation review and targeted owner acceptance remain open.
 
 Implementation commit `c77f0506b91a18949b347638725501d83e9bc007`. Rendered desktop evidence is under `/tmp/planarmto-r510/rendered/`, including wall construction at 1600 × 1000 and polygon pad construction at 1366 × 900.
+
+## R5.11 construction lifecycle
+
+The [R5.11 requirement and owner evidence register](c1c-r5-11-construction-lifecycle.md) records the R5.10 practical results, the canvas routing and Geometry-only discovery causes, and the outstanding practical reopen gate. Application commit `b6dd0bfd29bff379d1836c6b2165f497fcd49408` reuses the existing parent deletion controller and coordinates an independent wall and its optional layers through the existing specialist history transaction.
+
+The 25 ft wall fixture exercises preview isolation, exact wall and footing quantities, two 200 SF full-height exterior layers, 400 informational BF, atomic undo/redo, specified 6 ft coverage at 150 SF, full-height regeneration to 250 SF, and rejection of overspecified height. Canvas rectangle deletion and inspector standalone slab deletion exercise confirmation, cancellation and history. The polygon dependency test checks blocked deletion, unrelated pad quantity and export/reopen. Existing detached-record tests protect prior ownership behavior.
+
+Local Node 22 validation covered 241 Node and 99 Chromium cases in batches, including 59 foundation and 40 floor/roof cases. Locked install, TypeScript, production build, dependency audit, PHP syntax and PDF worker validation passed. Docker was unavailable locally for isolated WordPress integration. Logs and desktop captures are under `/tmp/planarmto-r511/`. Independent implementation review and targeted practical owner acceptance remain open.

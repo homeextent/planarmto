@@ -29,6 +29,8 @@ The local reference becomes committed only with the centred footing. Its zero is
 | 2 in XPS on 400 SF | 400 SF and 800 informational BF |
 | 6 in granular base on 400 SF | 7.407407 CY |
 
+The [R5.11 lifecycle specification](c1c-r5-11-construction-lifecycle.md) records the owner results and supersedes walls-only initial construction and Geometry-only deletion as workflow requirements.
+
 ## Targeted owner practical acceptance
 
 1. Use Node 22 and launch the exact candidate production build with `npm run preview -- --host 127.0.0.1 --port 4210 --strictPort`. Open it in a disposable browser profile.
