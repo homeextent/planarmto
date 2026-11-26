@@ -12,7 +12,7 @@ This consolidates owner-approved packages 01–05 and supersedes the correspondi
 
 Objective: import → calibrate → trace the architect's drawings → configure confirmed construction specifications → review/apply material takeoff. Contractor-facing complexity should be minimized; internal coordinates, ownership and source validation retained. Missing specifications are pending, not zero. No silent inferred dimensions, earthworks or engineering. Existing engines remain quantity authority.
 
-The [governing product design philosophy](../SYSTEM_BIBLE.md#governing-product-design-philosophy) applies to this specification. The [R5.6B plan](c1c-r5-6b-usability-plan.md) applies it to the owner’s practical feedback and awaits independent plan approval. Existing scope and technical gates continue to apply.
+The [governing product design philosophy](../SYSTEM_BIBLE.md#governing-product-design-philosophy) applies to this specification. The [R5.6B plan](c1c-r5-6b-usability-plan.md) applies it to the owner’s practical feedback. The owner authorized implementation after independent plan review, including the [bounded optional v3 amendments](c1c-r5-3-persistence-design.md#r56b-additive-v3-contract). Independent implementation review and owner practical acceptance remain required.
 
 ## 2. Package 01 — Graphical drafting and canvas interaction (R5.1)
 

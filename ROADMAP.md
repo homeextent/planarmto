@@ -16,7 +16,7 @@ C.1B staging integration: owner accepted `fb60747f83183016694f4c54ac2dbc609087f5
 | B | Independent typed workspaces, calibration, histories and persistence | Staging complete |
 | C.1A | Canonical schema v3, explicit ownership and specialist contracts | Staging complete; [record](docs/c1a-measurement-architecture.md) |
 | C.1B | Independent roof drafting, measurement and R4 usability | Staging integrated; owner-confirmed post-merge CI #133; [record](docs/c1b-roof-measurement.md), [R4](docs/c1b-r4-specialist-usability.md) |
-| C.1C | Foundation drafting and measurement | Draft PR #12. R5.6A technical baseline 311/311 and CI #193. Full R5 acceptance withheld. [R5.6B plan](docs/c1c-r5-6b-usability-plan.md) awaits independent approval. |
+| C.1C | Foundation drafting and measurement | Draft PR #12. R5.6A technical baseline 311/311 and CI #193. Full R5 acceptance withheld. [R5.6B plan](docs/c1c-r5-6b-usability-plan.md) is authorized. Independent implementation review and targeted practical acceptance remain pending. |
 | C.1D | Dedicated site drafting and measurement | Deferred beyond v2.16.0; separate future authorization |
 | C.1E | Integrated quantity ownership, completeness and duplicate prevention | After C.1C; independent of C.1D |
 | C.2 | Consolidated MTO, manual quantities, allowances, quotations, pricing and reporting | After C.1E; detailed contract and acceptance separately approved |

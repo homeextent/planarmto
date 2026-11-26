@@ -454,6 +454,23 @@ test('independent slab extent and confirmed under-slab stack retain exact quanti
  const applied=applyAssemblyPreview(doc,preview);
  const values=applied.workspaces[1].measurements.filter(e=>'elevationFt' in e).map(e=>'elevationFt'in e?e.elevationFt:null);
  assert.deepEqual(values,[0,-.25,-.75]);
+
+ const parent=applied.workspaces[1].foundationAssemblies![0];
+ const excluded=structuredClone(input);
+ excluded.specifications.insulation={status:'excluded',reason:'Not specified'};
+ const direct=previewAssemblyChange(applied,'foundation',parent.id,parent.revisionId,{kind:'replaceIntent',input:excluded},id);
+ assert.deepEqual(direct.conflicts,[]);
+ const directBase=direct.changes?.measurements.find(e=>e.kind==='foundationRegion'&&e.purpose==='granular');
+ assert.ok(directBase?.kind==='foundationRegion');
+ assert.equal(directBase.elevationFt,-.5);
+ expectVolume(assemblyWallVolume(direct,'foundation.granular.volume'),22.22222222222);
+ const pending=structuredClone(input);
+ pending.specifications.insulation={status:'pending',reason:'Awaiting detail'};
+ const unresolved=previewAssemblyChange(applied,'foundation',parent.id,parent.revisionId,{kind:'replaceIntent',input:pending},id);
+ assert.deepEqual(unresolved.conflicts,[]);
+ assert.ok(unresolved.unresolvedSpecifications.some(g=>g.system==='granular'&&g.path==='sequence'));
+ assert.equal(unresolved.quantities.after.some(row=>row.code==='foundation.granular.volume'),false);
+ expectVolume(assemblyWallVolume(unresolved,'foundation.slab.concrete'),14.81481481481);
 });
 
 test('component exclusion survives adoption, dormant scope and reactivation',()=>{

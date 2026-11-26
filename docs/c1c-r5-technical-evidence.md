@@ -2,7 +2,7 @@
 
 R5.3–R5.5 implementation against the approved coordinated specification and the revised v3 persistence design at `1be740b`. The 296-test R5.1–R5.2 candidate remains the regression baseline. Review applies to draft PR #12. Actual-plan owner acceptance and staging approval remain separate.
 
-The owner withheld full R5 acceptance after practical use of R5.6A candidate `eb5624c00a29ec3c91f325333f6743d6936e01a0` (CI #193 and 311/311 reported local checks). The [R5.6B usability plan](c1c-r5-6b-usability-plan.md) records the incomplete practical acceptance items, an unresolved owner-reported footing visibility concern that the synthetic Chromium check did not reproduce, and the proposed contractor workflow and relationship changes. Independent approval of the plan is the next gate.
+The owner withheld full R5 acceptance after practical use of R5.6A candidate `eb5624c00a29ec3c91f325333f6743d6936e01a0` (CI #193 and 311/311 reported local checks). The [R5.6B usability plan](c1c-r5-6b-usability-plan.md) records the incomplete practical acceptance items, an unresolved owner-reported footing visibility concern that the synthetic Chromium check did not reproduce, and the proposed contractor workflow and relationship changes. Independent plan approval is complete. The owner authorized UX-01 through UX-21 and the bounded optional v3 contract. Independent implementation review and targeted practical acceptance are the next gates.
 
 ## Implementation and boundaries
 
@@ -124,3 +124,24 @@ The exact limitations are tied to the existing engine contracts. Detachment requ
 4. Confirm a slab extent and base. Compare the under-slab strata and their independent quantities. Verify a scope exclusion and its reason survive undo, redo and reopen. Exercise a stepped or nonstandard condition and check the documented refusal or independent workflow.
 5. Move a saved trace vertex and preview a bounded inset where appropriate. Check that prior trace provenance remains. Detach a complete system without dependent sources, confirm its quantity appears once, revise an independent value, and verify explicit re-adoption or deletion, undo, redo and reopen.
 6. Record actual quantities, operation count/time and usability findings. Submit exact candidate evidence for independent review before requesting staging approval.
+
+## R5.6B implementation and practical acceptance
+
+Node 22 local validation passed 318/318 regressions (231 Node and 87 Chromium). The four focused Chromium cases passed on the corrected build. Locked dependency installation, TypeScript, production build, high-severity dependency audit, Chromium installation, PHP syntax and bundled PDF worker checks passed. Isolated WordPress integration was unavailable locally because Docker was unavailable. Local logs are under `/tmp/planarmto-r56b/final/`. Exact published-head CI and owner practical tests remain independent gates.
+
+The coordinated editor uses the existing assembly Preview/Apply transaction. The optional [v3 persistence amendment](c1c-r5-3-persistence-design.md#r56b-additive-v3-contract) preserves historical records and distinguishes local elevation frames from a shared project reference.
+
+| Items | Evidence and review focus |
+|---|---|
+| UX-01–UX-03 | Chromium standard irregular trace, cancellation and atomic undo/redo. The rectangle correction, preset and detachment case now starts in the standard assembly workflow. Legacy explicit perimeter adoption remains covered separately. |
+| UX-04–UX-06 | Contractor-facing labels, relative datum and advanced disclosures. Dimension suggestions come from project-confirmed values. The existing unit parser, unit-switch tests and fractional trace inputs cover manual entry. |
+| UX-07–UX-08 | Engine tests cover distant axis projection and exact interior corners on a complete irregular wall ring. Owner review should check snap priority and pointer feel on the actual plan. |
+| UX-09 | Component-specific canvas styling and labelled visibility options. The existing browser filter case checks persistence and quantities. The reported footing disappearance remains an unresolved owner observation. |
+| UX-10–UX-13 | Standard irregular Chromium case exercises the derived slab and quantity review. Independent polygon slab has a direct toolbar test. Existing trace correction and replacement lineage contracts remain covered. |
+| UX-14–UX-17 | Tests cover wall-base zero, centred footing, slab relationship, local-frame comparisons, and existing slab/insulation/granular stacking. Separate local zeros cannot resolve potentially overlapping concrete. |
+| UX-18–UX-19 | Node coverage reverses confirmed exterior layers and verifies stable child IDs, quantities, explicit unresolved order and save/reopen. Exterior order does not move the approved measurement face. |
+| UX-20–UX-21 | Node coverage persists local references across save, detachment and explicit re-adoption. Historical elevations, presets, advanced controls and undo/redo remain covered. |
+
+For practical acceptance, calibrate an actual drawing and trace a rectangle and a supported irregular foundation. Choose the trace reference, specify the wall and footing, and verify the relative datum and quantity preview. Include a supported interior slab where shown and confirm the under-slab and exterior material sequences. Inspect the committed footing with All visible. Correct a perimeter node, compare quantities and identity changes, undo and redo, then save and reopen. Confirm independent slab drafting remains accessible. Record any screen state, active visibility filter and action sequence if footing visibility recurs.
+
+Independent source review and actual-plan owner acceptance remain open.
