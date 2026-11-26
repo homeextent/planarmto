@@ -300,3 +300,9 @@ An absent elevation marker or explicit historical marker preserves the legacy co
 Exterior order is the existing array order from the wall outward. The absent field represents historical records. A newly changed or unconfirmed order persists an unresolved marker. Reordering invalidates confirmation until the contractor confirms the new order. Presets snapshot the confirmed order. The order leaves coverage and the approved measurement face unchanged.
 
 Targeted cases include exact contact within a frame, different local frames with and without plan intersection, historical overlap behavior, retention through detachment and re-adoption, and reversed exterior sequences with unchanged coverage, quantities and stable layer IDs.
+
+## R5.6C standalone slab and estimating coverage
+
+`AssemblyTrace.kind` adds `'slab'` with `reference: 'interior'` and the existing ordered, closed trace vertices and segments. It validates the trace using the existing simple-polygon contract. Standalone slab assemblies permit the existing slab, under-slab insulation and granular roles. Their independent slab extent must equal the trace. Conventional standalone slabs use the same local elevation reference mechanism and an explicitly confirmed zero at slab bottom.
+
+`SlabSpec.coverageBasis?: 'fullFootprintEstimate'` is a confirmed specification field. Generated layers use the existing optional source note and their quantity basis discloses the estimate. Historical records without the field retain their previous quantity presentation. The field leaves geometry, volume calculations, overlap reconciliation and project storage caps intact.

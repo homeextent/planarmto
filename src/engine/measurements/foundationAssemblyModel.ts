@@ -18,7 +18,7 @@ export type Scope<T> =
   | { status: 'included'; specification: DraftSpecification<T> };
 export type TraceSegment = { id: string; startVertexId: string; endVertexId: string };
 export type AssemblyTrace = {
-  kind: 'rectangle' | 'orthogonal';
+  kind: 'rectangle' | 'orthogonal' | 'slab';
   reference: 'exterior' | 'centreline' | 'interior';
   vertices: { id: string; point: Point }[];
   segments: TraceSegment[];
@@ -70,6 +70,7 @@ export type SlabSpec = {
   thicknessFt: number; baseFt: number;
   footingRelation: Confirmation;
   bottomRelationship?: 'atWallBase';
+  coverageBasis?: 'fullFootprintEstimate';
   elevationReference?: ElevationReference;
   openings: SlabOpening[]; thickenings: SlabThickening[];
 };

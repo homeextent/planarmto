@@ -74,11 +74,13 @@ function checkOrderedPath(v: {vertices:{id:string;point:Point}[];segments:{id:st
   }
 }
 const trace: Rule=(v,p)=>{
-  object({...routeFields,kind:choice('rectangle','orthogonal'),reference:choice('exterior','centreline','interior'),source})(v,p);
+  object({...routeFields,kind:choice('rectangle','orthogonal','slab'),reference:choice('exterior','centreline','interior'),source})(v,p);
   const t=v as FoundationAssemblyRecord['trace'];
   checkOrderedPath(t,true,p);
   requireValid(t.kind!=='rectangle'||t.vertices.length===4,p+'.vertices');
-  offsetOrthogonalPerimeter(t.vertices.map(x=>x.point),0);
+  const points=t.vertices.map(x=>x.point);
+  if(t.kind==='slab')polygon(points,p+'.vertices');
+  else offsetOrthogonalPerimeter(points,0);
 };
 const elevationReference=variants('kind',{
   assembly:object({kind:choice('assembly'),id:text}),
@@ -130,7 +132,7 @@ const systems=object({
   slab:scope({material:material('concrete'),extent:variants('kind',{
     confirmedInterior:object({kind:choice('confirmedInterior')}),
     independent:object({kind:choice('independent'),points:polygon}),
-  }), thicknessFt:positive,baseFt:finite,footingRelation:confirmation,bottomRelationship:choice('atWallBase'),elevationReference,openings:array(slabOpening),thickenings:array(thickening)}),
+  }), thicknessFt:positive,baseFt:finite,footingRelation:confirmation,bottomRelationship:choice('atWallBase'),coverageBasis:choice('fullFootprintEstimate'),elevationReference,openings:array(slabOpening),thickenings:array(thickening)}),
   insulation,granular,
 },{exteriorSequence});
 const presetVersion=object({version:integer,name:text,systems:object({

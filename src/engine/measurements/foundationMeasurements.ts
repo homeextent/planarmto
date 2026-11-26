@@ -2,7 +2,7 @@ import {foundationLayerConflicts} from './foundationLayers';
 /** Initial C.1C measurement adapter. Rectangular compatible systems only for overlap reconciliation.
  * Shared explicit topology validation at the persistence boundary; inspector integration pending.
  */
-import {comparableFoundationElevations,validateContributionSet,type FoundationEntity,type QuantityContribution,type Point} from './measurementTypes';
+import {comparableFoundationElevations,foundationSlabFootprintEstimate,validateContributionSet,type FoundationEntity,type QuantityContribution,type Point} from './measurementTypes';
 import {simplePolygon,projectedArea} from './roofMeasurements';
 import {extendedStrip,reconcileRectangularPrisms,orthogonalPolygonPieces,polygonEnvelope,orientedStripFootprint,orientedFootprintsOverlap,type Prism,type Bounds} from './foundationGeometry';
 import {foundationDetails} from './foundationDetails';
@@ -22,7 +22,7 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
  const layerConflicts=foundationLayerConflicts(entities);
  const rows:QuantityContribution[]=[],warnings:string[]=[],solids:Solid[]=[],detailBreakdown:FoundationVolumeBreakdown[]=[],footprintReferences:FoundationFootprintReference[]=[];
  const add=(e:FoundationEntity,code:string,unit:QuantityContribution['unit'],basis:string,value:number|null,reason='Missing or unconfirmed foundation input')=>{
-  const base={workspaceId,elementId:e.id,physicalId:e.physicalId,assemblyId:e.assemblyId,source:e.source,code,unit,basis};
+  const base={workspaceId,elementId:e.id,physicalId:e.physicalId,assemblyId:e.assemblyId,source:e.source,code,unit,basis:e.source.note===foundationSlabFootprintEstimate?foundationSlabFootprintEstimate:basis};
   if(layerConflicts.has(e.id)){value=null;reason=layerConflicts.get(e.id)!;}
   if(e.scopeApplicability?.status==='pending'){value=null;reason='Scope pending: '+e.scopeApplicability.reason;}
   rows.push(value===null?{...base,status:'unquantified',reason}:{...base,status:'measured',quantity:value});

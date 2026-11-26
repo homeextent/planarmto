@@ -38,6 +38,7 @@ export type FoundationStripSource={version:1;wallIds?:string[];wallId:string;gro
 export type FoundationEnvelopeSource={sourceIds?:string[];offsetBelowSlabFt?:number;perimeterWallIds?:string[];version:1;sourceId:string;groupId:string;purpose:'waterproofing'|'verticalInsulation'|'horizontalInsulation'|'granular';side?:'left'|'right';heightFt?:number;depthFt?:number;material:string;layerId:string;foam?:true};
 export type FoundationDrainageSource={version:1;wallIds:string[];groupId:string;edge:number;offsetFt:number;material:string;layerId:string};
 export type FoundationPerimeterReference={version:1;kind:'rectangle'|'orthogonal';reference:'exterior'|'centreline'|'interior';points:Point[];widthFt:number;edge:number};
+export const foundationSlabFootprintEstimate='Estimated full slab footprint; actual net installed coverage may differ';
 export type ElevationReference =
   | {kind:'assembly';id:string}
   | {kind:'project'|'unresolved'|'historical'};

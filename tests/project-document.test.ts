@@ -1,3 +1,4 @@
+import {independentWallLoop} from '../src/components/FoundationAssemblyPanel';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBlankProject, createModernTwoBedroomRancher, createStudioSuite, createGarageWorkshop } from '../src/engine/samplePlans';
@@ -768,4 +769,45 @@ test('confirmed exterior order preserves stable children, material quantities an
  const reopened=deserializeProjectDocument(serializeProjectDocument(applyAssemblyPreview(saved,reordered)));
  assert.deepEqual(reopened.workspaces[1].foundationAssemblies![0].specifications.exteriorLayers.map(layer=>layer.id),['foam','wrap']);
  assert.equal(reopened.workspaces[1].foundationAssemblies![0].specifications.exteriorSequence?.status,'confirmed');
+});
+
+test('standalone garage slab uses specified layer thickness and preserves estimated footprint basis',()=>{
+ const {doc,input,id}=assemblyFixture();
+ input.trace={...input.trace,kind:'slab',reference:'interior'};
+ input.specifications.walls={status:'excluded',reason:'Standalone garage slab'};
+ input.specifications.slab={status:'included',specification:{
+  material:c(poured),extent:c({kind:'independent',points:input.trace.vertices.map(v=>v.point)}),
+  thicknessFt:c(.5),baseFt:c(0),footingRelation:c(assemblySource),
+  elevationReference:c({kind:'assembly',id:'garage'}),coverageBasis:c('fullFootprintEstimate'),
+ }};
+ input.specifications.insulation={status:'excluded',reason:'Not specified'};
+ input.specifications.granular={status:'included',specification:{id:c('base'),material:c({kind:'catalogue',category:'granular',id:'clear crushed stone'}),thicknessFt:c(.25)}};
+ const preview=previewAssemblyChange(doc,'foundation','garage',null,{kind:'create',input},id);
+ assert.deepEqual(preview.conflicts,[]);
+ expectVolume(assemblyWallVolume(preview,'foundation.slab.concrete'),1200*.5/27);
+ expectVolume(assemblyWallVolume(preview,'foundation.granular.volume'),1200*.25/27);
+ assert.equal(preview.quantities.after.length,2);
+ assert.match(preview.quantities.after.find(row=>row.code==='foundation.granular.volume')!.basis,/Estimated full slab footprint/);
+ const saved=applyAssemblyPreview(doc,preview);
+ assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(saved)),saved);
+});
+
+test('closed independent wall loop adopts exactly once with preserved scope and identities',()=>{
+ const {doc,id}=assemblyFixture();
+ const outline=[{x:0,y:0},{x:40,y:0},{x:40,y:30},{x:0,y:30}];
+ const walls=generateOrthogonalFoundationPerimeter(outline,'centreline',1,8,0,id).map(w=>{
+  const {perimeterReference:_perimeter,...foundation}=w.foundation!;
+  return {...w,foundation};
+ });
+ const selected=walls.map(w=>w.id);
+ const existing=replaceSpecialistEntities(doc,'foundation',walls);
+ assert.throws(()=>independentWallLoop(walls,selected.slice(1)),/Select at least four/);
+ assert.throws(()=>independentWallLoop(walls.map((w,i)=>i===1?{...w,widthFt:2}:w),selected),/dimensions or elevation references differ/);
+ const {input,bindings}=independentWallLoop(walls,selected);
+ const result=previewAssemblyChange(existing,'foundation','adopted-loop',null,{kind:'adopt',input,bindings,source:assemblySource},id);
+ assert.deepEqual(result.conflicts,[]);
+ assert.deepEqual(result.changes?.measurements.map(w=>[w.id,w.physicalId,w.scopeApplicability]),walls.map(w=>[w.id,w.physicalId,w.scopeApplicability]));
+ assert.equal(result.quantities.before.length,result.quantities.after.length);
+ const wallTotal=(rows:typeof result.quantities.before)=>rows.reduce((sum,row)=>sum+(row.status==='measured'?row.quantity:0),0);
+ expectVolume(wallTotal(result.quantities.after),wallTotal(result.quantities.before));
 });

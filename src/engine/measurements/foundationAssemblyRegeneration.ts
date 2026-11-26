@@ -1,3 +1,4 @@
+import { drainageCatalogueAttributes } from './foundationMaterialCatalogue';
 import { orthogonalExteriorEdges } from './foundationExteriorRoute';
 import type {
   AssemblySpecifications, ChildBinding, ChildRole, FoundationAssemblyRecord, MaterialChoice, Scope, SpecificationGap,
@@ -7,7 +8,7 @@ import { deriveStripFootings } from './foundationDerivation';
 import { derivePerimeterDrainage } from './foundationDrainageDerivation';
 import { generateOrthogonalFoundationPerimeter } from './foundationDrafting';
 import { deriveFoundationEnvelope, deriveRectangularEnvelope } from './foundationEnvelopeDerivation';
-import { comparableFoundationElevations, type FoundationEntity, type FoundationEnvelopeSource } from './measurementTypes';
+import { comparableFoundationElevations, foundationSlabFootprintEstimate, type FoundationEntity, type FoundationEnvelopeSource } from './measurementTypes';
 import { orthogonalWallPerimeter } from './foundationPerimeterGeometry';
 
 const isFoam=(material:MaterialChoice)=>material.kind==='catalogue'&&['eps','xps','polyisocyanurate'].includes(material.id);
@@ -47,10 +48,17 @@ export function regenerateFoundationAssembly(parent:FoundationAssemblyRecord, in
   function gap(system:keyof AssemblySpecifications,path:string,reason:string,blocks:SpecificationGap['blocks']=['quantity']){
     gaps.push({system,path,reason,blocks});
   }
+  const prompts:Record<string,string>={
+    material:'Select the construction material',widthFt:'Enter the width or wall thickness',depthFt:'Enter the footing depth',
+    heightFt:'Enter the wall height',datum:'Confirm the wall elevation reference',extent:'Select the slab coverage area',
+    footingRelation:'Confirm the slab construction relationship',thicknessFt:'Enter the material thickness',
+    alignment:'Confirm footing alignment',top:'Confirm the footing top reference',coverage:'Specify the layer coverage',
+    route:'Confirm the drainage route',id:'Confirm the layer specification',
+  };
   function fields<T,K extends keyof T>(scope:Scope<T>,system:keyof AssemblySpecifications,names:K[],prefix=String(system)){
     if(scope.status!=='included')return false;
     let complete=true;
-    for(const name of names)if(value(scope,name)===undefined){gap(system,prefix+'.'+String(name),'Confirm '+String(name));complete=false;}
+    for(const name of names)if(value(scope,name)===undefined){gap(system,prefix+'.'+String(name),prompts[String(name)]??'Confirm the construction input');complete=false;}
     return complete;
   }
   function derivedIds(key:string){
@@ -59,6 +67,8 @@ export function regenerateFoundationAssembly(parent:FoundationAssemblyRecord, in
   }
 
   const wallsBySegment=new Map<string,FoundationEntity>();
+  if(trace.kind==='slab'&&(trace.reference!=='interior'||spec.walls.status==='included'||spec.footing.status==='included'||spec.drainage.status==='included'||spec.exteriorLayers.length))
+    throw Error('A standalone slab supports only concrete, under-slab insulation and granular base.');
   const wallScope=spec.walls;
   if(allowed('wall')&&fields(wallScope,'walls',['material','widthFt','heightFt','datum'])&&wallScope.status==='included'){
     const s=wallScope.specification;
@@ -143,8 +153,11 @@ export function regenerateFoundationAssembly(parent:FoundationAssemblyRecord, in
     const override=parent.overrides.find(o=>o.system==='drainage');
     const route=override?.system==='drainage'?override.route:s.route!.value;
     const attrs=s.attributes?.value;
+    const choice=s.material!.value;
+    const catalogue:Partial<Record<'nominalDiameterFt'|'pipeMaterial'|'perforation',string>>=
+      choice.kind==='catalogue'?drainageCatalogueAttributes(choice.id):{};
     for(const name of ['nominalDiameterFt','pipeMaterial','perforation'] as const)
-      if(!attrs?.[name])gap('drainage','attributes.'+name,'Specify '+name,['materialSpecification']);
+      if(!attrs?.[name]&&!catalogue[name])gap('drainage','attributes.'+name,({nominalDiameterFt:'Enter the nominal drainage pipe diameter',pipeMaterial:'Confirm the drainage pipe material',perforation:'Confirm whether the drainage pipe is perforated or solid'})[name],['materialSpecification']);
     if(route.kind==='manual'){
       const vertices=new Map(route.vertices.map(v=>[v.id,v.point]));
       for(const edge of route.segments){
@@ -178,6 +191,8 @@ export function regenerateFoundationAssembly(parent:FoundationAssemblyRecord, in
   if(allowed('slab')&&fields(slabScope,'slab',['material','extent','thicknessFt','footingRelation'])&&slabScope.status==='included'){
     const s=slabScope.specification,extent=s.extent!.value;
     const width=value(wallScope,'widthFt');
+    if(trace.kind==='slab'&&(extent.kind!=='independent'||JSON.stringify(extent.points)!==JSON.stringify(points)))
+      throw Error('Standalone slab coverage must match its confirmed trace.');
     const polygon=extent.kind==='independent'?extent.points:
       typeof width==='number'&&supportsWallDerivation?orthogonalWallPerimeter(points,width,trace.reference).interior:null;
     const base=s.bottomRelationship?.value==='atWallBase'&&supportsWallDerivation&&walls[0].kind==='foundationWall'&&
@@ -220,7 +235,8 @@ export function regenerateFoundationAssembly(parent:FoundationAssemblyRecord, in
       purpose,material:materialString(s.material!.value),layerId,depthFt,offsetBelowSlabFt:below,
       ...(system==='insulation'&&isFoam(s.material!.value)?{foam:true as const}:{}),
     },derivedIds(system+':'+layerId));
-    const result=add(member,{system,layerId});
+    const estimating=slabScope.status==='included'&&slabScope.specification.coverageBasis?.value==='fullFootprintEstimate';
+    const result=add(estimating?{...member,source:{...member.source,note:foundationSlabFootprintEstimate}}:member,{system,layerId});
     if(system==='insulation'&&result.scopeApplicability?.status==='pending'){gap('granular','sequence','Resolve pending insulation before positioning granular');break;}
     if(result.scopeApplicability?.status!=='excluded')below+=depthFt;
   }
