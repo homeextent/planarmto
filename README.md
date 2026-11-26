@@ -16,7 +16,7 @@ R5.6C application candidate `5a6db24aaab462d4dda888a18be08515709df849` retains 3
 
 [R5.7 foundation closeout](docs/c1c-r5-7-foundation-closeout.md) documents layered specification, assembly lifecycle, reconciliation and the remaining practical acceptance gate.
 
-The [R5.8 foundation interface](docs/c1c-r5-8-contractor-interface.md) separates drawing, construction, geometry and quantity review. R5.9 adds unified independent-wall construction editing and material-specific foundation takeoff. Full R5 acceptance remains withheld. [R5.9 specification](docs/c1c-r5-9-contractor-takeoff.md).
+The [R5.8 foundation interface](docs/c1c-r5-8-contractor-interface.md) separates drawing, construction, geometry and quantity review. R5.9 adds unified independent-wall construction editing and material-specific foundation takeoff. The owner exercised the R5.9 wall concrete, exterior protection and material grouping workflows. R5.10 brings independent wall and pad footing drawing into the primary construction lifecycle, adds conventional centred footings without a manual datum and keeps concrete volume subtotalled alongside supplementary counts. Full R5 and C.1C acceptance remain pending. [R5.10 specification](docs/c1c-r5-10-primary-construction.md).
 
 ## C.1B roof measurement (staging integrated)
 

@@ -80,6 +80,8 @@ A simplified contractor interface shall not justify reducing mathematical accura
 
 ### 5. Standard construction workflow
 
+**Trace → Confirm geometry → Specify construction → Preview → Apply.** This is the interface standard for current and future primary construction drawing tools. Confirm the reference and permit supported exact corrections before construction commitment. Keep geometry and specifications in a draft until validated Apply.
+
 Where applicable, the contractor workflow shall follow this model:
 
 1. Import and calibrate architectural drawings.
@@ -162,7 +164,7 @@ Unsupported conditions shall be identified explicitly rather than silently appro
 
 Workspace takeoff groups authoritative net measurement rows by actual material specification, purchasing attributes and applicable construction use. Preserve the link to component and specification evidence. Group compatible units at full precision and identify absent attributes as unspecified. Keep known partial quantities and outstanding requirements visible.
 
-Category subtotals summarize their detail rows and contribute no additional quantity. Reference figures and informational derivatives such as eligible insulation board feet remain separate from purchasing totals. Consolidated estimating, pricing, allowances and reporting belong to the separately authorized C.2 scope.
+Category subtotals summarize detail rows of compatible units and contribute no additional quantity. Concrete volume remains subtotalled when supplementary construction counts are available. Reference figures and informational derivatives such as eligible insulation board feet remain separate from purchasing totals. Consolidated estimating, pricing, allowances and reporting belong to the separately authorized C.2 scope.
 
 ### 9. Application across all workspaces
 

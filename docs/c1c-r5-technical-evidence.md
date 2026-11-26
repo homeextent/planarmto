@@ -191,3 +191,11 @@ Implementation `8da8813e69bf97b12c4d3871b4f39db0988f22d8` passed 332/332 local r
 Node 22 locked installation, TypeScript, production build, dependency audit, Chromium install, PHP syntax and PDF worker checks passed. Docker was unavailable locally for isolated WordPress integration. Exact-head CI and targeted owner acceptance are required for closeout.
 
 First publication CI #200 passed 94 Chromium cases. The independent-wall reopen test timed out because it required the autosave recovery prompt, whose presence depends on whether the one-second autosave timer runs before reload. The follow-up test imports the exported JSON in a fresh browser context and compares the complete reopened document, without depending on autosave timing. The application source and production build for the follow-up are identical to the first publication.
+
+## R5.10 primary construction workflow
+
+The [R5.10 specification and practical acceptance procedure](c1c-r5-10-primary-construction.md) records the owner findings, the exact source-wall eligibility blocker, the approved local estimating relationship and the unrounded numerical benchmarks. Existing pad footprint and concrete calculations remain authoritative. The standard wall and pad drafts exercise exact correction, transaction isolation, stale preview and history. The R5.9 linked-layer lifecycle, exterior face selection, scope and export/reopen coverage remain in the regression suite.
+
+Local validation on Node 22 covered 238 Node cases and 97 Chromium cases across the foundation and floor/roof batches. TypeScript, locked install, production build, audit, PHP syntax and the PDF worker checks passed. Local isolated WordPress integration could not run because Docker was unavailable. The final trace selector guard and expanded pad depth-edit coverage use a rebuilt production preview. Evidence and logs are under `/tmp/planarmto-r510/final/`. Independent implementation review and targeted owner acceptance remain open.
+
+Implementation commit `c77f0506b91a18949b347638725501d83e9bc007`. Rendered desktop evidence is under `/tmp/planarmto-r510/rendered/`, including wall construction at 1600 × 1000 and polygon pad construction at 1366 × 900.

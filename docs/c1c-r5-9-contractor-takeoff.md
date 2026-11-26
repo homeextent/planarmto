@@ -1,6 +1,6 @@
 # R5.9 contractor interface and material takeoff
 
-Approved baseline `6f8252a25504ad6a832356e4b72f40e50fc092e7`, 328 local regressions and exact-head CI #199. The owner exercised rectangular and irregular foundations, standalone rectangular and polygon slabs, independent walls, construction layers and the tabbed inspector. The owner reported fragmented independent-wall editing, generic material totals and a potentially over-conservative overlap warning. Full R5 and C.1C acceptance remain withheld.
+Approved baseline `6f8252a25504ad6a832356e4b72f40e50fc092e7`, 328 local regressions and exact-head CI #199. The owner exercised rectangular and irregular foundations, standalone rectangular and polygon slabs, independent walls, construction layers and the tabbed inspector. The owner reported fragmented independent-wall editing, generic material totals and a potentially over-conservative overlap warning. Full R5 and C.1C acceptance remain withheld. The [R5.10 closeout](c1c-r5-10-primary-construction.md) supersedes the standard wall and pad footing entry and concrete subtotal behavior documented for this baseline.
 
 | Requirement | Implementation and evidence |
 | --- | --- |

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] — Increments B, C.1A and C.1B (staging release train)
 
 ### C.1C — Feature candidate and hybrid handoff (not staging integrated)
+- R5.10 adds confirmed independent wall and pad footing drafts, a local estimating reference for conventional centred wall footings and concrete volume subtotals alongside supplementary pad counts. [R5.10 specification](docs/c1c-r5-10-primary-construction.md).
 - R5.9 unifies independent wall and linked-layer editing and groups foundation takeoff by saved material specification. [R5.9 specification](docs/c1c-r5-9-contractor-takeoff.md).
 - R5.8 separates foundation inspector tabs, adds progressively disclosed construction layers and makes independent wall and exterior protection workflows more discoverable. [R5.8 specification](docs/c1c-r5-8-contractor-interface.md).
 - R5.7 adds progressive construction layers, concrete proposals, complete assembly deletion and slab footprint correction. It retains disjoint concrete quantities when an unrelated incomplete run cannot overlap. [R5.7 closeout](docs/c1c-r5-7-foundation-closeout.md).
