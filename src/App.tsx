@@ -850,7 +850,7 @@ function AppContent() {
           }}
         />
 
-        {foundationEntities && <FoundationInspector ownedComponentIds={new Set(activeWorkspace.foundationAssemblies?.flatMap(parent=>parent.children.map(child=>child.entityId)))} assemblyControls={<FoundationAssemblyPanel project={document} workspaceId={activeWorkspace.id} traced={activeTrace} onCancelTrace={clearTracedAssembly}
+        {foundationEntities && <FoundationInspector activeConstructionDraft={!!activeTrace} ownedComponentIds={new Set(activeWorkspace.foundationAssemblies?.flatMap(parent=>parent.children.map(child=>child.entityId)))} assemblyControls={<FoundationAssemblyPanel project={document} workspaceId={activeWorkspace.id} traced={activeTrace} onCancelTrace={clearTracedAssembly}
           onDraftChange={draft=>setTracedAssemblies(old=>({...old,[activeWorkspace.id]:draft}))}
           selectedIds={selection.type==='foundation'?selection.ids:undefined} selectedId={selection.type==='foundation'?(selection.id??selection.ids?.[0]):undefined} metric={state.settings.unitSystem==='metric'}
           onTraceEdit={(trace,onMove)=>{

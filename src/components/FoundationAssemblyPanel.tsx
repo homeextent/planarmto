@@ -1,7 +1,9 @@
+import {FoundationInspectorContext} from './FoundationInspectorTabs';
+import {foundationColor} from './foundationComponentStyle';
 import { orthogonalWallPerimeter } from '../engine/measurements/foundationPerimeterGeometry';
 import { addFoundationTraceNotch, moveFoundationTraceVertex } from '../engine/measurements/foundationTraceCorrection';
 import { foundationReleaseGroup } from '../engine/measurements/foundationAssemblyValidation';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { v4 as uuid } from 'uuid';
 import type { ProjectDocument } from '../engine/projectDocument';
 import type {
@@ -125,6 +127,10 @@ type Props={
 };
 
 export function FoundationAssemblyPanel({project,workspaceId,selectedId,selectedIds,metric,traced,onCancelTrace,onDraftChange,onApply,onTraceEdit,onPresets,onPreview,onSelectChildren}:Props){
+  const {tab,selectTab}=useContext(FoundationInspectorContext);
+  useEffect(()=>{if(traced)selectTab('Construction')},[traced?.id]);
+  const [newExterior,setNewExterior]=useState<string>();
+  const [exteriorKinds,setExteriorKinds]=useState<Record<string,'waterproofing'|'insulation'>>({});
   const workspace=project.workspaces.find(w=>w.id===workspaceId)!;
   const parents=workspace.foundationAssemblies??[];
   const inherited=parents.find(p=>p.children.some(c=>c.entityId===selectedId||selectedIds?.includes(c.entityId)));
@@ -202,10 +208,6 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
   }
   function setSystem(system:System,next:AssemblySpecifications[System]){
     if(!intent)return;
-    if(system==='footing'&&next.status==='included'&&!next.specification.material){
-      const footing=next as Scope<FootingSpec>&{status:'included'};
-      next={...footing,specification:{...footing.specification,material:confirmed(concrete,sources('Concrete selection confirmed on Apply'))}};
-    }
     if(conventional&&system==='footing'&&next.status==='included'){
       const footing=next as Scope<FootingSpec>&{status:'included'};
       const source={kind:'estimatingAssumption',reference:'Confirmed conventional centred strip footing under wall'} as const;
@@ -214,11 +216,14 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
     }
     update({...intent,specifications:{...intent.specifications,[system]:next}});
   }
-  function addExteriorLayer(){
+  function addExteriorLayer(category?:'waterproofing'|'insulation'){
     if(!intent)return;
+    const id=uuid();
+    setNewExterior(id);
     update({...intent,specifications:{...intent.specifications,exteriorSequence:{status:'unresolved'},exteriorLayers:[
-      ...intent.specifications.exteriorLayers,{id:uuid(),scope:{status:'included',specification:{}}},
+      ...intent.specifications.exteriorLayers,{id,scope:{status:'included',specification:{}}},
     ]}});
+    setExteriorKinds(old=>({...old,[id]:category??'waterproofing'}));
   }
   function moveExteriorLayer(from:number,to:number){
     if(!intent||to<0||to>=intent.specifications.exteriorLayers.length)return;
@@ -327,6 +332,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
   }
   function showPreview(next:AssemblyPreview,trace?:AssemblyTrace){
     setPreview(next);
+    selectTab('Quantities');
     const owned=new Set(next.changes?.parents.find(p=>p.id===next.assemblyId)?.children.map(c=>c.entityId));
     onPreview(next.changes?.measurements.filter(e=>owned.has(e.id))??null,trace?.vertices.map(v=>v.point));
   }
@@ -397,9 +403,51 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
       {kind:'replaceIntent',input,...(additionalBindings.length?{adoption:{bindings:additionalBindings,source:sources(reference.trim())}}:{})};
     showPreview(previewAssemblyChange(project,workspaceId,id,traced||adoption?null:parent!.revisionId,command,uuid));
   }
+  function renderSystem(system:System){
+    const scope=intent!.specifications[system];
+    const editor=<SystemEditor system={system} scope={scope} metric={metric} reference={inputReference}
+      conventional={conventional} slabOnly={slabOnly} suggestions={suggestions(system)} onChange={next=>setSystem(system,next)}/>;
+    const primary=system===(slabOnly?'slab':'walls');
+    if(primary)return <div key={system} style={{borderInlineStartColor:slabOnly?foundationColor.slab:foundationColor.wall}} className="rounded-lg border border-slate-700 border-l-4 bg-slate-800/50 p-2">{editor}</div>;
+    const fields=scopeFields(scope as Scope<Record<string,unknown>>);
+    const material=fields.material?.value as MaterialChoice|undefined;
+    const label=material?.kind==='catalogue'?material.id:material?.description;
+    const dimensions=(['widthFt','depthFt','thicknessFt'] as const).flatMap(name=>{
+      const n=fields[name]?.value;
+      return typeof n==='number'?[formatFoundationQuantity(metric?n*304.8:n*12,metric?'mm':'in',false)]:[];
+    });
+    const required=system==='footing'?['widthFt','depthFt']:system==='drainage'?['route']:['thicknessFt'];
+    const unresolved=scope.status==='included'&&(!label||required.some(name=>fields[name]===undefined));
+    const color=system==='footing'?foundationColor.footing:system==='slab'?foundationColor.slab:
+      system==='insulation'?foundationColor.insulation:system==='granular'?foundationColor.granular:foundationColor.drainage;
+    return <ConstructionCard key={(traced?.id??parent?.revisionId??'adoption')+system} accent={color}
+      label={labels[system]} status={scope.status} summary={[label,...dimensions].filter(Boolean).join(' · ')}
+      unresolved={unresolved}>{editor}</ConstructionCard>;
+  }
+  const ownedSelection=new Set(inherited?.children.map(child=>child.entityId));
+  const mixedSelection=(selectedIds?.length??0)>1&&selectedIds!.some(id=>!ownedSelection.has(id));
+  const unrelatedSelection=!traced&&!adoption&&(mixedSelection||!!selectedId&&!inherited);
+  const showConstruction=tab==='Construction'&&!unrelatedSelection;
   return <section className="space-y-2 text-xs" aria-label="Foundation assemblies">
+    {intent&&(traced||adoption||editing)&&!unrelatedSelection&&<div role="group" aria-label="Construction transaction" className="sticky top-0 z-10 bg-slate-900 border-b border-slate-600 py-2 space-y-1">
+        <p>{deleting?'Review assembly deletion':pendingCorrection?'Perimeter correction':activePreview?'Construction preview':traced||edit||adoption?'Construction draft':'Saved construction'}</p>
+        <div className="flex flex-wrap gap-2">
+        <button className={button} disabled={pickingCorner||deleting} aria-label="Preview assembly changes" onClick={request}>Preview</button>
+        <button className={button} disabled={!activePreview?.changes||!completeNewDraft} aria-label={deleting?'Confirm delete assembly':'Apply assembly changes'} onClick={()=>{
+          if(deleting&&!window.confirm('Delete this assembly and its construction layers? Independent construction stays. You can undo this change.'))return;
+          if(activePreview&&onApply(activePreview)){setFocused(activePreview.assemblyId);setEdit(undefined);setAdoption(null);setAdditionalBindings([]);setCorrection(undefined);setNewExterior(undefined);onCancelTrace();clearPreview();selectTab('Construction');}
+        }}>{deleting?'Confirm delete':'Apply'}</button>
+        <button className={button} aria-label="Cancel assembly changes" onClick={()=>{setAdoption(null);setEdit(undefined);setAdditionalBindings([]);setCorrection(undefined);onCancelTrace();clearPreview()}}>Cancel</button>
+        </div>
+        {activePreview&&<button type="button" className="text-sky-300 underline" onClick={()=>selectTab('Quantities')}>Review quantities and outstanding inputs{activePreview.unresolvedSpecifications.length>0?' ('+activePreview.unresolvedSpecifications.length+')':''}</button>}
+        {activePreview&&!activePreview.changes&&tab!=='Quantities'&&<p role="alert">{activePreview.conflicts[0]?.message??'No changes to apply. Revise the specification and preview again.'}</p>}
+        {!activePreview&&<p className="text-slate-300">Preview the current specification to enable Apply.</p>}
+      </div>}
+    <div hidden={tab!=='Construction'||unrelatedSelection}>
     <h3 className="font-semibold">{traced?(slabOnly?'Specify slab construction':'Specify foundation construction'):'Foundation assemblies'}</h3>
     {traced&&<p>{slabOnly?'Confirm the slab footprint and enter concrete thickness.':'Confirm the traced reference and enter the wall thickness and height.'} Review quantities before applying.</p>}
+    </div>
+    <div hidden={tab!=='Geometry'} className="space-y-2">
     {!traced&&parents.length>0&&<label className="block">Assembly
       <select aria-label="Foundation assembly" disabled={!!pendingCorrection||pickingCorner} className={field} value={parent?.id??''} onChange={e=>{setFocused(e.target.value);setEditing(false);setAdoption(null);setAdditionalBindings([]);clearPreview()}}>
         <option value="">Select assembly</option>
@@ -410,9 +458,16 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
       try{const draft=independentWallLoop(workspace.measurements as FoundationEntity[],selectedIds);setAdoption(draft);clearPreview();}
       catch(error){setCorrectionError(error instanceof Error?error.message:String(error));}
     }}>Create assembly from selected wall loop</button>}
+    </div>
+    <div hidden={tab!=='Construction'} className="space-y-2">
     {!traced&&adoptable&&!adoption&&<button className={button} onClick={()=>{setAdoption(adoptable);clearPreview()}}>Configure assembly from selected perimeter</button>}
-    {parent&&!adoption&&<div className="flex flex-wrap gap-2">
+    {parent&&!adoption&&!unrelatedSelection&&<>
+      <p className="text-slate-200">{parent.trace.kind==='slab'?'Selected standalone slab':'Selected foundation perimeter'}</p>
       <button className={button} onClick={()=>setEditing(true)}>Edit assembly</button>
+    </>}
+    </div>
+    <div hidden={tab!=='Geometry'} className="space-y-2">
+    {parent&&!adoption&&!unrelatedSelection&&<div className="flex flex-wrap gap-2">
       {<button className={button} onClick={()=>{
         if(edit?.parentId===parent.id&&edit.revision===parent.revisionId){
           setCorrectionError('Apply or cancel specification changes before editing the perimeter.');
@@ -427,7 +482,9 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
         showPreview(previewAssemblyChange(project,workspaceId,parent.id,parent.revisionId,{kind:'delete'},uuid));
       }}>Delete assembly</button>
     </div>}
-    {(traced||parent)&&<p className="text-slate-300" aria-label="Construction footprint">{describeTrace((traced?.input.trace??parent?.trace)!,metric)}</p>}
+    {(traced||parent)&&!unrelatedSelection&&<p className="text-slate-300" aria-label="Construction footprint">{describeTrace((traced?.input.trace??parent?.trace)!,metric)}</p>}
+    </div>
+    <div hidden={tab!=='Quantities'||unrelatedSelection}>
     {parent&&summary.size>0&&<details className="space-y-1">
       <summary>Assembly material quantities</summary>
       <ul>{[...summary].map(([key,row])=><li key={key}>
@@ -437,25 +494,15 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
       {measured?.footprintReferences.filter(ref=>parent.children.some(c=>c.entityId===ref.elementId)).map(ref=>
         <p key={ref.elementId}>Slab footprint reference · {ref.netSF===null?'Not quantified':formatFoundationQuantity(ref.netSF,'SF',metric)}</p>)}
     </details>}
-    {intent&&(traced||adoption||editing)&&<div role="group" aria-label="Construction transaction" className="sticky top-0 z-10 bg-slate-900 border-b border-slate-600 py-2 space-y-1">
-        <p>{deleting?'Review assembly deletion':pendingCorrection?'Perimeter correction':activePreview?'Construction preview':traced||edit||adoption?'Construction draft':'Saved construction'}</p>
-        <div className="flex flex-wrap gap-2">
-        <button className={button} disabled={pickingCorner||deleting} onClick={request}>Preview assembly changes</button>
-        <button className={button} disabled={!activePreview?.changes||!completeNewDraft} onClick={()=>{
-          if(deleting&&!window.confirm('Delete this assembly and its construction layers? Independent construction stays. You can undo this change.'))return;
-          if(activePreview&&onApply(activePreview)){setFocused(activePreview.assemblyId);setEdit(undefined);setAdoption(null);setAdditionalBindings([]);setCorrection(undefined);onCancelTrace();clearPreview();}
-        }}>{deleting?'Confirm delete assembly':'Apply assembly changes'}</button>
-        <button className={button} onClick={()=>{setAdoption(null);setEdit(undefined);setAdditionalBindings([]);setCorrection(undefined);onCancelTrace();clearPreview()}}>Cancel assembly changes</button>
-        </div>
-        {activePreview&&<a className="text-sky-300 underline" href="#foundation-review">Review quantities and outstanding inputs</a>}
-      </div>}
+    </div>
+    <div hidden={!showConstruction}>
     {intent&&(traced||adoption||editing)&&!pendingCorrection&&!pickingCorner&&!deleting&&<>
       {!traced&&<label className="block">Reference for revised specifications
         <input className={field} value={reference} onChange={e=>setReference(e.target.value)}/>
       </label>}
       {adoption&&!traced?<p>Preview adoption of the selected perimeter. Existing component decisions are retained.</p>:
         <>
-          <details className="space-y-1">
+          <details className="space-y-1 mb-2">
             <summary>Advanced assembly inputs</summary>
             {parent&&parent.trace.kind!=='slab'&&<fieldset className="border border-slate-700 p-2 space-y-1">
               <legend>Correct saved perimeter</legend>
@@ -515,30 +562,36 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
             {presetError&&<p role="alert">{presetError}</p>}
           </details>
       {traced&&!slabOnly&&conventional&&<p>Wall base is the local estimating reference. Review and Apply confirm this convention.</p>}
-          {(Object.keys(labels) as System[]).filter(system=>!slabOnly||['slab','insulation','granular'].includes(system)).map(system=>{
-            const scope=intent.specifications[system];
-            const editor=<SystemEditor system={system} scope={scope} metric={metric} reference={inputReference}
-              conventional={conventional} slabOnly={slabOnly} suggestions={suggestions(system)} onChange={next=>setSystem(system,next)}/>;
-            const primary=system===(slabOnly?'slab':'walls');
-            if(primary)return <React.Fragment key={system}>{editor}</React.Fragment>;
-            const fields=scopeFields(scope as Scope<Record<string,unknown>>);
-            const material=fields.material?.value as MaterialChoice|undefined;
-            const label=material?.kind==='catalogue'?material.id:material?.description;
-            const dimensions=(['widthFt','depthFt','thicknessFt'] as const).flatMap(name=>{
-              const n=fields[name]?.value;
-              return typeof n==='number'?[formatFoundationQuantity(metric?n*304.8:n*12,metric?'mm':'in',false)]:[];
-            });
-            return <details key={system} open={scope.status==='included'} className="rounded border border-slate-700 p-2">
-              <summary>{labels[system]} · {scope.status}{label?' · '+label:''}{dimensions.length?' · '+dimensions.join(' × '):''}</summary>
-              {editor}
-            </details>;
-          })}
+          <div className="space-y-2">
+            {renderSystem(slabOnly?'slab':'walls')}
+            {!slabOnly&&<section aria-label="Supporting construction" className="space-y-2">
+              <h4 className="font-semibold">Supporting construction</h4>
+              {renderSystem('footing')}{renderSystem('drainage')}
+            </section>}
+          </div>
           {!slabOnly&&<>
-          <details open={intent.specifications.exteriorLayers.length>0}><summary className="font-semibold">Exterior layers from wall outward</summary>
-          <p>Use the specified material order. Each layer keeps its own coverage and quantities.</p>
-          <button className={button} onClick={addExteriorLayer}>Add exterior layer</button>
-          {intent.specifications.exteriorLayers.map((layer,i)=><div key={layer.id} className="space-y-1">
-            <SystemEditor system="exteriorLayers" label={'Exterior layer '+(i+1)}
+          <section className="space-y-2" aria-label="Exterior protection">
+          <h4 className="font-semibold">Exterior protection</h4>
+          <p className="text-slate-300">Layers are ordered from the wall outward. Quantities use the confirmed wall face.</p>
+          <div className="flex flex-wrap gap-1">
+            <button className={button} onClick={()=>addExteriorLayer('waterproofing')}>Add waterproofing</button>
+            <button className={button} onClick={()=>addExteriorLayer('insulation')}>Add vertical insulation</button>
+            <button className={button} onClick={()=>addExteriorLayer()}>Add another exterior layer</button>
+          </div>
+          {intent.specifications.exteriorLayers.map((layer,i)=>{
+            const saved=scopeFields<LayerSpec>(layer.scope);
+            const kind=saved.material?.value.category??exteriorKinds[layer.id];
+            const name=kind==='insulation'?'Vertical insulation':'Waterproofing';
+            const material=saved.material?.value;
+            const summary=material?.kind==='catalogue'?material.id:material?.description;
+            const coverage=saved.coverage?.value;
+            const coverageSummary=coverage?.kind==='confirmedFullHeight'?'Full wall height':
+              coverage?.kind==='specifiedHeight'?formatFoundationQuantity(coverage.heightFt,'LF',metric)+' height':
+              coverage?.kind==='manualNetSegments'?'Specified net coverage':undefined;
+            return <ConstructionCard key={(traced?.id??parent?.revisionId??'adoption')+layer.id} accent={kind==='insulation'?foundationColor.insulation:foundationColor.waterproofing}
+              label={(i+1)+'. '+name} status={layer.scope.status} summary={[summary,coverageSummary].filter(Boolean).join(' · ')}
+              unresolved={layer.scope.status==='included'&&(!material||!coverage||kind==='insulation'&&!saved.thicknessFt)} initiallyOpen={newExterior===layer.id}>
+            <SystemEditor system="exteriorLayers" initialExterior={exteriorKinds[layer.id]} label={'Exterior layer '+(i+1)}
             metric={metric} reference={inputReference} scope={layer.scope} onChange={next=>{
               const scope=next as typeof layer.scope;
               const changed=scope.status!==layer.scope.status||!same(scopeFields<LayerSpec>(scope).material?.value,scopeFields<LayerSpec>(layer.scope).material?.value);
@@ -549,16 +602,22 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
               <button className={button} disabled={!i} onClick={()=>moveExteriorLayer(i,i-1)}>Move layer {i+1} toward wall</button>
               <button className={button} disabled={i===intent.specifications.exteriorLayers.length-1} onClick={()=>moveExteriorLayer(i,i+1)}>Move layer {i+1} outward</button>
             </div>
-          </div>)}
+          </ConstructionCard>})}
           {intent.specifications.exteriorLayers.length>0&&<label className="block"><input type="checkbox" checked={intent.specifications.exteriorSequence?.status==='confirmed'}
             onChange={e=>{
               const exteriorSequence=e.target.checked?{status:'confirmed' as const,confirmation:sources(inputReference)}:{status:'unresolved' as const};
               update({...intent,specifications:{...intent.specifications,exteriorSequence}});
             }}/> Confirm exterior layer order</label>}
-          </details></>}
+          </section></>}
+          <section aria-label={slabOnly?'Under-slab construction':'Interior construction'} className="space-y-2 mt-3">
+            <h4 className="font-semibold">{slabOnly?'Under-slab construction':'Interior construction'}</h4>
+            {!slabOnly&&renderSystem('slab')}{renderSystem('insulation')}{renderSystem('granular')}
+          </section>
         </>}
     </>}
+    </div>
     {correctionError&&<p role="alert">{correctionError}</p>}
+    <div hidden={tab!=='Quantities'||unrelatedSelection}>
     {activePreview&&<section id="foundation-review" aria-label="Assembly preview details" className="space-y-1">
       {activePreview.conflicts.map(c=><p role="alert" key={c.code}>{c.message}</p>)}
       {activePreview.unresolvedSpecifications.map((gap,i)=><p className="text-amber-300" key={gap.path+i}>{gap.reason}</p>)}
@@ -574,7 +633,24 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
         metric={metric}
       />}
     </section>}
+    </div>
   </section>;
+}
+
+function ConstructionCard({accent,label,status,summary,unresolved,initiallyOpen=false,children}:{
+  key?:string;accent:string;label:string;status:string;summary:string;unresolved:boolean;initiallyOpen?:boolean;children:React.ReactNode;
+}){
+  const [open,setOpen]=useState(initiallyOpen);
+  useEffect(()=>setOpen(initiallyOpen),[initiallyOpen]);
+  return <details open={open} onToggle={e=>setOpen(e.currentTarget.open)} style={{borderInlineStartColor:accent}}
+    className="rounded-lg border border-slate-700 border-l-4 bg-slate-800/50">
+    <summary className="cursor-pointer px-3 py-2.5 hover:bg-slate-700/60">
+      <span className="font-semibold">{label}</span><span className="ml-1 text-slate-300"> · {status}</span>
+      {summary&&<span className="block mt-1 text-slate-300">{summary}</span>}
+      {unresolved&&<span className="block mt-1 text-amber-300">Inputs required</span>}
+    </summary>
+    <div className="space-y-2 px-2 pb-2">{children}</div>
+  </details>;
 }
 
 function describeTrace(trace:AssemblyTrace,metric:boolean){
@@ -623,9 +699,9 @@ function PreviewMaterialChanges({preview,before,previous,metric}:{
   const retained=new Set(changes.retained.map(child=>child.entityId));
   const revised=changes.measurements.filter(entity=>retained.has(entity.id)&&prior.get(entity.id)!==JSON.stringify(entity)).length;
   return <>
-    <table className="w-full text-left" aria-label="Preview quantities"><thead><tr><th>Material</th><th>Before</th><th>After</th></tr></thead>
+    <table className="w-full text-left border-separate border-spacing-y-1" aria-label="Preview quantities"><thead><tr><th>Material</th><th className="px-1.5 text-right">Before</th><th className="pl-1.5 text-right">After</th></tr></thead>
       <tbody>{[...new Set([...old.keys(),...current.keys()])].map(key=><tr key={key}>
-        <th scope="row">{(current.get(key)??old.get(key))!.label}</th><td>{show(old.get(key))}</td><td>{show(current.get(key))}</td>
+        <th scope="row" className="font-medium pr-1.5">{(current.get(key)??old.get(key))!.label}</th><td className="px-1.5 text-right align-top tabular-nums">{show(old.get(key))}</td><td className="pl-1.5 text-right align-top tabular-nums">{show(current.get(key))}</td>
       </tr>)}</tbody>
     </table>
     <p role="status">{changes.created.length} added, {changes.retained.length} retained ({revised} revised), {changes.retired.length} removed, {changes.detached.length} released as independent</p>
@@ -634,8 +710,8 @@ function PreviewMaterialChanges({preview,before,previous,metric}:{
 }
 
 type EditableScope=AssemblySpecifications[System]|AssemblySpecifications['exteriorLayers'][number]['scope'];
-function SystemEditor({system,label,scope,metric,reference,conventional,slabOnly,suggestions,onChange}:{
-  key?:string;system:System|'exteriorLayers';label?:string;scope:EditableScope;metric:boolean;reference:string;conventional?:boolean;slabOnly?:boolean;suggestions?:Record<string,number[]>;onChange:(next:EditableScope)=>void;
+function SystemEditor({system,label,scope,initialExterior,metric,reference,conventional,slabOnly,suggestions,onChange}:{
+  key?:string;initialExterior?:'waterproofing'|'insulation';system:System|'exteriorLayers';label?:string;scope:EditableScope;metric:boolean;reference:string;conventional?:boolean;slabOnly?:boolean;suggestions?:Record<string,number[]>;onChange:(next:EditableScope)=>void;
 }){
   const fields=scopeFields(scope as Scope<Record<string,unknown>>);
   const source=sources(reference.trim());
@@ -660,7 +736,7 @@ function SystemEditor({system,label,scope,metric,reference,conventional,slabOnly
     onChange={v=>set(v&&Number.isFinite(Number(v))?Number(v):undefined)}/>;
   const datum=value('datum') as WallSpec['datum']|undefined;
   const material=value('material') as MaterialChoice|undefined;
-  const [exteriorMaterial,setExteriorMaterial]=useState<'waterproofing'|'insulation'>('waterproofing');
+  const [exteriorMaterial,setExteriorMaterial]=useState<'waterproofing'|'insulation'>(initialExterior??'waterproofing');
   const exteriorCategory=material?.category==='insulation'||material?.category==='waterproofing'?material.category:exteriorMaterial;
   const materialCategory=system==='drainage'?'drainage':system==='insulation'?'insulation':system==='granular'?'granular':system==='exteriorLayers'?exteriorCategory:'concrete';
   return <fieldset className="border border-slate-700 rounded p-2 space-y-1">
@@ -668,7 +744,10 @@ function SystemEditor({system,label,scope,metric,reference,conventional,slabOnly
     <label className="block">Scope
       <select aria-label={(label??labels[system as System])+' scope'} className={field} value={scope.status} onChange={e=>{
         const status=e.target.value as EditableScope['status'];
-        onChange((status==='included'?{status,specification:fields}:{status,reason:'',retainedSpecification:fields}) as EditableScope);
+        const concreteSystem=system==='walls'||system==='footing'||system==='slab';
+        const include=concreteSystem&&!fields.material&&scope.status!=='included'&&Object.keys(fields).length===0
+          ?{...fields,material:confirmed(concrete,source)}:fields;
+        onChange((status==='included'?{status,specification:include}:{status,reason:'',retainedSpecification:fields}) as EditableScope);
       }}><option value="included">Included</option><option value="excluded">Excluded</option><option value="pending">Pending</option></select>
     </label>
     {scope.status!=='included'?<label className="block">Reason<input className={field} value={scope.reason} onChange={e=>onChange({...scope,reason:e.target.value})}/></label>:
@@ -716,7 +795,7 @@ function SystemEditor({system,label,scope,metric,reference,conventional,slabOnly
           <label className="block"><input type="checkbox" checked={(value('coverage') as {kind?:string})?.kind==='confirmedFullHeight'}
             onChange={e=>change('coverage',e.target.checked?{kind:'confirmedFullHeight'}:undefined)}/> Confirm full wall height as coverage</label>
           {numeric((value('coverage') as {heightFt?:number})?.heightFt,'Coverage height',false,v=>change('coverage',v===undefined?undefined:{kind:'specifiedHeight',heightFt:v}))}
-          {dimension('thicknessFt','Layer thickness',true)}
+          {exteriorCategory==='insulation'?dimension('thicknessFt','Layer thickness',true):fields.thicknessFt&&<details><summary>Advanced specified thickness</summary>{dimension('thicknessFt','Layer thickness',true)}</details>}
         </>}
         {system==='drainage'&&<>
           <label className="block"><input type="checkbox" checked={(value('route') as {kind?:string})?.kind==='footingEdgeOffset'}

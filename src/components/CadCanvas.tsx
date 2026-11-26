@@ -1,3 +1,4 @@
+import {foundationStroke} from './foundationComponentStyle';
 import { moveFoundationTraceVertex } from '../engine/measurements/foundationTraceCorrection';
 import type { AssemblyTrace } from '../engine/measurements/foundationAssemblyModel';
 import {offsetOrthogonalPerimeter} from '../engine/measurements/foundationPerimeterGeometry';
@@ -2335,10 +2336,20 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       ctx.stroke();
       ctx.restore();
     }
-    if(visibleFoundation){ctx.save();for(const e of visibleFoundation){const footprint=foundationFootprint(e);const points=(footprint??foundationPoints(e)).map(p=>worldToScreen(p.x,p.y));const selected=selection.type==='foundation'&&(selection.id===e.id||selection.ids?.includes(e.id));const stroke=e.kind==='stripFooting'||e.kind==='padFooting'?'#fbbf24':e.kind==='slab'?'#94a3b8':
-      e.kind==='foundationLine'&&e.purpose==='waterproofing'?'#c084fc':'purpose' in e&&e.purpose==='insulation'?'#2dd4bf':
-      'purpose' in e&&e.purpose==='drainage'?'#fb923c':'#38bdf8';
+    if(visibleFoundation){ctx.save();for(const e of visibleFoundation){const footprint=foundationFootprint(e);const points=(footprint??foundationPoints(e)).map(p=>worldToScreen(p.x,p.y));const selected=selection.type==='foundation'&&(selection.id===e.id||selection.ids?.includes(e.id));const stroke=foundationStroke(e);
       ctx.strokeStyle=selected?'#ffffff':stroke;ctx.lineWidth=selected?3:2;ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(footprint){ctx.closePath();ctx.fillStyle=stroke+'22';ctx.fill()}ctx.stroke();if(footprint&&'start' in e){const a=worldToScreen(e.start.x,e.start.y),b=worldToScreen(e.end.x,e.end.y);ctx.save();ctx.setLineDash([5,4]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore()}}for(const e of visibleFoundation)for(const detail of foundationDetailOutlines(e)){ctx.save();ctx.strokeStyle=detail.kind==='opening'?'#fbbf24':'#c084fc';ctx.fillStyle=detail.kind==='opening'?'rgba(251,191,36,.14)':'rgba(192,132,252,.18)';ctx.lineWidth=2;ctx.setLineDash(detail.kind==='opening'?[5,3]:[]);ctx.beginPath();detail.points.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();}for(const e of validPerimeterCandidate?.members??foundationPreview??[]){const footprint=foundationFootprint(e),pts=(footprint??foundationPoints(e)).map(p=>worldToScreen(p.x,p.y));ctx.save();ctx.strokeStyle='#4ade80';ctx.fillStyle='rgba(74,222,128,.13)';ctx.lineWidth=2;ctx.setLineDash([7,4]);ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(footprint){ctx.closePath();ctx.fill()}ctx.stroke();ctx.restore();}if(foundationMarquee){const a=worldToScreen(foundationMarquee.start.x,foundationMarquee.start.y),b=worldToScreen(foundationMarquee.end.x,foundationMarquee.end.y),crossing=foundationMarquee.start.x>foundationMarquee.end.x;ctx.save();ctx.strokeStyle=crossing?'#4ade80':'#38bdf8';ctx.fillStyle=crossing?'rgba(74,222,128,.10)':'rgba(56,189,248,.10)';ctx.lineWidth=1.5;ctx.setLineDash(crossing?[5,4]:[]);ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.restore();}if(perimeterOutline||assemblyDraftOutline){ctx.save();ctx.strokeStyle='#fbbf24';ctx.setLineDash([5,3]);ctx.beginPath();(perimeterOutline??assemblyDraftOutline!).map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.stroke();ctx.restore();}if(foundationVertices.length){ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.beginPath();[...foundationVertices,...(foundationCursor?[foundationCursor]:[])].map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();for(const p of foundationVertices){const q=worldToScreen(p.x,p.y);ctx.fillStyle='#fbbf24';ctx.fillRect(q.x-3,q.y-3,6,6)}}else if(foundationStart&&foundationCursor){const pts=(activeTool==='foundation_rectangle'||foundationArea(activeTool))&&foundationStart.x!==foundationCursor.x&&foundationStart.y!==foundationCursor.y?rectanglePoints(foundationStart,foundationCursor):[foundationStart,foundationCursor];ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.beginPath();pts.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(pts.length===4)ctx.closePath();ctx.stroke();if(activeTool==='foundation_wall'&&wallReference!=='centreline'){try{const candidate=createReferencedWall(foundationStart,foundationCursor,'preview',wallReference,wallReferenceWidth.trim()?Number(wallReferenceWidth):null),outline=foundationFootprint(candidate);if(outline){ctx.strokeStyle='#4ade80';ctx.fillStyle='rgba(74,222,128,.12)';ctx.beginPath();outline.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();ctx.stroke();}}catch{/* Invalid or incomplete reference remains uncommitted. */}}}ctx.restore();}
+    if(selection.type==='foundation'&&visibleFoundation){
+      const ids=selection.ids??(selection.id?[selection.id]:[]);
+      const wall=ids.length===1?visibleFoundation.find(e=>e.kind==='foundationWall'&&e.id===ids[0]&&!e.foundation?.perimeterReference):undefined;
+      if(wall?.kind==='foundationWall'){
+        const start=worldToScreen(wall.start.x,wall.start.y),end=worldToScreen(wall.end.x,wall.end.y);
+        ctx.save();ctx.font='12px sans-serif';ctx.lineWidth=3;ctx.strokeStyle='#0f172a';ctx.fillStyle='#f8fafc';
+        for(const [label,point] of [['Start',start],['End',end]] as const){
+          ctx.strokeText(label,point.x+6,point.y-8);ctx.fillText(label,point.x+6,point.y-8);
+        }
+        ctx.restore();
+      }
+    }
     if(traceCorrection){
       ctx.save();
       if(correctionOutline){
@@ -3703,7 +3714,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           <span className="text-xs font-semibold text-sky-400 uppercase tracking-wider">
             {(selection.type === 'multiple' || (selection.ids?.length ?? 0) > 1)
               ? `Selected: ${selection.ids?.length || 0} Items`
-              : `Selected: ${selection.type} (${(selection.id ?? selection.ids?.[0])?.slice(0, 8)})`}
+              : selection.type==='foundation'?'Selected foundation component':`Selected: ${selection.type} (${(selection.id ?? selection.ids?.[0])?.slice(0, 8)})`}
           </span>
 
           {selection.type === 'aperture' && (
