@@ -16,6 +16,8 @@ The [governing product design philosophy](../SYSTEM_BIBLE.md#governing-product-d
 
 The [R5.6C workflow specification](c1c-r5-6c-workflow.md) records the authorized correction, standard slab estimating conventions and practical acceptance procedure.
 
+Use the [R5.7 layered workflow and lifecycle](c1c-r5-7-foundation-closeout.md) for current standard construction, correction and deletion controls.
+
 ## 2. Package 01 — Graphical drafting and canvas interaction (R5.1)
 
 Dedicated Rectangle foundation tool: click first corner, move pointer for live preview, click opposite corner, optionally type exact width/depth, configure and apply. No held mouse button or X/Y entry required. Preserve advanced coordinate-based capabilities where necessary. No assumption that all rectangles are axis-independent: use supported geometry/reference contract and refuse unsupported placement rather than distort.

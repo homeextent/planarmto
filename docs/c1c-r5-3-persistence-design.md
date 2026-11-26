@@ -308,3 +308,9 @@ Recognized catalogue choices can populate unambiguous drainage attributes with f
 `AssemblyTrace.kind` adds `'slab'` with `reference: 'interior'` and the existing ordered, closed trace vertices and segments. It validates the trace using the existing simple-polygon contract. Standalone slab assemblies permit the existing slab, under-slab insulation and granular roles. Their independent slab extent must equal the trace. Conventional standalone slabs use the same local elevation reference mechanism and an explicitly confirmed zero at slab bottom.
 
 `SlabSpec.coverageBasis?: 'fullFootprintEstimate'` is a confirmed specification field. Generated layers use the existing optional source note and their quantity basis discloses the estimate. Historical records without the field retain their previous quantity presentation. The field leaves geometry, volume calculations, overlap reconciliation and project storage caps intact.
+
+## R5.7 assembly lifecycle transactions
+
+The internal `AssemblyChange` union adds `{kind: 'delete'}`. Preview resolves the current parent revision, plans removal of its active owned measurements, and refuses external dependents. The candidate graph runs through ordinary project validation. Apply requires the exact preview and commits the parent and owned removals as one history entry. The removed parent contains its own dormant bindings, archived trace revisions and lineage. Undo restores the complete parent with its owned geometry. Detached independent measurements and unrelated records remain in the committed project.
+
+Standalone slab footprint correction uses the existing trace correction command and audit. The trace kind and ordered edges remain stable. The command updates the independent slab extent with correction provenance and regenerates applicable dependent layers. No new serialized fields or schema version are required.

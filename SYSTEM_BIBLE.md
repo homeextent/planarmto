@@ -97,6 +97,8 @@ Primary Preview, Apply and Cancel actions shall remain accessible while construc
 
 Confirmed changes shall be applied atomically using the existing validated transaction architecture.
 
+Construction assemblies follow a complete lifecycle. Create and specify the primary geometry, add or remove applicable systems, edit geometry and specifications, review quantities, delete with validated ownership checks, and support undo and redo. The same lifecycle guides future workspaces within their approved technical scope.
+
 ### 6. Construction system dependencies
 
 Dependent construction systems shall use the appropriate confirmed source geometry.
