@@ -13,7 +13,8 @@ Applies to every developer and AI agent. Read README, ROADMAP, SYSTEM_BIBLE, DEV
 7. Revalidate exact final HEAD, check staging baseline and mergeability, then merge PR into staging only with owner authorization. Verify post-merge push CI and synchronize local staging.
 8. Production promotion requires separate explicit authorization, release PR to main, successful CI, approved version/tag as applicable, deployment verification and live smoke tests. Never bypass protections or push directly to main. Do not trigger deployment manually from feature or staging branches.
 
-For measurement and estimating changes, use the [governing product design philosophy](SYSTEM_BIBLE.md#governing-product-design-philosophy) to review proposed contractor inputs, automation boundaries and advanced workflows within the approved scope.
+
+Every measurement capability and interface change requires a product design review against the [governing System Bible contract](SYSTEM_BIBLE.md#governing-product-design-philosophy). Specify primary construction geometry, applicable dependent systems, standard contractor inputs, automatically established relationships, advanced exceptions, and measurement integrity and acceptance safeguards. Review stays within authorized scope.
 
 ## Local commands
 

@@ -1,4 +1,6 @@
 # PlanarMTO Coding Agent Transition and Completion Package
+
+Historical transition record. The original first task, branch-cleanup manifest and baseline describe the 2026-11-25 handoff. Current work follows [AGENTS.md](../AGENTS.md) and the [roadmap](../ROADMAP.md). The current candidate and acceptance gate are in the [technical evidence register](c1c-r5-technical-evidence.md).
 Date 2026-11-25. Owner approved transition to hybrid ChatGPT/Codex model, documentation and safe branch housekeeping. This is a repository-controlled handoff, not a release or authorization to merge.
 
 ## Immediate checkpoint
@@ -62,5 +64,5 @@ Remote audit confirmed PR #12 only open; all other listed PRs merged and all ten
 4. C.2 separate specification: consolidated MTO, contractor manual quantities and allowances/quotes, pricing/rates, waste applied once, completeness/reporting gates, traceable unit and cost basis, existing floor costs protected but not automatically authoritative. No site cost exclusion just because site engine deferred.
 5. Separate v2.16.0 release decision, PR staging→main, exact CI, deploy/live checks. C.1D dedicated site drafting deferred beyond release; D drawing library/revisions, E overlays, F optional 3D future only. No blanket authorization to complete future milestones autonomously.
 
-## First Codex task (copyable)
+## Archived first Codex task
 Read AGENTS.md and the transition package plus linked governing documents. Inspect current repository, verify branch/cleanliness/exact head and CI. Complete safe merged branch housekeeping per manifest if permissions permit. Reproduce baseline functional tests using local build and Playwright, recording exact source, selected kinds, actual quantities, diagnostics and evidence. Do not change production application code yet. Return baseline results, confirmed defects vs usability findings, remaining gaps and a bounded R5.0 implementation plan with the unresolved default/material/ownership decisions for owner/ChatGPT review. Preserve draft PR #12, staging and main. Stop at review gate.

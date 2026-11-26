@@ -301,6 +301,8 @@ Exterior order is the existing array order from the wall outward. The absent fie
 
 Targeted cases include exact contact within a frame, different local frames with and without plan intersection, historical overlap behavior, retention through detachment and re-adoption, and reversed exterior sequences with unchanged coverage, quantities and stable layer IDs.
 
+Recognized catalogue choices can populate unambiguous drainage attributes with field-level provenance. Preserve explicit diameter and other unresolved attributes. Arbitrary labels remain descriptive.
+
 ## R5.6C standalone slab and estimating coverage
 
 `AssemblyTrace.kind` adds `'slab'` with `reference: 'interior'` and the existing ordered, closed trace vertices and segments. It validates the trace using the existing simple-polygon contract. Standalone slab assemblies permit the existing slab, under-slab insulation and granular roles. Their independent slab extent must equal the trace. Conventional standalone slabs use the same local elevation reference mechanism and an explicitly confirmed zero at slab bottom.

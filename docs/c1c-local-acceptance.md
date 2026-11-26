@@ -1,5 +1,7 @@
 # C.1C — Local owner acceptance procedure and compliance traceability
 
+Historical pre-R5 procedure and evidence. For current practical acceptance use the [R5.6C procedure](c1c-r5-6c-workflow.md). The references below describe the original candidate and checks.
+
 ## Gate and evidence
 Automated candidate 537b03f9e0a3199e876857e064f0761a72c12480: CI #185, run 45669559089, job 139400816281, 288/288 (17+23+7+5+50+110+76). All validation stages passed. This document is an acceptance plan, not owner acceptance. Run exact feature HEAD CI after this documentation commit. No staging integration or release authorization. Production remains 2.15.1, schema 3.
 

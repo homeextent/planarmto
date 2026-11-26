@@ -1,5 +1,7 @@
 # C.1C-R5 — Contractor-focused foundation assembly workflow
 
+Historical proposal. Current workflow requirements are in the [System Bible](../SYSTEM_BIBLE.md#governing-product-design-philosophy), the [coordinated specification](c1c-r5-coordinated-specification.md) and [R5.6C](c1c-r5-6c-workflow.md).
+
 The [owner-approved coordinated specification](c1c-r5-coordinated-specification.md) supersedes the proposed decisions below. Keep this record for UX01–UX14, CA01–CA12 and historical evidence. This proposal records the original gate. The subsequent authorization and current evidence are in the [technical candidate register](c1c-r5-technical-evidence.md).
 
 Status: owner endorsed contractor-first direction and hybrid model; this is a proposed coordinated implementation specification for explicit review, not blanket authorization to implement. Preserve D01–D14, F01–F09 and measurement accuracy; amend only routine interaction/automation semantics. C.1C remains unmerged. No structural design, runtime dependencies, infrastructure, spending, schema bump or release.

@@ -1,5 +1,7 @@
 # R5.6C contractor workflow completion
 
+See the [technical evidence register](c1c-r5-technical-evidence.md) for the verified application checkpoint and acceptance status.
+
 The owner authorized F01–F10 from R5.6B candidate `0ddba3c5b05d10a291d8523f104256a62e245445`, with 318 local regressions and independently verified CI #195. Full R5 acceptance remains withheld. The [product design philosophy](../SYSTEM_BIBLE.md#governing-product-design-philosophy) governs this increment.
 
 | Requirement | Implementation and verification focus |

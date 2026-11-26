@@ -1,5 +1,7 @@
 # R5.6B contractor usability review and implementation plan
 
+Historical R5.6B planning and reproduction record. [R5.6C](c1c-r5-6c-workflow.md) supplies the current interaction for trace continuity, preview controls and slab construction.
+
 The owner withheld full R5 acceptance after practical use of `eb5624c00a29ec3c91f325333f6743d6936e01a0`. CI #193 passed, including isolated WordPress integration, and the reported local baseline remains 311/311. The owner completed much of the foundation takeoff through individual components and derivations because the coordinated parent workflow was hard to discover. The feedback below is owner-reported unless tied to a source finding or reproduction. The existing technical acceptance register still applies.
 
 ## Alignment with the governing product philosophy
@@ -43,7 +45,7 @@ The following IDs map the owner's additional refinements to this plan.
 |---|---|
 | UX-14 | For a newly created conventional assembly, confirm the estimating convention and use wall base as local zero. Compute wall top from the specified wall height. Use current canonical feet and persisted confirmation provenance. Explain the reference is relative to the assembly. Test a new assembly and an existing assembly with an explicitly confirmed datum. |
 | UX-15 | Require strip footing width and depth when included. Show “Centred beneath wall.” Compute footing top at wall base and bottom at wall base minus depth using the existing derivation. Keep signed offsets in supported independent/advanced workflows. Check widths and depths stay explicit and engine offset limits still apply. |
-| UX-16 | Require an explicit slab-to-wall/footing relationship where concrete intersection matters. Expose supported constraints such as a confirmed slab bottom at a named reference or a specified relative offset. Treat unknown positions as unresolved where evaluation requires them. Test exact contact, positive overlap and unresolved positioning. |
+| UX-16 | Historical R5.6B plan called for an explicit slab relationship control. R5.6C confirms the standard relationship through Preview and Apply. Use advanced inputs where the physical relationship affects validity. Retain exact contact, overlap and unresolved-position checks. |
 | UX-17 | Place included rigid insulation directly below the slab, then confirmed granular base below insulation. Place base directly under the slab when insulation is excluded. Keep pending insulation and missing thickness explicit. Verify each supported range, independent quantity and scope state. |
 | UX-18 | Present an ordered exterior stack from concrete outward. Require the contractor to confirm the actual layer sequence. Use that order for compatible internal positions and preserve each layer's approved measurement face. Test both waterproofing/insulation orders. |
 | UX-19 | Keep exterior coverage, thickness, material attributes, identity and quantities independent. Leave unknown extents or thicknesses unresolved where needed and preserve independently valid measurements. Test incomplete layers and different coverage extents with no inferred material or adjustment to quantity basis. |
@@ -67,6 +69,6 @@ Local synthetic evidence is in `/tmp/planarmto-r56b/probe.log` and `/tmp/planarm
 ## Implementation review notes
 
 - The standard perimeter path retains the trace-face choice and exact rectangle correction. **Specify foundation construction** opens a new unsaved coordinated draft directly. The explicit individual-perimeter action remains under Advanced.
-- The standard slab relation offers confirmed slab bottom at wall base. A different slab elevation still requires explicit input and compatible reference. Stepped, engineered and unsupported relationships stay in the advanced or independent workflows.
+- The R5.6B standard slab relation was an explicit wall-base selection. R5.6C confirms the disclosed standard relationship during Preview and Apply. A different slab elevation still requires explicit input and compatible reference. Stepped, engineered and unsupported relationships stay in the advanced or independent workflows.
 - Confirmed exterior order describes the assembly stack. Each layer continues to use its own confirmed net coverage on the approved measurement face. Canvas styling leaves that geometry unchanged.
 - Review pointer feel for axis inference and slab interior snapping on calibrated drawings. Full R5 acceptance remains withheld pending actual-plan review.

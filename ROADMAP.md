@@ -8,6 +8,8 @@ Owner-approved development direction. Deliver accurate drawing-driven material t
 
 C.1B staging integration: owner accepted `fb60747f83183016694f4c54ac2dbc609087f5e5` (10/10 local checks; CI #129, 127/127 tests). Documentation-only head `8d707902adbf7365ef6e78a64bdab90ce634732e` passed [CI #132](https://github.com/homeextent/planarmto/actions/runs/45544873706) (127/127, job 138971962757). [PR #10](https://github.com/homeextent/planarmto/pull/10) merged into staging at `3649f546cbf0a6e19b831753181cc8616330c22c`; owner confirmed clean synchronized local staging and successful post-merge CI #133. Merge and branch identity independently verified; CI #133 is owner-reported, with exact run ID/job logs not independently retrieved because the commit lookup omits push runs. No production promotion; main remains v2.15.1 at `0423cb6`.
 
+R5.6C application candidate `5a6db24aaab462d4dda888a18be08515709df849` retains 322/322 reported local regressions. Independently verified [CI #196](https://github.com/homeextent/planarmto/actions/runs/45825822174) passed, including isolated WordPress integration. Draft PR #12 targets staging. Full R5 practical owner acceptance remains withheld. Schema v3 and production 2.15.1 remain current.
+
 ## Milestone register
 
 | ID | Scope and dependency | Status |
