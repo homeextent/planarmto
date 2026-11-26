@@ -42,7 +42,7 @@ export function foundationCoverage(entities:FoundationEntity[]):{entity:Feature;
   }else if('polygon' in e&&simplePolygon(e.polygon))area=projectedArea(e.polygon);
   const code=e.purpose==='waterproofing'?'foundation.waterproofing.area':'foundation.insulation.area';
   const rows=[{entity:e,code,unit:'SF' as QuantityContribution['unit'],basis:'explicit '+('start' in e?'vertical':'horizontal')+' coverage',value:reason?null:area,reason:reason||'Invalid coverage geometry'}];
-  if(e.purpose==='insulation'&&c?.foam){
+  if(e.purpose==='insulation'&&c?.foam&&e.foundation?.material.trim().toLowerCase()!=='rigid mineral wool'){
    const thickness='polygon' in e?e.depthFt:c.thicknessFt;
    rows.push({entity:e,code:'foundation.insulation.foam',unit:'BF',basis:'actual coverage SF × thickness inches',value:reason||area===null||!thickness?null:area*thickness*12,reason:reason||'Missing foam thickness or coverage'});
   }

@@ -1,3 +1,4 @@
+import {describeFoundationTakeoff,groupFoundationTakeoff} from '../engine/measurements/foundationTakeoff';
 import {FoundationInspectorContext} from './FoundationInspectorTabs';
 import {foundationColor} from './foundationComponentStyle';
 import { orthogonalWallPerimeter } from '../engine/measurements/foundationPerimeterGeometry';
@@ -161,18 +162,8 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
   const selectedPreset=presets.find(p=>p.id===presetId);
   const parent=traced?undefined:parents.find(p=>p.id===correction?.id&&p.revisionId===correction.revision)??parents.find(p=>p.id===focused)??inherited;
   const measured=useMemo(()=>parent?measureFoundation(workspaceId,workspace.measurements as FoundationEntity[]):null,[parent,workspace,workspaceId]);
-  const summary=new Map<string,{material:string;code:string;unit:string;quantity:number;pending:number;known:number}>();
-  if(measured&&parent){
-    const owned=new Set(parent.children.map(c=>c.entityId));
-    const materials=new Map((workspace.measurements as FoundationEntity[]).map(e=>[e.id,e.foundation?.material]));
-    for(const row of measured.rows){
-      if(!owned.has(row.elementId))continue;
-      const material=materials.get(row.elementId)??'Material unresolved',key=JSON.stringify([material,row.code,row.unit]);
-      const entry=summary.get(key)??{material,code:row.code,unit:row.unit,quantity:0,pending:0,known:0};
-      if(row.status==='measured'){entry.quantity+=row.quantity;entry.known++;}else entry.pending++;
-      summary.set(key,entry);
-    }
-  }
+  const ownedIds=new Set(parent?.children.map(binding=>binding.entityId));
+  const summary=parent&&measured?groupFoundationTakeoff(measured.rows.filter(row=>ownedIds.has(row.elementId)),workspace.measurements as FoundationEntity[],[parent]):[];
   const selectedEdit=parent&&edit?.parentId===parent.id&&edit.revision===parent.revisionId?edit.input:
     parent?{trace:parent.trace,specifications:parent.specifications,overrides:parent.overrides,...(parent.preset?{preset:parent.preset}:{})}:undefined;
   const intent=traced?.input??adoption?.input??selectedEdit;
@@ -485,10 +476,10 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
     {(traced||parent)&&!unrelatedSelection&&<p className="text-slate-300" aria-label="Construction footprint">{describeTrace((traced?.input.trace??parent?.trace)!,metric)}</p>}
     </div>
     <div hidden={tab!=='Quantities'||unrelatedSelection}>
-    {parent&&summary.size>0&&<details className="space-y-1">
+    {parent&&summary.length>0&&<details className="space-y-1">
       <summary>Assembly material quantities</summary>
-      <ul>{[...summary].map(([key,row])=><li key={key}>
-        {row.material} · {row.code.replace('foundation.','').replaceAll('.',' ')} · {row.known?formatFoundationQuantity(row.quantity,row.unit,metric):'Not quantified'}
+      <ul>{summary.map(row=><li key={row.key}>
+        {describeFoundationTakeoff(row,metric)} · {row.code.replace('foundation.','').replaceAll('.',' ')} · {row.known?formatFoundationQuantity(row.quantity,row.unit,metric):'Not quantified'}
         {row.pending?' · '+row.pending+' unresolved':''}{row.unit==='BF'?' · informational':''}
       </li>)}</ul>
       {measured?.footprintReferences.filter(ref=>parent.children.some(c=>c.entityId===ref.elementId)).map(ref=>

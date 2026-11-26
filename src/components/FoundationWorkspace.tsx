@@ -1,3 +1,6 @@
+import {IndependentWallConstruction} from './IndependentWallConstruction';
+import {describeFoundationTakeoff,groupFoundationTakeoff,type FoundationTakeoffRow} from '../engine/measurements/foundationTakeoff';
+import type {FoundationAssemblyRecord} from '../engine/measurements/foundationAssemblyModel';
 import { FoundationInspectorContext, foundationInspectorTabs, type FoundationInspectorTab } from './FoundationInspectorTabs';
 import { foundationStroke } from './foundationComponentStyle';
 import { formatFoundationQuantity } from '../engine/measurements/foundationUnits';
@@ -44,9 +47,11 @@ const field='block w-full bg-slate-800 border border-slate-600 rounded p-1.5 tex
 const dimension=(label:string,value:string,onChange:(value:string)=>void,section=false,hint?:string)=>
  <FoundationDimensionInput label={label} value={value} onChange={onChange} className={field} section={section} hint={hint}/>;
 
-function Properties({entity,onSave}:{key?:string;entity:FoundationEntity;onSave:(e:FoundationEntity)=>boolean}){
+function Properties({entity,onSave,previewOnly=false}:{key?:string;entity:FoundationEntity;onSave:(e:FoundationEntity)=>boolean;previewOnly?:boolean}){
  const plainConcrete=['foundationWall','stripFooting','padFooting','slab'].includes(entity.kind);
  const [material,setMaterial]=useState(entity.foundation?.material??(plainConcrete?'poured concrete':''));
+ const [wallScope,setWallScope]=useState<'legacy'|'included'|'excluded'|'pending'>(entity.scopeApplicability?.status??'legacy');
+ const [wallScopeReason,setWallScopeReason]=useState(entity.scopeApplicability&&'reason' in entity.scopeApplicability?entity.scopeApplicability.reason:'');
  const [width,setWidth]=useState('widthFt' in entity?String(entity.widthFt??''):'');
  const [height,setHeight]=useState('heightFt' in entity?String(entity.heightFt??''):'');
  const [depth,setDepth]=useState('depthFt' in entity?String(entity.depthFt??''):'');
@@ -66,20 +71,32 @@ function Properties({entity,onSave}:{key?:string;entity:FoundationEntity;onSave:
  const input=(label:string,v:string,set:(s:string)=>void)=><label className="block">{label}<input aria-label={label} className={field} value={v} onChange={e=>set(e.target.value)}/></label>;
  const category=foundationMaterialCategory(entity);
  const coverage=entity.kind==='foundationLine'||entity.kind==='foundationRegion'&&entity.purpose==='insulation';
- return <form aria-label={entity.kind==='foundationWall'?'Independent wall construction':'Independent component construction'} className="space-y-2 text-xs" onSubmit={ev=>{ev.preventDefault();try{if(!material.trim())throw Error('Specify construction material');const f:FoundationMetadata={...entity.foundation,version:1,material:material.trim()};if('widthFt' in entity){if(centre){f.centrelineConfirmed=true;const a=number(joinStart),b=number(joinEnd);if(a!==null)f.joinStartFt=a;else delete f.joinStartFt;if(b!==null)f.joinEndFt=b;else delete f.joinEndFt;}else{delete f.centrelineConfirmed;delete f.joinStartFt;delete f.joinEndFt;}}if('elevationFt' in entity){if(elevation.trim())f.baseElevationConfirmed=true;else delete f.baseElevationConfirmed;}if(entity.kind==='foundationRegion'&&entity.purpose==='granular'){if(f.envelopeSource){if(layer.trim()!==f.envelopeSource.layerId)throw Error('Replace derived layer to change its identity');}else if(layer.trim())f.granularLayerId=layer.trim();else delete f.granularLayerId;}if(coverage){const c=manualFoundationCoverage(entity,{layer,confirmed,foam:coverageFoam,thicknessFt:number(coverageThickness),openingTreatment});if(c)f.coverage=c;else delete f.coverage;}let next:FoundationEntity={...entity,foundation:f};if('widthFt' in next){if(entity.source.reference.startsWith('Generated ')&&'widthFt' in entity&&(number(width)!==entity.widthFt||!centre||(f.joinStartFt??0)!==(entity.foundation?.joinStartFt??0)||(f.joinEndFt??0)!==(entity.foundation?.joinEndFt??0)))throw Error('Generated perimeter reference requires regeneration before width or junction changes');next={...next,widthFt:number(width),heightFt:number(height),elevationFt:foundationBaseElevation(number(elevation),elevationBasis,number(height))};}else if('polygon' in next)next={...next,depthFt:number(depth),elevationFt:foundationBaseElevation(number(elevation),elevationBasis,number(depth))};else if(next.kind==='foundationLine'){const h=number(height);next={...next,heightFt:h??undefined}}if(!onSave(next))throw Error('Edit rejected; review geometry and dimensions');setError('')}catch(err){setError(err instanceof Error?err.message:String(err))}}}>
+ const elevationFields=<><label className="block">Elevation reference<select aria-label="Elevation reference" className={field} value={elevationBasis} onChange={e=>{try{const next=e.target.value as 'base'|'top';const value=convertFoundationElevation(number(elevation),elevationBasis,next,number('widthFt' in entity?height:depth));setElevationBasis(next);setElevation(value===null?'':String(value));setError('')}catch(err){setError(err instanceof Error?err.message:String(err))}}}><option value="base">Base</option><option value="top">Top</option></select></label>{dimension(elevationBasis==='base'?'Base elevation':'Top elevation',elevation,setElevation,false,'blank unknown')}</>;
+ return <form aria-label={entity.kind==='foundationWall'?'Independent wall construction':'Independent component construction'} className="space-y-2 text-xs" onSubmit={ev=>{ev.preventDefault();try{if(!material.trim())throw Error('Specify construction material');const f:FoundationMetadata={...entity.foundation,version:1,material:material.trim()};if('widthFt' in entity){if(centre){f.centrelineConfirmed=true;const a=number(joinStart),b=number(joinEnd);if(a!==null)f.joinStartFt=a;else delete f.joinStartFt;if(b!==null)f.joinEndFt=b;else delete f.joinEndFt;}else{delete f.centrelineConfirmed;delete f.joinStartFt;delete f.joinEndFt;}}if('elevationFt' in entity){if(elevation.trim())f.baseElevationConfirmed=true;else delete f.baseElevationConfirmed;}if(entity.kind==='foundationRegion'&&entity.purpose==='granular'){if(f.envelopeSource){if(layer.trim()!==f.envelopeSource.layerId)throw Error('Replace derived layer to change its identity');}else if(layer.trim())f.granularLayerId=layer.trim();else delete f.granularLayerId;}if(coverage){const c=manualFoundationCoverage(entity,{layer,confirmed,foam:coverageFoam,thicknessFt:number(coverageThickness),openingTreatment});if(c)f.coverage=c;else delete f.coverage;}let next:FoundationEntity={...entity,foundation:f};if('widthFt' in next){if(entity.source.reference.startsWith('Generated ')&&'widthFt' in entity&&(number(width)!==entity.widthFt||!centre||(f.joinStartFt??0)!==(entity.foundation?.joinStartFt??0)||(f.joinEndFt??0)!==(entity.foundation?.joinEndFt??0)))throw Error('Generated perimeter reference requires regeneration before width or junction changes');next={...next,widthFt:number(width),heightFt:number(height),elevationFt:foundationBaseElevation(number(elevation),elevationBasis,number(height))};}else if('polygon' in next)next={...next,depthFt:number(depth),elevationFt:foundationBaseElevation(number(elevation),elevationBasis,number(depth))};else if(next.kind==='foundationLine'){const h=number(height);next={...next,heightFt:h??undefined}}if(previewOnly&&wallScope!=='legacy'){
+   if(wallScope!=='included'&&!wallScopeReason.trim())throw Error('Enter a reason for this scope decision.');
+   next={...next,scopeApplicability:wallScope==='included'?{status:'included'}:{status:wallScope,reason:wallScopeReason.trim()}};
+ }else if(previewOnly&&wallScope==='legacy'&&next.scopeApplicability)delete next.scopeApplicability;
+ if(!onSave(next))throw Error('Edit rejected; review geometry and dimensions');setError('')}catch(err){setError(err instanceof Error?err.message:String(err))}}}>
  {entity.kind==='foundationWall'&&<><h3 className="font-semibold">Independent wall construction</h3>
    <p>Length {formatFoundationQuantity(Math.hypot(entity.end.x-entity.start.x,entity.end.y-entity.start.y),'LF',false)}. Enter wall thickness and height to quantify concrete.</p></>}
+ {previewOnly&&<>
+   <label className="block">Include in takeoff<select className={field} value={wallScope} onChange={e=>setWallScope(e.target.value as typeof wallScope)}>
+     <option value="legacy">No explicit decision</option><option value="included">Included</option>
+     <option value="pending">Pending</option><option value="excluded">Excluded</option>
+   </select></label>
+   {(wallScope==='excluded'||wallScope==='pending')&&<label>Reason<input className={field} value={wallScopeReason} onChange={e=>setWallScopeReason(e.target.value)}/></label>}
+ </>}
  {category?<FoundationMaterialInput label="Material" category={category} value={material} onChange={setMaterial} className={field}/>:input('Material',material,setMaterial)}
- {'widthFt' in entity&&<>{dimension('Width',width,setWidth,true)}{dimension('Height / depth',height,setHeight,entity.kind==='stripFooting')}{tracedCentreline?<p>Wall thickness is measured about the traced centreline.</p>:<label className="block"><input type="checkbox" checked={centre} onChange={e=>setCentre(e.target.checked)}/> Confirm drafted centreline</label>}{centre&&<details><summary>Advanced wall junctions</summary>{dimension('Start junction extension',joinStart,setJoinStart,false)}{dimension('End junction extension',joinEnd,setJoinEnd,false)}</details>}</>}
+ {'widthFt' in entity&&<>{dimension(previewOnly?'Wall thickness':'Width',width,setWidth,true)}{dimension(previewOnly?'Wall height':'Height / depth',height,setHeight,entity.kind==='stripFooting')}{tracedCentreline?<p>Wall thickness is measured about the traced centreline.</p>:<label className="block"><input type="checkbox" checked={centre} onChange={e=>setCentre(e.target.checked)}/> Confirm drafted centreline</label>}{centre&&<details><summary>Advanced wall junctions</summary>{dimension('Start junction extension',joinStart,setJoinStart,false)}{dimension('End junction extension',joinEnd,setJoinEnd,false)}</details>}</>}
  {'polygon' in entity&&dimension('Depth',depth,setDepth,entity.purpose!=='excavation'&&entity.purpose!=='backfill')}
- {'elevationFt' in entity&&<><label className="block">Elevation reference<select aria-label="Elevation reference" className={field} value={elevationBasis} onChange={e=>{try{const next=e.target.value as 'base'|'top';const value=convertFoundationElevation(number(elevation),elevationBasis,next,number('widthFt' in entity?height:depth));setElevationBasis(next);setElevation(value===null?'':String(value));setError('')}catch(err){setError(err instanceof Error?err.message:String(err))}}}><option value="base">Base</option><option value="top">Top</option></select></label>{dimension(elevationBasis==='base'?'Base elevation':'Top elevation',elevation,setElevation,false,'blank unknown')}</>}
+ {'elevationFt' in entity&&(previewOnly?<details><summary>Advanced wall elevations</summary>{elevationFields}</details>:elevationFields)}
  {entity.kind==='foundationLine'&&entity.purpose!=='drainage'&&dimension('Coverage height',height,setHeight,false)}
  {entity.kind==='foundationRegion'&&entity.purpose==='granular'&&input('Granular layer identity',layer,setLayer)}
  {coverage&&<>{input('Layer identity',layer,setLayer)}<label className="block"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> Confirm explicit route / net coverage, no remaining openings</label>
  {entity.kind==='foundationLine'&&entity.purpose!=='drainage'&&<><label className="block">Opening treatment<select aria-label="Coverage opening treatment" className={field} value={openingTreatment} onChange={e=>setOpeningTreatment(e.target.value as typeof openingTreatment)}><option value="">Pending confirmation</option><option value="none">Explicit net segments; no remaining openings</option><option value="alreadyDeducted">Legacy already deducted — review required</option></select></label>{openingTreatment==='alreadyDeducted'&&<p className="text-amber-300">Quantities remain pending until actual net coverage segments are confirmed.</p>}</>}
  {'purpose' in entity&&entity.purpose==='insulation'&&<><label className="block"><input type="checkbox" checked={coverageFoam} onChange={e=>setCoverageFoam(e.target.checked)}/> Calculate foam board feet</label>{entity.kind==='foundationLine'?dimension('Insulation thickness',coverageThickness,setCoverageThickness,true):<p>Horizontal foam thickness uses the entered region depth.</p>}</>}
  </>}
- <button className="bg-sky-700 rounded px-2 py-1" type="submit">Apply foundation properties</button>{error&&<p role="alert" className="text-amber-300">{error}</p>}</form>;
+ {!previewOnly&&<button className="bg-sky-700 rounded px-2 py-1" type="submit">Apply foundation properties</button>}{error&&<p role="alert" className="text-amber-300">{error}</p>}</form>;
 }
 
 type GhostPreview={source:FoundationEntity[];members:FoundationEntity[];selection?:string;removedIds?:string[]};
@@ -214,7 +231,7 @@ const componentNames:Record<string,string>={
 };
 const componentName=(kind:string)=>componentNames[kind]??kind.replace(':',' · ');
 
-export function FoundationInspector({assemblyControls,activeConstructionDraft,ownedComponentIds,metric,workspaceId,entities,selection,onChange,onSelect,onDelete,onPreview,filter,onFilter}:{key?:string;assemblyControls?:React.ReactNode;activeConstructionDraft?:boolean;ownedComponentIds?:ReadonlySet<string>;metric:boolean;workspaceId:string;entities:FoundationEntity[];selection:SelectionState;onChange:(e:FoundationEntity[])=>boolean;onSelect:(s:SelectionState)=>void;onDelete:()=>void;onPreview:PreviewSink;filter:string;onFilter:(kind:string)=>void}){
+export function FoundationInspector({assemblyControls,assemblies,activeConstructionDraft,ownedComponentIds,metric,workspaceId,entities,selection,onChange,onSelect,onDelete,onPreview,filter,onFilter}:{key?:string;assemblyControls?:React.ReactNode;assemblies?:FoundationAssemblyRecord[];activeConstructionDraft?:boolean;ownedComponentIds?:ReadonlySet<string>;metric:boolean;workspaceId:string;entities:FoundationEntity[];selection:SelectionState;onChange:(e:FoundationEntity[])=>boolean;onSelect:(s:SelectionState)=>void;onDelete:()=>void;onPreview:PreviewSink;filter:string;onFilter:(kind:string)=>void}){
  const [tab,selectTab]=useState<FoundationInspectorTab>('Construction');
  const ids=selection.type==='foundation'?(selection.ids??(selection.id?[selection.id]:[])):[],selected=ids.length===1?entities.find(e=>e.id===ids[0]):undefined;
  useEffect(()=>{if(selected)selectTab('Construction')},[selected?.id]);
@@ -230,20 +247,12 @@ export function FoundationInspector({assemblyControls,activeConstructionDraft,ow
  const filterKind=(e:FoundationEntity)=>e.kind==='foundationLine'||e.kind==='foundationRegion'?e.kind+':'+e.purpose:e.kind;
  const breakdown=result.detailBreakdown.find(b=>b.elementId===selected?.id);
  const footprint=result.footprintReferences.find(b=>b.elementId===selected?.id);
- const totals=new Map<string,{qty:number;unit:string;pending:number;known:number}>();
- for(const r of result.rows){const t=totals.get(r.code)??{qty:0,unit:r.unit,pending:0,known:0};if(r.status==='measured'){t.qty+=r.quantity;t.known++}else t.pending++;totals.set(r.code,t)}
+ const totals=useMemo(()=>groupFoundationTakeoff(result.rows,entities,assemblies),[result.rows,entities,assemblies]);
  const independentWall=selected?.kind==='foundationWall'&&!ownedComponentIds?.has(selected.id)?selected:undefined;
- const independentWallEditor=independentWall&&<Properties key={'properties:'+JSON.stringify(independentWall)}
-   entity={independentWall} onSave={replacement=>onChange(entities.map(entity=>entity.id===replacement.id?replacement:entity))}/>;
- const wallLayers=independentWall?entities.filter(entity=>entity.foundation?.stripSource?.wallId===independentWall.id||
-   entity.foundation?.envelopeSource?.sourceId===independentWall.id):[];
- const wallLayerSummary=independentWall&&<section aria-label="Independent wall layers" className="space-y-2 border border-slate-700 rounded-lg p-2 text-xs">
-   <h3 className="font-semibold">Construction layers</h3>
-   {wallLayers.length===0?<p className="text-slate-300">Choose a footing or exterior protection for this wall.</p>:
-     <ul>{wallLayers.map(entity=><li key={entity.id} style={{borderInlineStartColor:foundationStroke(entity)}} className="border-l-2 pl-2">
-       {componentName(filterKind(entity))} · {entity.foundation?.material}
-     </li>)}</ul>}
- </section>;
+ const independentWallEditor=independentWall&&<IndependentWallConstruction key={independentWall.id}
+   wall={independentWall} entities={entities} ownedIds={ownedComponentIds} metric={metric} onChange={onChange} onPreview={onPreview}
+   renderWall={(preview,reset)=><Properties key={JSON.stringify(independentWall)+reset}
+     entity={independentWall} onSave={preview} previewOnly/>}/>;
  const groupedWarnings=new Map<string,{label:string;reason:string;count:number}>();
  const assemblyIds=[...new Set(entities.map(entity=>entity.assemblyId))];
  for(const row of result.rows){
@@ -277,17 +286,54 @@ export function FoundationInspector({assemblyControls,activeConstructionDraft,ow
      </div>
    </header>
    <div id="foundation-inspector-content" role="tabpanel" aria-labelledby={'foundation-tab-'+tab} className="min-h-0 overflow-y-auto p-3 space-y-3">
-   <div hidden={tab!=='Construction'}>{independentWallEditor}{wallLayerSummary}</div>
+   {independentWallEditor}
    {assemblyControls}
    <div hidden={tab!=='Geometry'} className="space-y-2">
 <label className="block text-xs">Visible components<select aria-label="Foundation component filter" className={field} value={filter} onChange={e=>onFilter(e.target.value)}><option value="all">All components</option>{[...new Set(entities.map(filterKind))].sort().map(k=><option key={k} value={k}>{componentName(k)}</option>)}</select></label><p className="text-xs text-slate-400">The filter changes what you see and select on the drawing.</p><select aria-label="Select foundation entity" className={field} value={selected?.id??''} onChange={e=>{onSelect(e.target.value?{type:'foundation',id:e.target.value}:{type:'none'});selectTab('Construction')}}><option value="">Select component</option>{entities.filter(e=>filter==='all'||filterKind(e)===filter).map((e,i)=><option key={e.id} value={e.id}>{e.kind} {'purpose' in e?e.purpose:''} {i+1}</option>)}</select>{!ids.some(id=>ownedComponentIds?.has(id))&&geometryTools}</div>
    <div hidden={tab!=='Construction'} className="space-y-2">
-     {activeConstructionDraft||ids.some(id=>ownedComponentIds?.has(id))?null:independentTools}
+     {activeConstructionDraft||ids.some(id=>ownedComponentIds?.has(id))?null:independentWall?
+       <details><summary>Advanced independent construction</summary>{independentTools}</details>:independentTools}
    </div>
    <div hidden={tab!=='Quantities'} className="space-y-2">
    {(!ids.some(id=>ownedComponentIds?.has(id)))&&selectedQuantities}
-   <h3 className="text-sm font-semibold">Workspace material totals</h3><p className="text-xs text-slate-400">Raw quantities only. Missing inputs remain pending.</p>{result.scopeDiagnostics.some(d=>d.status==='excluded'||d.status==='pending')&&<section aria-label="Foundation scope decisions" className="text-xs space-y-1"><h3 className="font-semibold">Scope decisions</h3>{result.scopeDiagnostics.filter(d=>d.status==='excluded'||d.status==='pending').map(d=><p key={d.elementId}>{componentName(filterKind(entities.find(e=>e.id===d.elementId)!))} · {d.status} · {d.reason}</p>)}</section>}{[...totals].map(([code,t])=><div key={code} className="flex justify-between gap-2 text-xs"><span style={{color:foundationStroke(entities.find(e=>e.id===result.rows.find(row=>row.code===code)?.elementId)!)}}>{code.replace('foundation.','').replaceAll('.',' ')}{t.unit==='BF'?' (informational)':''}</span><span>{t.known?formatFoundationQuantity(t.qty,t.unit,metric)+(t.pending?' + pending':''):'Not quantified'}</span></div>)}{result.warnings.length>0&&<details><summary className="text-xs text-amber-300">Measurement checks</summary>
+   <h3 className="text-sm font-semibold">Workspace material totals</h3><p className="text-xs text-slate-400">Raw quantities only. Missing inputs remain pending.</p>{result.scopeDiagnostics.some(d=>d.status==='excluded'||d.status==='pending')&&<section aria-label="Foundation scope decisions" className="text-xs space-y-1"><h3 className="font-semibold">Scope decisions</h3>{result.scopeDiagnostics.filter(d=>d.status==='excluded'||d.status==='pending').map(d=><p key={d.elementId}>{componentName(filterKind(entities.find(e=>e.id===d.elementId)!))} · {d.status} · {d.reason}</p>)}</section>}<WorkspaceTakeoff rows={totals} entities={entities} metric={metric}/>{result.warnings.length>0&&<details><summary className="text-xs text-amber-300">Measurement checks</summary>
    {groupedWarnings.size===0&&result.warnings.map((warning,i)=><p key={i} className="text-xs text-amber-300">{warning}</p>)}
    {[...groupedWarnings].map(([key,group])=><p key={key} className="text-xs text-amber-300">{group.label}: {group.reason}{group.count>1?' ('+group.count+' items)':''}</p>)}
    <details><summary className="text-xs">Technical details</summary>{result.warnings.map((w,i)=><p key={i} className="text-xs text-amber-300 break-words">{w}</p>)}</details></details>}</div></div></aside></FoundationInspectorContext.Provider></FoundationMetricContext.Provider>;
+}
+
+
+function WorkspaceTakeoff({rows,entities,metric}:{rows:FoundationTakeoffRow[];entities:FoundationEntity[];metric:boolean}){
+ const categories=new Map<FoundationTakeoffRow['category'],FoundationTakeoffRow[]>();
+ const byId=new Map(entities.map(entity=>[entity.id,entity]));
+ for(const row of rows){
+   const items=categories.get(row.category)??[];
+   items.push(row);
+   categories.set(row.category,items);
+ }
+ return <div className="space-y-2">{[...categories].map(([category,items])=>{
+   const subtotals=new Map<string,number>();
+   if(category!=='Informational')for(const item of items)if(item.known)
+     subtotals.set(item.unit,(subtotals.get(item.unit)??0)+item.quantity);
+   return <details key={category} open={categories.size===1} className="rounded-lg border border-slate-700 bg-slate-800/40">
+     <summary className="cursor-pointer rounded px-2 py-2 font-semibold text-xs">{category}
+       {items.length>1&&subtotals.size===1&&<span className="ml-2 text-slate-300">
+         {[...subtotals].map(([unit,value])=>formatFoundationQuantity(value,unit,metric))} subtotal{items.some(item=>item.pending)?' + pending':''}
+       </span>}
+     </summary>
+     <ul className="space-y-2 p-2 text-xs">
+       {items.map(item=>{
+         const entity=byId.get(item.contributions[0].elementId);
+         return <li className="flex items-start justify-between gap-2 border-l-2 pl-2" key={item.key}
+           style={{borderInlineStartColor:entity&&foundationStroke(entity)}}>
+           <div><span className="block">{item.code.replace('foundation.','').replaceAll('.',' ')}</span>
+             <span className="text-slate-300">{describeFoundationTakeoff(item,metric)}</span></div>
+           <span className="shrink-0 text-right tabular-nums">{item.known?formatFoundationQuantity(item.quantity,item.unit,metric)+(item.pending?' + pending':''):'Not quantified'}</span>
+         </li>;
+       })}
+     </ul>
+     {items.length>1&&subtotals.size===1&&<p className="px-2 pb-2 text-xs text-slate-300">Subtotal summarizes these material rows.</p>}
+     {category==='Informational'&&<p className="px-2 pb-2 text-xs text-slate-300">Reference quantities only.</p>}
+   </details>;
+ })}</div>;
 }

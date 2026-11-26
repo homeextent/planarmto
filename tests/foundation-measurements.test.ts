@@ -555,3 +555,67 @@ test('an incomplete independent wall preserves disjoint quantities and still blo
  const completed:FoundationEntity={...unresolved,widthFt:8/12,heightFt:8,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true}};
  assert.deepEqual(measureFoundation('test',[...entities,completed]).rows.filter(row=>row.elementId!==wall.id),previous);
 });
+
+test('R58 wall isolation fixture distinguishes a visible gap from a proven axial separation',()=>{
+ const slab={...region('slab',box(0,0,20,20)),kind:'slab',purpose:'concrete',depthFt:.5,elevationFt:0} as FoundationEntity;
+ const wall:FoundationEntity={id:'wall',physicalId:'wall',assemblyId:'wall',source:{reference:'Manual foundation draft'},
+  kind:'foundationWall',start:{x:4,y:25},end:{x:16,y:25},widthFt:null,heightFt:null,elevationFt:null};
+ const result=measureFoundation('isolation',[slab,wall]);
+ const slabRow=result.rows.find(row=>row.elementId==='slab')!;
+ assert.deepEqual(slabRow.status==='unquantified'?slabRow.reason:null,'Confirm the dimensions of a nearby construction component before reconciling overlap');
+ const pastEnd={...wall,start:{x:25,y:25},end:{x:35,y:25}};
+ const complete:FoundationEntity={...wall,widthFt:8/12,heightFt:8,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true}};
+ for(const record of [pastEnd,complete]){
+  const row=measureFoundation('isolation',[slab,record]).rows.find(entry=>entry.elementId==='slab')!;
+  assert.equal(row.status,'measured');
+  if(row.status==='measured')near(row.quantity,200/27);
+ }
+});
+
+import {describeFoundationTakeoff,groupFoundationTakeoff} from '../src/engine/measurements/foundationTakeoff';
+import type {FoundationAssemblyRecord} from '../src/engine/measurements/foundationAssemblyModel';
+import type {QuantityContribution} from '../src/engine/measurements/measurementTypes';
+test('workspace takeoff groups purchasing specifications with canonical quantities and retained provenance',()=>{
+ const e=(id:string,material:string,purpose:'granular'|'insulation',depthFt:number|null,x:number):FoundationEntity=>({
+  id,physicalId:id,assemblyId:id,source:{reference:'fixture'},kind:'foundationRegion',purpose,polygon:box(x,0,20,20),depthFt,elevationFt:0,
+  foundation:{version:1,material,baseElevationConfirmed:true,...(purpose==='insulation'?{coverage:{layerId:id,confirmed:true,foam:true}}:{})},
+ });
+ const entities=[
+  e('stone-1','clear crushed stone','granular',.5,0),e('stone-2','clear crushed stone','granular',.5,30),
+  e('sand','sand','granular',.5,60),e('granular-b','granular b','granular',.5,90),
+  e('xps-2','xps','insulation',2/12,120),e('xps-3','xps','insulation',3/12,150),
+  e('eps','eps','insulation',2/12,180),e('mineral','rigid mineral wool','insulation',3/12,210),
+  e('unknown','xps','insulation',null,240),
+ ];
+ entities.push({...e('excluded','sand','granular',1,270),scopeApplicability:{status:'excluded',reason:'Owner supplied'}});
+ entities.push({...e('pending','clear crushed stone','granular',.5,300),scopeApplicability:{status:'pending',reason:'Confirm scope'}});
+ const ledger=measureFoundation('takeoff',entities).rows;
+ const grouped=groupFoundationTakeoff(ledger,entities);
+ const stone=grouped.find(row=>row.material==='clear crushed stone')!;
+ near(stone.quantity,400/27);assert.equal(stone.known,2);assert.equal(stone.pending,1);
+ assert.equal(grouped.filter(row=>row.category==='Granular materials').length,3);
+ assert.equal(grouped.filter(row=>row.category==='Insulation').length,5);
+ assert.ok(grouped.some(row=>row.material==='xps'&&row.thicknessFt===null));
+ assert.ok(!grouped.some(row=>row.category==='Informational'&&row.material==='rigid mineral wool'));
+ assert.ok(grouped.filter(row=>row.category==='Informational').every(row=>row.unit==='BF'));
+ assert.equal(grouped.flatMap(row=>row.contributions).length,ledger.length);
+ const xps=grouped.find(row=>row.category==='Insulation'&&row.material==='xps'&&row.thicknessFt===2/12)!;
+ assert.match(describeFoundationTakeoff(xps,false),/2.00 in/);
+ assert.match(describeFoundationTakeoff(xps,true),/50.80 mm/);
+ near(xps.quantity,400);
+});
+
+test('drainage grouping uses current child ownership and separates unspecified historical diameter',()=>{
+ const drainage=(id:string):FoundationEntity=>({id,physicalId:id,assemblyId:id,source:{reference:'route'},
+  kind:'foundationLine',purpose:'drainage',start:{x:0,y:0},end:{x:10,y:0},foundation:{version:1,material:'perforated rigid pvc drainage pipe'}});
+ const entities=['a','b','c','detached'].map(drainage);
+ const rows:QuantityContribution[]=entities.map(e=>({workspaceId:'ws',elementId:e.id,physicalId:e.id,assemblyId:e.assemblyId,
+  code:'foundation.drainage.length',unit:'LF',basis:'plan',source:e.source,status:'measured',quantity:10}));
+ const parents=entities.slice(0,3).map((entity,i)=>({
+  children:[{entityId:entity.id,role:{system:'drainage'}}],
+  specifications:{drainage:{status:'included',specification:{attributes:{value:{nominalDiameterFt:{value:(i===2?6:4)/12}}}}}},
+ })) as unknown as FoundationAssemblyRecord[];
+ const grouped=groupFoundationTakeoff(rows,entities,parents);
+ assert.deepEqual(grouped.map(row=>[row.diameterFt,row.quantity]),[[4/12,20],[6/12,10],[null,10]]);
+ assert.match(describeFoundationTakeoff(grouped[2],false),/Diameter unspecified/);
+});
