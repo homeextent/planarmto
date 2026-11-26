@@ -99,6 +99,10 @@ Confirmed changes shall be applied atomically using the existing validated trans
 
 Construction assemblies follow a complete lifecycle. Create and specify the primary geometry, add or remove applicable systems, edit geometry and specifications, review quantities, delete with validated ownership checks, and support undo and redo. The same lifecycle guides future workspaces within their approved technical scope.
 
+#### Standard workspace interface
+
+Use the drawing toolbar for geometry creation and specialist drawing. Organize specifications and dependent construction around the selected geometry in the inspector. Progressively disclose construction layers and show only inputs relevant to the material, measurement basis, scope or a necessary physical relationship. Use distinct Construction, Geometry and Quantities views where applicable. Keep material totals and completeness separately reviewable, and preserve drafts and previews while navigating. Keep Preview, Apply and Cancel available during construction editing. Automate supported conventional relationships and retain discoverable advanced controls. The standard workflow requires no knowledge of internal ownership or record identifiers.
+
 ### 6. Construction system dependencies
 
 Dependent construction systems shall use the appropriate confirmed source geometry.

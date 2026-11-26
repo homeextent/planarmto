@@ -14,7 +14,7 @@ Applies to every developer and AI agent. Read README, ROADMAP, SYSTEM_BIBLE, DEV
 8. Production promotion requires separate explicit authorization, release PR to main, successful CI, approved version/tag as applicable, deployment verification and live smoke tests. Never bypass protections or push directly to main. Do not trigger deployment manually from feature or staging branches.
 
 
-Every measurement capability and interface change requires a product design review against the [governing System Bible contract](SYSTEM_BIBLE.md#governing-product-design-philosophy). Specify primary construction geometry, applicable dependent systems, standard contractor inputs, automatically established relationships, advanced exceptions, and measurement integrity and acceptance safeguards. Review stays within authorized scope.
+Apply the System Bible workspace interface standard when organizing toolbar, inspector and quantity review. Every measurement capability and interface change requires a product design review against the [governing System Bible contract](SYSTEM_BIBLE.md#governing-product-design-philosophy). Specify primary construction geometry, applicable dependent systems, standard contractor inputs, automatically established relationships, advanced exceptions, and measurement integrity and acceptance safeguards. Review stays within authorized scope.
 
 ## Local commands
 

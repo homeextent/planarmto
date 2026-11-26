@@ -18,7 +18,7 @@ R5.6C application candidate `5a6db24aaab462d4dda888a18be08515709df849` retains 3
 | B | Independent typed workspaces, calibration, histories and persistence | Staging complete |
 | C.1A | Canonical schema v3, explicit ownership and specialist contracts | Staging complete; [record](docs/c1a-measurement-architecture.md) |
 | C.1B | Independent roof drafting, measurement and R4 usability | Staging integrated; owner-confirmed post-merge CI #133; [record](docs/c1b-roof-measurement.md), [R4](docs/c1b-r4-specialist-usability.md) |
-| C.1C | Foundation drafting and measurement | Draft PR #12. R5.6C technical baseline 322/322 and CI #196. [R5.7 foundation closeout](docs/c1c-r5-7-foundation-closeout.md) awaits independent implementation review and targeted practical acceptance. |
+| C.1C | Foundation drafting and measurement | Draft PR #12. R5.6C technical baseline 322/322 and CI #196. R5.7 technical baseline 324/324 and CI #198. [R5.8 contractor interface](docs/c1c-r5-8-contractor-interface.md) awaits independent implementation review and targeted practical acceptance. |
 | C.1D | Dedicated site drafting and measurement | Deferred beyond v2.16.0; separate future authorization |
 | C.1E | Integrated quantity ownership, completeness and duplicate prevention | After C.1C; independent of C.1D |
 | C.2 | Consolidated MTO, manual quantities, allowances, quotations, pricing and reporting | After C.1E; detailed contract and acceptance separately approved |

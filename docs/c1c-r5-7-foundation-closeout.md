@@ -18,6 +18,8 @@ Parent deletion is a new internal Preview command. It reuses current project val
 
 Disjointness with unknown width can only be established where the projected intervals exclude overlap. A wall that appears separate on screen can still have unresolved physical coverage where its width or geometry is missing. Different local zeros never establish a shared elevation. The initial owner-reported 3.34 CY slab result remains unconfirmed.
 
+For the current interface layout and independent-wall workflows, see [R5.8](c1c-r5-8-contractor-interface.md). The acceptance scenarios below preserve R5.7 regression intent.
+
 ## Practical acceptance
 
 1. Trace a 20 × 20 ft foundation, confirm an 8 in wall thickness and 8 ft wall height, and compare the walls-only total with 15.28 CY. Add a separate irregular perimeter and then centred footing layers without retracing. Confirm primary quantities remain valid while optional systems are pending.
