@@ -1191,12 +1191,12 @@ test('layered inspector preserves a draft, visual previews and exterior material
  await click('Add waterproofing');
  const waterproofing=panel.getByRole('group',{name:'Exterior layer 1',exact:true});
  await waterproofing.getByLabel('Material',{exact:true}).selectOption('sheet waterproofing membrane');
- await waterproofing.getByLabel('Confirm full wall height as coverage').check();
+ await waterproofing.getByLabel('Coverage',{exact:true}).selectOption({label:'Full wall height'});
  await expect(waterproofing.getByLabel('Layer thickness (in)')).toHaveCount(0);
  await click('Add vertical insulation');
  const insulation=panel.getByRole('group',{name:'Exterior layer 2',exact:true});
  await insulation.getByLabel('Material',{exact:true}).selectOption('xps');
- await insulation.getByLabel('Confirm full wall height as coverage').check();
+ await insulation.getByLabel('Coverage',{exact:true}).selectOption({label:'Full wall height'});
  await insulation.getByLabel('Layer thickness (in)').fill('2');
  await panel.getByLabel('Confirm exterior layer order').check();
  await panel.getByText('Strip footing · pending',{exact:true}).click();
@@ -1288,6 +1288,7 @@ test('independent wall construction validates previews and edits source-linked l
  await apply.click();
  await panel.getByRole('button',{name:'Add waterproofing',exact:true}).click();
  await panel.getByLabel('Layer material').selectOption('sheet waterproofing membrane');
+ await panel.getByLabel('Coverage',{exact:true}).selectOption({label:'Specified coverage height'});
  await panel.getByLabel('Coverage height (ft)').fill('8');
  await preview.click();
  await expect(panel.getByRole('alert')).toContainText('Select the exterior side');
@@ -1298,6 +1299,7 @@ test('independent wall construction validates previews and edits source-linked l
  await apply.click();
  await panel.getByRole('button',{name:'Add vertical insulation',exact:true}).click();
  await panel.getByLabel('Layer material').selectOption('xps');
+ await panel.getByLabel('Coverage',{exact:true}).selectOption({label:'Specified coverage height'});
  await panel.getByLabel('Coverage height (ft)').fill('8');
  await panel.getByLabel('Insulation thickness (in)').fill('2');
  await panel.getByLabel('Exterior side').selectOption('right');
@@ -1514,4 +1516,113 @@ test('standard pad traces preview exact rectangle and actual polygon quantities'
  expect(await snapshot(page)).toEqual([pad]);
  await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();
  expect(await snapshot(page)).toEqual([revised]);
+});
+
+test('initial wall coordinates optional layers and regenerates only full-height coverage',async({page,browser},info)=>{
+ const canvas=page.locator('canvas').first();
+ const click=(name:string)=>page.getByRole('button',{name,exact:true}).click();
+ await click('Draw foundation wall');
+ await canvas.click({position:{x:240,y:240}});await canvas.click({position:{x:560,y:240}});
+ await page.keyboard.type('25');await page.keyboard.press('Enter');
+ await click('Specify wall construction');
+ const panel=page.getByRole('region',{name:'Independent wall layers'});
+ const tx=panel.getByRole('group',{name:'Wall construction transaction'});
+ const wall=panel.getByRole('form',{name:'Independent wall construction'});
+ await wall.getByLabel('Wall thickness (in)').fill('8');
+ await wall.getByLabel('Wall height (ft)').fill('8');
+ await panel.getByText('Strip footing · Pending',{exact:true}).click();
+ await click('Add strip footing');
+ await panel.getByLabel('Footing width (in)').fill('24');
+ await panel.getByLabel('Footing depth (in)').fill('6');
+ for(const [label,material] of [['Waterproofing','sheet waterproofing membrane'],['Vertical insulation','xps']]){
+   await panel.getByText(label+' · Pending',{exact:true}).click();
+   await click('Add '+label.toLowerCase());
+   const layer=panel.getByRole('group',{name:label,exact:true});
+   await layer.getByLabel('Layer material').selectOption(material);
+   await layer.getByLabel('Exterior side').selectOption('left');
+   await expect(layer.getByText('8.00 LF coverage',{exact:true})).toBeVisible();
+   if(label==='Vertical insulation')await layer.getByLabel('Insulation thickness (in)').fill('2');
+ }
+ await page.screenshot({path:info.outputPath('initial-wall-1600.png'),fullPage:true});
+ await tx.getByRole('button',{name:'Preview',exact:true}).click();
+ const preview=panel.getByRole('region',{name:'Wall construction preview'});
+ for(const value of ['4.94 CY','0.93 CY','5.86 CY','200.00 SF','400.00 BF'])await expect(preview).toContainText(value);
+ await page.screenshot({path:info.outputPath('initial-wall-preview.png')});
+ expect(await snapshot(page)).toEqual([]);
+ await tx.getByRole('button',{name:'Apply',exact:true}).click();
+ const committed=await snapshot(page);
+ expect(committed).toHaveLength(4);
+ expect(committed.filter(e=>e.foundation?.envelopeSource?.coverageMode==='fullWallHeight')).toHaveLength(2);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
+ expect(await snapshot(page)).toEqual([]);
+ await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();
+ expect(await snapshot(page)).toEqual(committed);
+ await selectFoundationEntity(page,committed[0].id);
+ await panel.getByText(/Waterproofing · No explicit decision/).click();
+ await click('Edit waterproofing');
+ await panel.getByLabel('Coverage',{exact:true}).selectOption({label:'Specified coverage height'});
+ await panel.getByLabel('Coverage height (ft)').fill('6');
+ await tx.getByRole('button',{name:'Preview',exact:true}).click();
+ await expect(preview).toContainText('150.00 SF');
+ await tx.getByRole('button',{name:'Apply',exact:true}).click();
+ await wall.getByLabel('Wall height (ft)').fill('10');
+ await tx.getByRole('button',{name:'Preview',exact:true}).click();
+ await expect(preview).toContainText('250.00 SF');
+ await tx.getByRole('button',{name:'Apply',exact:true}).click();
+ const edited=await snapshot(page);
+ expect(edited.find(e=>e.foundation?.envelopeSource?.purpose==='waterproofing')?.foundation?.envelopeSource).toMatchObject({heightFt:6});
+ expect(edited.find(e=>e.foundation?.envelopeSource?.purpose==='verticalInsulation')?.foundation?.envelopeSource).toMatchObject({heightFt:10,coverageMode:'fullWallHeight'});
+ await wall.getByLabel('Wall height (ft)').fill('5');
+ await tx.getByRole('button',{name:'Preview',exact:true}).click();
+ await expect(panel.getByRole('alert').first()).toContainText('Specified coverage exceeds wall height');
+ expect(await snapshot(page)).toEqual(edited);
+ const exported=await projectSnapshot(page);
+ const reopened=await browser.newPage();
+ try{
+   await reopened.goto(page.url());
+   await reopened.getByTitle('Import JSON Project').locator('input').setInputFiles({
+     name:'wall-coverage.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(exported)),
+   });
+   await expect(reopened.getByRole('heading',{name:'Foundation tools'})).toBeVisible();
+   expect(await projectSnapshot(reopened)).toEqual(exported);
+ }finally{
+   await reopened.close();
+ }
+});
+
+test('complete canvas assembly selection uses confirmed parent deletion',async({page},info)=>{
+ const canvas=page.locator('canvas').first();
+ const click=(name:string)=>page.getByRole('button',{name,exact:true}).click();
+ await click('Rectangle foundation');
+ await canvas.click({position:{x:235,y:235}});await canvas.click({position:{x:540,y:500}});
+ await click('Specify foundation construction');
+ const panel=page.getByRole('region',{name:'Foundation assemblies'});
+ const walls=panel.getByRole('group',{name:'Walls',exact:true});
+ await walls.getByLabel('Wall thickness (in)').fill('8');await walls.getByLabel('Wall height (ft)').fill('8');
+ await click('Preview assembly changes');await click('Apply assembly changes');
+ const committed=await snapshot(page);
+ expect(committed).toHaveLength(4);
+ await canvas.click({position:{x:235,y:365}});
+ await click('Delete selected construction');
+ await expect(page.getByRole('alert').filter({hasText:'Select all assembly components'})).toBeVisible();
+ expect(await snapshot(page)).toEqual(committed);
+ const box=(await canvas.boundingBox())!;
+ await page.mouse.move(box.x+200,box.y+200);await page.mouse.down();
+ await page.mouse.move(box.x+580,box.y+530,{steps:6});await page.mouse.up();
+ await expect(panel.getByRole('button',{name:'Delete assembly',exact:true})).toBeVisible();
+ await click('Delete selected construction');
+ await expect(panel.getByText('Review assembly deletion',{exact:true})).toBeVisible();
+ expect(await snapshot(page)).toEqual(committed);
+ await page.setViewportSize({width:1366,height:900});
+ await page.screenshot({path:info.outputPath('delete-assembly-1366.png')});
+ await click('Cancel assembly changes');
+ expect(await snapshot(page)).toEqual(committed);
+ await click('Delete assembly');
+ page.once('dialog',d=>d.accept());
+ await click('Confirm delete assembly');
+ expect(await snapshot(page)).toEqual([]);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
+ expect(await snapshot(page)).toEqual(committed);
+ await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();
+ expect(await snapshot(page)).toEqual([]);
 });

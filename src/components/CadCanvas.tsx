@@ -3818,6 +3818,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
 
           <button
             onClick={onDeleteSelected}
+            aria-label={selection.type==='foundation'?'Delete selected construction':undefined}
             className="px-2.5 py-1 bg-red-950/60 hover:bg-red-900/80 border border-red-500/30 text-red-300 text-xs rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />

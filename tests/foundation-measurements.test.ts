@@ -663,3 +663,34 @@ test('R5.10 primary construction quantities retain unrounded ledger precision',(
  near(total('insulation.foam',[xps.id]),800);
  near(total('granular.volume',[base.id]),200/27);
 });
+
+import {foundationDeletionTarget} from '../src/engine/measurements/foundationSelection';
+
+test('foundation deletion routing requires one exact owned selection',()=>{
+ const parents=[{id:'perimeter',children:[{entityId:'a'},{entityId:'b'}]},{id:'slab',children:[{entityId:'c'}]}];
+ assert.equal(foundationDeletionTarget(parents,['a']).kind,'partial');
+ assert.equal(foundationDeletionTarget(parents,['a','b','c']).kind,'mixed');
+ assert.equal(foundationDeletionTarget(parents,['a','b','detached']).kind,'mixed');
+ assert.equal(foundationDeletionTarget(parents,['detached']).kind,'independent');
+ assert.deepEqual(foundationDeletionTarget(parents,['b','a']),{kind:'complete',parent:parents[0]});
+});
+
+test('full-height envelope provenance rejects stale coverage while specified coverage preserves its value',()=>{
+ const source=wall('r511-wall',{x:0,y:0},{x:25,y:0});
+ if(source.kind!=='foundationWall')throw Error('Expected wall');
+ const changed={...source,heightFt:10};
+ let sequence=0;
+ const next=()=>String(++sequence);
+ const config={purpose:'waterproofing' as const,material:'sheet waterproofing membrane',layerId:'membrane',side:'right' as const};
+ const full=deriveFoundationEnvelope([source],[source.id],{...config,heightFt:8,coverageMode:'fullWallHeight'},next);
+ const taller=deriveFoundationEnvelope([changed],[source.id],{...config,heightFt:10,coverageMode:'fullWallHeight'},next);
+ const specified=deriveFoundationEnvelope([changed],[source.id],{...config,heightFt:6},next);
+ for(const [sourceWall,layers,value] of [[source,full,200],[changed,taller,250],[changed,specified,150]] as const){
+   const contribution=qty([sourceWall,...layers]).find(row=>row.code==='foundation.waterproofing.area');
+   assert.equal(contribution?.status,'measured');
+   if(contribution?.status==='measured')near(contribution.quantity,value);
+ }
+ assert.throws(()=>deriveFoundationEnvelope([changed],[source.id],{...config,heightFt:8,coverageMode:'fullWallHeight'},next),/Refresh full wall height/);
+ assert.throws(()=>deriveFoundationEnvelope([{...source,heightFt:5}],[source.id],{...config,heightFt:6},next),/Specified coverage exceeds wall height/);
+ assert.equal(specified[0].foundation?.envelopeSource?.coverageMode,undefined);
+});

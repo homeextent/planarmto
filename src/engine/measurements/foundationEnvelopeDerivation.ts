@@ -9,7 +9,9 @@ function geometry(source:FoundationEntity,s:FoundationEnvelopeSource,id:string,a
  const base={id,physicalId:id,assemblyId,source:{reference:'Derived '+s.purpose+' from '+source.id}};
  const foundation={version:1 as const,material:s.material,envelopeSource:s};
  if(s.purpose==='waterproofing'||s.purpose==='verticalInsulation'){
-  if(source.kind!=='foundationWall'||!source.foundation?.centrelineConfirmed||source.widthFt===null||source.heightFt===null||!s.heightFt||s.heightFt>source.heightFt||!s.side)throw Error('Confirm wall width, centreline and sufficient coverage height');
+  if(source.kind!=='foundationWall'||!source.foundation?.centrelineConfirmed||source.widthFt===null||source.heightFt===null||!s.heightFt||!s.side)throw Error('Confirm wall thickness, centreline, height and exterior side before setting coverage.');
+  if(s.coverageMode==='fullWallHeight'&&!near(s.heightFt,source.heightFt))throw Error('Refresh full wall height coverage before applying.');
+  if(s.heightFt>source.heightFt)throw Error('Specified coverage exceeds wall height. Enter a smaller coverage height or select full wall height.');
   if(source.foundation.wallOpenings?.length)throw Error('Wall openings require explicit net coverage segments');
   let face=faceToCentreline(source.start,source.end,source.widthFt,s.side);
   if(s.perimeterWallIds){
@@ -62,7 +64,7 @@ export function validateEnvelopeSources(entities:FoundationEntity[]):void{
  const key=JSON.stringify([s.sourceId,s.purpose,s.layerId]);if(seen.has(key))throw Error('Duplicate derived envelope layer');seen.add(key);
  const list=members.get(s.groupId)??[];list.push(s);members.set(s.groupId,list);
  if(s.perimeterWallIds){const g=perimeters.get(s.groupId)??[];g.push(s);perimeters.set(s.groupId,g)}
- const spec=JSON.stringify([e.assemblyId,s.purpose,s.perimeterWallIds?null:s.side,s.heightFt,s.depthFt,s.offsetBelowSlabFt,s.material,s.layerId,s.foam,s.sourceIds?[...s.sourceIds].sort():null,s.perimeterWallIds?[...s.perimeterWallIds].sort():null]);if(groups.has(s.groupId)&&groups.get(s.groupId)!==spec)throw Error('Inconsistent envelope group');groups.set(s.groupId,spec);
+ const spec=JSON.stringify([e.assemblyId,s.purpose,s.perimeterWallIds?null:s.side,s.heightFt,s.coverageMode,s.depthFt,s.offsetBelowSlabFt,s.material,s.layerId,s.foam,s.sourceIds?[...s.sourceIds].sort():null,s.perimeterWallIds?[...s.perimeterWallIds].sort():null]);if(groups.has(s.groupId)&&groups.get(s.groupId)!==spec)throw Error('Inconsistent envelope group');groups.set(s.groupId,spec);
  const expected=geometry(source,s,e.id,e.assemblyId,entities);
  const signature=(q:FoundationEntity)=>JSON.stringify(['polygon' in q?q.polygon:[q.start,q.end],'depthFt' in q?q.depthFt:null,'heightFt' in q?q.heightFt:null,'elevationFt' in q?q.elevationFt:null,q.foundation?.material,q.foundation?.baseElevationConfirmed,q.foundation?.elevationReference,q.foundation?.coverage?.layerId,q.foundation?.coverage?.confirmed,q.foundation?.coverage?.openingTreatment,q.foundation?.coverage?.foam,q.foundation?.coverage?.thicknessFt,q.foundation?.granularLayerId]);
  if(signature(e)!==signature(expected))throw Error('Derived envelope is stale; remove or regenerate before editing source');

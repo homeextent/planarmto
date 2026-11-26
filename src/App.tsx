@@ -1,3 +1,4 @@
+import {foundationDeletionTarget} from './engine/measurements/foundationSelection';
 import { createTracedAssembly, FoundationAssemblyPanel, type TracedAssembly } from './components/FoundationAssemblyPanel';
 import { applyAssemblyPreview } from './engine/measurements/foundationAssemblyController';
 import type { AssemblyPreview, AssemblyTrace, FoundationPreset } from './engine/measurements/foundationAssemblyModel';
@@ -291,17 +292,32 @@ function AppContent() {
     }catch(err){setStorageWarning(err instanceof Error?err.message:String(err))}
   },[redoStack,state,document,activeWorkspace]);
 
+  const [assemblyDeletion,setAssemblyDeletion]=useState<{project:typeof document;workspaceId:string;parentId:string}>();
+
   // Handle Deleting Selected CAD Element
   const handleDeleteSelected = useCallback(() => {
     if(selection.type==='foundation'&&foundationEntities){
       const ids=selection.ids??(selection.id?[selection.id]:[]);
       if(!ids.length)return;
-      const selected=new Set(ids);
+      const owners=activeWorkspace.foundationAssemblies??[];
+      const target=foundationDeletionTarget(owners,ids);
+      if(primaryDraft||activeTrace){
+        setStorageWarning('Apply or cancel the active construction draft before deleting.');
+        return;
+      }
+      if(target.kind==='complete'){
+        setStorageWarning('');
+        setAssemblyDeletion({project:document,workspaceId:activeWorkspace.id,parentId:target.parent.id});
+        return;
+      }
+      if(target.kind!=='independent'){
+        setStorageWarning(target.kind==='partial'?'Select all assembly components in Geometry, then choose Delete assembly.':'Delete one complete assembly at a time. Select independent components separately.');
+        return;
+      }
       const plan=planFoundationDeletion(foundationEntities,ids);
       const affected=new Set(plan.removed.map(entity=>entity.id));
-      const owners=activeWorkspace.foundationAssemblies??[];
-      if(owners.some(parent=>parent.children.some(child=>selected.has(child.entityId)||affected.has(child.entityId)))){
-        setStorageWarning('Use Delete assembly in Foundation properties. Select independent components separately.');
+      if(owners.some(parent=>parent.children.some(child=>affected.has(child.entityId)))){
+        setStorageWarning('An assembly depends on this selection. Resolve that dependency before deleting.');
         return;
       }
       if(window.confirm('Delete '+ids.length+' selected foundation components and '+plan.dependentCount+' dependent components?')&&handleFoundationChange(plan.remaining))setSelection({type:'none'});
@@ -390,7 +406,7 @@ function AppContent() {
     });
 
     setSelection({ type: 'none' });
-  }, [selection, state, handleStateChange, roofEntities, handleRoofChange, foundationEntities, handleFoundationChange]);
+  }, [selection, state, handleStateChange, roofEntities, handleRoofChange, foundationEntities, handleFoundationChange, activeWorkspace, document, primaryDraft, activeTrace]);
 
   // Clipboard Operations
   const handleCopy = useCallback(() => {
@@ -868,7 +884,7 @@ function AppContent() {
           }}
         />
 
-        {foundationEntities && <FoundationInspector primaryDraft={primaryDraft} onCancelPrimaryDraft={clearPrimaryDraft} assemblies={activeWorkspace.foundationAssemblies} activeConstructionDraft={!!activeTrace} ownedComponentIds={new Set(activeWorkspace.foundationAssemblies?.flatMap(parent=>parent.children.map(child=>child.entityId)))} assemblyControls={primaryDraft?null:<FoundationAssemblyPanel project={document} workspaceId={activeWorkspace.id} traced={activeTrace} onCancelTrace={clearTracedAssembly}
+        {foundationEntities && <FoundationInspector primaryDraft={primaryDraft} onCancelPrimaryDraft={clearPrimaryDraft} assemblies={activeWorkspace.foundationAssemblies} activeConstructionDraft={!!activeTrace} ownedComponentIds={new Set(activeWorkspace.foundationAssemblies?.flatMap(parent=>parent.children.map(child=>child.entityId)))} assemblyControls={primaryDraft?null:<FoundationAssemblyPanel project={document} workspaceId={activeWorkspace.id} traced={activeTrace} deletionRequest={assemblyDeletion?.project===document&&assemblyDeletion.workspaceId===activeWorkspace.id?assemblyDeletion:undefined} onCancelTrace={clearTracedAssembly}
           onDraftChange={draft=>setTracedAssemblies(old=>({...old,[activeWorkspace.id]:draft}))}
           selectedIds={selection.type==='foundation'?selection.ids:undefined} selectedId={selection.type==='foundation'?(selection.id??selection.ids?.[0]):undefined} metric={state.settings.unitSystem==='metric'}
           onTraceEdit={(trace,onMove)=>{

@@ -50,7 +50,7 @@ const field='block w-full bg-slate-800 border border-slate-600 rounded p-1.5 tex
 const dimension=(label:string,value:string,onChange:(value:string)=>void,section=false,hint?:string)=>
  <FoundationDimensionInput label={label} value={value} onChange={onChange} className={field} section={section} hint={hint}/>;
 
-function Properties({entity,onSave,previewOnly=false}:{key?:string;entity:FoundationEntity;onSave:(e:FoundationEntity)=>boolean;previewOnly?:boolean}){
+function Properties({entity,onSave,previewOnly=false,onHeightChange}:{key?:string;entity:FoundationEntity;onSave:(e:FoundationEntity)=>boolean;previewOnly?:boolean;onHeightChange?:(value:number|null)=>void}){
  const plainConcrete=['foundationWall','stripFooting','padFooting','slab'].includes(entity.kind);
  const [material,setMaterial]=useState(entity.foundation?.material??(plainConcrete?'poured concrete':''));
  const [wallScope,setWallScope]=useState<'legacy'|'included'|'excluded'|'pending'>(entity.scopeApplicability?.status??'legacy');
@@ -90,7 +90,7 @@ function Properties({entity,onSave,previewOnly=false}:{key?:string;entity:Founda
    {(wallScope==='excluded'||wallScope==='pending')&&<label>Reason<input className={field} value={wallScopeReason} onChange={e=>setWallScopeReason(e.target.value)}/></label>}
  </>}
  {category?<FoundationMaterialInput label="Material" category={category} value={material} onChange={setMaterial} className={field}/>:input('Material',material,setMaterial)}
- {'widthFt' in entity&&<>{dimension(previewOnly?'Wall thickness':'Width',width,setWidth,true)}{dimension(previewOnly?'Wall height':'Height / depth',height,setHeight,entity.kind==='stripFooting')}{tracedCentreline?<p>Wall thickness is measured about the traced centreline.</p>:<label className="block"><input type="checkbox" checked={centre} onChange={e=>setCentre(e.target.checked)}/> Confirm drafted centreline</label>}{centre&&<details><summary>Advanced wall junctions</summary>{dimension('Start junction extension',joinStart,setJoinStart,false)}{dimension('End junction extension',joinEnd,setJoinEnd,false)}</details>}</>}
+ {'widthFt' in entity&&<>{dimension(previewOnly?'Wall thickness':'Width',width,setWidth,true)}{dimension(previewOnly?'Wall height':'Height / depth',height,value=>{setHeight(value);onHeightChange?.(value?Number(value):null);},entity.kind==='stripFooting')}{tracedCentreline?<p>Wall thickness is measured about the traced centreline.</p>:<label className="block"><input type="checkbox" checked={centre} onChange={e=>setCentre(e.target.checked)}/> Confirm drafted centreline</label>}{centre&&<details><summary>Advanced wall junctions</summary>{dimension('Start junction extension',joinStart,setJoinStart,false)}{dimension('End junction extension',joinEnd,setJoinEnd,false)}</details>}</>}
  {'polygon' in entity&&dimension(previewOnly&&entity.kind==='padFooting'?'Footing depth':'Depth',depth,setDepth,entity.purpose!=='excavation'&&entity.purpose!=='backfill')}
  {'elevationFt' in entity&&(previewOnly?<details><summary>{entity.kind==='padFooting'?'Advanced pad elevations':'Advanced wall elevations'}</summary>{elevationFields}</details>:elevationFields)}
  {entity.kind==='foundationLine'&&entity.purpose!=='drainage'&&dimension('Coverage height',height,setHeight,false)}
@@ -255,7 +255,7 @@ export function FoundationInspector({assemblyControls,assemblies,activeConstruct
  const standardComponent=primaryDraft??independentWall??(selected?.kind==='padFooting'?selected:undefined);
  const independentWallEditor=standardComponent&&<IndependentWallConstruction key={standardComponent.id}
    wall={standardComponent} entities={entities} ownedIds={ownedComponentIds} metric={metric} onCancelDraft={primaryDraft?onCancelPrimaryDraft:undefined} onChange={onChange} onPreview={onPreview}
-   renderWall={(preview,reset)=><Properties key={JSON.stringify(standardComponent)+reset}
+   renderWall={(preview,reset,onHeightChange)=><Properties onHeightChange={onHeightChange} key={JSON.stringify(standardComponent)+reset}
      entity={standardComponent} onSave={preview} previewOnly/>}/>;
  const groupedWarnings=new Map<string,{label:string;reason:string;count:number}>();
  const assemblyIds=[...new Set(entities.map(entity=>entity.assemblyId))];

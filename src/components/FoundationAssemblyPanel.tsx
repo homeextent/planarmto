@@ -1,3 +1,4 @@
+import {foundationDeletionTarget} from '../engine/measurements/foundationSelection';
 import {describeFoundationTakeoff,groupFoundationTakeoff} from '../engine/measurements/foundationTakeoff';
 import {FoundationInspectorContext} from './FoundationInspectorTabs';
 import {foundationColor} from './foundationComponentStyle';
@@ -118,6 +119,7 @@ type Props={
   selectedIds?:string[];
   metric:boolean;
   traced?:TracedAssembly;
+  deletionRequest?:{parentId:string};
   onCancelTrace:()=>void;
   onDraftChange:(draft:TracedAssembly)=>void;
   onApply:(preview:AssemblyPreview)=>boolean;
@@ -127,7 +129,7 @@ type Props={
   onSelectChildren:(ids:string[])=>void;
 };
 
-export function FoundationAssemblyPanel({project,workspaceId,selectedId,selectedIds,metric,traced,onCancelTrace,onDraftChange,onApply,onTraceEdit,onPresets,onPreview,onSelectChildren}:Props){
+export function FoundationAssemblyPanel({project,workspaceId,selectedId,selectedIds,metric,traced,deletionRequest,onCancelTrace,onDraftChange,onApply,onTraceEdit,onPresets,onPreview,onSelectChildren}:Props){
   const {tab,selectTab}=useContext(FoundationInspectorContext);
   useEffect(()=>{if(traced)selectTab('Construction')},[traced?.id]);
   const [newExterior,setNewExterior]=useState<string>();
@@ -415,8 +417,20 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
       label={labels[system]} status={scope.status} summary={[label,...dimensions].filter(Boolean).join(' · ')}
       unresolved={unresolved}>{editor}</ConstructionCard>;
   }
+  const selectionTarget=foundationDeletionTarget(parents,independentSelection);
+  const canDelete=!!parent&&(!independentSelection.length||selectionTarget.kind==='complete'&&selectionTarget.parent.id===parent.id);
+  const deletionBlocked=!!traced||!!edit||!!pendingCorrection||pickingCorner||!!adoption;
+  function requestDeletion(targetId:string){
+    const target=parents.find(candidate=>candidate.id===targetId);
+    if(!target)return;
+    if(deletionBlocked){setCorrectionError('Apply or cancel the active construction changes before deleting this assembly.');return;}
+    clearPreview();setFocused(target.id);setEditing(true);setDeleting(true);
+    showPreview(previewAssemblyChange(project,workspaceId,target.id,target.revisionId,{kind:'delete'},uuid));
+  }
+  useEffect(()=>{if(deletionRequest)requestDeletion(deletionRequest.parentId)},[deletionRequest]);
+  const deleteButton=canDelete&&<button className={button} disabled={deletionBlocked||deleting} onClick={()=>requestDeletion(parent.id)}>Delete assembly</button>;
   const ownedSelection=new Set(inherited?.children.map(child=>child.entityId));
-  const mixedSelection=(selectedIds?.length??0)>1&&selectedIds!.some(id=>!ownedSelection.has(id));
+  const mixedSelection=selectionTarget.kind==='mixed'||(selectedIds?.length??0)>1&&selectedIds!.some(id=>!ownedSelection.has(id));
   const unrelatedSelection=!traced&&!adoption&&(mixedSelection||!!selectedId&&!inherited);
   const showConstruction=tab==='Construction'&&!unrelatedSelection;
   return <section className="space-y-2 text-xs" aria-label="Foundation assemblies">
@@ -428,7 +442,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
           if(deleting&&!window.confirm('Delete this assembly and its construction layers? Independent construction stays. You can undo this change.'))return;
           if(activePreview&&onApply(activePreview)){setFocused(activePreview.assemblyId);setEdit(undefined);setAdoption(null);setAdditionalBindings([]);setCorrection(undefined);setNewExterior(undefined);onCancelTrace();clearPreview();selectTab('Construction');}
         }}>{deleting?'Confirm delete':'Apply'}</button>
-        <button className={button} aria-label="Cancel assembly changes" onClick={()=>{setAdoption(null);setEdit(undefined);setAdditionalBindings([]);setCorrection(undefined);onCancelTrace();clearPreview()}}>Cancel</button>
+        <button className={button} aria-label="Cancel assembly changes" onClick={()=>{setAdoption(null);setEdit(undefined);setAdditionalBindings([]);setCorrection(undefined);onCancelTrace();clearPreview();if(deleting)selectTab('Construction')}}>Cancel</button>
         </div>
         {activePreview&&<button type="button" className="text-sky-300 underline" onClick={()=>selectTab('Quantities')}>Review quantities and outstanding inputs{activePreview.unresolvedSpecifications.length>0?' ('+activePreview.unresolvedSpecifications.length+')':''}</button>}
         {activePreview&&!activePreview.changes&&tab!=='Quantities'&&<p role="alert">{activePreview.conflicts[0]?.message??'No changes to apply. Revise the specification and preview again.'}</p>}
@@ -455,6 +469,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
     {parent&&!adoption&&!unrelatedSelection&&<>
       <p className="text-slate-200">{parent.trace.kind==='slab'?'Selected standalone slab':'Selected foundation perimeter'}</p>
       <button className={button} onClick={()=>setEditing(true)}>Edit assembly</button>
+      {deleteButton}
     </>}
     </div>
     <div hidden={tab!=='Geometry'} className="space-y-2">
@@ -468,10 +483,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
         onTraceEdit(parent.trace,(index,point)=>requestCorrection(()=>({trace:moveFoundationTraceVertex(parent.trace,index,point),segments:[]}),'Contractor confirmed graphical perimeter correction'));
       }}>{parent.trace.kind==='slab'?'Edit slab footprint':'Edit perimeter'}</button>}
       <button className={button} onClick={()=>onSelectChildren(parent.children.map(c=>c.entityId))}>Select assembly components</button>
-      <button className={button} disabled={!!edit||!!pendingCorrection||pickingCorner} onClick={()=>{
-        clearPreview();setEditing(true);setDeleting(true);
-        showPreview(previewAssemblyChange(project,workspaceId,parent.id,parent.revisionId,{kind:'delete'},uuid));
-      }}>Delete assembly</button>
+      {deleteButton}
     </div>}
     {(traced||parent)&&!unrelatedSelection&&<p className="text-slate-300" aria-label="Construction footprint">{describeTrace((traced?.input.trace??parent?.trace)!,metric)}</p>}
     </div>
@@ -583,7 +595,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
               label={(i+1)+'. '+name} status={layer.scope.status} summary={[summary,coverageSummary].filter(Boolean).join(' · ')}
               unresolved={layer.scope.status==='included'&&(!material||!coverage||kind==='insulation'&&!saved.thicknessFt)} initiallyOpen={newExterior===layer.id}>
             <SystemEditor system="exteriorLayers" initialExterior={exteriorKinds[layer.id]} label={'Exterior layer '+(i+1)}
-            metric={metric} reference={inputReference} scope={layer.scope} onChange={next=>{
+            metric={metric} wallHeight={scopeFields<WallSpec>(intent.specifications.walls).heightFt?.value} reference={inputReference} scope={layer.scope} onChange={next=>{
               const scope=next as typeof layer.scope;
               const changed=scope.status!==layer.scope.status||!same(scopeFields<LayerSpec>(scope).material?.value,scopeFields<LayerSpec>(layer.scope).material?.value);
               update({...intent,specifications:{...intent.specifications,...(changed?{exteriorSequence:{status:'unresolved'}}:{}),
@@ -701,8 +713,8 @@ function PreviewMaterialChanges({preview,before,previous,metric}:{
 }
 
 type EditableScope=AssemblySpecifications[System]|AssemblySpecifications['exteriorLayers'][number]['scope'];
-function SystemEditor({system,label,scope,initialExterior,metric,reference,conventional,slabOnly,suggestions,onChange}:{
-  key?:string;initialExterior?:'waterproofing'|'insulation';system:System|'exteriorLayers';label?:string;scope:EditableScope;metric:boolean;reference:string;conventional?:boolean;slabOnly?:boolean;suggestions?:Record<string,number[]>;onChange:(next:EditableScope)=>void;
+function SystemEditor({system,label,scope,initialExterior,metric,reference,conventional,slabOnly,suggestions,wallHeight,onChange}:{
+  key?:string;initialExterior?:'waterproofing'|'insulation';system:System|'exteriorLayers';label?:string;scope:EditableScope;metric:boolean;reference:string;conventional?:boolean;slabOnly?:boolean;wallHeight?:number;suggestions?:Record<string,number[]>;onChange:(next:EditableScope)=>void;
 }){
   const fields=scopeFields(scope as Scope<Record<string,unknown>>);
   const source=sources(reference.trim());
@@ -783,9 +795,15 @@ function SystemEditor({system,label,scope,initialExterior,metric,reference,conve
           </details>
         </>}
         {system==='exteriorLayers'&&<>
-          <label className="block"><input type="checkbox" checked={(value('coverage') as {kind?:string})?.kind==='confirmedFullHeight'}
-            onChange={e=>change('coverage',e.target.checked?{kind:'confirmedFullHeight'}:undefined)}/> Confirm full wall height as coverage</label>
-          {numeric((value('coverage') as {heightFt?:number})?.heightFt,'Coverage height',false,v=>change('coverage',v===undefined?undefined:{kind:'specifiedHeight',heightFt:v}))}
+          <label className="block">Coverage<select aria-label="Coverage" className={field}
+            value={(value('coverage') as {kind?:string})?.kind??'specifiedHeight'}
+            onChange={e=>change('coverage',e.target.value==='confirmedFullHeight'?{kind:'confirmedFullHeight'}:undefined)}>
+            <option value="confirmedFullHeight">Full wall height</option><option value="specifiedHeight">Specified coverage height</option>
+            {(value('coverage') as {kind?:string})?.kind==='manualNetSegments'&&<option value="manualNetSegments">Specified net coverage</option>}
+          </select></label>
+          {(value('coverage') as {kind?:string})?.kind==='confirmedFullHeight'?
+            <p>{wallHeight?formatFoundationQuantity(wallHeight,'LF',metric)+' coverage':'Enter the wall height to establish coverage.'}</p>:
+            numeric((value('coverage') as {heightFt?:number})?.heightFt,'Coverage height',false,v=>change('coverage',v===undefined?undefined:{kind:'specifiedHeight',heightFt:v}))}
           {exteriorCategory==='insulation'?dimension('thicknessFt','Layer thickness',true):fields.thicknessFt&&<details><summary>Advanced specified thickness</summary>{dimension('thicknessFt','Layer thickness',true)}</details>}
         </>}
         {system==='drainage'&&<>

@@ -818,3 +818,27 @@ test('closed independent wall loop adopts exactly once with preserved scope and 
  const wallTotal=(rows:typeof result.quantities.before)=>rows.reduce((sum,row)=>sum+(row.status==='measured'?row.quantity:0),0);
  expectVolume(wallTotal(result.quantities.after),wallTotal(result.quantities.before));
 });
+
+test('polygon assembly deletion blocks independent dependencies and preserves unrelated quantities',()=>{
+ const {doc,input,id}=assemblyFixture();
+ const vertices=[{x:0,y:0},{x:40,y:0},{x:40,y:20},{x:20,y:20},{x:20,y:30},{x:0,y:30}].map((point,i)=>({id:'vertex-'+i,point}));
+ input.trace={...input.trace,kind:'orthogonal',vertices,segments:vertices.map((vertex,i)=>({id:'edge-'+i,startVertexId:vertex.id,endVertexId:vertices[(i+1)%vertices.length].id}))};
+ const created=applyAssemblyPreview(doc,previewAssemblyChange(doc,'foundation','polygon',null,{kind:'create',input},id));
+ const workspace=created.workspaces[1];
+ const parent=workspace.foundationAssemblies![0];
+ const walls=workspace.measurements as FoundationEntity[];
+ const unrelated:FoundationEntity={id:'remote-pad',physicalId:'remote-pad',assemblyId:'remote-pad',source:{reference:'Synthetic independent pad'},
+   kind:'padFooting',purpose:'concrete',polygon:rectanglePoints({x:60,y:60},{x:63,y:63}),depthFt:.5,elevationFt:null,
+   foundation:{version:1,material:'poured concrete'}};
+ const protectedProject=replaceSpecialistEntities(created,'foundation',[...walls,unrelated,...deriveStripFootings(walls,walls.map(wall=>wall.id),2,.5,id)]);
+ const blocked=previewAssemblyChange(protectedProject,'foundation',parent.id,parent.revisionId,{kind:'delete'},id);
+ assert.equal(blocked.changes,null);
+ assert.match(blocked.conflicts[0].message,/dependent construction outside/);
+ const isolated=replaceSpecialistEntities(created,'foundation',[...walls,unrelated]);
+ const deletion=previewAssemblyChange(isolated,'foundation',parent.id,parent.revisionId,{kind:'delete'},id);
+ assert.deepEqual(deletion.conflicts,[]);
+ expectVolume(assemblyWallVolume(deletion,'foundation.footing.pad.concrete'),1/6);
+ const deleted=applyAssemblyPreview(isolated,deletion);
+ assert.deepEqual(deleted.workspaces[1].measurements,[unrelated]);
+ assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(deleted)),deleted);
+});

@@ -31,3 +31,13 @@ export function foundationWindowSelection(entities:FoundationEntity[],start:Poin
   return crosses(points[0],points[1]);
  }).map(e=>e.id);
 }
+
+/** Canvas deletion may route to a parent only when the selection is exactly its live children. */
+export function foundationDeletionTarget<T extends {id:string;children:{entityId:string}[]}>(parents:readonly T[], ids:readonly string[]){
+ const selected=new Set(ids);
+ const touched=parents.filter(parent=>parent.children.some(child=>selected.has(child.entityId)));
+ if(!touched.length)return {kind:'independent'} as const;
+ const parent=touched[0];
+ if(touched.length>1||ids.some(id=>!parent.children.some(child=>child.entityId===id)))return {kind:'mixed'} as const;
+ return selected.size===parent.children.length?{kind:'complete',parent} as const:{kind:'partial'} as const;
+}
