@@ -163,6 +163,10 @@ const assembly=object({
 },{
   preset:object({presetId:text,version:presetVersion,confirmation:source}),
   adoption:object({entityIds:array(text),source}),
+  detachments:array(object({former:binding,revisionId:text,reason:text,source,disposition:choice('released','readopted')},{readoptedAtRevisionId:text}),256),
+  traceCorrections:array(object({previousRevisionId:text,revisionId:text,previousTrace:trace,source,
+    segments:array(object({retiredId:text,successorIds:array(text,64)}),64),
+  }),64),
 });
 function unique(ids:string[],p:string){
   requireValid(new Set(ids).size===ids.length,p+' has duplicate IDs');
@@ -176,6 +180,10 @@ export function validateFoundationPresets(value:unknown): asserts value is Found
 
 export function foundationRoleKey(role: import('./foundationAssemblyModel').ChildRole):string{
   return JSON.stringify([role.system,'sourceId' in role?role.sourceId:null,'layerId' in role?role.layerId:null]);
+}
+
+export function foundationReleaseGroup(role:import('./foundationAssemblyModel').ChildRole):string{
+  return JSON.stringify([role.system,role.system==='exterior'?role.layerId:null]);
 }
 
 export function validateFoundationAssemblies(value:unknown,entities:FoundationEntity[],presets:FoundationPreset[]): asserts value is FoundationAssemblyRecord[]{
@@ -193,7 +201,28 @@ export function validateFoundationAssemblies(value:unknown,entities:FoundationEn
     owningIds.push(...ids);
     owningPhysicalIds.push(...[...active,...dormant,...historical].map(b=>b.physicalId));
     unique([...active,...dormant].map(b=>foundationRoleKey(b.role)),'active or dormant role');
-    const childSet=new Set(ids);
+    const detachments=parent.detachments??[];
+    const released=detachments.filter(a=>a.disposition==='released');
+    unique(released.map(a=>foundationRoleKey(a.former.role)),'released role');
+    for(const a of detachments)requireValid((a.disposition==='readopted')===(a.readoptedAtRevisionId!==undefined),'detachment disposition provenance');
+    requireValid(![...active,...dormant].some(b=>released.some(a=>foundationReleaseGroup(a.former.role)===foundationReleaseGroup(b.role))),'released group is still owned');
+    const childSet=new Set([...ids,...detachments.map(a=>a.former.entityId)]);
+    const corrections=parent.traceCorrections??[];
+    unique(corrections.map(c=>c.revisionId),'trace correction revision');
+    const retiredTraceIds=new Set<string>();
+    for(const [i,c] of corrections.entries()){
+      const successor=corrections[i+1]?.previousTrace??parent.trace;
+      const beforeIds=new Set(c.previousTrace.segments.map(s=>s.id));
+      const afterIds=new Set(successor.segments.map(s=>s.id));
+      const removed=[...beforeIds].filter(id=>!afterIds.has(id));
+      unique(c.segments.map(s=>s.retiredId),'trace correction lineage');
+      requireValid(c.previousRevisionId!==c.revisionId&&c.previousTrace.reference===successor.reference&&
+        removed.length===c.segments.length&&c.segments.every(s=>removed.includes(s.retiredId)&&s.successorIds.length>0&&
+          s.successorIds.every(id=>!beforeIds.has(id)&&afterIds.has(id)&&!retiredTraceIds.has(id))),
+        'trace correction lineage references');
+      for(const id of removed)retiredTraceIds.add(id);
+      requireValid([...afterIds].every(id=>!retiredTraceIds.has(id)),'retired trace identity reused');
+    }
     for(const child of active){
       const e=existing.get(child.entityId);
       requireValid(e?.physicalId===child.physicalId,'missing or mismatched owned measurement '+child.entityId);
@@ -216,7 +245,7 @@ export function validateFoundationAssemblies(value:unknown,entities:FoundationEn
     const drainage=parent.specifications.drainage;
     const routeOverride=parent.overrides.find(o=>o.system==='drainage');
     const route=routeOverride?.route??(drainage.status==='included'?drainage.specification:drainage.retainedSpecification)?.route?.value;
-    const identities=new Map<string,string>(ids.map(id=>[id,'child']));
+    const identities=new Map<string,string>([...childSet].map(id=>[id,'child']));
     for(const [kind,items] of [['routeVertex',route?.kind==='manual'?route.vertices:[]],['routeSegment',route?.kind==='manual'?route.segments:[]]] as const)
       for(const {id} of items){requireValid(!identities.has(id),'duplicate route identity');identities.set(id,kind);}
     const graph=new Map<string,string[]>();

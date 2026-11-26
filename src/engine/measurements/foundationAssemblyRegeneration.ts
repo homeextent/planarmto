@@ -2,7 +2,7 @@ import { orthogonalExteriorEdges } from './foundationExteriorRoute';
 import type {
   AssemblySpecifications, ChildBinding, ChildRole, FoundationAssemblyRecord, MaterialChoice, Scope, SpecificationGap,
 } from './foundationAssemblyModel';
-import { foundationRoleKey } from './foundationAssemblyValidation';
+import { foundationReleaseGroup, foundationRoleKey } from './foundationAssemblyValidation';
 import { deriveStripFootings } from './foundationDerivation';
 import { derivePerimeterDrainage } from './foundationDrainageDerivation';
 import { generateOrthogonalFoundationPerimeter } from './foundationDrafting';
@@ -19,6 +19,8 @@ function value<T>(scope:Scope<T>,name:keyof T):NonNullable<T[keyof T]>|undefined
 export function regenerateFoundationAssembly(parent:FoundationAssemblyRecord, independent:FoundationEntity[]){
   const {trace,specifications:spec}=parent;
   const points=trace.vertices.map(v=>v.point);
+  const released=new Set((parent.detachments??[]).filter(a=>a.disposition==='released').map(a=>foundationReleaseGroup(a.former.role)));
+  const allowed=(system:ChildRole['system'],layerId:string|null=null)=>!released.has(JSON.stringify([system,system==='exterior'?layerId:null]));
   const previous=new Map([...parent.children,...parent.dormantChildren.map(b=>b.child)].map(b=>[foundationRoleKey(b.role),b]));
   const scopes=new Map(parent.componentScope.map(s=>[s.entityId,s.decision]));
   const gaps:SpecificationGap[]=[];
@@ -58,7 +60,7 @@ export function regenerateFoundationAssembly(parent:FoundationAssemblyRecord, in
 
   const wallsBySegment=new Map<string,FoundationEntity>();
   const wallScope=spec.walls;
-  if(fields(wallScope,'walls',['material','widthFt','heightFt','datum'])&&wallScope.status==='included'){
+  if(allowed('wall')&&fields(wallScope,'walls',['material','widthFt','heightFt','datum'])&&wallScope.status==='included'){
     const s=wallScope.specification;
     const width=s.widthFt!.value,height=s.heightFt!.value,datum=s.datum!.value;
     const base=datum.basis==='top'?datum.elevationFt-height:datum.elevationFt;
@@ -88,7 +90,7 @@ export function regenerateFoundationAssembly(parent:FoundationAssemblyRecord, in
   const supportsWallDerivation=walls.length>0&&walls.every(e=>e.scopeApplicability?.status!=='pending'&&e.scopeApplicability?.status!=='excluded');
   const footingScope=spec.footing;
   let footingProjection:number|undefined;
-  if(fields(footingScope,'footing',['material','widthFt','depthFt','alignment','top'])&&footingScope.status==='included'){
+  if(allowed('footing')&&fields(footingScope,'footing',['material','widthFt','depthFt','alignment','top'])&&footingScope.status==='included'){
     const s=footingScope.specification;
     const alignment=parent.overrides.find(o=>o.system==='footing')?.alignment??s.alignment!.value;
     const top=s.top!.value;
@@ -108,6 +110,7 @@ export function regenerateFoundationAssembly(parent:FoundationAssemblyRecord, in
   }
 
   for(const layer of spec.exteriorLayers){
+    if(!allowed('exterior',layer.id))continue;
     if(!fields(layer.scope,'exteriorLayers',['material','coverage'],'exteriorLayers.'+layer.id)||layer.scope.status!=='included')continue;
     const s=layer.scope.specification,choice=s.material!.value;
     const override=parent.overrides.find(o=>o.system==='exterior'&&o.layerId===layer.id);
@@ -135,7 +138,7 @@ export function regenerateFoundationAssembly(parent:FoundationAssemblyRecord, in
   }
 
   const drainage=spec.drainage;
-  if(fields(drainage,'drainage',['route','material'])&&drainage.status==='included'){
+  if(allowed('drainage')&&fields(drainage,'drainage',['route','material'])&&drainage.status==='included'){
     const s=drainage.specification,material=materialString(s.material!.value);
     const override=parent.overrides.find(o=>o.system==='drainage');
     const route=override?.system==='drainage'?override.route:s.route!.value;
@@ -170,7 +173,7 @@ export function regenerateFoundationAssembly(parent:FoundationAssemblyRecord, in
 
   let slab:FoundationEntity|undefined;
   const slabScope=spec.slab;
-  if(fields(slabScope,'slab',['material','extent','thicknessFt','baseFt','footingRelation'])&&slabScope.status==='included'){
+  if(allowed('slab')&&fields(slabScope,'slab',['material','extent','thicknessFt','baseFt','footingRelation'])&&slabScope.status==='included'){
     const s=slabScope.specification,extent=s.extent!.value;
     const width=value(wallScope,'widthFt');
     const polygon=extent.kind==='independent'?extent.points:
@@ -188,6 +191,12 @@ export function regenerateFoundationAssembly(parent:FoundationAssemblyRecord, in
   let below=0;
   for(const system of ['insulation','granular'] as const){
     const scope=spec[system];
+    if(!allowed(system)){
+      if(system==='insulation'&&spec.granular.status==='included'&&allowed('granular')){
+        gap('granular','sequence','Confirm independent insulation separation before positioning granular');break;
+      }
+      continue;
+    }
     if(scope.status==='excluded')continue;
     if(!fields(scope,system,['id','material','thicknessFt'])||scope.status!=='included'){
       if(system==='insulation'&&spec.granular.status==='included'){gap('granular','sequence','Resolve under-slab insulation before positioning granular');break;}

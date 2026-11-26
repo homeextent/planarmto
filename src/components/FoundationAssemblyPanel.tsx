@@ -1,8 +1,10 @@
+import { addFoundationTraceNotch, moveFoundationTraceVertex } from '../engine/measurements/foundationTraceCorrection';
+import { foundationReleaseGroup } from '../engine/measurements/foundationAssemblyValidation';
 import React, { useEffect, useMemo, useState } from 'react';
 import { v4 as uuid } from 'uuid';
 import type { ProjectDocument } from '../engine/projectDocument';
 import type {
-  AssemblyChange, AssemblyIntent, AssemblyPreview, AssemblySpecifications, DraftSpecification, FoundationAssemblyRecord,
+  AssemblyChange, AssemblyIntent, AssemblyPreview, AssemblyTrace, TraceCorrectionAudit, AssemblySpecifications, DraftSpecification, FoundationAssemblyRecord,
   MaterialChoice, Scope, Source, FoundationPreset, PresetVersion, WallSpec, FootingSpec, LayerSpec, DrainageSpec, PresetLayer, ChildBinding,
 } from '../engine/measurements/foundationAssemblyModel';
 import { foundationMaterialCatalogue } from '../engine/measurements/foundationMaterialCatalogue';
@@ -62,12 +64,13 @@ type Props={
   selectedIds?:string[];
   metric:boolean;
   onApply:(preview:AssemblyPreview)=>boolean;
+  onTraceEdit:(trace?:AssemblyTrace,onMove?:(index:number,point:{x:number;y:number})=>void)=>void;
   onPresets:(presets:FoundationPreset[])=>boolean;
   onPreview:(members:FoundationEntity[]|null)=>void;
   onSelectChildren:(ids:string[])=>void;
 };
 
-export function FoundationAssemblyPanel({project,workspaceId,selectedId,selectedIds,metric,onApply,onPresets,onPreview,onSelectChildren}:Props){
+export function FoundationAssemblyPanel({project,workspaceId,selectedId,selectedIds,metric,onApply,onTraceEdit,onPresets,onPreview,onSelectChildren}:Props){
   const workspace=project.workspaces.find(w=>w.id===workspaceId)!;
   const parents=workspace.foundationAssemblies??[];
   const inherited=parents.find(p=>p.children.some(c=>c.entityId===selectedId));
@@ -82,6 +85,13 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
   const [presetError,setPresetError]=useState('');
   const [childStatus,setChildStatus]=useState<'included'|'excluded'|'pending'>('included');
   const [childReason,setChildReason]=useState('');
+  const [detachReason,setDetachReason]=useState('');
+  const [ownershipGroup,setOwnershipGroup]=useState('');
+  const [traceEdge,setTraceEdge]=useState('0');
+  const [notchOffset,setNotchOffset]=useState('');
+  const [notchWidth,setNotchWidth]=useState('');
+  const [notchDepth,setNotchDepth]=useState('');
+  const [correctionError,setCorrectionError]=useState('');
   const presets=project.foundationPresets??[];
   const selectedPreset=presets.find(p=>p.id===presetId);
   const parent=parents.find(p=>p.id===focused)||inherited;
@@ -104,7 +114,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
   const adoptable=!inherited?assemblyFromSelection(workspace.measurements as FoundationEntity[],selectedId):null;
   const activePreview=preview?.source===project?preview:null;
   useEffect(()=>{if(preview&&preview.source!==project)setPreview(null)},[project,preview]);
-  function clearPreview(){setPreview(null);onPreview(null)}
+  function clearPreview(){setPreview(null);onPreview(null);onTraceEdit()}
   function update(input:AssemblyIntent){
     if(adoption)setAdoption({...adoption,input});
     else if(parent)setEdit({parentId:parent.id,revision:parent.revisionId,input});
@@ -213,6 +223,36 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
     const owned=new Set(next.changes?.parents.find(p=>p.id===next.assemblyId)?.children.map(c=>c.entityId));
     onPreview(next.changes?.measurements.filter(e=>owned.has(e.id))??null);
   }
+  const groups=new Map(parent?.children.map(c=>[foundationReleaseGroup(c.role),c.role]));
+  const released=new Map(parent?.detachments?.filter(a=>a.disposition==='released').map(a=>[foundationReleaseGroup(a.former.role),a.former.role]));
+  const groupName=(role:ChildBinding['role'])=>role.system==='exterior'
+    ? 'Exterior layer '+((parent?.specifications.exteriorLayers.findIndex(e=>e.id===role.layerId)??-1)+1)
+    : labels[role.system==='wall'?'walls':role.system];
+  function requestDetach(){
+    if(!parent||!detachReason.trim()||!reference.trim())return;
+    const roles=parent.children.filter(c=>foundationReleaseGroup(c.role)===ownershipGroup).map(c=>c.role);
+    showPreview(previewAssemblyChange(project,workspaceId,parent.id,parent.revisionId,{
+      kind:'detach',roles,reason:detachReason,source:sources(reference.trim()),
+    },uuid));
+  }
+  function requestReadopt(){
+    if(!parent||!intent||!reference.trim())return;
+    const bindings=parent.detachments?.filter(a=>a.disposition==='released'&&foundationReleaseGroup(a.former.role)===ownershipGroup).map(a=>a.former)??[];
+    if(!bindings.length)return;
+    showPreview(previewAssemblyChange(project,workspaceId,parent.id,parent.revisionId,{
+      kind:'replaceIntent',input:intent,adoption:{bindings,source:sources(reference.trim())},
+    },uuid));
+  }
+  function requestCorrection(create:()=>{trace:AssemblyTrace;segments:TraceCorrectionAudit['segments']}){
+    if(!parent||!reference.trim())return;
+    try{
+      const {trace,segments}=create();
+      setCorrectionError('');
+      showPreview(previewAssemblyChange(project,workspaceId,parent.id,parent.revisionId,{
+        kind:'correctTrace',trace,segments,source:sources(reference.trim()),
+      },uuid));
+    }catch(error){setCorrectionError(error instanceof Error?error.message:String(error));}
+  }
   function requestChildScope(){
     if(!parent||!selectedId||!parent.children.some(c=>c.entityId===selectedId)||!reference.trim())return;
     if(childStatus!=='included'&&!childReason.trim())return;
@@ -256,6 +296,37 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
         <>
           <details className="space-y-1">
             <summary>Advanced assembly inputs</summary>
+            {parent&&<fieldset className="border border-slate-700 p-2 space-y-1">
+              <legend>Correct saved perimeter</legend>
+              <button className={button} disabled={!reference.trim()} onClick={()=>{
+                clearPreview();
+                onTraceEdit(parent.trace,(index,point)=>requestCorrection(()=>({trace:moveFoundationTraceVertex(parent.trace,index,point),segments:[]})));
+              }}>Move trace vertex on canvas</button>
+              <details><summary>Add orthogonal inset or projection</summary>
+                <label className="block">Trace edge<select className={field} value={traceEdge} onChange={e=>setTraceEdge(e.target.value)}>
+                  {parent.trace.segments.map((edge,i)=><option key={edge.id} value={i}>Edge {i+1}</option>)}
+                </select></label>
+                <FoundationDimensionInput label="Distance from edge start" className={field} metric={metric} value={notchOffset} onChange={setNotchOffset}/>
+                <FoundationDimensionInput label="Inset width" className={field} metric={metric} value={notchWidth} onChange={setNotchWidth}/>
+                <FoundationDimensionInput label="Signed depth (left positive)" className={field} metric={metric} value={notchDepth} onChange={setNotchDepth}/>
+                <button className={button} disabled={!reference.trim()} onClick={()=>requestCorrection(()=>addFoundationTraceNotch(parent.trace,
+                  Number(traceEdge),Number(notchOffset),Number(notchWidth),Number(notchDepth),uuid))}>Preview trace edge replacement</button>
+              </details>
+              {correctionError&&<p role="alert">{correctionError}</p>}
+            </fieldset>}
+            {parent&&(groups.size>0||released.size>0)&&<fieldset className="border border-slate-700 p-2 space-y-1">
+              <legend>Component ownership</legend>
+              <label className="block">Ownership group<select className={field} value={ownershipGroup} onChange={e=>setOwnershipGroup(e.target.value)}>
+                <option value="">Select system or layer</option>
+                {[...groups].map(([key,role])=><option key={key} value={key}>{groupName(role)}</option>)}
+                {[...released].map(([key,role])=><option key={key} value={key}>{groupName(role)} · independent</option>)}
+              </select></label>
+              {groups.has(ownershipGroup)&&<>
+                <label className="block">Confirmed detachment reason<input className={field} value={detachReason} onChange={e=>setDetachReason(e.target.value)}/></label>
+                <button className={button} disabled={!detachReason.trim()||!reference.trim()} onClick={requestDetach}>Preview detachment</button>
+              </>}
+              {released.has(ownershipGroup)&&<button className={button} disabled={!reference.trim()} onClick={requestReadopt}>Preview re-adoption</button>}
+            </fieldset>}
             <button className={button} disabled={!selectedSlab||!reference.trim()} onClick={includeSlab}>Adopt selected independent slab and confirm its footing relation</button>
             <button className={button} disabled={!independentSelection.length||!reference.trim()} onClick={includeDrainage}>Adopt selected independent drainage route</button>
             {parent?.children.some(c=>c.entityId===selectedId)&&<fieldset className="space-y-1 border border-slate-700 p-2">
@@ -309,7 +380,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
         {activePreview.quantities.after.filter(r=>activePreview.changes!.parents.find(p=>p.id===activePreview.assemblyId)?.children.some(c=>c.entityId===r.elementId)).map(r=>
           <li key={JSON.stringify([r.elementId,r.code,r.unit])}>{r.code.replace('foundation.','')} · {r.status==='measured'?formatFoundationQuantity(r.quantity,r.unit,metric):r.reason}</li>)}
       </ul>}
-      {activePreview.changes&&<p role="status">{activePreview.changes.created.length} added, {activePreview.changes.retained.length} retained, {activePreview.changes.retired.length} removed</p>}
+      {activePreview.changes&&<p role="status">{activePreview.changes.created.length} added, {activePreview.changes.retained.length} retained, {activePreview.changes.retired.length} removed, {activePreview.changes.detached.length} released as independent</p>}
     </section>}
   </section>;
 }

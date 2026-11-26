@@ -593,3 +593,110 @@ test('independent slab adoption preserves its identity, source, and the original
  assert.equal(preserved.physicalId,slab.physicalId);
  expectVolume(assemblyWallVolume(adopted,'foundation.slab.concrete'),14.81481481481);
 });
+
+import { moveFoundationTraceVertex, addFoundationTraceNotch } from '../src/engine/measurements/foundationTraceCorrection';
+
+test('detached strip remains independent through edit, regeneration, deletion and explicit re-adoption',()=>{
+ const {doc,input,id}=assemblyFixture();
+ input.specifications.footing={status:'included',specification:{material:c(poured),widthFt:c(2),depthFt:c(.5),alignment:c({kind:'centred'}),top:c({kind:'wallBase'})}};
+ const initial=applyAssemblyPreview(doc,previewAssemblyChange(doc,'foundation','assembly',null,{kind:'create',input},id));
+ const parent=initial.workspaces[1].foundationAssemblies![0];
+ const bindings=parent.children.filter(b=>b.role.system==='footing');
+ const scopes=previewAssemblyChange(initial,'foundation',parent.id,parent.revisionId,{
+  kind:'setComponentScope',entityIds:[bindings[0].entityId],decision:{status:'excluded',reason:'Owner-supplied strip'},confirmation:assemblySource,
+ },id);
+ const withScope=applyAssemblyPreview(initial,scopes);
+ const saved=withScope.workspaces[1].foundationAssemblies![0];
+ const blocked=previewAssemblyChange(withScope,'foundation',saved.id,saved.revisionId,{kind:'detach',roles:[bindings[0].role],reason:'Partial strip',source:assemblySource},id);
+ assert.match(blocked.conflicts[0].message,/complete system/);
+ const dependent=previewAssemblyChange(withScope,'foundation',saved.id,saved.revisionId,{kind:'detach',roles:saved.children.filter(b=>b.role.system==='wall').map(b=>b.role),reason:'Release walls',source:assemblySource},id);
+ assert.match(dependent.conflicts[0].message,/Dependent measurements/);
+ const preview=previewAssemblyChange(withScope,'foundation',saved.id,saved.revisionId,{kind:'detach',roles:bindings.map(b=>b.role),reason:'Separate trade takeoff',source:assemblySource},id);
+ assert.deepEqual(preview.conflicts,[]);
+ const released=applyAssemblyPreview(withScope,preview);
+ const releasedParent=released.workspaces[1].foundationAssemblies![0];
+ assert.equal(releasedParent.children.length,4);
+ assert.equal(releasedParent.detachments?.length,4);
+ assert.equal(releasedParent.dormantChildren.length,0);
+ assert.equal(releasedParent.replacements.length,0);
+ for(const binding of bindings){
+  const original=withScope.workspaces[1].measurements.find(e=>e.id===binding.entityId);
+  const next=released.workspaces[1].measurements.find(e=>e.id===binding.entityId);
+  assert.ok(original&&next&&'foundation' in original&&'foundation' in next);
+  assert.equal(next.physicalId,original.physicalId);
+  assert.deepEqual(next.scopeApplicability,original.scopeApplicability);
+  assert.equal(next.foundation?.stripSource,undefined);
+ }
+ expectVolume(assemblyWallVolume(preview,'foundation.footing.strip.concrete'),
+  preview.quantities.before.filter(r=>r.code==='foundation.footing.strip.concrete'&&r.status==='measured').reduce((a,r)=>a+(r.status==='measured'?r.quantity:0),0));
+ const reopened=deserializeProjectDocument(serializeProjectDocument(released));
+ assert.deepEqual(reopened,released);
+ const snap=(d:ProjectDocument)=>({view:workspaceFloorplan(d),measurements:d.workspaces[1].measurements,foundationAssemblies:d.workspaces[1].foundationAssemblies});
+ assert.deepEqual(restoreWorkspaceSnapshot(released,'foundation',snap(withScope)),withScope);
+ assert.deepEqual(restoreWorkspaceSnapshot(withScope,'foundation',snap(released)),released);
+ const edited=replaceSpecialistEntities(released,'foundation',released.workspaces[1].measurements.map(e=>e.kind==='stripFooting'?{...e,heightFt:1}:e));
+ const revised=structuredClone(input);
+ if(revised.specifications.walls.status==='included')revised.specifications.walls.specification.heightFt=c(9);
+ const regen=previewAssemblyChange(edited,'foundation',saved.id,releasedParent.revisionId,{kind:'replaceIntent',input:revised},id);
+ assert.deepEqual(regen.conflicts,[]);
+ assert.equal(regen.changes!.measurements.filter(e=>e.kind==='stripFooting').length,4);
+ assert.ok(regen.changes!.measurements.every(e=>e.kind!=='stripFooting'||e.heightFt===1&&!e.foundation?.stripSource));
+ const deleted=replaceSpecialistEntities(released,'foundation',released.workspaces[1].measurements.filter(e=>e.id!==bindings[0].entityId));
+ assert.equal(deserializeProjectDocument(serializeProjectDocument(deleted)).workspaces[1].foundationAssemblies![0].detachments?.length,4);
+ const readopt=previewAssemblyChange(released,'foundation',saved.id,releasedParent.revisionId,{kind:'replaceIntent',input,adoption:{bindings,source:assemblySource}},id);
+ assert.deepEqual(readopt.conflicts,[]);
+ assert.equal(readopt.changes!.measurements.filter(e=>e.kind==='stripFooting').length,4);
+ assert.ok(readopt.changes!.parents[0].detachments?.every(a=>a.disposition==='readopted'));
+ assert.deepEqual(readopt.changes!.measurements.find(e=>e.id===bindings[0].entityId)?.scopeApplicability,{status:'excluded',reason:'Owner-supplied strip'});
+ const excessive=structuredClone(released);
+ const audit=excessive.workspaces[1].foundationAssemblies![0].detachments!;
+ excessive.workspaces[1].foundationAssemblies![0].detachments=Array.from({length:257},()=>audit[0]);
+ assert.throws(()=>readProjectDocument(excessive),/detachments/);
+});
+
+test('confirmed vertex and edge correction retain prior trace, regenerate dependencies and record child lineage',()=>{
+ const {doc,input,id}=assemblyFixture();
+ input.specifications.footing={status:'included',specification:{material:c(poured),widthFt:c(2),depthFt:c(.5),alignment:c({kind:'centred'}),top:c({kind:'wallBase'})}};
+ const origin=applyAssemblyPreview(doc,previewAssemblyChange(doc,'foundation','assembly',null,{kind:'create',input},id));
+ const parent=origin.workspaces[1].foundationAssemblies![0];
+ const moved=moveFoundationTraceVertex(parent.trace,1,{x:42,y:0});
+ const plain=previewAssemblyChange(origin,'foundation',parent.id,parent.revisionId,{kind:'replaceIntent',input:{...input,trace:moved}},id);
+ assert.match(plain.conflicts[0].message,/separately confirmed trace correction/);
+ const corner=previewAssemblyChange(origin,'foundation',parent.id,parent.revisionId,{kind:'correctTrace',trace:moved,segments:[],source:assemblySource},id);
+ assert.deepEqual(corner.conflicts,[]);
+ assert.deepEqual(corner.changes!.parents[0].children,parent.children);
+ const revised=applyAssemblyPreview(origin,corner);
+ const after=revised.workspaces[1].foundationAssemblies![0];
+ assert.deepEqual(after.traceCorrections?.[0].previousTrace,parent.trace);
+ assert.ok(assemblyWallVolume(corner,'foundation.footing.strip.concrete')>5.08641975309);
+ const notch=addFoundationTraceNotch(after.trace,0,10,10,4,id);
+ const amended=previewAssemblyChange(revised,'foundation',after.id,after.revisionId,{kind:'correctTrace',...notch,source:assemblySource},id);
+ assert.deepEqual(amended.conflicts,[]);
+ const complete=applyAssemblyPreview(revised,amended);
+ const final=complete.workspaces[1].foundationAssemblies![0];
+ assert.equal(final.trace.vertices.length,8);
+ assert.equal(final.traceCorrections?.length,2);
+ assert.equal(final.replacements.length,2);
+ assert.ok(final.replacements.every(r=>r.successorIds.length===5));
+ assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(complete)),complete);
+ assert.throws(()=>addFoundationTraceNotch(after.trace,0,0,10,4,id),/within the selected edge/);
+});
+
+test('confirmed run override survives coordinated width revision and round-trip without overwriting provenance',()=>{
+ const {doc,input,id}=assemblyFixture();
+ input.overrides=[{system:'walls',sourceSegmentId:'edge-0',patch:{heightFt:9},source:{kind:'manualOverride',reference:'Confirmed stepped wall detail'}}];
+ const initial=applyAssemblyPreview(doc,previewAssemblyChange(doc,'foundation','assembly',null,{kind:'create',input},id));
+ const saved=initial.workspaces[1].foundationAssemblies![0];
+ const wider=structuredClone(input);
+ if(wider.specifications.walls.status==='included')wider.specifications.walls.specification.widthFt=c(10/12);
+ const preview=previewAssemblyChange(initial,'foundation',saved.id,saved.revisionId,{kind:'replaceIntent',input:wider},id);
+ assert.deepEqual(preview.conflicts,[]);
+ const applied=applyAssemblyPreview(initial,preview);
+ const reopened=deserializeProjectDocument(serializeProjectDocument(applied));
+ const next=reopened.workspaces[1].foundationAssemblies![0];
+ const overridden=next.children.find(c=>c.role.system==='wall'&&c.role.sourceId==='edge-0');
+ assert.deepEqual(next.overrides,saved.overrides);
+ assert.deepEqual(next.trace,saved.trace);
+ assert.equal(overridden?.entityId,saved.children[0].entityId);
+ assert.ok(reopened.workspaces[1].measurements.some(e=>e.kind==='foundationWall'&&e.id===overridden?.entityId&&e.heightFt===9));
+});

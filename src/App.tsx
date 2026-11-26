@@ -1,6 +1,6 @@
 import { assemblyFromSelection, FoundationAssemblyPanel } from './components/FoundationAssemblyPanel';
 import { applyAssemblyPreview, previewAssemblyChange } from './engine/measurements/foundationAssemblyController';
-import type { AssemblyPreview, FoundationPreset } from './engine/measurements/foundationAssemblyModel';
+import type { AssemblyPreview, AssemblyTrace, FoundationPreset } from './engine/measurements/foundationAssemblyModel';
 import {planFoundationDeletion} from './engine/measurements/foundationDerivation';
 import {planRoofDeletion} from './engine/measurements/roofSelection';
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
@@ -137,6 +137,7 @@ function AppContent() {
   const histories = useRef(new Map<string, { history: WorkspaceSnapshot[]; redo: WorkspaceSnapshot[] }>());
 
   // Active drafting tool
+  const [traceEdit,setTraceEdit]=useState<{document:typeof document;trace:AssemblyTrace;onMove:(index:number,point:{x:number;y:number})=>void}>();
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
 
   // Active wall preset for drafting
@@ -497,6 +498,7 @@ function AppContent() {
   }, [selection, state, handlePaste]);
 
   function resetWorkspaceInteraction() {
+    setTraceEdit(undefined);
     generation.current++;
     setWorkspaceEpoch(n => n + 1);
     setSelection({ type: 'none' }); setContextMenu(null); setClipboard(null);
@@ -707,6 +709,7 @@ function AppContent() {
   }, []);
 
   const handleToolChange = useCallback((tool: ActiveTool) => {
+    setTraceEdit(undefined);
     if (tool === 'calibrate_scale' && activeTool !== 'calibrate_scale') {
       saveSnapSetting({ enabled: state.settings.gridSnap, size: state.settings.gridSnapSize });
       handleUpdateSettings({ ...state.settings, gridSnap: false }, false);
@@ -787,6 +790,7 @@ function AppContent() {
           foundationFilter={visibleFoundationKind}
           onFoundationChange={handleFoundationChange}
           onApplyTracedAssembly={handleTracedAssembly}
+          traceCorrection={traceEdit?.document===document?traceEdit:undefined}
           roofEntities={roofEntities}
           onRoofChange={handleRoofChange}
           commitDraftPlacement={commitDraftPlacement}
@@ -810,7 +814,10 @@ function AppContent() {
 
         {foundationEntities && <FoundationInspector ownedComponentIds={new Set(activeWorkspace.foundationAssemblies?.flatMap(parent=>parent.children.map(child=>child.entityId)))} assemblyControls={<FoundationAssemblyPanel project={document} workspaceId={activeWorkspace.id}
           selectedIds={selection.type==='foundation'?selection.ids:undefined} selectedId={selection.type==='foundation'?(selection.id??selection.ids?.[0]):undefined} metric={state.settings.unitSystem==='metric'}
-          onApply={handleAssemblyApply} onPresets={handleFoundationPresets} onPreview={members=>setFoundationGhost(members?{workspaceId:activeWorkspace.id,source:foundationEntities,members}:null)}
+          onTraceEdit={(trace,onMove)=>{
+            setActiveTool('select');
+            setTraceEdit(trace&&onMove?{document,trace,onMove:(index,point)=>{setTraceEdit(undefined);onMove(index,point)}}:undefined);
+          }} onApply={handleAssemblyApply} onPresets={handleFoundationPresets} onPreview={members=>setFoundationGhost(members?{workspaceId:activeWorkspace.id,source:foundationEntities,members}:null)}
           onSelectChildren={ids=>setSelection(ids.length?{type:'foundation',ids}:{type:'none'})}/>} metric={state.settings.unitSystem==='metric'} key={activeWorkspace.id} onPreview={members=>setFoundationGhost(members?{workspaceId:activeWorkspace.id,source:foundationEntities,members}:null)} filter={visibleFoundationKind} onFilter={kind=>{setFoundationFilter({workspaceId:activeWorkspace.id,kind});setSelection({type:'none'})}} workspaceId={activeWorkspace.id} entities={foundationEntities} selection={selection} onChange={handleFoundationChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
         {roofEntities && <RoofInspector workspaceId={activeWorkspace.id} entities={roofEntities} selection={selection} onChange={handleRoofChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
         {/* Right Real-time MTO Take-Off Matrix */}

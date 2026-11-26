@@ -129,6 +129,21 @@ export type AssemblyOverride =
   | { system: 'exterior'; layerId: string; coverage: LayerSpec['coverage']; source: Source }
   | { system: 'footing'; alignment: FootingSpec['alignment']; source: Source }
   | { system: 'drainage'; route: DrainageSpec['route']; source: Source };
+export type DetachmentAudit = {
+  former: ChildBinding;
+  revisionId: string;
+  reason: string;
+  source: Source;
+  disposition: 'released' | 'readopted';
+  readoptedAtRevisionId?: string;
+};
+export type TraceCorrectionAudit = {
+  previousRevisionId: string;
+  revisionId: string;
+  previousTrace: AssemblyTrace;
+  source: Source;
+  segments: { retiredId: string; successorIds: string[] }[];
+};
 export type FoundationAssemblyRecord = {
   version: 1; id: string; revisionId: string;
   trace: AssemblyTrace;
@@ -140,6 +155,8 @@ export type FoundationAssemblyRecord = {
   componentScope: ComponentScopeRecord[];
   priorScopeDecisions: PriorScopeDecision[];
   replacements: Replacement[];
+  detachments?: DetachmentAudit[];
+  traceCorrections?: TraceCorrectionAudit[];
   adoption?: { entityIds: string[]; source: Source };
 };
 
@@ -156,7 +173,8 @@ export type AssemblyChange =
   | { kind: 'replaceIntent'; input: AssemblyIntent; adoption?: { bindings: ChildBinding[]; source: Source }; identityReplacements?: IdentityReplacementIntent[]; scopeResolutions?: ScopeResolution[] }
   | { kind: 'adopt'; input: AssemblyIntent; bindings: ChildBinding[]; source: Source }
   | { kind: 'setComponentScope'; entityIds: string[]; decision: FoundationApplicability; confirmation: Source }
-  | { kind: 'detach'; roles: ChildRole[]; source: Source };
+  | { kind: 'detach'; roles: ChildRole[]; reason: string; source: Source }
+  | { kind: 'correctTrace'; trace: AssemblyTrace; segments: TraceCorrectionAudit['segments']; source: Source };
 export type SpecificationGap = {
   system: keyof AssemblySpecifications;
   role?: ChildRole;
@@ -175,6 +193,7 @@ export type AssemblyPreview = {
     measurements: FoundationEntity[];
     retained: ChildBinding[];
     retired: ChildBinding[];
+    detached: ChildBinding[];
     created: ChildBinding[];
   };
   quantities: { before: QuantityContribution[]; after: QuantityContribution[] };

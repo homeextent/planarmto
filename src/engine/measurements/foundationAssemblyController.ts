@@ -4,7 +4,7 @@ import type {
   AssemblyChange, AssemblyIntent, AssemblyPreview, ChildBinding, ComponentScopeRecord, FoundationAssemblyRecord, RetainedIdentity,
 } from './foundationAssemblyModel';
 import { regenerateFoundationAssembly } from './foundationAssemblyRegeneration';
-import { foundationRoleKey, stableValue } from './foundationAssemblyValidation';
+import { foundationReleaseGroup, foundationRoleKey, stableValue } from './foundationAssemblyValidation';
 import { measureFoundation } from './foundationMeasurements';
 import type { FoundationEntity } from './measurementTypes';
 
@@ -57,6 +57,27 @@ export function previewAssemblyChange(document:ProjectDocument,workspaceId:strin
       next={...rest,...structuredClone(design(command.input))};
     }
     const revision=next.revisionId;
+    if(command.kind==='replaceIntent'&&!equal(command.input.trace,previous?.trace))
+      throw Error('Use a separately confirmed trace correction to change the original trace.');
+    if(command.kind==='correctTrace'){
+      if(command.trace.reference!==next.trace.reference)throw Error('Trace correction must preserve the reference convention.');
+      const old=next.trace;
+      if(equal(old,command.trace))return preview;
+      const removed=old.segments.filter(segment=>!command.trace.segments.some(s=>s.id===segment.id));
+      if(removed.length!==command.segments.length||
+        removed.some(segment=>!command.segments.some(s=>s.retiredId===segment.id&&s.successorIds.length>0)))
+        throw Error('Map every replaced trace segment to its explicit successor segments.');
+      const retainedIds=new Set(old.segments.map(s=>s.id));
+      const newIds=new Set(command.trace.segments.map(s=>s.id));
+      if(command.segments.some(s=>s.successorIds.some(id=>!newIds.has(id)||retainedIds.has(id))))
+        throw Error('Trace replacements require new, valid successor identities.');
+      if((next.detachments??[]).some(a=>a.disposition==='released'))throw Error('Resolve detached roles before correcting this parent trace.');
+      next.trace=structuredClone(command.trace);
+      next.traceCorrections=[...(next.traceCorrections??[]),{
+        previousRevisionId:previous!.revisionId,revisionId:revision,previousTrace:old,source:command.source,
+        segments:structuredClone(command.segments),
+      }];
+    }
     const byId=new Map(measurements.map(e=>[e.id,e]));
     if(adoption){
       const otherOwned=new Set((workspace.foundationAssemblies??[]).flatMap(a=>allBindings(a).map(b=>b.entityId)));
@@ -68,8 +89,20 @@ export function previewAssemblyChange(document:ProjectDocument,workspaceId:strin
         targetRoles.add(foundationRoleKey(binding.role));
         return {entityId:entity.id,decision:entity.scopeApplicability??{status:'legacyAbsent'},source:{kind:'historicalRecord',entityId:entity.id},inheritedFromEntityIds:[]};
       });
+      const adoptees=new Map(adoption.bindings.map(b=>[foundationRoleKey(b.role),b]));
+      const released=next.detachments?.filter(a=>a.disposition==='released')??[];
+      const restoringGroups=new Set(adoption.bindings.map(b=>foundationReleaseGroup(b.role)));
+      for(const audit of released){
+        if(!restoringGroups.has(foundationReleaseGroup(audit.former.role)))continue;
+        const target=adoptees.get(foundationRoleKey(audit.former.role));
+        if(!target)throw Error('Re-adopt the complete released role group.');
+        audit.disposition='readopted';
+        audit.readoptedAtRevisionId=revision;
+      }
       next.children.push(...structuredClone(adoption.bindings));
-      next.componentScope.push(...adoptedScopes);
+      const superseded=next.componentScope.filter(s=>adoptedScopes.some(a=>a.entityId===s.entityId));
+      next.priorScopeDecisions.push(...superseded.map(previous=>({revisionId:revision,previous})));
+      next.componentScope=next.componentScope.filter(s=>!adoptedScopes.some(a=>a.entityId===s.entityId)).concat(adoptedScopes);
       next.adoption={entityIds:[...new Set([...(next.adoption?.entityIds??[]),...adoption.bindings.map(c=>c.entityId)])],
         source:next.adoption?.source??adoption.source};
     }
@@ -86,8 +119,42 @@ export function previewAssemblyChange(document:ProjectDocument,workspaceId:strin
       }
       if(equal(next.componentScope,previous?.componentScope))return preview;
     }
-    if(command.kind==='detach')throw Error('Detachment requires explicit independent scope and dependent-source reconciliation');
-    const replacements=command.kind==='replaceIntent'?command.identityReplacements??[]:[];
+    const detached=new Set<string>();
+    if(command.kind==='detach'){
+      const selected=new Set(command.roles.map(foundationRoleKey));
+      if(!selected.size||!command.reason.trim())throw Error('Select owned roles and confirm a detachment reason.');
+      const targets=next.children.filter(b=>selected.has(foundationRoleKey(b.role)));
+      if(targets.length!==selected.size)throw Error('Detach only active, owned roles.');
+      const groups=new Set(targets.map(b=>foundationReleaseGroup(b.role)));
+      if(originalBindings.some(b=>groups.has(foundationReleaseGroup(b.role))&&!selected.has(foundationRoleKey(b.role))))
+        throw Error('Detach the complete system or exterior layer together.');
+      targets.forEach(b=>detached.add(b.entityId));
+      for(const entity of measurements){
+        if(detached.has(entity.id))continue;
+        const f=entity.foundation;
+        const sources=[...(f?.stripSource?[f.stripSource.wallId]:[]),
+          ...(f?.envelopeSource?[f.envelopeSource.sourceId,...(f.envelopeSource.perimeterWallIds??[])]:[]),
+          ...(f?.drainageSource?.wallIds??[])];
+        if(sources.some(id=>detached.has(id)))throw Error('Dependent measurements still reference the released group. Reconcile them before detaching.');
+      }
+      next.detachments=[...(next.detachments??[]),...targets.map(former=>({
+        former,revisionId:revision,reason:command.reason,source:command.source,disposition:'released' as const,
+      }))];
+      next.children=next.children.filter(b=>!detached.has(b.entityId));
+      for(const id of detached)ownedIds.delete(id);
+    }
+    const replacements=command.kind==='replaceIntent'?[...command.identityReplacements??[]]:[];
+    if(command.kind==='correctTrace'){
+      for(const binding of originalBindings){
+        const role=binding.role;
+        if(!('sourceId' in role))continue;
+        const source=command.segments.find(x=>x.retiredId===role.sourceId);
+        if(!source)continue;
+        if(next.dormantChildren.some(d=>d.child.entityId===binding.entityId))throw Error('Resolve a dormant role before replacing its trace segment.');
+        const successorIds=source.successorIds.map(sourceId=>JSON.stringify(['foundation-child',next.id,foundationRoleKey({...role,sourceId})]));
+        replacements.push({retired:{kind:'child',binding},successorIds});
+      }
+    }
     const retiredIds=new Set(replacements.map(x=>retainedId(x.retired)));
     if(retiredIds.size!==replacements.length)throw Error('Duplicate replacement intent');
     const oldRoute=previous?routeIdentities(previous):new Map<string,RetainedIdentity>();
@@ -127,7 +194,11 @@ export function previewAssemblyChange(document:ProjectDocument,workspaceId:strin
     }
     next.children=next.children.filter(b=>!retiredIds.has(b.entityId));
     next.dormantChildren=next.dormantChildren.filter(b=>!retiredIds.has(b.child.entityId));
-    const independent=measurements.filter(e=>!ownedIds.has(e.id));
+    const independent=measurements.filter(e=>!ownedIds.has(e.id)).map(e=>{
+      if(!detached.has(e.id)||!e.foundation)return e;
+      const {stripSource:_strip,envelopeSource:_envelope,drainageSource:_drainage,...foundation}=e.foundation;
+      return {...e,foundation};
+    });
     let result=regenerateFoundationAssembly(next,independent);
     if(adoption){
       if(command.kind==='adopt'&&(result.children.length!==next.children.length||result.children.some(b=>!ownedIds.has(b.entityId))))
@@ -167,7 +238,7 @@ export function previewAssemblyChange(document:ProjectDocument,workspaceId:strin
     }
     const live=new Set(result.children.map(b=>b.entityId));
     const dormant=new Map(next.dormantChildren.map(b=>[b.child.entityId,b]));
-    for(const b of originalBindings)if(!live.has(b.entityId)&&!retiredIds.has(b.entityId)&&!dormant.has(b.entityId))
+    for(const b of originalBindings)if(!live.has(b.entityId)&&!retiredIds.has(b.entityId)&&!detached.has(b.entityId)&&!dormant.has(b.entityId))
       dormant.set(b.entityId,{child:b,disabledAtRevisionId:revision});
     next.dormantChildren=[...dormant.values()].filter(b=>!live.has(b.child.entityId));
     next.children=result.children;
@@ -176,11 +247,16 @@ export function previewAssemblyChange(document:ProjectDocument,workspaceId:strin
     const updated=[...independent,...result.members.map(e=>originallyAdopted.has(e.id)&&byId.has(e.id)?{...e,source:byId.get(e.id)!.source}:e)];
     const after=measureFoundation(workspaceId,updated).rows;
     for(const row of before){
-      if(row.status!=='measured'||ownedIds.has(row.elementId))continue;
+      if(command.kind==='detach'&&row.status==='unquantified'){
+        if(!after.some(r=>r.elementId===row.elementId&&r.code===row.code&&r.unit===row.unit&&r.status==='unquantified'))
+          throw Error('Detachment would change unresolved measurement eligibility.');
+      }
+      if(row.status!=='measured'||ownedIds.has(row.elementId)&&command.kind!=='detach')continue;
       const retained=after.find(r=>r.elementId===row.elementId&&r.code===row.code&&r.unit===row.unit);
       if(retained?.status!=='measured'||Math.abs(retained.quantity-row.quantity)>1e-8*Math.max(1,Math.abs(row.quantity)))
         throw Error('Apply would change an independent measured contribution: '+row.elementId);
     }
+    if(command.kind==='detach'&&after.length!==before.length)throw Error('Detachment would alter the quantity ledger.');
     const unresolved=result.gaps;
     for(const row of after)if(row.status==='unquantified'&&live.has(row.elementId)){
       const binding=next.children.find(b=>b.entityId===row.elementId)!;
@@ -189,7 +265,8 @@ export function previewAssemblyChange(document:ProjectDocument,workspaceId:strin
     }
     replaceFoundationAssemblyState(document,workspaceId,updated,parents);
     preview.changes={parents,measurements:updated,
-      retained:result.children.filter(b=>ownedIds.has(b.entityId)),retired:originalBindings.filter(b=>!nextIds.has(b.entityId)),
+      retained:result.children.filter(b=>ownedIds.has(b.entityId)),retired:originalBindings.filter(b=>!nextIds.has(b.entityId)&&!detached.has(b.entityId)),
+      detached:originalBindings.filter(b=>detached.has(b.entityId)),
       created:result.children.filter(b=>!ownedIds.has(b.entityId))};
     preview.quantities.after=after;
     preview.unresolvedSpecifications=unresolved;
