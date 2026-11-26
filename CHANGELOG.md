@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] — Increments B, C.1A and C.1B (staging release train)
 
 ### C.1C — Feature candidate and hybrid handoff (not staging integrated)
+- R5.9 unifies independent wall and linked-layer editing and groups foundation takeoff by saved material specification. [R5.9 specification](docs/c1c-r5-9-contractor-takeoff.md).
 - R5.8 separates foundation inspector tabs, adds progressively disclosed construction layers and makes independent wall and exterior protection workflows more discoverable. [R5.8 specification](docs/c1c-r5-8-contractor-interface.md).
 - R5.7 adds progressive construction layers, concrete proposals, complete assembly deletion and slab footprint correction. It retains disjoint concrete quantities when an unrelated incomplete run cannot overlap. [R5.7 closeout](docs/c1c-r5-7-foundation-closeout.md).
 - R5.6C keeps construction drafts visible and transaction actions accessible, preserves pending perimeter corrections, and adds coordinated standalone slab construction. R5.6C application candidate `5a6db24aaab462d4dda888a18be08515709df849` retains 322/322 reported local regressions. Independently verified [CI #196](https://github.com/homeextent/planarmto/actions/runs/45825822174) passed, including isolated WordPress integration. Draft PR #12 targets staging. Full R5 practical owner acceptance remains withheld. Schema v3 and production 2.15.1 remain current. [R5.6C workflow](docs/c1c-r5-6c-workflow.md).

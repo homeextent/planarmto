@@ -101,7 +101,7 @@ Construction assemblies follow a complete lifecycle. Create and specify the prim
 
 #### Standard workspace interface
 
-Use the drawing toolbar for geometry creation and specialist drawing. Organize specifications and dependent construction around the selected geometry in the inspector. Progressively disclose construction layers and show only inputs relevant to the material, measurement basis, scope or a necessary physical relationship. Use distinct Construction, Geometry and Quantities views where applicable. Keep material totals and completeness separately reviewable, and preserve drafts and previews while navigating. Keep Preview, Apply and Cancel available during construction editing. Automate supported conventional relationships and retain discoverable advanced controls. The standard workflow requires no knowledge of internal ownership or record identifiers.
+Use the drawing toolbar for geometry creation and specialist drawing. Organize specifications and dependent construction around the selected geometry in the inspector. Progressively disclose construction layers and show only inputs relevant to the material, measurement basis, scope or a necessary physical relationship. Use distinct Construction, Geometry and Quantities views where applicable. Keep material totals and completeness separately reviewable, and preserve drafts and previews while navigating. Keep Preview, Apply and Cancel available during construction editing. Automate supported conventional relationships and retain discoverable advanced controls. The standard workflow requires no knowledge of internal ownership or record identifiers. Equivalent construction operations use consistent terminology, visual hierarchy, controls and transaction behavior across workspaces and ownership models.
 
 ### 6. Construction system dependencies
 
@@ -159,6 +159,10 @@ Prevent duplicate material contributions and unsupported overlap reconciliation.
 Preserve independently valid quantities wherever possible when another construction relationship remains unresolved.
 
 Unsupported conditions shall be identified explicitly rather than silently approximated.
+
+Workspace takeoff groups authoritative net measurement rows by actual material specification, purchasing attributes and applicable construction use. Preserve the link to component and specification evidence. Group compatible units at full precision and identify absent attributes as unspecified. Keep known partial quantities and outstanding requirements visible.
+
+Category subtotals summarize their detail rows and contribute no additional quantity. Reference figures and informational derivatives such as eligible insulation board feet remain separate from purchasing totals. Consolidated estimating, pricing, allowances and reporting belong to the separately authorized C.2 scope.
 
 ### 9. Application across all workspaces
 

@@ -1,6 +1,6 @@
 # R5.8 contractor interface and independent walls
 
-R5.8 starts from `61ee5f1d53845a54492d99b52fac24eac2533674`, reported 324/324 local regressions and independently verified CI #198. This increment applies the [governing product design contract](../SYSTEM_BIBLE.md#governing-product-design-philosophy) to foundation only. Full C.1C and R5 owner acceptance remains withheld.
+R5.8 starts from `61ee5f1d53845a54492d99b52fac24eac2533674`, reported 324/324 local regressions and independently verified CI #198. This increment applies the [governing product design contract](../SYSTEM_BIBLE.md#governing-product-design-philosophy) to foundation only. Full C.1C and R5 owner acceptance remains withheld. R5.8 provides the historical baseline for the [R5.9 independent wall transaction and material ledger corrections](c1c-r5-9-contractor-takeoff.md).
 
 | Requirements | R5.8 implementation and review |
 |---|---|
