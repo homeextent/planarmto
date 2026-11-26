@@ -44,3 +44,5 @@ Use isolated feature/documentation branches and PRs to staging, exact-head CI, t
 ## Next authorized work
 
 R5.0A is accepted at `cd782e7` on the existing feature branch. The owner approved the [coordinated specification](docs/c1c-r5-coordinated-specification.md). The [R5.1–R5.2 candidate](docs/c1c-r5-1-r5-2-evidence.md) is for independent source review. The revised [R5.3 persistence design](docs/c1c-r5-3-persistence-design.md) was approved at `1be740b`. Review the [R5.3–R5.5 candidate and R5.6 evidence](docs/c1c-r5-technical-evidence.md) before actual-plan owner acceptance and any staging decision. C.1C remains unmerged pending owner contractor-workflow acceptance and explicit staging authorization. See [R5.0A evidence and owner checks](docs/c1c-functional-findings.md#r50a-formal-acceptance) and [proposed R5](docs/c1c-r5-contractor-workflow.md). C.1E and C.2 are separately gated.
+
+R5.6A closeout covers the bounded detachment and trace correction amendment. See [technical evidence](docs/c1c-r5-technical-evidence.md) for the independent implementation and actual-plan acceptance gates.

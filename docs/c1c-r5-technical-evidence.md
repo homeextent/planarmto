@@ -9,7 +9,7 @@ R5.3–R5.5 implementation against the approved coordinated specification and th
 - `foundationAssemblyRegeneration.ts` orchestrates existing perimeter, strip, coverage, drainage, slab, under-slab and quantity engines. Role IDs follow source segments and layer IDs. Debug diagnostics distinguish incomplete specification from pending or excluded scope. Dormant and retired identities, explicit child-scope decisions and reasons remain persisted.
 - `FoundationAssemblyPanel.tsx` implements direct parent selection, confirmation, scope and material editing, local preset versions, adoption previews, advanced independent slab and drainage adoption, and material quantities. Existing specialist tools remain available, grouped under advanced component controls for owned selections. Standard assembly fields support compound imperial and explicit metric entry. Metric quantities are presentation only. Board feet and footprint references remain informational.
 - Explicit footing elevations other than confirmed wall base, nonzero offset strips on a connected perimeter, and derived coverage for steps or complex openings follow the existing engine limits. Use separately traced details when the coordinated engine cannot reconcile them. Offsets and nonstandard geometry are never approximated.
-- The controller supports explicit lineage and per-successor scope resolution. There is no general graphical lineage editor or implemented detachment command in this candidate. The approved design requires a detached physical measurement to stay live and independent, while its inactive child identity must not remain live. Review a distinct non-owning detachment audit record before implementing that transition. Generic editing of an owned child is refused. Broader manual transition paths and the remaining tests marked partial below require review before claiming the whole R5 register is accepted.
+- R5.6A resolves the previous detachment conflict with a non-owning released-group audit. Complete active systems or exterior layers can be released when all affected dependencies remain valid. Owned and independent contributions are checked before Apply. The browser offers graphical corner correction and a bounded orthogonal inset or projection. Every correction records its previous trace and explicit replacement lineage where a source edge changes. Intersecting, ambiguous and unsupported transitions are refused.
 
 ## Approved requirement register
 
@@ -47,24 +47,24 @@ R5.3–R5.5 implementation against the approved coordinated specification and th
 | R53-D08 | Covered. Explicit wall-face route or adopted manual route uses the existing engine, with pending diagnostics where footing edge is unavailable. |
 | R53-D09 | Verified for independent slab extent by engine test. Interior polygon uses the existing perimeter engine and explicit confirmation. |
 | R53-D10 | Verified. Independent slab-stack test checks values and actual elevations. |
-| R53-D11 | Covered. UI saves project-local preset versions and applies a confirmed snapshot. Structure and round-trip tested. |
-| R53-D12 | Verified. Confirmed snapshot survives local preset removal in a v3 round trip. |
+| R53-D11 | Verified. Browser saves project-local preset versions and applies a confirmed snapshot. |
+| R53-D12 | Verified. A new local preset version leaves the applied snapshot intact, including after removal and v3 round trip. |
 | R53-D13 | Verified. Established independent excavation/backfill regressions retained. No coordinated inference. |
 | R53-D14 | Verified. Included incomplete and pending are distinct with no generated placeholder quantity. |
 | R53-D15 | Covered. Existing engine bounds and explicit configuration. No engineering determination. |
 | R54-01 | Verified by the supplemental two-parent workspace probe. Ownership stays independent while one parent is revised. |
-| R54-02 | Verified. Thickness change preserves the original trace. |
+| R54-02 | Verified. Thickness change preserves the original trace. Separately confirmed graphical corner and segment corrections retain prior revision provenance. |
 | R54-03 | Verified. CA05–07 fixture changes wall and strip quantities using current derivations. |
 | R54-04 | Verified. Browser preview leaves exported measurement count unchanged. |
 | R54-05 | Verified. Browser Apply creates eight measurements from four with one history transition. |
 | R54-06 | Verified. Rejected stale, tampered and invalid previews leave the saved state intact. |
 | R54-07 | Verified. Browser undo and redo restore exact workspace equality including parent graph. |
 | R54-08 | Verified. Equivalent intent is idempotent. |
-| R54-09 | Verified. Excluded child survives dormancy and reactivation with IDs and reason. |
-| R54-10 | Covered. Controller invalidates previews that change independently measured quantities. Existing foundation protection regressions retained. |
-| R54-11 | Verified. Manual segment split records explicit replacement lineage and retained scope with round-trip. |
-| R54-12 | Verified for explicit perimeter adoption. Model/controller allow additional independent binding adoption after confirmation; no automatic adoption. |
-| R54-13 | Partial. Compatible overrides are retained and validated. General graphical topology/override editing and detachment remain outside tested workflows. |
+| R54-09 | Verified. Scope and IDs survive dormant reactivation, detachment and explicit re-adoption with the exact exclusion reason. |
+| R54-10 | Verified. Detachment preserves known contributions and prevents coincident regeneration after independent changes or deletion. Linked dependants block release. |
+| R54-11 | Verified. Manual drainage and bounded trace segment replacements record child lineage and prior trace through v3 round trip. |
+| R54-12 | Verified for perimeter and independent slab adoption, plus explicit re-adoption of detached strips without duplicate quantities. |
+| R54-13 | Verified for compatible stepped wall override preservation, complete-group detachment, and targeted corner and edge correction. Unsupported or ambiguous dependency changes are refused. |
 | R54-14 | Verified. Stale and tampered preview tests. |
 | R54-15 | Verified. Save/export/reopen of synthetic assembly and controller v3 round trips. |
 | R54-16 | Verified. Accepted numerical and persistence regression suites retained. |
@@ -81,7 +81,7 @@ R5.3–R5.5 implementation against the approved coordinated specification and th
 | R55-11 | Verified. Preview shows unresolved system and material information. Data-level tests separate quantity and material completeness. |
 | R55-12 | Verified. Existing consolidated pricing gate retained. |
 | R56-01 | Verified by the full local regression suite. |
-| R56-02 | Partial. This register identifies targeted coverage and remaining acceptance gaps, including manual editing and owner procedures. |
+| R56-02 | Verified for the bounded R5.6A scope. Controller and browser evidence covers detachment, override provenance, graphical corrections, presets and atomic history. Unrestricted topology editing and unsupported engine geometry remain outside the bounded workflow. |
 | R56-03 | Open until exact-candidate CI is independently verified. |
 | R56-04 | Open. Independent implementation review required. |
 | R56-05 | Open. Actual architectural plan owner acceptance required. |
@@ -108,10 +108,17 @@ R5.3–R5.5 implementation against the approved coordinated specification and th
 
 Final Node 22.23.5 validation passed 307/307 (223 Node and 84 Chromium). TypeScript, build, dependency audit (zero findings), Chromium installation, PHP lint and PDF worker checks passed. The locked install was verified on the preceding shared-architecture run, with package manifests unchanged. The focused document/controller suite and four targeted browser cases passed. A separate synthetic calibrated-plan probe created an owned 40×30 rectangle, applied the confirmed footing and drainage, reported **150.67 LF**, and retained the underlay and all 12 child bindings on reopen. The isolated two-parent and storage/lineage probes also passed. Logs and traces are under `/tmp/planarmto-r536-final`. Docker is unavailable locally.
 
+### R5.6A verification
+
+The 307-test baseline at `7ac4dd9` passed [CI #192](https://github.com/homeextent/planarmto/actions/runs/45705520839/job/139526365639), including isolated WordPress. The bounded closeout passed **311/311** locally on Node 22.23.5 (226 Node and 85 Chromium). The locked install, TypeScript, production build, audit, PHP lint and PDF worker checks passed. Docker was unavailable locally. Targeted browser checks passed for calibrated drafting, assembly adoption, interactive correction, preset snapshots and reversible detachment. The complete browser run also checks metric display without mutating the persisted workspace. Logs and traces are under `/tmp/planarmto-r56a`.
+
+The exact limitations are tied to the existing engine contracts. Detachment requires an entire system or exterior layer and refuses remaining linked dependencies. Trace editing supports corner moves that preserve orthogonality and bounded orthogonal insets or projections. Released groups and dormant or conflicting lineage require resolution before topology replacement. Legacy generated references retain their native independent-edit restrictions. Actual-plan acceptance remains open.
+
 ## Practical owner verification
 
 1. Use a disposable local production-preview profile. Import an actual plan locally, calibrate against a labeled dimension and verify scale after zoom and reopen. Keep the plan and screenshots out of Git and CI.
 2. Trace one rectangle and one irregular perimeter. Compare the quantities to independent takeoff and confirm each source convention and assumption. Preview the perimeter, apply it as a foundation assembly, and compare the original trace before and after a wall-thickness revision.
 3. Confirm a footing, at least two differently specified exterior layers, and the approved drainage reference. Preview before Apply. Verify each material row and check how incomplete pipe attributes are reported while eligible route length remains known.
 4. Confirm a slab extent and base. Compare the under-slab strata and their independent quantities. Verify a scope exclusion and its reason survive undo, redo and reopen. Exercise a stepped or nonstandard condition and check the documented refusal or independent workflow.
-5. Record actual quantities, operation count/time and usability findings. Submit exact candidate evidence for independent review before requesting staging approval.
+5. Move a saved trace vertex and preview a bounded inset where appropriate. Check that prior trace provenance remains. Detach a complete system without dependent sources, confirm its quantity appears once, revise an independent value, and verify explicit re-adoption or deletion, undo, redo and reopen.
+6. Record actual quantities, operation count/time and usability findings. Submit exact candidate evidence for independent review before requesting staging approval.

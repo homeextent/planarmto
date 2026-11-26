@@ -73,7 +73,7 @@ npm run build:zip creates ../../builds/planar-mto.zip relative to the repository
 
 PR #8 merged into staging at `c1a0bf7` after documentation-only candidate `3d0830e` passed CI #40 ([run 45462442984](https://github.com/homeextent/planarmto/actions/runs/45462442984)). Post-merge staging push [run 45462698052](https://github.com/homeextent/planarmto/actions/runs/45462698052), job 138689310248, completed successfully; owner CLI and job details verified. C.1A formally complete. Production `main` remains v2.15.1 at `0423cb6`.
 
-[R5.0A baseline stabilization](docs/c1c-functional-findings.md#r50a-formal-acceptance) passed independent review and owner acceptance at `cd782e7` on draft PR #12. The approved revised design at `1be740b` authorizes R5.3–R5.5 and R5.6 automated verification. See the [technical register](docs/c1c-r5-technical-evidence.md) before independent and actual-plan owner review. C.1D is deferred. See [ROADMAP.md](ROADMAP.md).
+[R5.0A baseline stabilization](docs/c1c-functional-findings.md#r50a-formal-acceptance) passed independent review and owner acceptance at `cd782e7` on draft PR #12. The approved revised design at `1be740b` authorizes R5.3–R5.5 and R5.6 automated verification. The R5.6A bounded amendment covers detachment and trace correction. See the [technical register](docs/c1c-r5-technical-evidence.md) before independent and actual-plan owner review. C.1D is deferred. See [ROADMAP.md](ROADMAP.md).
 
 ## Evidence-driven debugging and browser regression protocol
 
