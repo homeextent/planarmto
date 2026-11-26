@@ -37,11 +37,12 @@ function ensureSingleLayer(layer:FoundationEntity,entities:FoundationEntity[]){
    throw Error('Resolve dependent construction before changing this layer.');
 }
 
-export function IndependentWallConstruction({wall,entities,ownedIds,metric,onChange,onPreview,renderWall}:{
+export function IndependentWallConstruction({wall,entities,ownedIds,metric,onChange,onPreview,renderWall,onCancelDraft}:{
  key?:string;wall:FoundationEntity;entities:FoundationEntity[];ownedIds?:ReadonlySet<string>;metric:boolean;onChange:(entities:FoundationEntity[])=>boolean;
- onPreview:(members:FoundationEntity[]|null)=>void;
+ onPreview:(members:FoundationEntity[]|null)=>void;onCancelDraft?:()=>void;
  renderWall:(preview:(entity:FoundationEntity)=>boolean,reset:number)=>React.ReactNode;
 }){
+ const pad=wall.kind==='padFooting';
  const {tab,selectTab}=useContext(FoundationInspectorContext);
  const formHost=useRef<HTMLDivElement>(null);
  const [draft,setDraft]=useState<LayerDraft>();
@@ -78,7 +79,7 @@ export function IndependentWallConstruction({wall,entities,ownedIds,metric,onCha
  function previewWall(replacement:FoundationEntity){
    clear();
    try{
-     review(entities.map(record=>record.id===wall.id?replacement:record),wall.id,replacement,false);
+     review(onCancelDraft?[...entities,replacement]:entities.map(record=>record.id===wall.id?replacement:record),wall.id,replacement,!!onCancelDraft);
      return true;
    }catch(cause){setError(cause instanceof Error?cause.message:String(cause));return false;}
  }
@@ -93,14 +94,24 @@ export function IndependentWallConstruction({wall,entities,ownedIds,metric,onCha
        ensureSingleLayer(original,entities);
        if(draft.remove&&original.scopeApplicability)throw Error('Resolve the explicit scope decision in Advanced before removing this layer.');
      }
-     const other=original?entities.filter(entity=>entity.id!==original.id):entities;
+     let other=original?entities.filter(entity=>entity.id!==original.id):entities;
      if(draft.remove&&original){review(other,original.id);return;}
      const source=original?.foundation?.stripSource??original?.foundation?.envelopeSource;
      const ids=source?[source.groupId,original!.assemblyId,original!.id]:[];
      const id=()=>ids.shift()??uuid();
      let member:FoundationEntity;
      if(draft.kind==='footing'){
-       [member]=deriveStripFootings(other,[wall.id],Number(draft.width),Number(draft.depth),id,Number(draft.offset));
+       if(wall.kind!=='foundationWall'||!wall.foundation?.centrelineConfirmed||wall.widthFt===null||wall.foundation.material!=='poured concrete')
+         throw Error('Confirm the wall trace, thickness and poured concrete in Construction.');
+       const offset=Number(draft.offset);
+       if(!wall.foundation.baseElevationConfirmed||wall.elevationFt===null){
+         if(offset!==0||wall.elevationFt!==null||wall.foundation.elevationReference)
+           throw Error('Confirm the wall base under Advanced wall elevations for this footing.');
+         const localWall:FoundationEntity={...wall,elevationFt:0,foundation:{...wall.foundation,
+           baseElevationConfirmed:true,elevationReference:{kind:'assembly',id:wall.id}}};
+         other=other.map(entity=>entity.id===wall.id?localWall:entity);
+       }
+       [member]=deriveStripFootings(other,[wall.id],Number(draft.width),Number(draft.depth),id,offset);
      }else{
        if(!draft.side)throw Error('Select the exterior side to review coverage on the drawing.');
        const insulating=draft.kind==='verticalInsulation';
@@ -112,7 +123,7 @@ export function IndependentWallConstruction({wall,entities,ownedIds,metric,onCha
          ...(insulating&&['eps','xps','polyisocyanurate'].includes(draft.material)?{foam:true as const}:{})},id);
      }
      if(original)member={...member,physicalId:original.physicalId,source:original.source,...(original.scopeApplicability?{scopeApplicability:original.scopeApplicability}:{})};
-     review(original?entities.map(entity=>entity.id===original.id?member:entity):[...entities,member],member.id,member);
+     review(original?entities.map(entity=>entity.id===original.id?member:entity):[...other,member],member.id,member);
    }catch(cause){setError(cause instanceof Error?cause.message:String(cause));}
  }
  function start(next:LayerDraft){
@@ -127,9 +138,10 @@ export function IndependentWallConstruction({wall,entities,ownedIds,metric,onCha
    formatFoundationQuantity(row.quantity,row.unit,metric)+(row.unit==='BF'?' informational':''):row.reason;
  const input=(label:string,key:'width'|'depth'|'offset'|'height',section=true)=>
    <FoundationDimensionInput label={label} value={draft?.[key]??''} onChange={value=>update({[key]:value})} className={field} section={section}/>;
- return <section aria-label="Independent wall layers" className="space-y-2 text-xs">
-   <div className="sticky top-0 z-10 space-y-1 border-b border-slate-600 bg-slate-900 py-2" role="group" aria-label="Wall construction transaction">
-     <p>{draft?draft.remove?'Remove '+layerNames[draft.kind]:layerNames[draft.kind]:'Independent wall'} · {current?'Preview ready':'Construction'}</p>
+ return <section aria-label={pad?"Pad footing construction":"Independent wall layers"} className="space-y-2 text-xs">
+   <div className="sticky top-0 z-10 space-y-1 border-b border-slate-600 bg-slate-900 py-2" role="group" aria-label={pad?"Pad footing transaction":"Wall construction transaction"}>
+     <p>{draft?draft.remove?'Remove '+layerNames[draft.kind]:layerNames[draft.kind]:pad?'Pad footing':'Independent wall'} · {current?'Preview ready':'Construction'}</p>
+     {current&&draft?.kind==='footing'&&!wall.foundation?.baseElevationConfirmed&&<p>Uses the wall base as a local estimating reference.</p>}
      <div className="flex gap-2">
        <button className={button} onClick={()=>{if(draft)previewLayer();else formHost.current?.querySelector('form')?.requestSubmit();}}>Preview</button>
        <button className={button} disabled={!current} onClick={()=>{
@@ -137,13 +149,14 @@ export function IndependentWallConstruction({wall,entities,ownedIds,metric,onCha
          if(current.source!==entities||!onChange(current.next)){setError('Preview changed or failed validation. Review the construction again.');return;}
          clear();setDraft(undefined);setReset(value=>value+1);selectTab('Construction');
        }}>Apply</button>
-       <button className={button} onClick={()=>{clear();setDraft(undefined);setReset(value=>value+1);selectTab('Construction');}}>Cancel</button>
+       <button className={button} onClick={()=>{clear();setDraft(undefined);setReset(value=>value+1);selectTab('Construction');onCancelDraft?.();}}>Cancel</button>
      </div>
      {error?<p role="alert">{error}</p>:!current&&<p className="text-slate-300">Preview this construction before applying.</p>}
    </div>
    <div hidden={tab!=='Construction'} className="space-y-2">
      <div ref={formHost} hidden={!!draft} className="rounded-lg border border-slate-700 border-l-sky-400 border-l-4 p-2"
        onChangeCapture={clear}>{renderWall(previewWall,reset)}</div>
+     {!pad&&!onCancelDraft&&<>
      <h3 className="font-semibold">Supporting construction</h3>
      {(!related.some(e=>e.kind==='stripFooting'))&&<button className={button} onClick={()=>start(makeDraft('footing'))}>Add strip footing</button>}
      <h3 className="font-semibold">Exterior protection</h3>
@@ -167,7 +180,7 @@ export function IndependentWallConstruction({wall,entities,ownedIds,metric,onCha
      {draft&&!draft.remove&&<fieldset className="space-y-2 rounded-lg border border-slate-700 p-2">
        <legend>{layerNames[draft.kind]}</legend>
        {draft.kind==='footing'?<>
-         <p>Poured concrete · centred on the wall unless an offset is specified.</p>
+         <p>Poured concrete · {Number(draft.offset)===0?'Centred beneath the wall. Footing top is at the wall base.':'Advanced alignment. Footing top is at the wall base.'}</p>
          {input('Footing width','width')}{input('Footing depth','depth')}
          <details><summary>Advanced footing alignment</summary>{input('Footing offset','offset')}</details>
        </>:<>
@@ -180,9 +193,10 @@ export function IndependentWallConstruction({wall,entities,ownedIds,metric,onCha
          </select></label>
        </>}
      </fieldset>}
+     </>}
    </div>
-   {tab==='Quantities'&&current&&<section aria-label="Wall construction preview" className="space-y-1">
-     <h3 className="font-semibold">Wall construction preview</h3>
+   {tab==='Quantities'&&current&&<section aria-label={pad?"Pad footing preview":"Wall construction preview"} className="space-y-1">
+     <h3 className="font-semibold">{pad?'Pad footing preview':'Wall construction preview'}</h3>
      {current.before.length>0&&<div><h4>Before</h4>{current.before.map(row=><p key={row.code}>{show(row)}</p>)}</div>}
      <h4>After</h4>
      {current.after.length?current.after.map(row=><p key={row.code}>{show(row)}</p>):<p>Removes the selected construction layer and its quantities.</p>}

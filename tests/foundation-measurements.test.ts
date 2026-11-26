@@ -619,3 +619,47 @@ test('drainage grouping uses current child ownership and separates unspecified h
  assert.deepEqual(grouped.map(row=>[row.diameterFt,row.quantity]),[[4/12,20],[6/12,10],[null,10]]);
  assert.match(describeFoundationTakeoff(grouped[2],false),/Diameter unspecified/);
 });
+
+test('R5.10 primary construction quantities retain unrounded ledger precision',()=>{
+ const material={version:1 as const,material:'poured concrete'};
+ const entity=(id:string)=>({id,physicalId:id,assemblyId:id,source:{reference:'R5.10 benchmark'}});
+ const pad=(id:string,polygon:{x:number;y:number}[]):FoundationEntity=>({...entity(id),kind:'padFooting',purpose:'concrete',polygon,depthFt:.5,elevationFt:null,foundation:material});
+ const local:FoundationEntity={...wall('isolated',{x:0,y:0},{x:25,y:0}),...entity('isolated')};
+ if(local.kind!=='foundationWall')throw Error('Expected wall');
+ const incomplete={...local,elevationFt:null,foundation:{...material,centrelineConfirmed:true as const}};
+ let sequence=0;
+ const id=()=>String(++sequence);
+ assert.throws(()=>deriveStripFootings([incomplete],[local.id],2,.5,id),/Confirm source wall centreline, width, material and base elevation/);
+ local.foundation!.elevationReference={kind:'assembly',id:local.id};
+ const footing=deriveStripFootings([local],[local.id],2,.5,id);
+ const membrane=deriveFoundationEnvelope([local],[local.id],{purpose:'waterproofing',material:'sheet waterproofing membrane',layerId:'membrane',side:'right',heightFt:8},id);
+ const perimeter=generateOrthogonalFoundationPerimeter(box(0,20,20,20),'exterior',8/12,8,0,id);
+ const perimeterFooting=deriveStripFootings(perimeter,perimeter.map(w=>w.id),2,.5,id);
+ const rectangle=box(60,0,20,20);
+ const slab:FoundationEntity={...entity('slab'),kind:'slab',purpose:'concrete',polygon:rectangle,depthFt:.5,elevationFt:null,foundation:material};
+ const xps:FoundationEntity={...entity('xps'),kind:'foundationRegion',purpose:'insulation',polygon:rectangle,depthFt:2/12,elevationFt:-2/12,foundation:{version:1,material:'xps',baseElevationConfirmed:true,coverage:{confirmed:true,layerId:'foam',foam:true}}};
+ const base:FoundationEntity={...entity('base'),kind:'foundationRegion',purpose:'granular',polygon:rectangle,depthFt:.5,elevationFt:-2/12-.5,foundation:{version:1,material:'clear crushed stone',baseElevationConfirmed:true,granularLayerId:'granular'}};
+ const pads=Array.from({length:4},(_,index)=>pad('pad-'+index,box(100+5*index,0,3,3)));
+ const polygon=pad('polygon',[{x:130,y:0},{x:134,y:0},{x:133,y:3},{x:130,y:3}]);
+ const result=measureFoundation('benchmarks',[local,...footing,...membrane,...perimeter,...perimeterFooting,slab,xps,base,...pads,polygon]);
+ function total(code:string,ids:string[]){
+   const rows=result.rows.filter(r=>r.code==='foundation.'+code&&ids.includes(r.elementId));
+   assert.equal(rows.length,ids.length);
+   return rows.reduce((sum,row)=>{assert.equal(row.status,'measured');return sum+(row.status==='measured'?row.quantity:0)},0);
+ }
+ near(total('wall.concrete',[local.id]),25*(8/12)*8/27);
+ near(total('footing.strip.concrete',footing.map(e=>e.id)),25*2*.5/27);
+ near(total('waterproofing.area',membrane.map(e=>e.id)),200);
+ near(total('footing.pad.concrete',[pads[0].id]),9*.5/27);
+ near(total('footing.pad.concrete',pads.map(e=>e.id)),36*.5/27);
+ near(total('footing.pad.count',pads.map(e=>e.id)),4);
+ near(result.footprintReferences.find(row=>row.elementId===pads[0].id)!.netSF!,9);
+ near(result.footprintReferences.find(row=>row.elementId===polygon.id)!.netSF!,10.5);
+ near(total('footing.pad.concrete',[polygon.id]),10.5*.5/27);
+ near(total('wall.concrete',perimeter.map(e=>e.id)),(400-(20-2*(8/12))**2)*8/27);
+ near(total('footing.strip.concrete',perimeterFooting.map(e=>e.id)),4*(20-8/12)*2*.5/27);
+ near(total('slab.concrete',[slab.id]),200/27);
+ near(total('insulation.area',[xps.id]),400);
+ near(total('insulation.foam',[xps.id]),800);
+ near(total('granular.volume',[base.id]),200/27);
+});

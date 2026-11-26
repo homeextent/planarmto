@@ -140,6 +140,7 @@ function AppContent() {
   const [traceEdit,setTraceEdit]=useState<{document:typeof document;trace:AssemblyTrace;onMove:(index:number,point:{x:number;y:number})=>void}>();
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
   const [standardSlab,setStandardSlab]=useState(false);
+  const [standardPrimary,setStandardPrimary]=useState(false);
   const [slabMode,setSlabMode]=useState<'rectangle'|'polygon'>('rectangle');
 
   // Active wall preset for drafting
@@ -242,6 +243,15 @@ function AppContent() {
   const [pendingCorrectionOutline,setPendingCorrectionOutline]=useState<{workspaceId:string;points:AssemblyTrace['vertices'][number]['point'][]}>();
   const [tracedAssemblies,setTracedAssemblies]=useState<Record<string,TracedAssembly>>({});
   const activeTrace=tracedAssemblies[activeWorkspace.id];
+  const [primaryDrafts,setPrimaryDrafts]=useState<Record<string,FoundationEntity>>({});
+  const primaryDraft=primaryDrafts[activeWorkspace.id];
+  function clearPrimaryDraft(){
+    setPrimaryDrafts(drafts=>{
+      const {[activeWorkspace.id]:_removed,...remaining}=drafts;
+      return remaining;
+    });
+  }
+
   const handleTracedAssembly = (...args:Parameters<typeof createTracedAssembly>) => {
     if(activeTrace)throw Error('Apply or cancel the current construction draft first.');
     const draft=createTracedAssembly(...args);
@@ -534,6 +544,7 @@ function AppContent() {
   function installDocument(next: ProjectDocument, dirty: boolean, reset = true) {
     if (reset) {
       setTracedAssemblies({});
+      setPrimaryDrafts({});
       histories.current.clear(); setHistory([]); setRedoStack([]); resetWorkspaceInteraction();
     }
     currentDocument.current = next; setDocument(next); setIsDirty(dirty);
@@ -735,7 +746,7 @@ function AppContent() {
     });
   }, []);
 
-  const draftBlocksDrawing=!!activeTrace||pendingCorrectionOutline?.workspaceId===activeWorkspace.id||!!traceEdit;
+  const draftBlocksDrawing=!!primaryDraft||!!activeTrace||pendingCorrectionOutline?.workspaceId===activeWorkspace.id||!!traceEdit;
   const handleToolChange = useCallback((tool: ActiveTool) => {
     if(draftBlocksDrawing&&tool!=='select'){
       setStorageWarning('Review, apply or cancel the active construction draft before starting another drawing operation.');
@@ -808,9 +819,10 @@ function AppContent() {
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left CAD Tool Palette */}
         {foundationEntities ? <FoundationToolbar activeTool={activeTool} draftBlocksDrawing={draftBlocksDrawing} onSelectTool={tool=>{
+          setStandardPrimary(false);
           if(tool==='foundation_slab'){setSlabMode('rectangle');setStandardSlab(false);}
           handleToolChange(tool);
-        }} onStandardSlab={mode=>{setStandardSlab(true);setSlabMode(mode);handleToolChange('foundation_slab')}}/> : roofEntities ? <RoofToolbar activeTool={activeTool} onSelectTool={handleToolChange}/> : <Toolbar
+        }} onStandardPrimary={(tool,mode)=>{setStandardPrimary(true);setSlabMode(mode);handleToolChange(tool)}} onStandardSlab={mode=>{setStandardPrimary(false);setStandardSlab(true);setSlabMode(mode);handleToolChange('foundation_slab')}}/> : roofEntities ? <RoofToolbar activeTool={activeTool} onSelectTool={handleToolChange}/> : <Toolbar
           activeTool={activeTool}
           onSelectTool={handleToolChange}
           activeWallPreset={activeWallPreset}
@@ -825,6 +837,12 @@ function AppContent() {
           foundationFilter={visibleFoundationKind}
           slabMode={slabMode}
           standardSlab={standardSlab}
+          standardPrimary={standardPrimary}
+          primaryDraft={primaryDraft}
+          onConfigurePrimary={draft=>{
+            setPrimaryDrafts(drafts=>({...drafts,[activeWorkspace.id]:draft}));
+            setSelection({type:'none'});
+          }}
           onFoundationChange={handleFoundationChange}
           onConfigureTracedAssembly={handleTracedAssembly}
           assemblyDraftOutline={activeTrace?.input.trace.vertices.map(v=>v.point)??(pendingCorrectionOutline?.workspaceId===activeWorkspace.id?pendingCorrectionOutline.points:undefined)}
@@ -850,7 +868,7 @@ function AppContent() {
           }}
         />
 
-        {foundationEntities && <FoundationInspector assemblies={activeWorkspace.foundationAssemblies} activeConstructionDraft={!!activeTrace} ownedComponentIds={new Set(activeWorkspace.foundationAssemblies?.flatMap(parent=>parent.children.map(child=>child.entityId)))} assemblyControls={<FoundationAssemblyPanel project={document} workspaceId={activeWorkspace.id} traced={activeTrace} onCancelTrace={clearTracedAssembly}
+        {foundationEntities && <FoundationInspector primaryDraft={primaryDraft} onCancelPrimaryDraft={clearPrimaryDraft} assemblies={activeWorkspace.foundationAssemblies} activeConstructionDraft={!!activeTrace} ownedComponentIds={new Set(activeWorkspace.foundationAssemblies?.flatMap(parent=>parent.children.map(child=>child.entityId)))} assemblyControls={primaryDraft?null:<FoundationAssemblyPanel project={document} workspaceId={activeWorkspace.id} traced={activeTrace} onCancelTrace={clearTracedAssembly}
           onDraftChange={draft=>setTracedAssemblies(old=>({...old,[activeWorkspace.id]:draft}))}
           selectedIds={selection.type==='foundation'?selection.ids:undefined} selectedId={selection.type==='foundation'?(selection.id??selection.ids?.[0]):undefined} metric={state.settings.unitSystem==='metric'}
           onTraceEdit={(trace,onMove)=>{
@@ -860,7 +878,14 @@ function AppContent() {
             setPendingCorrectionOutline(outline?{workspaceId:activeWorkspace.id,points:outline}:undefined);
             setFoundationGhost(members?{workspaceId:activeWorkspace.id,source:foundationEntities,members}:null);
           }}
-          onSelectChildren={ids=>setSelection(ids.length?{type:'foundation',ids}:{type:'none'})}/>} metric={state.settings.unitSystem==='metric'} key={activeWorkspace.id} onPreview={members=>setFoundationGhost(members?{workspaceId:activeWorkspace.id,source:foundationEntities,members}:null)} filter={visibleFoundationKind} onFilter={kind=>{setFoundationFilter({workspaceId:activeWorkspace.id,kind});setSelection({type:'none'})}} workspaceId={activeWorkspace.id} entities={foundationEntities} selection={selection} onChange={handleFoundationChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
+          onSelectChildren={ids=>setSelection(ids.length?{type:'foundation',ids}:{type:'none'})}/>} metric={state.settings.unitSystem==='metric'} key={activeWorkspace.id} onPreview={members=>setFoundationGhost(members?{workspaceId:activeWorkspace.id,source:foundationEntities,members}:null)} filter={visibleFoundationKind} onFilter={kind=>{setFoundationFilter({workspaceId:activeWorkspace.id,kind});setSelection({type:'none'})}} workspaceId={activeWorkspace.id} entities={foundationEntities} selection={selection} onChange={entities=>{
+          if(!handleFoundationChange(entities))return false;
+          if(primaryDraft&&entities.some(entity=>entity.id===primaryDraft.id)){
+            clearPrimaryDraft();
+            setSelection({type:'foundation',id:primaryDraft.id});
+          }
+          return true;
+        }} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
         {roofEntities && <RoofInspector workspaceId={activeWorkspace.id} entities={roofEntities} selection={selection} onChange={handleRoofChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
         {/* Right Real-time MTO Take-Off Matrix */}
         {reportable && <MtoMatrixPanel
