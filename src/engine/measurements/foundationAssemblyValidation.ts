@@ -80,7 +80,13 @@ const trace: Rule=(v,p)=>{
   requireValid(t.kind!=='rectangle'||t.vertices.length===4,p+'.vertices');
   offsetOrthogonalPerimeter(t.vertices.map(x=>x.point),0);
 };
-const datum=object({basis:choice('base','top'),elevationFt:finite});
+const elevationReference=variants('kind',{
+  assembly:object({kind:choice('assembly'),id:text}),
+  project:object({kind:choice('project')}),
+  unresolved:object({kind:choice('unresolved')}),
+  historical:object({kind:choice('historical')}),
+});
+const datum=object({basis:choice('base','top'),elevationFt:finite},{reference:elevationReference});
 const wallOpening=object({id:text,offsetFt:nonnegative,sillFt:nonnegative,widthFt:positive,heightFt:positive});
 const slabOpening=object({id:text,polygon});
 const thickening=object({id:text,polygon,depthFt:positive,basis:choice('total','additional')});
@@ -114,20 +120,24 @@ const pipe={material:material('drainage'),attributes:object({},{
 })};
 const insulation=scope({id:text,material:material('insulation'),thicknessFt:positive,attributes:productAttributes});
 const granular=scope({id:text,material:material('granular'),thicknessFt:positive,attributes:productAttributes});
+const exteriorSequence=variants('status',{
+  confirmed:object({status:choice('confirmed'),confirmation}),
+  unresolved:object({status:choice('unresolved')}),
+});
 const systems=object({
   walls:scope(wall),footing:scope({...footingCore,top}),exteriorLayers:array(object({id:text,scope:scope(layer)})),
   drainage:scope({...pipe,route}),
   slab:scope({material:material('concrete'),extent:variants('kind',{
     confirmedInterior:object({kind:choice('confirmedInterior')}),
     independent:object({kind:choice('independent'),points:polygon}),
-  }), thicknessFt:positive,baseFt:finite,footingRelation:confirmation,openings:array(slabOpening),thickenings:array(thickening)}),
+  }), thicknessFt:positive,baseFt:finite,footingRelation:confirmation,bottomRelationship:choice('atWallBase'),elevationReference,openings:array(slabOpening),thickenings:array(thickening)}),
   insulation,granular,
-});
+},{exteriorSequence});
 const presetVersion=object({version:integer,name:text,systems:object({
   walls:scope(wallCore),footing:scope({...footingCore,top:wallBase}),
   exteriorLayers:array(object({id:text,scope:scope({...layerCore,coverage:variants('kind',coverageCore)})})),
   drainage:scope({...pipe,route:variants('kind',routes)}),insulation,granular,
-})});
+},{exteriorSequence})});
 const presetShape=object({version:choice(1),id:text,versions:array(presetVersion)},{origin:object({presetId:text,version:integer})});
 const role=variants('system',{
   wall:object({system:choice('wall'),sourceId:text}),footing:object({system:choice('footing'),sourceId:text}),

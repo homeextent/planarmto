@@ -268,3 +268,35 @@ Foundation parents accept optional `detachments` and `traceCorrections` arrays i
 - A successful Detach releases a complete active system or exterior layer. It preserves the same live measurement, geometry, physical ID, material, quantity and scope. Existing derivation links are removed only from the released measurements. The controller rejects an external dependent source reference, an incomplete group, a changed quantitative ledger or an unsupported dependency transition before Apply. Released groups are suppressed during regeneration even if their parent specification remains included. Explicit validated re-adoption is required for the whole released role group. Adoption reads current child scope and preserves prior recorded child decisions.
 - A separate confirmed Correct Trace command records the previous trace, previous and current revision IDs, source and explicit retired-to-successor segment relationships. A corner move preserves the compatible vertex and segment identities, and moves the adjoining orthogonal edges. The bounded orthogonal inset or projection creates new vertex and segment IDs for the replacement path. Child roles follow each segment and inherit predecessor scope. Conflicting, dormant or released role mappings and unsupported geometry require resolution. Construction specification changes cannot replace the saved trace.
 - Audit caps are 256 detachment entries and 64 trace-correction entries per assembly. Existing ownership, lineage, character and transport limits remain. Reject a change beyond any limit with the previous committed revision intact. Preview, Apply, undo/redo and serialization treat the parent and children as one workspace transaction.
+
+## R5.6B additive v3 contract
+
+```ts
+type ElevationReference =
+  | { kind: 'assembly'; id: string }
+  | { kind: 'project' }
+  | { kind: 'unresolved' }
+  | { kind: 'historical' };
+
+type WallDatum = {
+  basis: 'base' | 'top';
+  elevationFt: number;
+  reference?: ElevationReference;
+};
+
+// Optional fields on existing records:
+// SlabSpec.bottomRelationship?: 'atWallBase'
+// SlabSpec.elevationReference?: ElevationReference
+// FoundationMetadata.elevationReference?: ElevationReference
+// AssemblySpecifications.exteriorSequence?: ExteriorSequence
+// PresetSystems.exteriorSequence?: ExteriorSequence
+type ExteriorSequence =
+  | { status: 'confirmed'; confirmation: Confirmation }
+  | { status: 'unresolved' };
+```
+
+An absent elevation marker or explicit historical marker preserves the legacy comparison path with other historical measurements. A local reference uses the creating assembly ID as an opaque coordinate frame, including after detachment. Only identical local frames and shared project frames are comparable. Incomparable frames require reconciliation when same-material geometry can overlap in plan. Independently valid quantities stay measurable. The existing elevation numbers and confirmations continue to govern dimensions.
+
+Exterior order is the existing array order from the wall outward. The absent field represents historical records. A newly changed or unconfirmed order persists an unresolved marker. Reordering invalidates confirmation until the contractor confirms the new order. Presets snapshot the confirmed order. The order leaves coverage and the approved measurement face unchanged.
+
+Targeted cases include exact contact within a frame, different local frames with and without plan intersection, historical overlap behavior, retention through detachment and re-adoption, and reversed exterior sequences with unchanged coverage, quantities and stable layer IDs.

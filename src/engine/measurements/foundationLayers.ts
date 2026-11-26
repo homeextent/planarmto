@@ -1,4 +1,4 @@
-import type {FoundationEntity} from './measurementTypes';
+import {comparableFoundationElevations,type FoundationEntity} from './measurementTypes';
 import {polygonEnvelope,orthogonalPolygonPieces,type Bounds} from './foundationGeometry';
 import {simplePolygon} from './roofMeasurements';
 type Layer=FoundationEntity & {kind:'foundationRegion';polygon:{x:number;y:number}[];depthFt:number|null;elevationFt:number|null};
@@ -19,7 +19,7 @@ export function foundationLayerConflicts(entities:FoundationEntity[]):Map<string
   // Preserve legacy same-purpose reconciliation; cross-purpose layer overlap must never be counted twice.
   if(a.purpose===b.purpose&&!explicit(a)&&!explicit(b))continue;
   const x=interval(a),y=interval(b);
-  if(x&&y&&Math.min(x[1],y[1])<=Math.max(x[0],y[0])+1e-8)continue;
+  if(comparableFoundationElevations(a,b)&&x&&y&&Math.min(x[1],y[1])<=Math.max(x[0],y[0])+1e-8)continue;
   const reason='Overlapping under-slab material layers require explicit vertical separation';
   blocked.set(a.id,reason);blocked.set(b.id,reason);
  }

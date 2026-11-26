@@ -1,5 +1,5 @@
 import {orthogonalExteriorEdges} from './foundationExteriorRoute';
-import type {FoundationEntity,FoundationEnvelopeSource} from './measurementTypes';
+import {comparableFoundationElevations,type FoundationEntity,type FoundationEnvelopeSource} from './measurementTypes';
 import {rectangularExteriorRoute} from './foundationDrainageDerivation';
 import {simplePolygon} from './roofMeasurements';
 import {extendedStrip,faceToCentreline} from './foundationGeometry';
@@ -15,7 +15,7 @@ function geometry(source:FoundationEntity,s:FoundationEnvelopeSource,id:string,a
   if(s.perimeterWallIds){
    const perimeter=s.perimeterWallIds.length===4?rectangularExteriorRoute(entities,s.perimeterWallIds,0):null;
    const walls=s.perimeterWallIds.map(id=>entities.find(e=>e.id===id)!);
-   if(walls.some(e=>e.kind!=='foundationWall'||!e.foundation?.baseElevationConfirmed||e.elevationFt===null||e.heightFt===null||e.foundation.wallOpenings?.length||!near(e.elevationFt,source.elevationFt??Infinity)||!near(e.heightFt,source.heightFt!)))throw Error('Exterior envelope requires equal confirmed wall bases and heights, without openings');
+   if(walls.some(e=>e.kind!=='foundationWall'||!e.foundation?.baseElevationConfirmed||e.elevationFt===null||e.heightFt===null||e.foundation.wallOpenings?.length||!comparableFoundationElevations(e,source)||!near(e.elevationFt,source.elevationFt??Infinity)||!near(e.heightFt,source.heightFt!)))throw Error('Exterior envelope requires equal confirmed wall bases and heights, without openings');
    const edges=perimeter?perimeter.map((start,i)=>({start,end:perimeter[(i+1)%4]})):orthogonalExteriorEdges(entities,s.perimeterWallIds).filter(e=>e.sourceId===source.id);
    const match=edges.find(e=>near(e.start.x,e.end.x)?near(face.start.x,e.start.x)&&near(face.end.x,e.start.x):near(face.start.y,e.start.y)&&near(face.end.y,e.start.y));
    if(!match)throw Error('Selected wall face is not exterior');
@@ -33,7 +33,7 @@ function geometry(source:FoundationEntity,s:FoundationEnvelopeSource,id:string,a
  const z=source.foundation.baseElevationConfirmed&&source.elevationFt!==null?source.elevationFt-offset-s.depthFt:null;
  if(s.offsetBelowSlabFt!==undefined&&z===null)throw Error('Confirm slab base elevation for explicit layer placement');
  if(s.purpose==='granular'&&z===null)throw Error('Confirm slab base elevation for granular layer');
- return {...base,kind:'foundationRegion',purpose:s.purpose==='granular'?'granular':'insulation',polygon:source.polygon.map(p=>({...p})),depthFt:s.depthFt,elevationFt:z,foundation:{...foundation,...(z!==null?{baseElevationConfirmed:true as const}:{}),...(s.purpose==='granular'&&s.offsetBelowSlabFt!==undefined?{granularLayerId:s.layerId}:{}),...(s.purpose==='horizontalInsulation'?{coverage:{layerId:s.layerId,confirmed:true as const,...(s.foam?{foam:true as const}:{})}}:{})}};
+ return {...base,kind:'foundationRegion',purpose:s.purpose==='granular'?'granular':'insulation',polygon:source.polygon.map(p=>({...p})),depthFt:s.depthFt,elevationFt:z,foundation:{...foundation,...(z!==null?{baseElevationConfirmed:true as const}:{}),...(source.foundation.elevationReference?{elevationReference:source.foundation.elevationReference}:{}),...(s.purpose==='granular'&&s.offsetBelowSlabFt!==undefined?{granularLayerId:s.layerId}:{}),...(s.purpose==='horizontalInsulation'?{coverage:{layerId:s.layerId,confirmed:true as const,...(s.foam?{foam:true as const}:{})}}:{})}};
 }
 export function deriveFoundationEnvelope(entities:FoundationEntity[],ids:string[],config:Config,id:()=>string):FoundationEntity[]{
  if(!ids.length||new Set(ids).size!==ids.length||!config.material.trim()||!config.layerId.trim())throw Error('Select distinct sources and specify material and layer');
@@ -64,7 +64,7 @@ export function validateEnvelopeSources(entities:FoundationEntity[]):void{
  if(s.perimeterWallIds){const g=perimeters.get(s.groupId)??[];g.push(s);perimeters.set(s.groupId,g)}
  const spec=JSON.stringify([e.assemblyId,s.purpose,s.perimeterWallIds?null:s.side,s.heightFt,s.depthFt,s.offsetBelowSlabFt,s.material,s.layerId,s.foam,s.sourceIds?[...s.sourceIds].sort():null,s.perimeterWallIds?[...s.perimeterWallIds].sort():null]);if(groups.has(s.groupId)&&groups.get(s.groupId)!==spec)throw Error('Inconsistent envelope group');groups.set(s.groupId,spec);
  const expected=geometry(source,s,e.id,e.assemblyId,entities);
- const signature=(q:FoundationEntity)=>JSON.stringify(['polygon' in q?q.polygon:[q.start,q.end],'depthFt' in q?q.depthFt:null,'heightFt' in q?q.heightFt:null,'elevationFt' in q?q.elevationFt:null,q.foundation?.material,q.foundation?.baseElevationConfirmed,q.foundation?.coverage?.layerId,q.foundation?.coverage?.confirmed,q.foundation?.coverage?.openingTreatment,q.foundation?.coverage?.foam,q.foundation?.coverage?.thicknessFt,q.foundation?.granularLayerId]);
+ const signature=(q:FoundationEntity)=>JSON.stringify(['polygon' in q?q.polygon:[q.start,q.end],'depthFt' in q?q.depthFt:null,'heightFt' in q?q.heightFt:null,'elevationFt' in q?q.elevationFt:null,q.foundation?.material,q.foundation?.baseElevationConfirmed,q.foundation?.elevationReference,q.foundation?.coverage?.layerId,q.foundation?.coverage?.confirmed,q.foundation?.coverage?.openingTreatment,q.foundation?.coverage?.foam,q.foundation?.coverage?.thicknessFt,q.foundation?.granularLayerId]);
  if(signature(e)!==signature(expected))throw Error('Derived envelope is stale; remove or regenerate before editing source');
  }
  for(const group of members.values()){const ids=group[0].sourceIds;if(ids&&(group.length!==ids.length||ids.some(id=>!group.some(s=>s.sourceId===id))))throw Error('Incomplete derived envelope group');}

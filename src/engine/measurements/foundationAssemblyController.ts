@@ -205,7 +205,7 @@ export function previewAssemblyChange(document:ProjectDocument,workspaceId:strin
         throw Error('Adopt a complete compatible role mapping; create new roles separately');
       for(const binding of adoption.bindings){
         const member=result.members.find(e=>e.id===binding.entityId),existing=byId.get(binding.entityId)!;
-        if(!member||!equal(geometry(member),geometry(existing))||member.foundation?.material!==existing.foundation?.material)
+        if(!member||!equal(geometry(member),geometry(existing))||member.foundation?.material!==existing.foundation?.material||!equal(member.foundation?.elevationReference??{kind:'historical'},existing.foundation?.elevationReference??{kind:'historical'}))
           throw Error('Adoption would move or change an existing physical measurement');
       }
     }

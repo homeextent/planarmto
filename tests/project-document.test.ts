@@ -700,3 +700,55 @@ test('confirmed run override survives coordinated width revision and round-trip 
  assert.equal(overridden?.entityId,saved.children[0].entityId);
  assert.ok(reopened.workspaces[1].measurements.some(e=>e.kind==='foundationWall'&&e.id===overridden?.entityId&&e.heightFt===9));
 });
+
+test('conventional elevation references survive save, detachment and explicit re-adoption',()=>{
+ const {doc,input,id}=assemblyFixture();
+ if(input.specifications.walls.status!=='included')throw Error('Expected walls');
+ input.specifications.walls.specification.datum=c({basis:'base',elevationFt:0,reference:{kind:'assembly',id:'local'}});
+ input.specifications.footing={status:'included',specification:{material:c(poured),widthFt:c(2),depthFt:c(.5),alignment:c({kind:'centred'}),top:c({kind:'wallBase'})}};
+ const creation=previewAssemblyChange(doc,'foundation','local',null,{kind:'create',input},id);
+ assert.deepEqual(creation.conflicts,[]);
+ const committed=deserializeProjectDocument(serializeProjectDocument(applyAssemblyPreview(doc,creation)));
+ const parent=committed.workspaces[1].foundationAssemblies![0];
+ const reference={kind:'assembly',id:'local'};
+ assert.ok(committed.workspaces[1].measurements.every(e=>'foundation' in e&&JSON.stringify(e.foundation?.elevationReference)===JSON.stringify(reference)));
+ const bindings=parent.children.filter(b=>b.role.system==='footing');
+ const detached=previewAssemblyChange(committed,'foundation',parent.id,parent.revisionId,{
+  kind:'detach',roles:bindings.map(b=>b.role),reason:'Separate trade',source:assemblySource,
+ },id);
+ assert.deepEqual(detached.conflicts,[]);
+ const saved=applyAssemblyPreview(committed,detached);
+ const slabless=saved.workspaces[1].foundationAssemblies![0];
+ const rejoined=previewAssemblyChange(saved,'foundation',parent.id,slabless.revisionId,{
+  kind:'replaceIntent',input,adoption:{bindings,source:assemblySource},
+ },id);
+ assert.deepEqual(rejoined.conflicts,[]);
+ assert.deepEqual(rejoined.changes?.measurements.filter(e=>e.kind==='stripFooting').map(e=>[e.id,e.foundation?.elevationReference]),
+  bindings.map(b=>[b.entityId,reference]));
+ expectVolume(assemblyWallVolume(rejoined,'foundation.footing.strip.concrete'),5.08641975309);
+});
+
+test('confirmed exterior order preserves stable children, material quantities and v3 round trip',()=>{
+ const {doc,input,id}=assemblyFixture();
+ input.specifications.exteriorLayers=[
+  {id:'wrap',scope:{status:'included',specification:{material:c({kind:'catalogue',category:'waterproofing',id:'sheet waterproofing membrane'}),coverage:c({kind:'specifiedHeight',heightFt:6})}}},
+  {id:'foam',scope:{status:'included',specification:{material:c({kind:'catalogue',category:'insulation',id:'eps'}),coverage:c({kind:'confirmedFullHeight'}),thicknessFt:c(.25)}}},
+ ];
+ input.specifications.exteriorSequence={status:'confirmed',confirmation:assemblySource};
+ const first=previewAssemblyChange(doc,'foundation','ordered',null,{kind:'create',input},id);
+ assert.deepEqual(first.conflicts,[]);
+ const saved=applyAssemblyPreview(doc,first);
+ const parent=saved.workspaces[1].foundationAssemblies![0];
+ input.specifications.exteriorLayers.reverse();
+ input.specifications.exteriorSequence={status:'unresolved'};
+ const unresolved=previewAssemblyChange(saved,'foundation',parent.id,parent.revisionId,{kind:'replaceIntent',input},id);
+ assert.ok(unresolved.unresolvedSpecifications.some(g=>g.path==='sequence'));
+ input.specifications.exteriorSequence={status:'confirmed',confirmation:assemblySource};
+ const reordered=previewAssemblyChange(saved,'foundation',parent.id,parent.revisionId,{kind:'replaceIntent',input},id);
+ assert.deepEqual(reordered.conflicts,[]);
+ assert.deepEqual(reordered.changes?.parents[0].children.map(child=>child.entityId).sort(),parent.children.map(child=>child.entityId).sort());
+ assert.deepEqual(reordered.quantities.after.sort((a,b)=>a.elementId.localeCompare(b.elementId)),first.quantities.after.sort((a,b)=>a.elementId.localeCompare(b.elementId)));
+ const reopened=deserializeProjectDocument(serializeProjectDocument(applyAssemblyPreview(saved,reordered)));
+ assert.deepEqual(reopened.workspaces[1].foundationAssemblies![0].specifications.exteriorLayers.map(layer=>layer.id),['foam','wrap']);
+ assert.equal(reopened.workspaces[1].foundationAssemblies![0].specifications.exteriorSequence?.status,'confirmed');
+});

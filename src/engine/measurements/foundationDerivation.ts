@@ -35,7 +35,7 @@ export function deriveStripFootings(entities:FoundationEntity[],selectedIds:stri
  if(entities.some(e=>e.foundation?.stripSource&&selectedIds.includes(e.foundation.stripSource.wallId)))throw Error('Remove existing derived strip group before regenerating');
  if(offsetFt!==0&&walls.length!==1)throw Error('Select one isolated wall for offset footing');
  const groupId=id(),assemblyId=id();
- return walls.map(w=>{const s:FoundationStripSource={version:1,wallIds:walls.map(q=>q.id).sort(),wallId:w.id,groupId,offsetFt,widthFt,depthFt},g=expected(w,s,entities),entityId=id();return {id:entityId,physicalId:entityId,assemblyId,source:{reference:'Derived strip footing from '+w.id},kind:'stripFooting',start:g.start,end:g.end,widthFt:g.widthFt,heightFt:g.heightFt,elevationFt:g.elevationFt,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true,baseElevationConfirmed:true,joinStartFt:g.joinStartFt,joinEndFt:g.joinEndFt,stripSource:s}}});
+ return walls.map(w=>{const s:FoundationStripSource={version:1,wallIds:walls.map(q=>q.id).sort(),wallId:w.id,groupId,offsetFt,widthFt,depthFt},g=expected(w,s,entities),entityId=id();return {id:entityId,physicalId:entityId,assemblyId,source:{reference:'Derived strip footing from '+w.id},kind:'stripFooting',start:g.start,end:g.end,widthFt:g.widthFt,heightFt:g.heightFt,elevationFt:g.elevationFt,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true,baseElevationConfirmed:true,joinStartFt:g.joinStartFt,joinEndFt:g.joinEndFt,stripSource:s,...(w.foundation?.elevationReference?{elevationReference:w.foundation.elevationReference}:{})}}});
 }
 export function validateStripSources(entities:FoundationEntity[]):void{
  const seen=new Set<string>(),groups=new Map<string,string>(),members=new Map<string,FoundationStripSource[]>();
@@ -47,6 +47,8 @@ export function validateStripSources(entities:FoundationEntity[]):void{
  const list=members.get(s.groupId)??[];list.push(s);members.set(s.groupId,list);
  if(groups.has(s.groupId)&&groups.get(s.groupId)!==groupSpec)throw Error('Inconsistent derived footing group');groups.set(s.groupId,groupSpec);
  const g=expected(w,s,entities);
+ const a=e.foundation?.elevationReference,b=w.foundation?.elevationReference;
+ if((a?.kind??'historical')!==(b?.kind??'historical')||a?.kind==='assembly'&&b?.kind==='assembly'&&a.id!==b.id)throw Error('Derived footing elevation reference is stale');
  if(!e.foundation?.centrelineConfirmed||!e.foundation.baseElevationConfirmed||e.foundation.material!=='poured concrete'||e.widthFt!==g.widthFt||e.heightFt!==g.heightFt||e.elevationFt!==g.elevationFt||e.start.x!==g.start.x||e.start.y!==g.start.y||e.end.x!==g.end.x||e.end.y!==g.end.y||e.foundation.joinStartFt!==g.joinStartFt||e.foundation.joinEndFt!==g.joinEndFt)throw Error('Derived footing is stale; remove or regenerate the group before editing its source');
  }
  for(const group of members.values()){const ids=group[0].wallIds;if(ids&&(group.length!==ids.length||ids.some(id=>!group.some(s=>s.wallId===id))))throw Error('Incomplete derived strip group');}

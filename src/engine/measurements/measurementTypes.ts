@@ -38,7 +38,18 @@ export type FoundationStripSource={version:1;wallIds?:string[];wallId:string;gro
 export type FoundationEnvelopeSource={sourceIds?:string[];offsetBelowSlabFt?:number;perimeterWallIds?:string[];version:1;sourceId:string;groupId:string;purpose:'waterproofing'|'verticalInsulation'|'horizontalInsulation'|'granular';side?:'left'|'right';heightFt?:number;depthFt?:number;material:string;layerId:string;foam?:true};
 export type FoundationDrainageSource={version:1;wallIds:string[];groupId:string;edge:number;offsetFt:number;material:string;layerId:string};
 export type FoundationPerimeterReference={version:1;kind:'rectangle'|'orthogonal';reference:'exterior'|'centreline'|'interior';points:Point[];widthFt:number;edge:number};
-export type FoundationMetadata = { perimeterReference?:FoundationPerimeterReference; granularLayerId?:string; drainageSource?:FoundationDrainageSource; envelopeSource?:FoundationEnvelopeSource; stripSource?:FoundationStripSource; coverage?:FoundationCoverage; wallOpenings?:WallOpening[]; slabOpenings?:SlabOpening[]; slabThickenings?:SlabThickening[]; version:1; material:string; baseElevationConfirmed?:true; centrelineConfirmed?:true; joinStartFt?:number; joinEndFt?:number };
+export type ElevationReference =
+  | {kind:'assembly';id:string}
+  | {kind:'project'|'unresolved'|'historical'};
+
+export function comparableFoundationElevations(a:FoundationEntity,b:FoundationEntity):boolean{
+  const x=a.foundation?.elevationReference,y=b.foundation?.elevationReference;
+  const left=x?.kind??'historical',right=y?.kind??'historical';
+  if(left!==right||left==='unresolved')return false;
+  return left!=='assembly'||x?.kind==='assembly'&&y?.kind==='assembly'&&x.id===y.id;
+}
+
+export type FoundationMetadata = { elevationReference?:ElevationReference; perimeterReference?:FoundationPerimeterReference; granularLayerId?:string; drainageSource?:FoundationDrainageSource; envelopeSource?:FoundationEnvelopeSource; stripSource?:FoundationStripSource; coverage?:FoundationCoverage; wallOpenings?:WallOpening[]; slabOpenings?:SlabOpening[]; slabThickenings?:SlabThickening[]; version:1; material:string; baseElevationConfirmed?:true; centrelineConfirmed?:true; joinStartFt?:number; joinEndFt?:number };
 export type FoundationApplicability={status:'included'}|{status:'excluded'|'pending';reason:string};
 export type FoundationEntity = Identity & { foundation?:FoundationMetadata; scopeApplicability?:FoundationApplicability } & (
   | { kind: 'foundationWall'|'stripFooting'; start: Point; end: Point; widthFt: number | null; heightFt: number | null; elevationFt: number | null }
@@ -111,6 +122,10 @@ export function validateSpecialistEntities(type: string, entities: unknown): ass
       const f=e.foundation;
       check(type==='foundation'&&obj(f)&&f.version===1&&str(f.material),'invalid foundation metadata');
       check(f.baseElevationConfirmed===undefined||f.baseElevationConfirmed===true,'invalid foundation datum confirmation');
+      if(f.elevationReference!==undefined){
+        const r=f.elevationReference;
+        check(obj(r)&&(r.kind==='assembly'?str(r.id)&&Object.keys(r).length===2:['project','unresolved','historical'].includes(r.kind)&&Object.keys(r).length===1),'invalid foundation elevation reference');
+      }
       check(f.centrelineConfirmed===undefined||((e.kind==='foundationWall'||e.kind==='stripFooting'||e.kind==='foundationTrench')&&f.centrelineConfirmed===true),'invalid foundation centreline confirmation');
       if(f.drainageSource!==undefined){const s=f.drainageSource;check(e.kind==='foundationLine'&&e.purpose==='drainage'&&obj(s)&&s.version===1&&Array.isArray(s.wallIds)&&s.wallIds.length>=4&&s.wallIds.length<=64&&s.wallIds.every(str)&&new Set(s.wallIds).size===s.wallIds.length&&str(s.groupId)&&Number.isInteger(s.edge)&&s.edge>=0&&s.edge<s.wallIds.length&&num(s.offsetFt)&&s.offsetFt>=0&&str(s.material)&&str(s.layerId),'invalid perimeter drainage source');}
       if(f.granularLayerId!==undefined)check(e.kind==='foundationRegion'&&e.purpose==='granular'&&str(f.granularLayerId),'invalid granular layer identity');

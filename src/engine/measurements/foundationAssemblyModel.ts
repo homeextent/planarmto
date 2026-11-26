@@ -1,6 +1,6 @@
 import type { ProjectDocument } from '../projectDocument';
 import type {
-  FoundationApplicability, FoundationEntity, Point, QuantityContribution, SlabOpening, SlabThickening, WallOpening,
+  ElevationReference, FoundationApplicability, FoundationEntity, Point, QuantityContribution, SlabOpening, SlabThickening, WallOpening,
 } from './measurementTypes';
 
 export type MaterialCategory = 'concrete' | 'insulation' | 'waterproofing' | 'drainage' | 'granular';
@@ -28,7 +28,7 @@ export type WallSpec = {
   material: MaterialChoice;
   widthFt: number;
   heightFt: number;
-  datum: { basis: 'base' | 'top'; elevationFt: number };
+  datum: { basis: 'base' | 'top'; elevationFt: number; reference?: ElevationReference };
   openings: { sourceSegmentId: string; opening: WallOpening }[];
 };
 export type FootingSpec = {
@@ -69,15 +69,19 @@ export type SlabSpec = {
   extent: { kind: 'confirmedInterior' } | { kind: 'independent'; points: Point[] };
   thicknessFt: number; baseFt: number;
   footingRelation: Confirmation;
+  bottomRelationship?: 'atWallBase';
+  elevationReference?: ElevationReference;
   openings: SlabOpening[]; thickenings: SlabThickening[];
 };
 export type UnderSlabLayer = {
   id: string; material: MaterialChoice; thicknessFt: number;
   attributes?: { productReference?: Confirmed<string> };
 };
+export type ExteriorSequence = {status:'confirmed';confirmation:Confirmation}|{status:'unresolved'};
 export type AssemblySpecifications = {
   walls: Scope<WallSpec>;
   footing: Scope<FootingSpec>;
+  exteriorSequence?: ExteriorSequence;
   exteriorLayers: { id: string; scope: Scope<LayerSpec> }[];
   drainage: Scope<DrainageSpec>;
   slab: Scope<SlabSpec>;
@@ -90,6 +94,7 @@ export type PresetLayer = Omit<LayerSpec, 'coverage'> & {
 export type PresetSystems = {
   walls: Scope<Pick<WallSpec, 'material' | 'widthFt' | 'heightFt'>>;
   footing: Scope<Omit<FootingSpec, 'top'> & { top: { kind: 'wallBase' } }>;
+  exteriorSequence?: ExteriorSequence;
   exteriorLayers: { id: string; scope: Scope<PresetLayer> }[];
   drainage: Scope<Omit<DrainageSpec, 'route'> & {
     route: Exclude<DrainageSpec['route'], { kind: 'manual' }>;

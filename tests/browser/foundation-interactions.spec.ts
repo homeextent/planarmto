@@ -249,6 +249,7 @@ test('irregular polygon perimeter previews six walls and commits one undoable as
  for(const p of [{x:200,y:200},{x:500,y:200},{x:500,y:320},{x:380,y:320},{x:380,y:440},{x:200,y:440}])await canvas.click({position:p});
  await page.getByRole('button',{name:'Finish foundation polygon',exact:true}).click();
  await expect(page.getByLabel('Polygon perimeter configuration')).toBeVisible();
+ await page.getByText('Advanced individual perimeter',{exact:true}).click();
  for(const [label,value] of [['Polygon wall thickness (in)','1 ft'],['Polygon wall height (ft)','8'],['Polygon wall base (ft)','0']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview polygon perimeter',exact:true}).click();
  await expect(page.getByLabel('Foundation graphical preview')).toHaveText('Preview — 6 uncommitted components');
@@ -385,6 +386,7 @@ test('irregular exterior envelope previews and applies one component per source 
  const canvas=page.locator('canvas').first();
  for(const p of [{x:200,y:200},{x:500,y:200},{x:500,y:320},{x:380,y:320},{x:380,y:440},{x:200,y:440}])await canvas.click({position:p});
  await page.getByRole('button',{name:'Finish foundation polygon',exact:true}).click();
+ await page.getByText('Advanced individual perimeter',{exact:true}).click();
  for(const [label,value] of [['Polygon wall thickness (in)','1 ft'],['Polygon wall height (ft)','8'],['Polygon wall base (ft)','0']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview polygon perimeter',exact:true}).click();await page.getByRole('button',{name:'Apply polygon perimeter',exact:true}).click();
  await page.getByLabel('Select foundation entity').selectOption({index:1});await page.getByRole('button',{name:'Select entire foundation assembly',exact:true}).click();
@@ -401,6 +403,7 @@ test('irregular perimeter drainage preview and apply preserves closed source-lin
  const canvas=page.locator('canvas').first();
  for(const p of [{x:200,y:200},{x:500,y:200},{x:500,y:320},{x:380,y:320},{x:380,y:440},{x:200,y:440}])await canvas.click({position:p});
  await page.getByRole('button',{name:'Finish foundation polygon',exact:true}).click();
+ await page.getByText('Advanced individual perimeter',{exact:true}).click();
  for(const [label,value] of [['Polygon wall thickness (in)','1 ft'],['Polygon wall height (ft)','8'],['Polygon wall base (ft)','0']])await fillFoundationField(page,label,value);
  await page.getByRole('button',{name:'Preview polygon perimeter',exact:true}).click();await page.getByRole('button',{name:'Apply polygon perimeter',exact:true}).click();
  await page.getByLabel('Select foundation entity').selectOption({index:1});await page.getByRole('button',{name:'Select entire foundation assembly',exact:true}).click();
@@ -595,6 +598,7 @@ test('graphical foundation rectangle uses exact dimensions and one committed his
  await expect(entities(page)).toHaveCount(1);
  await page.keyboard.type('40,30');await page.keyboard.press('Enter');
  await expect(page.getByLabel('Live drafting dimensions')).toHaveText('Placement reference: 40.00 × 30.00 ft');
+ await page.getByText('Advanced individual perimeter',{exact:true}).click();
  await fillFoundationField(page,'Rectangle wall thickness (in)','8');
  await fillFoundationField(page,'Rectangle wall height (ft)',`8'`);
  await fillFoundationField(page,'Rectangle wall base (ft)','0');
@@ -732,6 +736,7 @@ test('calibrated graphical rectangle preserves the underlay and original trace t
  await canvas.click({position:pixel(450,350,calibrated.feetPerPixel)});
  await page.keyboard.type('40,30');await page.keyboard.press('Enter');
  await page.getByLabel('Rectangle reference',{exact:true}).selectOption('interior');
+ await page.getByText('Advanced individual perimeter',{exact:true}).click();
  await fillFoundationField(page,'Rectangle wall thickness (in)','8');
  await fillFoundationField(page,'Rectangle wall height (ft)','8');
  await fillFoundationField(page,'Rectangle wall base (ft)','0');
@@ -754,6 +759,7 @@ test('graphical assembly adopts its traced perimeter, previews strip changes and
  await page.getByRole('button',{name:'Rectangle foundation',exact:true}).click();
  await canvas.click({position:{x:250,y:250}});await canvas.click({position:{x:550,y:450}});
  await page.keyboard.type('40,30');await page.keyboard.press('Enter');
+ await page.getByText('Advanced individual perimeter',{exact:true}).click();
  await fillFoundationField(page,'Rectangle wall thickness (in)','8');
  await fillFoundationField(page,'Rectangle wall height (ft)','8');
  await fillFoundationField(page,'Rectangle wall base (ft)','0');
@@ -769,6 +775,7 @@ test('graphical assembly adopts its traced perimeter, previews strip changes and
  const foundation=(doc:ProjectDocument)=>doc.workspaces.find(w=>w.type==='foundation')!;
  const [assembly]=foundation(adopted).foundationAssemblies!;
  expect(assembly.children.map(c=>c.entityId)).toEqual(before.map(e=>e.id));
+ await panel.getByRole('button',{name:'Edit assembly',exact:true}).click();
  await expect(panel.getByLabel('Wall height (ft)',{exact:true})).toHaveValue(`8' 0"`);
  await panel.getByLabel('Reference for revised specifications').fill('Synthetic plan sheet A-1');
  await panel.getByLabel('Strip footing scope').selectOption('included');
@@ -800,14 +807,18 @@ test('saved assembly supports graphical trace correction, preset snapshots and r
  await page.getByRole('button',{name:'Rectangle foundation',exact:true}).click();
  await canvas.click({position:{x:250,y:250}});await canvas.click({position:{x:550,y:450}});
  await page.keyboard.type('40,30');await page.keyboard.press('Enter');
- await fillFoundationField(page,'Rectangle wall thickness (in)','8');
- await fillFoundationField(page,'Rectangle wall height (ft)','8');
- await fillFoundationField(page,'Rectangle wall base (ft)','0');
- await page.getByRole('button',{name:'Preview rectangle perimeter',exact:true}).click();
- await page.getByRole('button',{name:'Apply as foundation assembly',exact:true}).click();
+ await page.getByRole('button',{name:'Specify foundation construction',exact:true}).click();
+ const editor=page.getByRole('region',{name:'Foundation assemblies',exact:true});
+ await editor.getByRole('group',{name:'Walls',exact:true}).getByLabel('Material',{exact:true}).selectOption('poured concrete');
+ await editor.getByLabel('Wall thickness (in)',{exact:true}).fill('8');
+ await editor.getByLabel('Wall height (ft)',{exact:true}).fill('8');
+ await editor.getByLabel('Confirm conventional foundation using the wall base as the relative reference').check();
+ await editor.getByRole('button',{name:'Preview assembly changes',exact:true}).click();
+ await editor.getByRole('button',{name:'Apply assembly changes',exact:true}).click();
  const foundation=(doc:ProjectDocument)=>doc.workspaces.find(w=>w.type==='foundation')!;
  const original=foundation(await projectSnapshot(page));
  const panel=page.getByRole('region',{name:'Foundation assemblies',exact:true});
+ await panel.getByRole('button',{name:'Edit assembly',exact:true}).click();
  await panel.getByLabel('Reference for revised specifications').fill('Corrected synthetic drawing');
  await panel.getByText('Advanced assembly inputs',{exact:true}).click();
  await panel.getByRole('button',{name:'Move trace vertex on canvas'}).click();
@@ -851,4 +862,59 @@ test('saved assembly supports graphical trace correction, preset snapshots and r
  expect(foundation(await projectSnapshot(page))).toEqual(foundation(saved));
  await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();
  expect(foundation(await projectSnapshot(page))).toEqual(detached);
+});
+
+test('standard irregular trace opens coordinated construction, cancels, and applies an inside-face slab atomically',async({page})=>{
+ const canvas=page.locator('canvas').first();
+ const panel=page.getByRole('region',{name:'Foundation assemblies',exact:true});
+ const click=async(name:string)=>page.getByRole('button',{name,exact:true}).click();
+ const trace=async()=>{
+  await click('Polygon foundation perimeter');
+  for(const p of [{x:200,y:200},{x:500,y:200},{x:500,y:320},{x:380,y:320},{x:380,y:440},{x:200,y:440}])await canvas.click({position:p});
+  await click('Finish foundation polygon');
+  await click('Specify foundation construction');
+  await expect(panel.getByRole('heading',{name:'Specify foundation construction'})).toBeVisible();
+ };
+ await trace();
+ await click('Cancel assembly changes');
+ expect(await snapshot(page)).toEqual([]);
+ await trace();
+ await panel.getByRole('group',{name:'Walls',exact:true}).getByLabel('Material',{exact:true}).selectOption('poured concrete');
+ await panel.getByLabel('Wall thickness (in)',{exact:true}).fill('8 1/2');
+ await panel.getByLabel('Wall height (ft)',{exact:true}).fill("8' 0\"");
+ await panel.getByLabel('Confirm conventional foundation using the wall base as the relative reference').check();
+ await panel.getByLabel('Strip footing scope').selectOption('included');
+ const footing=panel.getByRole('group',{name:'Strip footing',exact:true});
+ await footing.getByLabel('Material',{exact:true}).selectOption('poured concrete');
+ await footing.getByLabel('Footing width (in)').fill('24');
+ await footing.getByLabel('Footing depth (in)').fill('6');
+ await panel.getByLabel('Slab scope').selectOption('included');
+ const slab=panel.getByRole('group',{name:'Slab',exact:true});
+ await slab.getByLabel('Material',{exact:true}).selectOption('poured concrete');
+ await slab.getByLabel('Confirm interior slab extent').check();
+ await slab.getByLabel('Confirm slab relation to footing').check();
+ await slab.getByLabel('Slab bottom at wall base (footing top for centred strip)').check();
+ await slab.getByLabel('Slab thickness (in)').fill('4');
+ await click('Preview assembly changes');
+ await expect(panel.getByRole('table',{name:'Preview quantities'})).toContainText('slab concrete');
+ expect(await snapshot(page)).toEqual([]);
+ await click('Apply assembly changes');
+ const saved=await snapshot(page);
+ expect(saved.filter(e=>e.kind==='foundationWall')).toHaveLength(6);
+ expect(saved.filter(e=>e.kind==='stripFooting'&&e.elevationFt===-.5)).toHaveLength(6);
+ expect(saved.filter(e=>e.kind==='slab'&&e.elevationFt===0)).toHaveLength(1);
+ await expect(panel.getByRole('button',{name:'Edit perimeter',exact:true})).toBeVisible();
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
+ expect(await snapshot(page)).toEqual([]);
+ await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();
+ expect(await snapshot(page)).toEqual(saved);
+});
+
+test('independent polygon slab tool sets the shape directly',async({page})=>{
+ await page.getByRole('button',{name:'Draw polygon slab',exact:true}).click();
+ await expect(page.getByLabel('Foundation drawing mode')).toHaveValue('polygon');
+ const canvas=page.locator('canvas').first();
+ for(const p of [{x:200,y:200},{x:500,y:200},{x:400,y:400}])await canvas.click({position:p});
+ await page.getByRole('button',{name:'Finish foundation polygon',exact:true}).click();
+ expect((await snapshot(page)).map(e=>e.kind)).toEqual(['slab']);
 });

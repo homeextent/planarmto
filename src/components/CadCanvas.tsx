@@ -3,7 +3,7 @@ import {offsetOrthogonalPerimeter} from '../engine/measurements/foundationPerime
 import {FoundationDimensionInput} from './FoundationDimensionInput';
 import {parseFoundationDimension} from '../engine/measurements/foundationUnits';
 import {previewFoundationGeneration} from '../engine/measurements/foundationGeneration';
-import {nearestFoundationSnap} from '../engine/measurements/foundationSnap';
+import {foundationAlignment,foundationInteriorCorners,nearestFoundationSnap} from '../engine/measurements/foundationSnap';
 import {measureFoundation} from '../engine/measurements/foundationMeasurements';
 import type {RectangleReference} from '../engine/measurements/foundationGeometry';
 import {roofWindowSelection} from '../engine/measurements/roofSelection';
@@ -74,9 +74,10 @@ interface CadCanvasProps {
   foundationEntities?: FoundationEntity[];
   foundationPreview?: FoundationEntity[];
   foundationFilter?: string;
+  slabMode?:'rectangle'|'polygon';
   onFoundationChange?: (entities:FoundationEntity[])=>boolean;
   traceCorrection?: { trace: AssemblyTrace; onMove:(index:number,point:Point2D)=>void };
-  onApplyTracedAssembly?: (walls:FoundationEntity[])=>boolean;
+  onConfigureTracedAssembly?: (points:Point2D[],kind:'rectangle'|'orthogonal',reference:RectangleReference)=>void;
   roofEntities?: RoofEntity[];
   commitDraftPlacement?: (token:string,next:FloorplanState|SpecialistEntity[],replace?:boolean)=>boolean;
   onRoofChange?: (entities: RoofEntity[]) => boolean;
@@ -210,9 +211,10 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   onContextMenu,
   foundationEntities,
   foundationPreview,
+  slabMode,
   foundationFilter='all',
   onFoundationChange,
-  onApplyTracedAssembly,
+  onConfigureTracedAssembly,
   traceCorrection,
   roofEntities,
   onRoofChange,
@@ -226,12 +228,16 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   const [wallReference,setWallReference]=useState<WallDraftReference>('centreline');
   const [wallReferenceWidth,setWallReferenceWidth]=useState('');
   const [foundationMode,setFoundationMode]=useState<'rectangle'|'polygon'>('rectangle');
+  useEffect(()=>{if(activeTool==='foundation_slab'&&slabMode)setFoundationMode(slabMode)},[activeTool,slabMode]);
   const [foundationVertices,setFoundationVertices]=useState<Point2D[]>([]);
   const [correctionVertex,setCorrectionVertex]=useState<number|null>(null);
   useEffect(()=>setCorrectionVertex(null),[traceCorrection]);
   const [foundationStart,setFoundationStart]=useState<Point2D|null>(null);
   const [foundationContinuous,setFoundationContinuous]=useState(false);
   const [foundationCursor,setFoundationCursor]=useState<Point2D|null>(null);
+  const [foundationGuide,setFoundationGuide]=useState<{point:Point2D;anchor:Point2D}>();
+  const interiorCorners=useMemo(()=>activeTool==='foundation_slab'?foundationInteriorCorners(visibleFoundation??[]):[],[activeTool,visibleFoundation]);
+  const foundationSnapAnchors=useMemo(()=>visibleFoundation?.flatMap(foundationPoints)??[],[visibleFoundation]);
   const [perimeterOutline,setPerimeterOutline]=useState<Point2D[]|null>(null);
   const [perimeterReference,setPerimeterReference]=useState<RectangleReference>('exterior');
   const [perimeterWidth,setPerimeterWidth]=useState('');
@@ -240,7 +246,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   const [perimeterCandidate,setPerimeterCandidate]=useState<{source:FoundationEntity[];members:FoundationEntity[];volume:number}|null>(null);
   const [perimeterError,setPerimeterError]=useState('');
   const validPerimeterCandidate=perimeterCandidate?.source===foundationEntities?perimeterCandidate:null;
-  useEffect(()=>{setFoundationStart(null);setFoundationCursor(null);setFoundationVertices([]);setPerimeterOutline(null);setPerimeterCandidate(null);setPerimeterError('')},[activeTool,foundationMode]);
+  useEffect(()=>{setFoundationStart(null);setFoundationCursor(null);setFoundationGuide(undefined);setFoundationVertices([]);setPerimeterOutline(null);setPerimeterCandidate(null);setPerimeterError('')},[activeTool,foundationMode]);
   useEffect(()=>{if(perimeterCandidate&&perimeterCandidate.source!==foundationEntities){setPerimeterCandidate(null);setPerimeterError('Foundation changed; preview again.')}},[foundationEntities,perimeterCandidate]);
   const [roofDraft, setRoofDraft] = useState<Point2D[]>([]);
   const [roofCursor, setRoofCursor] = useState<Point2D | null>(null);
@@ -2307,7 +2313,22 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       ctx.restore();
     }
 
-    if(visibleFoundation){ctx.save();for(const e of visibleFoundation){const footprint=foundationFootprint(e);const points=(footprint??foundationPoints(e)).map(p=>worldToScreen(p.x,p.y));const selected=selection.type==='foundation'&&(selection.id===e.id||selection.ids?.includes(e.id));ctx.strokeStyle=selected?'#ffffff':'#38bdf8';ctx.lineWidth=selected?3:2;ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(footprint){ctx.closePath();ctx.fillStyle='rgba(56,189,248,.13)';ctx.fill()}ctx.stroke();if(footprint&&'start' in e){const a=worldToScreen(e.start.x,e.start.y),b=worldToScreen(e.end.x,e.end.y);ctx.save();ctx.setLineDash([5,4]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore()}}for(const e of visibleFoundation)for(const detail of foundationDetailOutlines(e)){ctx.save();ctx.strokeStyle=detail.kind==='opening'?'#fbbf24':'#c084fc';ctx.fillStyle=detail.kind==='opening'?'rgba(251,191,36,.14)':'rgba(192,132,252,.18)';ctx.lineWidth=2;ctx.setLineDash(detail.kind==='opening'?[5,3]:[]);ctx.beginPath();detail.points.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();}for(const e of validPerimeterCandidate?.members??foundationPreview??[]){const footprint=foundationFootprint(e),pts=(footprint??foundationPoints(e)).map(p=>worldToScreen(p.x,p.y));ctx.save();ctx.strokeStyle='#4ade80';ctx.fillStyle='rgba(74,222,128,.13)';ctx.lineWidth=2;ctx.setLineDash([7,4]);ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(footprint){ctx.closePath();ctx.fill()}ctx.stroke();ctx.restore();}if(foundationMarquee){const a=worldToScreen(foundationMarquee.start.x,foundationMarquee.start.y),b=worldToScreen(foundationMarquee.end.x,foundationMarquee.end.y),crossing=foundationMarquee.start.x>foundationMarquee.end.x;ctx.save();ctx.strokeStyle=crossing?'#4ade80':'#38bdf8';ctx.fillStyle=crossing?'rgba(74,222,128,.10)':'rgba(56,189,248,.10)';ctx.lineWidth=1.5;ctx.setLineDash(crossing?[5,4]:[]);ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.restore();}if(perimeterOutline){ctx.save();ctx.strokeStyle='#fbbf24';ctx.setLineDash([5,3]);ctx.beginPath();perimeterOutline.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.stroke();ctx.restore();}if(foundationVertices.length){ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.beginPath();[...foundationVertices,...(foundationCursor?[foundationCursor]:[])].map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();for(const p of foundationVertices){const q=worldToScreen(p.x,p.y);ctx.fillStyle='#fbbf24';ctx.fillRect(q.x-3,q.y-3,6,6)}}else if(foundationStart&&foundationCursor){const pts=(activeTool==='foundation_rectangle'||foundationArea(activeTool))&&foundationStart.x!==foundationCursor.x&&foundationStart.y!==foundationCursor.y?rectanglePoints(foundationStart,foundationCursor):[foundationStart,foundationCursor];ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.beginPath();pts.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(pts.length===4)ctx.closePath();ctx.stroke();if(activeTool==='foundation_wall'&&wallReference!=='centreline'){try{const candidate=createReferencedWall(foundationStart,foundationCursor,'preview',wallReference,wallReferenceWidth.trim()?Number(wallReferenceWidth):null),outline=foundationFootprint(candidate);if(outline){ctx.strokeStyle='#4ade80';ctx.fillStyle='rgba(74,222,128,.12)';ctx.beginPath();outline.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();ctx.stroke();}}catch{/* Invalid or incomplete reference remains uncommitted. */}}}ctx.restore();}
+    if(activeTool.startsWith('foundation_')&&foundationGuide&&foundationCursor&&!perimeterOutline){
+      const a=worldToScreen(foundationGuide.anchor.x,foundationGuide.anchor.y);
+      const b=worldToScreen(foundationGuide.point.x,foundationGuide.point.y);
+      ctx.save();
+      ctx.strokeStyle='#67e8f9';
+      ctx.setLineDash([4,4]);
+      ctx.beginPath();
+      ctx.moveTo(a.x,a.y);
+      ctx.lineTo(b.x,b.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    if(visibleFoundation){ctx.save();for(const e of visibleFoundation){const footprint=foundationFootprint(e);const points=(footprint??foundationPoints(e)).map(p=>worldToScreen(p.x,p.y));const selected=selection.type==='foundation'&&(selection.id===e.id||selection.ids?.includes(e.id));const stroke=e.kind==='stripFooting'||e.kind==='padFooting'?'#fbbf24':e.kind==='slab'?'#94a3b8':
+      e.kind==='foundationLine'&&e.purpose==='waterproofing'?'#c084fc':'purpose' in e&&e.purpose==='insulation'?'#2dd4bf':
+      'purpose' in e&&e.purpose==='drainage'?'#fb923c':'#38bdf8';
+      ctx.strokeStyle=selected?'#ffffff':stroke;ctx.lineWidth=selected?3:2;ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(footprint){ctx.closePath();ctx.fillStyle=stroke+'22';ctx.fill()}ctx.stroke();if(footprint&&'start' in e){const a=worldToScreen(e.start.x,e.start.y),b=worldToScreen(e.end.x,e.end.y);ctx.save();ctx.setLineDash([5,4]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore()}}for(const e of visibleFoundation)for(const detail of foundationDetailOutlines(e)){ctx.save();ctx.strokeStyle=detail.kind==='opening'?'#fbbf24':'#c084fc';ctx.fillStyle=detail.kind==='opening'?'rgba(251,191,36,.14)':'rgba(192,132,252,.18)';ctx.lineWidth=2;ctx.setLineDash(detail.kind==='opening'?[5,3]:[]);ctx.beginPath();detail.points.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();}for(const e of validPerimeterCandidate?.members??foundationPreview??[]){const footprint=foundationFootprint(e),pts=(footprint??foundationPoints(e)).map(p=>worldToScreen(p.x,p.y));ctx.save();ctx.strokeStyle='#4ade80';ctx.fillStyle='rgba(74,222,128,.13)';ctx.lineWidth=2;ctx.setLineDash([7,4]);ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(footprint){ctx.closePath();ctx.fill()}ctx.stroke();ctx.restore();}if(foundationMarquee){const a=worldToScreen(foundationMarquee.start.x,foundationMarquee.start.y),b=worldToScreen(foundationMarquee.end.x,foundationMarquee.end.y),crossing=foundationMarquee.start.x>foundationMarquee.end.x;ctx.save();ctx.strokeStyle=crossing?'#4ade80':'#38bdf8';ctx.fillStyle=crossing?'rgba(74,222,128,.10)':'rgba(56,189,248,.10)';ctx.lineWidth=1.5;ctx.setLineDash(crossing?[5,4]:[]);ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.restore();}if(perimeterOutline){ctx.save();ctx.strokeStyle='#fbbf24';ctx.setLineDash([5,3]);ctx.beginPath();perimeterOutline.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.stroke();ctx.restore();}if(foundationVertices.length){ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.beginPath();[...foundationVertices,...(foundationCursor?[foundationCursor]:[])].map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();for(const p of foundationVertices){const q=worldToScreen(p.x,p.y);ctx.fillStyle='#fbbf24';ctx.fillRect(q.x-3,q.y-3,6,6)}}else if(foundationStart&&foundationCursor){const pts=(activeTool==='foundation_rectangle'||foundationArea(activeTool))&&foundationStart.x!==foundationCursor.x&&foundationStart.y!==foundationCursor.y?rectanglePoints(foundationStart,foundationCursor):[foundationStart,foundationCursor];ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.beginPath();pts.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(pts.length===4)ctx.closePath();ctx.stroke();if(activeTool==='foundation_wall'&&wallReference!=='centreline'){try{const candidate=createReferencedWall(foundationStart,foundationCursor,'preview',wallReference,wallReferenceWidth.trim()?Number(wallReferenceWidth):null),outline=foundationFootprint(candidate);if(outline){ctx.strokeStyle='#4ade80';ctx.fillStyle='rgba(74,222,128,.12)';ctx.beginPath();outline.map(p=>worldToScreen(p.x,p.y)).forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();ctx.stroke();}}catch{/* Invalid or incomplete reference remains uncommitted. */}}}ctx.restore();}
     if(traceCorrection){
       ctx.save();
       traceCorrection.trace.vertices.forEach(({point},i)=>{
@@ -2434,7 +2455,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     roomSnapFeedback,
     marqueeStart,
     marqueeEnd,
-    traceCorrection,correctionVertex,foundationEntities,visibleFoundation,foundationPreview,validPerimeterCandidate,perimeterOutline,foundationStart,foundationCursor,foundationVertices,foundationMarquee,wallReference,wallReferenceWidth,
+    traceCorrection,correctionVertex,foundationEntities,visibleFoundation,foundationPreview,validPerimeterCandidate,perimeterOutline,foundationStart,foundationCursor,foundationGuide,foundationVertices,foundationMarquee,wallReference,wallReferenceWidth,
     roofEntities, roofDraft, roofCursor, roofVertex, roofMode, roofTarget, generationOutline, generationPreview, roofMarquee,
   ]);
 
@@ -2591,16 +2612,28 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   const polygonPerimeterTool=foundationTool&&activeTool==='foundation_perimeter';
   const perimeterTool=rectanglePerimeterTool||polygonPerimeterTool;
   const foundationPolygon=foundationTool&&(polygonPerimeterTool||foundationArea(activeTool)&&foundationMode==='polygon');
-  const foundationSnap=(raw:Point2D)=>{
+  const foundationSnap=(raw:Point2D,showGuide=false)=>{
+    if(showGuide)setFoundationGuide(undefined);
     const tolerance=12/transform.scale;
     const first=foundationVertices[0],last=foundationVertices[foundationVertices.length-1];
     if(foundationPolygon&&foundationVertices.length>=3&&distance(raw,first)<=tolerance)return first;
+    if(activeTool==='foundation_slab'){
+      const corner=interiorCorners.reduce<Point2D|undefined>((best,p)=>distance(raw,p)<=tolerance&&(!best||distance(raw,p)<distance(raw,best))?p:best,undefined);
+      if(corner)return corner;
+    }
     const near=nearestFoundationSnap(raw,visibleFoundation??[],tolerance);
     const grid=state.settings.gridSnap?snapPointToGrid(raw,state.settings.gridSnapSize):raw;
     const anchor=polygonPerimeterTool?last:state.settings.orthoMode&&!rectanglePerimeterTool&&!foundationArea(activeTool)?foundationStart:null;
-    if(!anchor)return near?.point??grid;
-    if(near&&(near.point.x===anchor.x||near.point.y===anchor.y))return near.point;
-    return orthoPoint(anchor,grid);
+    if(near&&(!anchor||near.point.x===anchor.x||near.point.y===anchor.y))return near.point;
+    const projected=anchor?orthoPoint(anchor,raw):raw;
+    const axis=anchor?(projected.x===anchor.x?'y':'x'):undefined;
+    const targets=[...foundationVertices,...foundationSnapAnchors];
+    const alignment=foundationAlignment(projected,targets,tolerance,axis);
+    if(alignment){
+      if(showGuide)setFoundationGuide(alignment);
+      return alignment.point;
+    }
+    return anchor?orthoPoint(anchor,grid):grid;
   };
   const placeFoundationRectangle=(start:Point2D,end:Point2D):boolean=>{
     try {
@@ -3091,7 +3124,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       if(distance(drag.screen,{x:clientX,y:clientY})>=4||roofMarquee)setRoofMarquee({start:drag.start,end:rawWorld});
       return;
     }
-    if(foundationTool){if(!perimeterOutline){const p=foundationSnap(rawWorld);setFoundationCursor(p);}return;}
+    if(foundationTool){if(!perimeterOutline){const p=foundationSnap(rawWorld,true);setFoundationCursor(p);}return;}
     if(roofEntities&&activeTool.startsWith('roof_')) {const target=getRoofSnap(rawWorld);setRoofTarget(target);setRoofCursor(target.point);return;}
     // Check for underlay hover
     if (state.underlay && state.underlay.isVisible && !state.underlay.isLocked && underlayImageRef.current) {
@@ -3420,6 +3453,11 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       {perimeterOutline&&perimeterTool&&<section aria-label={rectanglePerimeterTool?'Rectangle perimeter configuration':'Polygon perimeter configuration'} className="absolute top-20 left-4 z-20 bg-slate-900 border border-sky-600 rounded-lg p-4 text-xs space-y-3 w-64 shadow-xl">
         <h3 className="font-semibold text-sky-300">{rectanglePerimeterTool?'Rectangle foundation':'Polygon foundation perimeter'}</h3><p>{perimeterOutline.length} vertices</p>
         <label className="block">{rectanglePerimeterTool?'Rectangle reference':'Polygon reference'}<select aria-label={rectanglePerimeterTool?'Rectangle reference':'Polygon reference'} className="block w-full bg-slate-800 rounded p-2" value={perimeterReference} onChange={e=>{setPerimeterReference(e.target.value as RectangleReference);setPerimeterCandidate(null)}}><option value="exterior">Exterior face</option><option value="centreline">Centreline</option><option value="interior">Interior face</option></select></label>
+        {onConfigureTracedAssembly&&<button className="bg-sky-700 rounded p-2" onClick={()=>{
+          onConfigureTracedAssembly(perimeterOutline,rectanglePerimeterTool?'rectangle':'orthogonal',perimeterReference);
+          setPerimeterCandidate(null);setPerimeterOutline(null);onToolChange('select');
+        }}>Specify foundation construction</button>}
+        <details><summary>Advanced individual perimeter</summary>
         {([['wall thickness',perimeterWidth,setPerimeterWidth,true],['wall height',perimeterHeight,setPerimeterHeight,false],['wall base',perimeterBase,setPerimeterBase,false]] as const).map(([label,value,set,section])=>
           <FoundationDimensionInput key={label} label={(rectanglePerimeterTool?'Rectangle ':'Polygon ')+label} className="block w-full bg-slate-800 rounded p-2" value={value} section={section} metric={state.settings.unitSystem==='metric'} onChange={v=>{set(v);setPerimeterCandidate(null)}}/>
         )}
@@ -3436,12 +3474,8 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
           setPerimeterCandidate({source:foundationEntities,members,volume:rows.reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0)});setPerimeterError('');
         }catch(err){setPerimeterCandidate(null);setPerimeterError(err instanceof Error?err.message:String(err))}}}>{rectanglePerimeterTool?'Preview rectangle perimeter':'Preview polygon perimeter'}</button>
         <button disabled={!validPerimeterCandidate} className="bg-emerald-700 disabled:opacity-40 rounded p-2" onClick={()=>{if(validPerimeterCandidate&&foundationEntities&&onFoundationChange?.([...foundationEntities,...validPerimeterCandidate.members])){setPerimeterCandidate(null);setPerimeterOutline(null);onToolChange('select');onSelect({type:'foundation',ids:validPerimeterCandidate.members.map(m=>m.id)})}else setPerimeterError('Preview is stale or placement rejected')}}>{rectanglePerimeterTool?'Apply rectangle perimeter':'Apply polygon perimeter'}</button>
-        {onApplyTracedAssembly&&<button className="bg-sky-800 rounded p-2 disabled:opacity-40" disabled={!validPerimeterCandidate} onClick={()=>{
-          if(validPerimeterCandidate&&onApplyTracedAssembly(validPerimeterCandidate.members)){
-            setPerimeterCandidate(null);setPerimeterOutline(null);onToolChange('select');
-          }else setPerimeterError('The assembly could not be applied. Review the preview and diagnostics.');
-        }}>Apply as foundation assembly</button>}
-        <button className="bg-slate-700 rounded p-2" onClick={()=>{setPerimeterCandidate(null);setPerimeterOutline(null);setPerimeterError('');onToolChange('select')}}>{rectanglePerimeterTool?'Cancel rectangle perimeter':'Cancel polygon perimeter'}</button></div>
+        </div></details>
+        <button className="bg-slate-700 rounded p-2" onClick={()=>{setPerimeterCandidate(null);setPerimeterOutline(null);setPerimeterError('');onToolChange('select')}}>{rectanglePerimeterTool?'Cancel rectangle perimeter':'Cancel polygon perimeter'}</button>
       </section>}
       {generationOutline&&<section className="absolute top-20 left-4 z-20 bg-slate-900 border border-sky-600 rounded-lg p-4 text-xs space-y-3 w-64 shadow-xl"><h3 className="font-semibold text-sky-300">Generate Roof Skeleton</h3><p>Rectangular roof perimeter · preview only</p><label className="block">Configuration<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.type} onChange={e=>{setGenerationConfig(c=>({...c,type:e.target.value as RoofConfig['type']}));setGenerationPreview(null)}}>{['hip','gable','shed','flat'].map(t=><option key={t}>{t}</option>)}</select></label>{generationConfig.type!=='flat'&&<label className="block">Pitch rise per 12<input className="block w-full bg-slate-800 p-2 rounded" type="number" min="0.01" max="48" step="any" value={generationConfig.pitch} onChange={e=>{setGenerationConfig(c=>({...c,pitch:Number(e.target.value)}));setGenerationPreview(null)}}/></label>}{generationConfig.type==='gable'&&<label>Ridge orientation<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.ridge} onChange={e=>{setGenerationConfig(c=>({...c,ridge:e.target.value as RoofConfig['ridge']}));setGenerationPreview(null)}}><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>}{generationConfig.type==='shed'&&<label>Downslope direction<select className="block w-full bg-slate-800 p-2 rounded" value={generationConfig.direction} onChange={e=>{setGenerationConfig(c=>({...c,direction:Number(e.target.value) as RoofConfig['direction']}));setGenerationPreview(null)}}>{[[0,'Right'],[90,'Down'],[180,'Left'],[270,'Up']].map(([v,n])=><option key={v} value={v}>{n}</option>)}</select></label>}<p className="text-slate-400">No automatic overhang or assembly allowances. Review against drawings.</p>{generationError&&<p role="alert" className="text-amber-300">{generationError}</p>}<div className="flex gap-2"><button className="bg-sky-700 rounded p-2" onClick={()=>{try{const next=generateRectangularRoof(generationOutline[0],generationOutline[2],generationConfig,uuidv4);validateRoofTopology([...generationBase(),...next]);setGenerationPreview(next);setGenerationError('');}catch(err){setGenerationPreview(null);setGenerationError(err instanceof Error?err.message:String(err));}}}>Preview</button><button disabled={!generationPreview} className="bg-emerald-700 disabled:opacity-40 rounded p-2" onClick={()=>{try{if(generationPreview){const next=[...generationBase(),...generationPreview];validateRoofTopology(next);if(onRoofChange?.(next)){setCorrection(null);onSelect({type:'none'});onToolChange('select');}}}catch(err){setGenerationError(err instanceof Error?err.message:String(err));}}}>Apply</button><button className="bg-slate-700 rounded p-2" onClick={()=>{setCorrection(null);onToolChange('select')}}>Cancel</button></div></section>}
       {traceCorrection&&<div role="status" className="absolute left-4 top-20 rounded bg-slate-900 p-2 text-xs">
@@ -3480,7 +3514,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         {activeTool==='foundation_wall'&&wallReference==='centreline'&&foundationCursor&&visibleFoundation?.some(e=>e.kind==='foundationWall'&&[e.start,e.end].some(p=>distance(p,foundationCursor)<1e-8))&&<span role="status">Wall endpoint snapped</span>}
         {polygonPerimeterTool&&foundationVertices.length>=3&&foundationCursor&&distance(foundationVertices[0],foundationCursor)<1e-8&&<span role="status">Start node snapped</span>}
         {foundationPolygon&&foundationVertices.length>=(perimeterTool?4:3)&&<button className="bg-sky-700 px-2 py-1 rounded" onClick={finishFoundationPolygon}>Finish foundation polygon</button>}
-        {foundationTool&&foundationArea(activeTool)&&<select aria-label="Foundation drawing mode" value={foundationMode} onChange={e=>setFoundationMode(e.target.value as 'rectangle'|'polygon')} className="bg-slate-800 rounded px-2 py-1"><option value="rectangle">Rectangle</option><option value="polygon">Polygon</option></select>}
+        {foundationTool&&foundationArea(activeTool)&&<select aria-label="Foundation drawing mode" title="Choose rectangle or polygon for this component" value={foundationMode} onChange={e=>setFoundationMode(e.target.value as 'rectangle'|'polygon')} className="bg-slate-800 rounded px-2 py-1"><option value="rectangle">Rectangle</option><option value="polygon">Polygon</option></select>}
         {roofDraft.length>=3&&<button className="bg-sky-700 px-2 py-1 rounded" onClick={()=>finishRoofPolygon()}>Finish polygon</button>}
         {roofAreaTool&&activeTool!=='roof_generate'&&<select aria-label="Roof drawing mode" value={roofMode} onChange={e=>setRoofMode(e.target.value as 'rectangle'|'polygon')} className="bg-slate-800 rounded px-2 py-1"><option value="rectangle">Rectangle</option><option value="polygon">Polygon</option></select>}
         {/* Precision Grid Snapping Selector */}

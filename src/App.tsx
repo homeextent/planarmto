@@ -1,5 +1,5 @@
-import { assemblyFromSelection, FoundationAssemblyPanel } from './components/FoundationAssemblyPanel';
-import { applyAssemblyPreview, previewAssemblyChange } from './engine/measurements/foundationAssemblyController';
+import { createTracedAssembly, FoundationAssemblyPanel, type TracedAssembly } from './components/FoundationAssemblyPanel';
+import { applyAssemblyPreview } from './engine/measurements/foundationAssemblyController';
 import type { AssemblyPreview, AssemblyTrace, FoundationPreset } from './engine/measurements/foundationAssemblyModel';
 import {planFoundationDeletion} from './engine/measurements/foundationDerivation';
 import {planRoofDeletion} from './engine/measurements/roofSelection';
@@ -139,6 +139,7 @@ function AppContent() {
   // Active drafting tool
   const [traceEdit,setTraceEdit]=useState<{document:typeof document;trace:AssemblyTrace;onMove:(index:number,point:{x:number;y:number})=>void}>();
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
+  const [slabMode,setSlabMode]=useState<'rectangle'|'polygon'>('rectangle');
 
   // Active wall preset for drafting
   const [activeWallPreset, setActiveWallPreset] = useState<WallPreset>('interior_2x4');
@@ -237,10 +238,11 @@ function AppContent() {
       return true;
     }catch(err){setStorageWarning(err instanceof Error?err.message:String(err));return false;}
   };
-  const handleTracedAssembly = (walls:FoundationEntity[]):boolean => {
-    const draft=assemblyFromSelection(walls,walls[0]?.id);
-    if(!draft)return false;
-    return handleAssemblyApply(previewAssemblyChange(document,activeWorkspace.id,uuidv4(),null,{kind:'create',input:draft.input},uuidv4));
+  const [tracedAssembly,setTracedAssembly]=useState<{workspaceId:string;draft:TracedAssembly}>();
+  const activeTrace=tracedAssembly?.workspaceId===activeWorkspace.id?tracedAssembly.draft:undefined;
+  const handleTracedAssembly = (...args:Parameters<typeof createTracedAssembly>) => {
+    setTracedAssembly({workspaceId:activeWorkspace.id,draft:createTracedAssembly(...args)});
+    setSelection({type:'none'});
   };
   const handleFoundationPresets = (presets:FoundationPreset[]):boolean => {
     if(currentDocument.current!==document)return false;
@@ -498,6 +500,7 @@ function AppContent() {
   }, [selection, state, handlePaste]);
 
   function resetWorkspaceInteraction() {
+    setTracedAssembly(undefined);
     setTraceEdit(undefined);
     generation.current++;
     setWorkspaceEpoch(n => n + 1);
@@ -775,7 +778,10 @@ function AppContent() {
       {/* 2. MAIN 3-PANEL WORKSPACE */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left CAD Tool Palette */}
-        {foundationEntities ? <FoundationToolbar activeTool={activeTool} onSelectTool={handleToolChange}/> : roofEntities ? <RoofToolbar activeTool={activeTool} onSelectTool={handleToolChange}/> : <Toolbar
+        {foundationEntities ? <FoundationToolbar activeTool={activeTool} onSelectTool={tool=>{
+          if(tool==='foundation_slab')setSlabMode('rectangle');
+          handleToolChange(tool);
+        }} onPolygonSlab={()=>{setSlabMode('polygon');handleToolChange('foundation_slab')}}/> : roofEntities ? <RoofToolbar activeTool={activeTool} onSelectTool={handleToolChange}/> : <Toolbar
           activeTool={activeTool}
           onSelectTool={handleToolChange}
           activeWallPreset={activeWallPreset}
@@ -788,8 +794,9 @@ function AppContent() {
           foundationEntities={foundationEntities}
           foundationPreview={foundationGhost?.workspaceId===activeWorkspace.id&&foundationGhost.source===foundationEntities?foundationGhost.members:undefined}
           foundationFilter={visibleFoundationKind}
+          slabMode={slabMode}
           onFoundationChange={handleFoundationChange}
-          onApplyTracedAssembly={handleTracedAssembly}
+          onConfigureTracedAssembly={handleTracedAssembly}
           traceCorrection={traceEdit?.document===document?traceEdit:undefined}
           roofEntities={roofEntities}
           onRoofChange={handleRoofChange}
@@ -812,7 +819,7 @@ function AppContent() {
           }}
         />
 
-        {foundationEntities && <FoundationInspector ownedComponentIds={new Set(activeWorkspace.foundationAssemblies?.flatMap(parent=>parent.children.map(child=>child.entityId)))} assemblyControls={<FoundationAssemblyPanel project={document} workspaceId={activeWorkspace.id}
+        {foundationEntities && <FoundationInspector ownedComponentIds={new Set(activeWorkspace.foundationAssemblies?.flatMap(parent=>parent.children.map(child=>child.entityId)))} assemblyControls={<FoundationAssemblyPanel project={document} workspaceId={activeWorkspace.id} traced={activeTrace} onCancelTrace={()=>setTracedAssembly(undefined)}
           selectedIds={selection.type==='foundation'?selection.ids:undefined} selectedId={selection.type==='foundation'?(selection.id??selection.ids?.[0]):undefined} metric={state.settings.unitSystem==='metric'}
           onTraceEdit={(trace,onMove)=>{
             setActiveTool('select');

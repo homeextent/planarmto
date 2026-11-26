@@ -7,7 +7,7 @@ import { deriveStripFootings } from './foundationDerivation';
 import { derivePerimeterDrainage } from './foundationDrainageDerivation';
 import { generateOrthogonalFoundationPerimeter } from './foundationDrafting';
 import { deriveFoundationEnvelope, deriveRectangularEnvelope } from './foundationEnvelopeDerivation';
-import type { FoundationEntity, FoundationEnvelopeSource } from './measurementTypes';
+import { comparableFoundationElevations, type FoundationEntity, type FoundationEnvelopeSource } from './measurementTypes';
 import { orthogonalWallPerimeter } from './foundationPerimeterGeometry';
 
 const isFoam=(material:MaterialChoice)=>material.kind==='catalogue'&&['eps','xps','polyisocyanurate'].includes(material.id);
@@ -80,7 +80,7 @@ export function regenerateFoundationAssembly(parent:FoundationAssemblyRecord, in
       const openings=s.openings?.value.filter(o=>o.sourceSegmentId===segment.id).map(o=>o.opening);
       if(e.kind!=='foundationWall')throw Error('Expected generated foundation wall');
       wallsBySegment.set(segment.id,add({...e,heightFt:wallHeight,elevationFt:elevation,foundation:{
-        ...e.foundation!,material:materialString(patch.material??s.material!.value),...(openings?.length?{wallOpenings:openings}:{})
+        ...e.foundation!,material:materialString(patch.material??s.material!.value),...(wallDatum.reference?{elevationReference:wallDatum.reference}:{}),...(openings?.length?{wallOpenings:openings}:{})
       }},{system:'wall',sourceId:segment.id}));
     });
   }
@@ -171,19 +171,28 @@ export function regenerateFoundationAssembly(parent:FoundationAssemblyRecord, in
     }
   }
 
+  if(spec.exteriorLayers.filter(layer=>layer.scope.status==='included').length>1&&spec.exteriorSequence?.status!=='confirmed')
+    gap('exteriorLayers','sequence','Confirm the exterior material order from the wall outward',['materialSpecification']);
   let slab:FoundationEntity|undefined;
   const slabScope=spec.slab;
-  if(allowed('slab')&&fields(slabScope,'slab',['material','extent','thicknessFt','baseFt','footingRelation'])&&slabScope.status==='included'){
+  if(allowed('slab')&&fields(slabScope,'slab',['material','extent','thicknessFt','footingRelation'])&&slabScope.status==='included'){
     const s=slabScope.specification,extent=s.extent!.value;
     const width=value(wallScope,'widthFt');
     const polygon=extent.kind==='independent'?extent.points:
       typeof width==='number'&&supportsWallDerivation?orthogonalWallPerimeter(points,width,trace.reference).interior:null;
+    const base=s.bottomRelationship?.value==='atWallBase'&&supportsWallDerivation&&walls[0].kind==='foundationWall'&&
+      walls.every(wall=>wall.kind==='foundationWall'&&wall.elevationFt===('elevationFt' in walls[0]?walls[0].elevationFt:null)&&comparableFoundationElevations(wall,walls[0]))
+      ? walls[0].elevationFt : s.bottomRelationship?null:s.baseFt?.value??null;
+    const reference=s.bottomRelationship?.value==='atWallBase'
+      ? walls[0]?.foundation?.elevationReference : s.elevationReference?.value;
     if(!polygon)gap('slab','extent','Confirm applicable interior walls or trace the slab independently');
+    else if(base===null)gap('slab','baseFt','Confirm slab bottom relative to the walls or specify its elevation');
     else{
       const child=binding({system:'slab'});
-      slab=add({kind:'slab',purpose:'concrete',polygon,depthFt:s.thicknessFt!.value,elevationFt:s.baseFt!.value,
+      slab=add({kind:'slab',purpose:'concrete',polygon,depthFt:s.thicknessFt!.value,elevationFt:base,
         id:child.entityId,physicalId:child.physicalId,assemblyId:parent.id,source:{reference:'Confirmed assembly slab'},
         foundation:{version:1,material:materialString(s.material!.value),baseElevationConfirmed:true,
+          ...(reference?{elevationReference:reference}:{}),
           ...(s.openings?.value.length?{slabOpenings:s.openings.value}:{}),...(s.thickenings?.value.length?{slabThickenings:s.thickenings.value}:{})}},
       {system:'slab'});
     }

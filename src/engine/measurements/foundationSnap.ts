@@ -1,5 +1,6 @@
 import type {FoundationEntity,Point} from './measurementTypes';
 import {foundationPoints,foundationFootprint} from './foundationDrafting';
+import {orthogonalWallPerimeter} from "./foundationPerimeterGeometry";
 export type FoundationSnap={point:Point;kind:'node'|'edge'};
 /** Snap to the nearest visible node first, otherwise nearest segment projection.
  * Include canonical run endpoints and confirmed physical footprint vertices/edges.
@@ -18,4 +19,39 @@ export function nearestFoundationSnap(raw:Point,entities:FoundationEntity[],tole
   if(foot){foot.forEach(considerNode);foot.forEach((p,i)=>considerEdge(p,foot[(i+1)%foot.length]));}
  }
  return node?{point:node,kind:'node'}:edge?{point:edge,kind:'edge'}:null;
+}
+
+/** Find one projected alignment without requiring proximity along the guide. */
+export function foundationAlignment(raw:Point,anchors:Point[],tolerance:number,axis?:'x'|'y'){
+ let best:{point:Point;anchor:Point;distance:number}|undefined;
+ for(const anchor of anchors){
+  for(const coordinate of axis?[axis]:['x','y'] as const){
+   const distance=Math.abs(raw[coordinate]-anchor[coordinate]);
+   if(distance>tolerance)continue;
+   const point={...raw,[coordinate]:anchor[coordinate]};
+   if(!best||distance<best.distance||distance===best.distance&&(
+    point.x<best.point.x||point.x===best.point.x&&(point.y<best.point.y||
+     point.y===best.point.y&&(anchor.x<best.anchor.x||anchor.x===best.anchor.x&&anchor.y<best.anchor.y))
+   ))best={point,anchor,distance};
+  }
+ }
+ return best;
+}
+
+export function foundationInteriorCorners(entities:FoundationEntity[]):Point[]{
+ const groups=new Map<string,FoundationEntity[]>();
+ for(const entity of entities){
+  if(entity.kind!=='foundationWall'||!entity.foundation?.perimeterReference)continue;
+  const group=groups.get(entity.assemblyId)??[];
+  group.push(entity);
+  groups.set(entity.assemblyId,group);
+ }
+ return [...groups.values()].flatMap(group=>{
+  const reference=group[0].foundation!.perimeterReference!;
+  if(group.length!==reference.points.length||new Set(group.map(e=>e.foundation?.perimeterReference?.edge)).size!==group.length)return [];
+  const signature=(p:typeof reference)=>JSON.stringify([p.points,p.widthFt,p.reference]);
+  if(group.some(e=>e.scopeApplicability&&e.scopeApplicability.status!=='included'||signature(e.foundation!.perimeterReference!)!==signature(reference)))return [];
+  try{return orthogonalWallPerimeter(reference.points,reference.widthFt,reference.reference).interior}
+  catch{return []}
+ });
 }

@@ -348,7 +348,7 @@ test('irregular drainage rejects collapsed offsets, partial selection and stale 
  assert.throws(()=>qty([{...source,widthFt:2},...walls.slice(1),...d]));
 });
 
-import {nearestFoundationSnap} from '../src/engine/measurements/foundationSnap';
+import {foundationAlignment,foundationInteriorCorners,nearestFoundationSnap} from '../src/engine/measurements/foundationSnap';
 test('foundation snapping selects nearest node independently of entity order and falls back to edge',()=>{
  const a=wall('a',{x:0,y:0},{x:10,y:0}),b=wall('b',{x:0,y:2},{x:10,y:2});delete a.foundation;delete b.foundation;
  for(const list of [[a,b],[b,a]]){
@@ -499,4 +499,35 @@ test('foundation construction dimensions parse fractional and metric inputs to c
  }
  for(const text of ['','--8','8..2','7 1/0','8x','2 m 3','8\' 12"'])assert.equal(parseFoundationDimension(text,'in'),null);
  assert.equal(displayFoundationDimension(.625,'mm'),'190.5');
+});
+
+test('projected alignment uses distant anchors and the active orthogonal axis',()=>{
+ const anchors=[{x:10,y:-40},{x:60,y:20}];
+ assert.deepEqual(foundationAlignment({x:10.1,y:20.2},anchors,.25)?.point,{x:10,y:20.2});
+ assert.deepEqual(foundationAlignment({x:10.1,y:20.2},anchors,.25,'y')?.point,{x:10.1,y:20});
+ assert.equal(foundationAlignment({x:10.1,y:20.2},anchors,.05),undefined);
+});
+test('interior corner snaps follow the validated wall faces of a complete irregular ring',()=>{
+ let i=0;
+ const walls=generateOrthogonalFoundationPerimeter([
+  {x:0,y:0},{x:30,y:0},{x:30,y:15},{x:15,y:15},{x:15,y:30},{x:0,y:30},
+ ],'exterior',1,8,0,()=>String(++i));
+ const corners=foundationInteriorCorners(walls);
+ assert.equal(corners.length,6);
+ assert.ok(corners.some(p=>p.x===14&&p.y===14));
+ assert.deepEqual(foundationInteriorCorners(walls.slice(1)),[]);
+ assert.deepEqual(foundationInteriorCorners([{...walls[0],scopeApplicability:{status:'excluded',reason:'Separate scope'}},...walls.slice(1)]),[]);
+});
+test('independent local elevation references cannot establish vertical separation',()=>{
+ const make=(id:string,x:number,z:number,reference?:NonNullable<FoundationEntity['foundation']>['elevationReference']):FoundationEntity=>({
+  ...region(id,box(x,0,x+4,4)),kind:'slab',polygon:box(x,0,x+4,4),purpose:'concrete',elevationFt:z,depthFt:1,
+  foundation:{version:1,material:'poured concrete',baseElevationConfirmed:true,...(reference?{elevationReference:reference}:{})},
+ });
+ const a=make('local-a',0,0,{kind:'assembly',id:'a'});
+ const b=make('local-b',2,10,{kind:'assembly',id:'b'});
+ const c=make('local-c',20,0,{kind:'assembly',id:'b'});
+ const result=measureFoundation('refs',[a,b,c]).rows;
+ assert.deepEqual(result.map(row=>row.status),['unquantified','unquantified','measured']);
+ assert.ok(measureFoundation('refs',[a,make('local-d',2,1,{kind:'assembly',id:'a'})]).rows.every(row=>row.status==='measured'));
+ assert.ok(measureFoundation('refs',[make('hist-a',0,0),make('hist-b',2,10)]).rows.every(row=>row.status==='measured'));
 });
