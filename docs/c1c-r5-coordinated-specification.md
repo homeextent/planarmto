@@ -14,6 +14,8 @@ Objective: import → calibrate → trace the architect's drawings → configure
 
 The [governing product design philosophy](../SYSTEM_BIBLE.md#governing-product-design-philosophy) applies to this specification. The [R5.6B plan](c1c-r5-6b-usability-plan.md) applies it to the owner’s practical feedback. The owner authorized implementation after independent plan review, including the [bounded optional v3 amendments](c1c-r5-3-persistence-design.md#r56b-additive-v3-contract). Independent implementation review and owner practical acceptance remain required.
 
+The [R5.6C workflow specification](c1c-r5-6c-workflow.md) records the authorized correction, standard slab estimating conventions and practical acceptance procedure.
+
 ## 2. Package 01 — Graphical drafting and canvas interaction (R5.1)
 
 Dedicated Rectangle foundation tool: click first corner, move pointer for live preview, click opposite corner, optionally type exact width/depth, configure and apply. No held mouse button or X/Y entry required. Preserve advanced coordinate-based capabilities where necessary. No assumption that all rectangles are axis-independent: use supported geometry/reference contract and refuse unsupported placement rather than distort.

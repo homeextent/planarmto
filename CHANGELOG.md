@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] — Increments B, C.1A and C.1B (staging release train)
 
 ### C.1C — Feature candidate and hybrid handoff (not staging integrated)
+- R5.6C keeps construction drafts visible and transaction actions accessible, preserves pending perimeter corrections, and adds coordinated standalone slab construction. See [R5.6C workflow and acceptance](docs/c1c-r5-6c-workflow.md).
 - R5.6B routes new perimeter traces to coordinated specification and quantity review, adds direct editing and drafting aids, and records confirmed residential relationships and exterior system order using optional v3 fields. Independent implementation review and owner practical acceptance remain pending.
 - Recorded the owner-approved [product design philosophy](SYSTEM_BIBLE.md#governing-product-design-philosophy) and reconciled the [R5.6B usability plan](docs/c1c-r5-6b-usability-plan.md) for independent review. Full R5 acceptance remains withheld. Documentation only.
 - R1–R4 foundation geometry, quantities, source-linked assemblies, scope/layers, precision, replacement, persistence and bounded angled runs implemented in draft PR #12. CI #186 at e5e9748, run 45670433567/job 139403930112, 288/288 independently verified.

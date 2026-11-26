@@ -14,6 +14,8 @@ Keep coordinates, relative elevations, component identities, mathematical offset
 
 Automation requires confirmed conventional relationships and supplied construction specifications. Preserve architect-specified geometry and dimensions, confirmed specifications and estimating assumptions, independent material quantities and unresolved specification status. Preserve measurement accuracy, overlap protection, component ownership, duplicate prevention, historical records, source geometry and provenance. Explicitly refuse unsupported conditions and surface the reason to the contractor. Implementation remains subject to the applicable scope and authorization gates.
 
+Keep an uncommitted trace visible through construction specification and review. Provide persistent Preview, Apply and Cancel controls in standard construction editors, with consistent workflows for primary construction objects. Apply validated changes atomically. Model the relationships needed to quantify specified materials and protect the takeoff. Use disclosed estimating conventions where supported and request detailed physical geometry when it affects validity.
+
 ## Architectural direction and governing principles — C.1B staging; C.1C feature candidate
 
 This section governs all subsequent development and takes precedence over older engine descriptions below. Production v2.15.1 is a separate baseline. Preserve valid historical floor formulas as regression references; do not infer roof, foundation or site quantities from floor gross area. Roof-specific measurement is integrated; generic CAD tools in foundation/site workspaces do not establish specialist measurement authority.
