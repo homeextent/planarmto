@@ -1026,6 +1026,21 @@ test('subsequent foundation drafts survive rejected overlap and commit separatel
  expect(await snapshot(page)).toHaveLength(8);
  await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();
  expect(await snapshot(page)).toEqual(committed);
+ const wallQuantity=page.getByText('wall concrete',{exact:true}).locator('..');
+ const priorQuantity=(await wallQuantity.innerText()).split('\n').at(-1);
+ await click('Foundation wall');
+ await point(630,420);
+ await point(740,420);
+ const editor=page.getByRole('form',{name:'Independent wall construction'});
+ const assemblyRegion=page.getByRole('region',{name:'Foundation assemblies'});
+ await expect(editor).toBeVisible();
+ expect((await editor.boundingBox())!.y).toBeLessThan((await assemblyRegion.boundingBox())!.y);
+ await expect(editor.getByLabel('Material',{exact:true})).toHaveValue('poured concrete');
+ expect((await snapshot(page)).filter(entity=>entity.kind==='foundationWall')).toHaveLength(15);
+ await expect(wallQuantity).toContainText(priorQuantity!);
+ await page.getByText('Measurement checks',{exact:true}).click();
+ await expect(page.getByText(/Enter the component width to determine its footprint/).filter({visible:true})).toHaveCount(1);
+
 });
 
 test('exact standard slab dimensions, footprint correction and confirmed assembly deletion are atomic',async({page})=>{

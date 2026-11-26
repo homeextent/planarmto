@@ -45,7 +45,7 @@ export function measureFoundation(workspaceId:string,entities:FoundationEntity[]
    else try{oriented=orientedStripFootprint(e.start,e.end,e.widthFt,e.foundation.joinStartFt,e.foundation.joinEndFt);bounds=polygonEnvelope(oriented);if(e.start.x===e.end.x||e.start.y===e.end.y){bounds=extendedStrip(e.start,e.end,e.widthFt,e.foundation.joinStartFt,e.foundation.joinEndFt);pieces=[bounds]}else{area=(Math.hypot(e.end.x-e.start.x,e.end.y-e.start.y)+(e.foundation.joinStartFt??0)+(e.foundation.joinEndFt??0))*e.widthFt;if((e.foundation.joinStartFt??0)!==0||(e.foundation.joinEndFt??0)!==0)reason='Angled junction extensions require explicit reconciliation';}}catch{reason='Unsupported strip footprint; reconcile explicitly'}
   }else if('polygon' in e&&simplePolygon(e.polygon)){bounds=polygonEnvelope(e.polygon);area=projectedArea(e.polygon);try{pieces=orthogonalPolygonPieces(e.polygon)}catch{/* Nonorthogonal polygon may be measured only without unresolved overlap. */}}
   const height='start' in e?e.heightFt:e.depthFt;
-  if(height===null)reason='Missing thickness or height';
+  if(height===null)reason??='Enter the height or thickness';
   if(bounds&&!reason)prism={id:e.id,bounds,bottomFt:e.foundation?.baseElevationConfirmed?e.elevationFt:null,heightFt:height};
   if(layerConflicts.has(e.id))reason=layerConflicts.get(e.id)!;
   if(e.scopeApplicability?.status==='pending')reason='Scope pending: '+e.scopeApplicability.reason;
