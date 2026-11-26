@@ -3,6 +3,7 @@ import { replaceFoundationAssemblyState } from '../workspaceController';
 import type {
   AssemblyChange, AssemblyIntent, AssemblyPreview, ChildBinding, ComponentScopeRecord, FoundationAssemblyRecord, RetainedIdentity,
 } from './foundationAssemblyModel';
+import { planFoundationDeletion } from './foundationDerivation';
 import { regenerateFoundationAssembly } from './foundationAssemblyRegeneration';
 import { foundationReleaseGroup, foundationRoleKey, stableValue } from './foundationAssemblyValidation';
 import { measureFoundation } from './foundationMeasurements';
@@ -42,6 +43,18 @@ export function previewAssemblyChange(document:ProjectDocument,workspaceId:strin
     if(creating===!!previous)throw Error('Assembly command does not match the saved parent');
     const before=measureFoundation(workspaceId,measurements).rows;
     preview.quantities={before,after:before};
+    if(command.kind==='delete'){
+      const parent=previous!;
+      const plan=planFoundationDeletion(measurements,parent.children.map(child=>child.entityId));
+      if(plan.dependentCount)throw Error('This assembly has dependent construction outside it. Resolve those dependencies before deletion.');
+      const parents=workspace.foundationAssemblies!.filter(candidate=>candidate.id!==parent.id);
+      replaceFoundationAssemblyState(document,workspaceId,plan.remaining,parents);
+      const after=measureFoundation(workspaceId,plan.remaining).rows;
+      preview.quantities.after=after;
+      preview.changes={parents,measurements:plan.remaining,created:[],retained:[],retired:parent.children,detached:[]};
+      validatedPreviews.set(preview,JSON.stringify(preview.changes));
+      return preview;
+    }
     if(command.kind==='replaceIntent'&&previous&&equal(design(command.input),design(previous))&&!command.adoption&&!command.identityReplacements?.length&&!command.scopeResolutions?.length){
       const known=new Set(previous.children.map(b=>b.entityId));
       preview.unresolvedSpecifications=regenerateFoundationAssembly(previous,measurements.filter(e=>!known.has(e.id))).gaps;
@@ -72,6 +85,12 @@ export function previewAssemblyChange(document:ProjectDocument,workspaceId:strin
       if(command.segments.some(s=>s.successorIds.some(id=>!newIds.has(id)||retainedIds.has(id))))
         throw Error('Trace replacements require new, valid successor identities.');
       if((next.detachments??[]).some(a=>a.disposition==='released'))throw Error('Resolve detached roles before correcting this parent trace.');
+      if(old.kind==='slab'||command.trace.kind==='slab'){
+        if(old.kind!=='slab'||command.trace.kind!=='slab'||removed.length)throw Error('A slab correction must retain its ordered footprint edges.');
+        const slab=next.specifications.slab;
+        const fields=slab.status==='included'?slab.specification:slab.retainedSpecification;
+        if(fields?.extent)fields.extent={value:{kind:'independent',points:command.trace.vertices.map(v=>v.point)},confirmation:command.source};
+      }
       next.trace=structuredClone(command.trace);
       next.traceCorrections=[...(next.traceCorrections??[]),{
         previousRevisionId:previous!.revisionId,revisionId:revision,previousTrace:old,source:command.source,

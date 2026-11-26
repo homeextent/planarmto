@@ -97,10 +97,11 @@ export function createTracedAssembly(points:AssemblyTrace['vertices'][number]['p
   const segments=vertices.map((v,i)=>({id:uuid(),startVertexId:v.id,endVertexId:vertices[(i+1)%vertices.length].id}));
   const id=uuid();
   const slabOnly=kind==='slab';
+  const convention={kind:'estimatingAssumption',reference:'Contractor confirmed conventional construction on Apply'} as const;
   return {id,input:{
     trace:{kind,reference,vertices,segments,source},overrides:[],
-    specifications:{walls:slabOnly?{status:'excluded',reason:'Standalone slab'}:{status:'included',specification:{}},footing:pending,exteriorLayers:[],drainage:pending,
-      slab:slabOnly?{status:'included',specification:{extent:confirmed({kind:'independent',points},source)}}:pending,insulation:pending,granular:pending},
+    specifications:{walls:slabOnly?{status:'excluded',reason:'Standalone slab'}:{status:'included',specification:{material:confirmed(concrete,convention),datum:confirmed({basis:'base',elevationFt:0,reference:{kind:'assembly',id}},convention)}},footing:pending,exteriorLayers:[],drainage:pending,
+      slab:slabOnly?{status:'included',specification:{extent:confirmed({kind:'independent',points},source),material:confirmed(concrete,convention)}}:pending,insulation:pending,granular:pending},
   }};
 }
 
@@ -147,6 +148,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
   const [notchWidth,setNotchWidth]=useState('');
   const [notchDepth,setNotchDepth]=useState('');
   const [correctionError,setCorrectionError]=useState('');
+  const [deleting,setDeleting]=useState(false);
   const [pickingCorner,setPickingCorner]=useState(false);
   const [correction,setCorrection]=useState<{id:string;revision:string;command:Extract<AssemblyChange,{kind:'correctTrace'}>}>();
   const presets=project.foundationPresets??[];
@@ -191,7 +193,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
       return [name,[...new Set(values)].slice(0,12)];
     }));
   }
-  function clearPreview(){setPickingCorner(false);setPreview(null);setCorrectionError('');onPreview(null);onTraceEdit()}
+  function clearPreview(){setDeleting(false);setPickingCorner(false);setPreview(null);setCorrectionError('');onPreview(null);onTraceEdit()}
   function update(input:AssemblyIntent){
     if(traced)onDraftChange({id:traced.id,input});
     else if(adoption)setAdoption({...adoption,input});
@@ -200,6 +202,10 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
   }
   function setSystem(system:System,next:AssemblySpecifications[System]){
     if(!intent)return;
+    if(system==='footing'&&next.status==='included'&&!next.specification.material){
+      const footing=next as Scope<FootingSpec>&{status:'included'};
+      next={...footing,specification:{...footing.specification,material:confirmed(concrete,sources('Concrete selection confirmed on Apply'))}};
+    }
     if(conventional&&system==='footing'&&next.status==='included'){
       const footing=next as Scope<FootingSpec>&{status:'included'};
       const source={kind:'estimatingAssumption',reference:'Confirmed conventional centred strip footing under wall'} as const;
@@ -393,7 +399,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
   }
   return <section className="space-y-2 text-xs" aria-label="Foundation assemblies">
     <h3 className="font-semibold">{traced?(slabOnly?'Specify slab construction':'Specify foundation construction'):'Foundation assemblies'}</h3>
-    {traced&&<p>Confirm the materials, dimensions and scope for this perimeter, then review quantities.</p>}
+    {traced&&<p>{slabOnly?'Confirm the slab footprint and enter concrete thickness.':'Confirm the traced reference and enter the wall thickness and height.'} Review quantities before applying.</p>}
     {!traced&&parents.length>0&&<label className="block">Assembly
       <select aria-label="Foundation assembly" disabled={!!pendingCorrection||pickingCorner} className={field} value={parent?.id??''} onChange={e=>{setFocused(e.target.value);setEditing(false);setAdoption(null);setAdditionalBindings([]);clearPreview()}}>
         <option value="">Select assembly</option>
@@ -407,16 +413,21 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
     {!traced&&adoptable&&!adoption&&<button className={button} onClick={()=>{setAdoption(adoptable);clearPreview()}}>Configure assembly from selected perimeter</button>}
     {parent&&!adoption&&<div className="flex flex-wrap gap-2">
       <button className={button} onClick={()=>setEditing(true)}>Edit assembly</button>
-      {parent.trace.kind!=='slab'&&<button className={button} onClick={()=>{
+      {<button className={button} onClick={()=>{
         if(edit?.parentId===parent.id&&edit.revision===parent.revisionId){
           setCorrectionError('Apply or cancel specification changes before editing the perimeter.');
           return;
         }
         setEditing(true);clearPreview();setPickingCorner(true);
         onTraceEdit(parent.trace,(index,point)=>requestCorrection(()=>({trace:moveFoundationTraceVertex(parent.trace,index,point),segments:[]}),'Contractor confirmed graphical perimeter correction'));
-      }}>Edit perimeter</button>}
+      }}>{parent.trace.kind==='slab'?'Edit slab footprint':'Edit perimeter'}</button>}
       <button className={button} onClick={()=>onSelectChildren(parent.children.map(c=>c.entityId))}>Select assembly components</button>
+      <button className={button} disabled={!!edit||!!pendingCorrection||pickingCorner} onClick={()=>{
+        clearPreview();setEditing(true);setDeleting(true);
+        showPreview(previewAssemblyChange(project,workspaceId,parent.id,parent.revisionId,{kind:'delete'},uuid));
+      }}>Delete assembly</button>
     </div>}
+    {(traced||parent)&&<p className="text-slate-300" aria-label="Construction footprint">{describeTrace((traced?.input.trace??parent?.trace)!,metric)}</p>}
     {parent&&summary.size>0&&<details className="space-y-1">
       <summary>Assembly material quantities</summary>
       <ul>{[...summary].map(([key,row])=><li key={key}>
@@ -427,17 +438,18 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
         <p key={ref.elementId}>Slab footprint reference · {ref.netSF===null?'Not quantified':formatFoundationQuantity(ref.netSF,'SF',metric)}</p>)}
     </details>}
     {intent&&(traced||adoption||editing)&&<div role="group" aria-label="Construction transaction" className="sticky top-0 z-10 bg-slate-900 border-b border-slate-600 py-2 space-y-1">
-        <p>{pendingCorrection?'Perimeter correction':activePreview?'Construction preview':traced||edit||adoption?'Construction draft':'Saved construction'}</p>
+        <p>{deleting?'Review assembly deletion':pendingCorrection?'Perimeter correction':activePreview?'Construction preview':traced||edit||adoption?'Construction draft':'Saved construction'}</p>
         <div className="flex flex-wrap gap-2">
-        <button className={button} disabled={pickingCorner} onClick={request}>Preview assembly changes</button>
+        <button className={button} disabled={pickingCorner||deleting} onClick={request}>Preview assembly changes</button>
         <button className={button} disabled={!activePreview?.changes||!completeNewDraft} onClick={()=>{
+          if(deleting&&!window.confirm('Delete this assembly and its construction layers? Independent construction stays. You can undo this change.'))return;
           if(activePreview&&onApply(activePreview)){setFocused(activePreview.assemblyId);setEdit(undefined);setAdoption(null);setAdditionalBindings([]);setCorrection(undefined);onCancelTrace();clearPreview();}
-        }}>Apply assembly changes</button>
+        }}>{deleting?'Confirm delete assembly':'Apply assembly changes'}</button>
         <button className={button} onClick={()=>{setAdoption(null);setEdit(undefined);setAdditionalBindings([]);setCorrection(undefined);onCancelTrace();clearPreview()}}>Cancel assembly changes</button>
         </div>
         {activePreview&&<a className="text-sky-300 underline" href="#foundation-review">Review quantities and outstanding inputs</a>}
       </div>}
-    {intent&&(traced||adoption||editing)&&!pendingCorrection&&!pickingCorner&&<>
+    {intent&&(traced||adoption||editing)&&!pendingCorrection&&!pickingCorner&&!deleting&&<>
       {!traced&&<label className="block">Reference for revised specifications
         <input className={field} value={reference} onChange={e=>setReference(e.target.value)}/>
       </label>}
@@ -502,26 +514,27 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
             <button className={button} disabled={!selectedPreset||!inputReference} onClick={usePreset}>Use confirmed preset in draft</button>
             {presetError&&<p role="alert">{presetError}</p>}
           </details>
-      {traced&&intent.specifications.walls.status==='included'&&<label className="block">
-        <input type="checkbox" checked={intent.specifications.walls.specification.datum?.value.reference?.kind==='assembly'} onChange={e=>{
-          if(intent.specifications.walls.status!=='included')return;
-          const {datum:_datum,...specification}=intent.specifications.walls.specification;
-          const source={kind:'estimatingAssumption',reference:'Conventional residential wall base as assembly-local zero'} as const;
-          const footing=intent.specifications.footing;
-          update({...intent,specifications:{...intent.specifications,
-            walls:{status:'included',specification:{...specification,...(e.target.checked?{datum:confirmed({basis:'base',elevationFt:0,reference:{kind:'assembly',id:traced.id}},source)}:{})}},
-            ...(e.target.checked&&footing.status==='included'?{footing:{status:'included',specification:{...footing.specification,
-              alignment:footing.specification.alignment??confirmed({kind:'centred'},source),
-              top:footing.specification.top??confirmed({kind:'wallBase'},source),
-            }}}:{}),
-          }});
-        }}/> Confirm conventional foundation using the wall base as the relative reference
-      </label>}
-          {(Object.keys(labels) as System[]).filter(system=>!slabOnly||['slab','insulation','granular'].includes(system)).map(system=>
-            <SystemEditor key={system} system={system} scope={intent.specifications[system]}
-              metric={metric} reference={inputReference} conventional={conventional} slabOnly={slabOnly} suggestions={suggestions(system)} onChange={next=>setSystem(system,next)}/>)}
+      {traced&&!slabOnly&&conventional&&<p>Wall base is the local estimating reference. Review and Apply confirm this convention.</p>}
+          {(Object.keys(labels) as System[]).filter(system=>!slabOnly||['slab','insulation','granular'].includes(system)).map(system=>{
+            const scope=intent.specifications[system];
+            const editor=<SystemEditor system={system} scope={scope} metric={metric} reference={inputReference}
+              conventional={conventional} slabOnly={slabOnly} suggestions={suggestions(system)} onChange={next=>setSystem(system,next)}/>;
+            const primary=system===(slabOnly?'slab':'walls');
+            if(primary)return <React.Fragment key={system}>{editor}</React.Fragment>;
+            const fields=scopeFields(scope as Scope<Record<string,unknown>>);
+            const material=fields.material?.value as MaterialChoice|undefined;
+            const label=material?.kind==='catalogue'?material.id:material?.description;
+            const dimensions=(['widthFt','depthFt','thicknessFt'] as const).flatMap(name=>{
+              const n=fields[name]?.value;
+              return typeof n==='number'?[formatFoundationQuantity(metric?n*304.8:n*12,metric?'mm':'in',false)]:[];
+            });
+            return <details key={system} open={scope.status==='included'} className="rounded border border-slate-700 p-2">
+              <summary>{labels[system]} · {scope.status}{label?' · '+label:''}{dimensions.length?' · '+dimensions.join(' × '):''}</summary>
+              {editor}
+            </details>;
+          })}
           {!slabOnly&&<>
-          <h4 className="font-semibold">Exterior layers from wall outward</h4>
+          <details open={intent.specifications.exteriorLayers.length>0}><summary className="font-semibold">Exterior layers from wall outward</summary>
           <p>Use the specified material order. Each layer keeps its own coverage and quantities.</p>
           <button className={button} onClick={addExteriorLayer}>Add exterior layer</button>
           {intent.specifications.exteriorLayers.map((layer,i)=><div key={layer.id} className="space-y-1">
@@ -542,7 +555,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
               const exteriorSequence=e.target.checked?{status:'confirmed' as const,confirmation:sources(inputReference)}:{status:'unresolved' as const};
               update({...intent,specifications:{...intent.specifications,exteriorSequence}});
             }}/> Confirm exterior layer order</label>}
-          </>}
+          </details></>}
         </>}
     </>}
     {correctionError&&<p role="alert">{correctionError}</p>}
@@ -562,6 +575,18 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
       />}
     </section>}
   </section>;
+}
+
+function describeTrace(trace:AssemblyTrace,metric:boolean){
+  const points=trace.vertices.map(v=>v.point);
+  const width=Math.max(...points.map(p=>p.x))-Math.min(...points.map(p=>p.x));
+  const depth=Math.max(...points.map(p=>p.y))-Math.min(...points.map(p=>p.y));
+  const rectangle=points.length===4&&points.every((p,i)=>{
+    const next=points[(i+1)%4];
+    return (p.x===next.x)!==(p.y===next.y);
+  });
+  return rectangle?formatFoundationQuantity(width,'LF',metric)+' × '+formatFoundationQuantity(depth,'LF',metric)+' · '+trace.reference+' footprint':
+    points.length+' edges · '+trace.reference+' footprint';
 }
 
 function PreviewMaterialChanges({preview,before,previous,metric}:{

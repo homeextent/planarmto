@@ -175,6 +175,7 @@ export type ScopeResolution = {
 };
 export type IdentityReplacementIntent = Pick<Replacement, 'retired' | 'successorIds'>;
 export type AssemblyChange =
+  | { kind: 'delete' }
   | { kind: 'create'; input: AssemblyIntent }
   | { kind: 'replaceIntent'; input: AssemblyIntent; adoption?: { bindings: ChildBinding[]; source: Source }; identityReplacements?: IdentityReplacementIntent[]; scopeResolutions?: ScopeResolution[] }
   | { kind: 'adopt'; input: AssemblyIntent; bindings: ChildBinding[]; source: Source }

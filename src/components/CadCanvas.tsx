@@ -2631,6 +2631,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
   const rectanglePerimeterTool=foundationTool&&activeTool==='foundation_rectangle';
   const polygonPerimeterTool=foundationTool&&activeTool==='foundation_perimeter';
   const perimeterTool=rectanglePerimeterTool||polygonPerimeterTool;
+  const standardSlabRectangle=activeTool==='foundation_slab'&&standardSlab&&foundationMode==='rectangle';
   const foundationPolygon=foundationTool&&(polygonPerimeterTool||foundationArea(activeTool)&&foundationMode==='polygon');
   const snapCorrection=(raw:Point2D)=>{
     const tolerance=12/transform.scale;
@@ -2682,14 +2683,8 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
     }
   };
   const placeFoundation=(start:Point2D,end:Point2D):boolean=>{
-    if(activeTool==='foundation_slab'&&standardSlab&&onConfigureTracedAssembly){
-      try{
-        onConfigureTracedAssembly(rectanglePoints(start,end),'slab','interior');
-        onToolChange('select');
-        return true;
-      }catch(error){setDimensionError(error instanceof Error?error.message:String(error));return false;}
-    }
-    if(rectanglePerimeterTool)return placeFoundationRectangle(start,end);if(!foundationEntities||!commitDraftPlacement){setDimensionError('Foundation placement unavailable');return false;}const before=foundationEntities,id=uuidv4(),token=uuidv4(),tool=activeTool;const reference=wallReference,width=wallReferenceWidth.trim()?Number(wallReferenceWidth):null;const build=(p:Point2D)=>[...before,tool==='foundation_wall'&&reference!=='centreline'?createReferencedWall(start,p,id,reference,width):createFoundationDraft(tool,start,p,id)];try{if(!commitDraftPlacement(token,build(end)))throw Error('Foundation placement rejected');const continuous=foundationContinuous&&!foundationArea(tool)&&(tool!=='foundation_wall'||reference==='centreline');setFoundationStart(continuous?end:null);setFoundationCursor(null);onSelect({type:'foundation',id});setCorrection({token,start,toward:end,rectangle:foundationArea(tool),correct:q=>{if(!placementHandler.current?.(token,build(q),true))throw Error('Correction rejected or placement changed');if(continuous)setFoundationStart(q);}});setDimensionError('');return true;}catch(err){setDimensionError(err instanceof Error?err.message:String(err));return false;}};
+    if(rectanglePerimeterTool||standardSlabRectangle)return placeFoundationRectangle(start,end);
+    if(!foundationEntities||!commitDraftPlacement){setDimensionError('Foundation placement unavailable');return false;}const before=foundationEntities,id=uuidv4(),token=uuidv4(),tool=activeTool;const reference=wallReference,width=wallReferenceWidth.trim()?Number(wallReferenceWidth):null;const build=(p:Point2D)=>[...before,tool==='foundation_wall'&&reference!=='centreline'?createReferencedWall(start,p,id,reference,width):createFoundationDraft(tool,start,p,id)];try{if(!commitDraftPlacement(token,build(end)))throw Error('Foundation placement rejected');const continuous=foundationContinuous&&!foundationArea(tool)&&(tool!=='foundation_wall'||reference==='centreline');setFoundationStart(continuous?end:null);setFoundationCursor(null);onSelect({type:'foundation',id});setCorrection({token,start,toward:end,rectangle:foundationArea(tool),correct:q=>{if(!placementHandler.current?.(token,build(q),true))throw Error('Correction rejected or placement changed');if(continuous)setFoundationStart(q);}});setDimensionError('');return true;}catch(err){setDimensionError(err instanceof Error?err.message:String(err));return false;}};
   const finishFoundationPolygon=()=>{if(!foundationEntities||!onFoundationChange||foundationVertices.length<3)return;try{if(perimeterTool){if(foundationVertices.length<4)throw Error('Perimeter requires at least four vertices');const error=polygonDraftError(foundationVertices);if(error)throw Error(error);const outline=foundationVertices.map(p=>({...p}));if(outline.some((p,i)=>{const q=outline[(i+1)%outline.length];return (p.x===q.x)===(p.y===q.y)}))throw Error('Close perimeter with orthogonal edges');offsetOrthogonalPerimeter(outline,0);setPerimeterOutline(outline);setPerimeterCandidate(null);setPerimeterError('');setFoundationVertices([]);setFoundationCursor(null);setCorrection(null);setDimensionA('');setDimensionError('');return;}if(activeTool==='foundation_slab'&&standardSlab&&onConfigureTracedAssembly){
       const error=polygonDraftError(foundationVertices);
       if(error)throw Error(error);
@@ -2801,7 +2796,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
       }
       return;
     }
-    if(foundationEntities&&(foundationTool||activeTool==='select')){if(foundationTool){if(perimeterTool&&perimeterOutline)return;const p=foundationSnap(rawWorld);if(foundationPolygon)addFoundationVertex(p);else if(!foundationStart)setFoundationStart(p);else placeFoundation(foundationStart,p);}else{const hit=[...(visibleFoundation??[])].reverse().find(q=>{const footprint=foundationFootprint(q);return !!(footprint&&isPointInPolygon(rawWorld,footprint))||('start' in q&&segmentDistance(rawWorld,q.start,q.end).distance<=10/transform.scale)});foundationDrag.current={start:rawWorld,screen:{x:clientX,y:clientY},hitId:hit?.id,shift:e.shiftKey};}return;}
+    if(foundationEntities&&(foundationTool||activeTool==='select')){if(foundationTool){if((perimeterTool||standardSlabRectangle)&&perimeterOutline)return;const p=foundationSnap(rawWorld);if(foundationPolygon)addFoundationVertex(p);else if(!foundationStart)setFoundationStart(p);else placeFoundation(foundationStart,p);}else{const hit=[...(visibleFoundation??[])].reverse().find(q=>{const footprint=foundationFootprint(q);return !!(footprint&&isPointInPolygon(rawWorld,footprint))||('start' in q&&segmentDistance(rawWorld,q.start,q.end).distance<=10/transform.scale)});foundationDrag.current={start:rawWorld,screen:{x:clientX,y:clientY},hitId:hit?.id,shift:e.shiftKey};}return;}
     if (roofEntities && onRoofChange && (activeTool.startsWith('roof_') || activeTool==='select')) {
       const tolerance=10/transform.scale;
       if(generationOutline||(activeTool==='roof_generate'&&selection.type==='roof'))return;
@@ -3493,6 +3488,14 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         }}
       />
 
+      {standardSlabRectangle&&perimeterOutline&&<section aria-label="Rectangle slab footprint" className="absolute top-20 left-4 z-20 bg-slate-900 border border-sky-600 rounded p-3 text-xs">
+        <p>Review the slab footprint or enter exact width and depth.</p>
+        <button className="bg-sky-700 rounded p-2" onClick={()=>{
+          onConfigureTracedAssembly?.(perimeterOutline,'slab','interior');
+          onToolChange('select');
+        }}>Specify slab construction</button>
+        <button className="rounded bg-slate-700 p-2" onClick={()=>onToolChange('select')}>Cancel footprint</button>
+      </section>}
       {perimeterOutline&&perimeterTool&&<section aria-label={rectanglePerimeterTool?'Rectangle perimeter configuration':'Polygon perimeter configuration'} className="absolute top-20 left-4 z-20 bg-slate-900 border border-sky-600 rounded-lg p-4 text-xs space-y-3 w-64 shadow-xl">
         <h3 className="font-semibold text-sky-300">{rectanglePerimeterTool?'Rectangle foundation':'Polygon foundation perimeter'}</h3><p>{perimeterOutline.length} vertices</p>
         <label className="block">{rectanglePerimeterTool?'Rectangle reference':'Polygon reference'}<select aria-label={rectanglePerimeterTool?'Rectangle reference':'Polygon reference'} className="block w-full bg-slate-800 rounded p-2" value={perimeterReference} onChange={e=>{setPerimeterReference(e.target.value as RectangleReference);setPerimeterCandidate(null)}}><option value="exterior">Exterior face</option><option value="centreline">Centreline</option><option value="interior">Interior face</option></select></label>

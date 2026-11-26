@@ -1,9 +1,12 @@
 import type { AssemblyTrace, TraceCorrectionAudit } from './foundationAssemblyModel';
 import type { Point } from './measurementTypes';
+import {simplePolygon} from './roofMeasurements';
 import { offsetOrthogonalPerimeter } from './foundationPerimeterGeometry';
 
 function validate(trace:AssemblyTrace){
-  offsetOrthogonalPerimeter(trace.vertices.map(v=>v.point),0);
+  const points=trace.vertices.map(v=>v.point);
+  if(trace.kind==='slab'){if(!simplePolygon(points))throw Error('The corrected slab must have a simple closed footprint.');}
+  else offsetOrthogonalPerimeter(points,0);
   return trace;
 }
 
@@ -13,6 +16,14 @@ export function moveFoundationTraceVertex(trace:AssemblyTrace,index:number,point
   const vertex=trace.vertices[index];
   if(!vertex||!Number.isFinite(point.x)||!Number.isFinite(point.y))throw Error('Choose a valid trace vertex and position.');
   const vertices=trace.vertices.map(v=>({...v,point:{...v.point}}));
+  const orthogonal=trace.vertices.every((v,i)=>{
+    const next=trace.vertices[(i+1)%n].point;
+    return (v.point.x===next.x)!==(v.point.y===next.y);
+  });
+  if(trace.kind==='slab'&&!orthogonal){
+    vertices[index].point=point;
+    return validate({...trace,vertices});
+  }
   for(const near of [(index+n-1)%n,(index+1)%n]){
     const neighbour=vertices[near].point;
     if(neighbour.x===vertex.point.x)neighbour.x=point.x;

@@ -649,6 +649,13 @@ test('detached strip remains independent through edit, regeneration, deletion an
   preview.quantities.before.filter(r=>r.code==='foundation.footing.strip.concrete'&&r.status==='measured').reduce((a,r)=>a+(r.status==='measured'?r.quantity:0),0));
  const reopened=deserializeProjectDocument(serializeProjectDocument(released));
  assert.deepEqual(reopened,released);
+ const deletion=previewAssemblyChange(released,'foundation',releasedParent.id,releasedParent.revisionId,{kind:'delete'},id);
+ assert.deepEqual(deletion.conflicts,[]);
+ const afterDeletion=applyAssemblyPreview(released,deletion);
+ assert.deepEqual(afterDeletion.workspaces[1].foundationAssemblies,[]);
+ assert.deepEqual(afterDeletion.workspaces[1].measurements,released.workspaces[1].measurements.filter(e=>e.kind==='stripFooting'));
+ assert.deepEqual(deserializeProjectDocument(serializeProjectDocument(afterDeletion)),afterDeletion);
+ assert.throws(()=>applyAssemblyPreview(afterDeletion,deletion),/Stale assembly preview/);
  const snap=(d:ProjectDocument)=>({view:workspaceFloorplan(d),measurements:d.workspaces[1].measurements,foundationAssemblies:d.workspaces[1].foundationAssemblies});
  assert.deepEqual(restoreWorkspaceSnapshot(released,'foundation',snap(withScope)),withScope);
  assert.deepEqual(restoreWorkspaceSnapshot(withScope,'foundation',snap(released)),released);

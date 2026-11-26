@@ -531,3 +531,27 @@ test('independent local elevation references cannot establish vertical separatio
  assert.ok(measureFoundation('refs',[a,make('local-d',2,1,{kind:'assembly',id:'a'})]).rows.every(row=>row.status==='measured'));
  assert.ok(measureFoundation('refs',[make('hist-a',0,0),make('hist-b',2,10)]).rows.every(row=>row.status==='measured'));
 });
+
+test('an incomplete independent wall preserves disjoint quantities and still blocks unresolved intersections',()=>{
+ let sequence=0;
+ const id=()=>String(++sequence);
+ const local=(wall:FoundationEntity):FoundationEntity=>({...wall,foundation:{...wall.foundation!,elevationReference:{kind:'assembly',id:wall.assemblyId}}});
+ const rectangle=generateOrthogonalFoundationPerimeter(box(0,0,20,20),'exterior',8/12,8,0,id).map(local);
+ const irregular=generateOrthogonalFoundationPerimeter([{x:30,y:0},{x:48,y:0},{x:48,y:10},{x:42,y:10},{x:42,y:20},{x:30,y:20}],'exterior',8/12,8,0,id).map(local);
+ const a=deriveStripFootings(rectangle,rectangle.map(w=>w.id),2,.5,id);
+ const b=deriveStripFootings(irregular,irregular.map(w=>w.id),2,.5,id);
+ const slab=local({...region('independent-slab',box(55,0,20,20)),kind:'slab',polygon:box(55,0,20,20),depthFt:.5,elevationFt:0,purpose:'concrete'});
+ const entities=[...rectangle,...irregular,...a,...b,slab];
+ const previous=measureFoundation('test',entities).rows;
+ assert.ok(previous.every(row=>row.status==='measured'));
+ const wall:FoundationEntity={id:'incomplete',physicalId:'incomplete',assemblyId:'incomplete',source:{reference:'Manual foundation draft'},
+  kind:'foundationWall',start:{x:85,y:0},end:{x:95,y:0},widthFt:null,heightFt:null,elevationFt:null};
+ const separated=measureFoundation('test',[...entities,wall]).rows;
+ assert.deepEqual(separated.filter(row=>row.elementId!==wall.id),previous);
+ assert.equal(separated.find(row=>row.elementId===wall.id)?.status,'unquantified');
+ const unresolved={...wall,start:{x:60,y:30},end:{x:70,y:30}};
+ const overlap=measureFoundation('test',[...entities,unresolved]).rows;
+ assert.equal(overlap.find(row=>row.elementId===slab.id)?.status,'unquantified');
+ const completed:FoundationEntity={...unresolved,widthFt:8/12,heightFt:8,foundation:{version:1,material:'poured concrete',centrelineConfirmed:true}};
+ assert.deepEqual(measureFoundation('test',[...entities,completed]).rows.filter(row=>row.elementId!==wall.id),previous);
+});

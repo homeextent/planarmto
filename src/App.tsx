@@ -283,7 +283,20 @@ function AppContent() {
 
   // Handle Deleting Selected CAD Element
   const handleDeleteSelected = useCallback(() => {
-    if(selection.type==='foundation'&&foundationEntities){const ids=selection.ids??(selection.id?[selection.id]:[]);const plan=planFoundationDeletion(foundationEntities,ids);if(ids.length&&window.confirm('Delete '+ids.length+' selected foundation component(s) and '+plan.dependentCount+' additional dependent group members, including parent-owned details?')&&handleFoundationChange(plan.remaining))setSelection({type:'none'});return;}
+    if(selection.type==='foundation'&&foundationEntities){
+      const ids=selection.ids??(selection.id?[selection.id]:[]);
+      if(!ids.length)return;
+      const selected=new Set(ids);
+      const plan=planFoundationDeletion(foundationEntities,ids);
+      const affected=new Set(plan.removed.map(entity=>entity.id));
+      const owners=activeWorkspace.foundationAssemblies??[];
+      if(owners.some(parent=>parent.children.some(child=>selected.has(child.entityId)||affected.has(child.entityId)))){
+        setStorageWarning('Use Delete assembly in Foundation properties. Select independent components separately.');
+        return;
+      }
+      if(window.confirm('Delete '+ids.length+' selected foundation components and '+plan.dependentCount+' dependent components?')&&handleFoundationChange(plan.remaining))setSelection({type:'none'});
+      return;
+    }
     if(selection.type==='roof'&&roofEntities){
       if(selection.ids?.length){
         try{
@@ -722,7 +735,12 @@ function AppContent() {
     });
   }, []);
 
+  const draftBlocksDrawing=!!activeTrace||pendingCorrectionOutline?.workspaceId===activeWorkspace.id||!!traceEdit;
   const handleToolChange = useCallback((tool: ActiveTool) => {
+    if(draftBlocksDrawing&&tool!=='select'){
+      setStorageWarning('Review, apply or cancel the active construction draft before starting another drawing operation.');
+      return;
+    }
     setTraceEdit(undefined);
     if (tool === 'calibrate_scale' && activeTool !== 'calibrate_scale') {
       saveSnapSetting({ enabled: state.settings.gridSnap, size: state.settings.gridSnapSize });
@@ -741,7 +759,7 @@ function AppContent() {
     if (tool !== 'select' && tool !== 'roof_opening' && tool !== 'roof_vertex' && tool !== 'roof_generate') {
       setSelection({ type: 'none' });
     }
-  }, [activeTool, state.settings, handleUpdateSettings, previousSnapSetting, saveSnapSetting, clearSnapSetting]);
+  }, [activeTool, draftBlocksDrawing, state.settings, handleUpdateSettings, previousSnapSetting, saveSnapSetting, clearSnapSetting]);
 
   // Real-Time Material Take-Off calculation
   const emptyReport = useMemo(() => calculateMTO(createBlankProject()), []);
@@ -789,7 +807,7 @@ function AppContent() {
       {/* 2. MAIN 3-PANEL WORKSPACE */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left CAD Tool Palette */}
-        {foundationEntities ? <FoundationToolbar activeTool={activeTool} onSelectTool={tool=>{
+        {foundationEntities ? <FoundationToolbar activeTool={activeTool} draftBlocksDrawing={draftBlocksDrawing} onSelectTool={tool=>{
           if(tool==='foundation_slab'){setSlabMode('rectangle');setStandardSlab(false);}
           handleToolChange(tool);
         }} onStandardSlab={mode=>{setStandardSlab(true);setSlabMode(mode);handleToolChange('foundation_slab')}}/> : roofEntities ? <RoofToolbar activeTool={activeTool} onSelectTool={handleToolChange}/> : <Toolbar

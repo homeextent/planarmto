@@ -50,7 +50,8 @@ test('foundation rectangle exact correction and single history transaction',asyn
 });
 test('wall inspector confirms dimensions and raw concrete quantity',async({page})=>{
  await place(page,'Foundation wall',{x:250,y:250},{x:550,y:250},'40');
- await page.getByLabel('Material',{exact:true}).selectOption('poured concrete');
+ const editor=page.getByRole('form',{name:'Independent wall construction'});
+ await expect(editor.getByLabel('Material',{exact:true})).toHaveValue('poured concrete');
  await page.getByLabel('Width (in)',{exact:true}).fill('0.6666666666666666 ft');
  await page.getByLabel('Height / depth (ft)',{exact:true}).fill('8');
  await page.getByLabel('Base elevation (ft; blank unknown)',{exact:true}).fill('0');
@@ -778,6 +779,7 @@ test('graphical assembly adopts its traced perimeter, previews strip changes and
  await panel.getByRole('button',{name:'Edit assembly',exact:true}).click();
  await expect(panel.getByLabel('Wall height (ft)',{exact:true})).toHaveValue(`8' 0"`);
  await panel.getByLabel('Reference for revised specifications').fill('Synthetic plan sheet A-1');
+ await panel.getByText('Strip footing · pending',{exact:true}).click();
  await panel.getByLabel('Strip footing scope').selectOption('included');
  const footing=panel.getByRole('group',{name:'Strip footing',exact:true});
  await footing.getByLabel('Material',{exact:true}).selectOption('poured concrete');
@@ -825,7 +827,7 @@ test('saved assembly supports graphical trace correction, preset snapshots and r
  await editor.getByRole('group',{name:'Walls',exact:true}).getByLabel('Material',{exact:true}).selectOption('poured concrete');
  await editor.getByLabel('Wall thickness (in)',{exact:true}).fill('8');
  await editor.getByLabel('Wall height (ft)',{exact:true}).fill('8');
- await editor.getByLabel('Confirm conventional foundation using the wall base as the relative reference').check();
+ await expect(editor.getByText(/Wall base is the local estimating reference/)).toBeVisible();
  await editor.getByRole('button',{name:'Preview assembly changes',exact:true}).click();
  await editor.getByRole('button',{name:'Apply assembly changes',exact:true}).click();
  const foundation=(doc:ProjectDocument)=>doc.workspaces.find(w=>w.type==='foundation')!;
@@ -900,12 +902,14 @@ test('standard irregular trace opens coordinated construction, cancels, and appl
  await panel.getByRole('group',{name:'Walls',exact:true}).getByLabel('Material',{exact:true}).selectOption('poured concrete');
  await panel.getByLabel('Wall thickness (in)',{exact:true}).fill('8 1/2');
  await panel.getByLabel('Wall height (ft)',{exact:true}).fill("8' 0\"");
- await panel.getByLabel('Confirm conventional foundation using the wall base as the relative reference').check();
+ await expect(panel.getByText(/Wall base is the local estimating reference/)).toBeVisible();
+ await panel.getByText('Strip footing · pending',{exact:true}).click();
  await panel.getByLabel('Strip footing scope').selectOption('included');
  const footing=panel.getByRole('group',{name:'Strip footing',exact:true});
  await footing.getByLabel('Material',{exact:true}).selectOption('poured concrete');
  await footing.getByLabel('Footing width (in)').fill('24');
  await footing.getByLabel('Footing depth (in)').fill('6');
+ await panel.getByText('Slab · pending',{exact:true}).click();
  await panel.getByLabel('Slab scope').selectOption('included');
  const slab=panel.getByRole('group',{name:'Slab',exact:true});
  await slab.getByLabel('Material',{exact:true}).selectOption('poured concrete');
@@ -954,6 +958,7 @@ test('new slab draft retains its geometry and inputs across foundation workspace
  await page.getByRole('button',{name:'Draw rectangular slab',exact:true}).click();
  await canvas.click({position:{x:200,y:200}});
  await canvas.click({position:{x:500,y:440}});
+ await page.getByRole('button',{name:'Specify slab construction',exact:true}).click();
  const slab=panel.getByRole('group',{name:'Slab',exact:true});
  await slab.getByLabel('Material',{exact:true}).selectOption('poured concrete');
  await slab.getByLabel('Slab thickness (in)').fill('6');
@@ -985,10 +990,10 @@ test('subsequent foundation drafts survive rejected overlap and commit separatel
  };
  const specify=async()=>{
   const walls=panel.getByRole('group',{name:'Walls',exact:true});
-  await walls.getByLabel('Material',{exact:true}).selectOption('poured concrete');
+  await expect(walls.getByLabel('Material',{exact:true})).toHaveValue('poured concrete');
   await walls.getByLabel('Wall thickness (in)').fill('8');
   await walls.getByLabel('Wall height (ft)').fill('8');
-  await panel.getByLabel('Confirm conventional foundation using the wall base as the relative reference').check();
+  await expect(panel.getByText(/Wall base is the local estimating reference/)).toBeVisible();
   await click('Preview assembly changes');
   await expect(page.getByLabel('Uncommitted foundation trace')).toBeVisible();
  };
@@ -1021,4 +1026,44 @@ test('subsequent foundation drafts survive rejected overlap and commit separatel
  expect(await snapshot(page)).toHaveLength(8);
  await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();
  expect(await snapshot(page)).toEqual(committed);
+});
+
+test('exact standard slab dimensions, footprint correction and confirmed assembly deletion are atomic',async({page})=>{
+ const canvas=page.locator('canvas').first();
+ const panel=page.getByRole('region',{name:'Foundation assemblies',exact:true});
+ const click=(name:string)=>page.getByRole('button',{name,exact:true}).click();
+ await click('Draw rectangular slab');
+ await canvas.click({position:{x:240,y:240}});
+ await canvas.click({position:{x:530,y:430}});
+ await page.keyboard.type('20,20');
+ await page.keyboard.press('Enter');
+ await click('Specify slab construction');
+ await expect(page.getByLabel('Construction footprint')).toContainText('20.00 LF × 20.00 LF');
+ const slab=panel.getByRole('group',{name:'Slab',exact:true});
+ await expect(slab.getByLabel('Material',{exact:true})).toHaveValue('poured concrete');
+ await expect(page.getByRole('button',{name:'Foundation wall',exact:true})).toBeDisabled();
+ await slab.getByLabel('Slab thickness (in)').fill('6');
+ await click('Preview assembly changes');
+ await expect(panel.getByRole('table',{name:'Preview quantities'})).toContainText('7.41 CY');
+ await click('Apply assembly changes');
+ expect(await snapshot(page)).toHaveLength(1);
+ await click('Edit slab footprint');
+ await canvas.click({position:{x:240,y:240}});
+ await canvas.click({position:{x:215,y:215}});
+ await click('Preview assembly changes');
+ await click('Apply assembly changes');
+ const corrected=await snapshot(page);
+ expect(corrected).toHaveLength(1);
+ await click('Delete assembly');
+ await expect(panel.getByText('Review assembly deletion',{exact:true})).toBeVisible();
+ page.once('dialog',dialog=>dialog.dismiss());
+ await click('Confirm delete assembly');
+ expect(await snapshot(page)).toEqual(corrected);
+ page.once('dialog',dialog=>dialog.accept());
+ await click('Confirm delete assembly');
+ expect(await snapshot(page)).toEqual([]);
+ await page.getByTitle('Undo (Ctrl+Z)',{exact:true}).click();
+ expect(await snapshot(page)).toEqual(corrected);
+ await page.getByTitle('Redo (Ctrl+Y)',{exact:true}).click();
+ expect(await snapshot(page)).toEqual([]);
 });
