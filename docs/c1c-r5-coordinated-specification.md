@@ -207,7 +207,7 @@ Fixture clarifications: CA02 exterior ring area = 1200 − (40−2t)(30−2t), t
 
 ## 8. Historical implementation sequence and authorization
 
-The original implementation gates below are archival. R5.12 is the frozen [owner-accepted C.1C checkpoint](c1c-local-acceptance.md#formal-owner-acceptance). The System Bible governs subsequent work. Independent integration review and explicit staging merge authorization are the active gates.
+The original implementation gates below are archival. R5.12 is the frozen [owner-accepted C.1C checkpoint](c1c-local-acceptance.md#formal-owner-acceptance). The System Bible governs subsequent work. C.1C is complete and integrated into staging. C.1E requires a separately reviewed and authorized specification.
 
 | Increment | Scope | Gate |
 |---|---|---|
