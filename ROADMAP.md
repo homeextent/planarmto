@@ -2,7 +2,7 @@
 
 ## Authority and vision
 
-Owner-approved development direction. Deliver accurate drawing-driven material takeoff and practical residential construction estimating before expanding CAD breadth. This is the authoritative milestone sequence and status register; [SYSTEM_BIBLE.md](SYSTEM_BIBLE.md) governs [product design philosophy](SYSTEM_BIBLE.md#governing-product-design-philosophy), architecture and formulas, [DEVELOPER.md](DEVELOPER.md) governs development and validation, [README.md](README.md) describes current capabilities, [CHANGELOG.md](CHANGELOG.md) records changes, and milestone specifications in docs/ govern approved detailed scope. Conflicts must be reconciled before implementation. A roadmap entry is not authorization to implement a new milestone.
+Owner-approved development direction. Deliver accurate drawing-driven material takeoff and practical residential material reporting before expanding CAD breadth. This is the authoritative milestone sequence and status register; [SYSTEM_BIBLE.md](SYSTEM_BIBLE.md) governs [product design philosophy](SYSTEM_BIBLE.md#governing-product-design-philosophy), architecture and formulas, [DEVELOPER.md](DEVELOPER.md) governs development and validation, [README.md](README.md) describes current capabilities, [CHANGELOG.md](CHANGELOG.md) records changes, and milestone specifications in docs/ govern approved detailed scope. Conflicts must be reconciled before implementation. A roadmap entry is not authorization to implement a new milestone.
 
 ## Current baseline and evidence
 
@@ -20,9 +20,10 @@ C.1C owner accepted R5.12 at `49deaa8d7b7801efd8bc0a89021e3fe4b41b7896`, with 34
 | C.1B | Roof drafting and measurement | Owner accepted and staging integrated. [Record](docs/c1b-roof-measurement.md) |
 | C.1C | Foundation drafting and measurement | Complete. Owner accepted at R5.12 and integrated through PR #12. [staging CI #206](https://github.com/homeextent/planarmto/actions/runs/45928716470) passed |
 | C.1D | Site drafting and measurement | Deferred |
-| C.1E | Integrated measurement coordination | Next planned milestone, subject to separately reviewed and authorized coordinated specification |
-| C.2 | Consolidated material takeoff and estimating | Future development after C.1E |
-| v2.16.0 | Combined B/C production release (excluding C.1D engine) | Separately authorized following integrated acceptance |
+| C.1S | Cross-workspace standardization | Next planned read-only Floor and Roof alignment assessment. Separately authorized |
+| C.1E | Integrated material measurement coordination | Cross-workspace ownership, completeness, duplicate prevention and compatible material identities, specifications and units |
+| C.2 | Dedicated material takeoff reporting and optional material pricing | Future workspace and consolidated Reporting, purchasing adjustments, CSV/PDF, Material Catalogue & Pricing and safe supplier synchronization adaptation |
+| v2.16.0 | Standalone material takeoff production release, with C.1D deferred | Separately authorized following integrated acceptance |
 | D | Drawing library and revisions | Planned future |
 | E | Drawing overlays | Planned future |
 | F | Optional 3D visualization | Future consideration only |
@@ -31,9 +32,11 @@ C.1C owner accepted R5.12 at `49deaa8d7b7801efd8bc0a89021e3fe4b41b7896`, with 34
 
 Floor, roof, foundation and site remain optional typed workspaces with independently calibrated geometry and histories, shared project settings/rates, and explicit measurement ownership. Existing valid floor formulas remain protected. Roof quantities are independent of floor gross area. Foundation quantities must derive from explicit geometry and specified assembly inputs, not inferred structural design.
 
-Owner approved deferral of C.1D specialist site drafting beyond v2.16.0; retain optional site schema, existing records and existing floor/deck functionality. Do not require a site workspace for completeness. C.1C includes building-specific excavation/backfill, granular materials, drainage and waterproofing where explicitly measured and specified; detailed design remains subject to scope approval. C.1E must reconcile ownership and completeness including non-drafted applicable site scope; C.2 must support explicitly sourced contractor-entered quantities, allowances and quotations alongside measured geometry, without treating allowances as measured quantities or double counting. Site UI visibility is a future release-design decision, not a current code change. See ROADMAP.md.
+C.1D remains deferred beyond v2.16.0. Retain optional site schema and existing records. Applicable site materials may be manually quantified with provenance, left explicitly pending, or excluded with a reason. Missing site quantities never become zero.
 
-Geometry-derived quantities, contractor-entered quantities and monetary allowances/quotes are distinct sources. C.1E and C.2 specifications must define provenance, applicable scope, units, completeness, exclusions with reason, duplicate prevention and pricing/waste applied once. Missing inputs remain unquantified, not zero. Manual quantities must be explicit and auditable; cost allowances must not masquerade as material quantities. Applicable site work can be manually quantified, priced by allowance or quote, or explicitly excluded; deferring the site engine does not silently exclude site costs. C.1E should define completeness treatment of unresolved and provisional allowances. Consolidated project cost/print output remains gated until C.2.
+The System Bible governs [material takeoff, reporting and pricing](SYSTEM_BIBLE.md#material-takeoff-reporting-and-pricing-boundaries). C.2 supersedes the earlier comprehensive estimating scope. Labour, equipment, subcontractor quotations, financial allowances, overhead, profit and budgeting remain deferred. The existing supplier sync and historical rate data are preserved. Potential TIG Estimating exchange is separately gated and carries no release dependency.
+
+[Issue #14](https://github.com/homeextent/planarmto/issues/14) retains multi-page PDF workspace assignment and architectural scale presets as future work.
 
 ## Deferred scope
 
@@ -45,4 +48,6 @@ Use isolated feature/documentation branches and PRs to staging, exact-head CI, t
 
 ## Next authorization gates
 
-C.1C integration is complete. [PR #12](https://github.com/homeextent/planarmto/pull/12) merged into staging at `b4457da23c1e1aa9b899218d7b375b2af8520180`. Exact post-merge [staging CI #206](https://github.com/homeextent/planarmto/actions/runs/45928716470) passed all required stages, including isolated WordPress integration. The next planned milestone is C.1E. Its coordinated technical specification requires separate review and authorization before implementation.
+C.1C is complete and frozen at R5.12 on staging `3be2cf482179a2a60bb232f7fbf07a26134b3145`. [CI #208](https://github.com/homeextent/planarmto/actions/runs/45930203888) passed.
+
+After independent documentation review and explicit staging merge authorization, the next planned task is a separately authorized, bounded read-only C.1S assessment. Assess Floor and Roof conformance against Foundation R5.12, presentation-only changes, deficient measurement contracts, reusable interface components, legacy MTO and labour dependencies, supplier rate compatibility, and risk to validated quantities. Consider whether C.1S implementation should stand alone or be combined with the opening stages of C.1E. Preserve existing validated transactions and assess the old Live MTO Matrix independently of historical pricing. The assessment and implementation are separately gated.

@@ -1,5 +1,7 @@
 # C.1C — Local owner acceptance procedure and compliance traceability
 
+The [current material takeoff and reporting architecture](../SYSTEM_BIBLE.md#material-takeoff-reporting-and-pricing-boundaries) and [roadmap](../ROADMAP.md) supersede earlier estimating scope and milestone sequencing. Earlier evidence and measurement contracts below are retained. C.1S is next planned and separately authorized.
+
 Historical pre-R5 procedure and evidence. Earlier procedures and per-case results are retained below for traceability. The [formal owner decision](#formal-owner-acceptance) governs current acceptance. The references below describe the original candidate and checks.
 
 ## Gate and evidence
@@ -118,7 +120,7 @@ The three bounded stabilization checks A–C passed on `cd782e7`. See [formal ac
 
 ## Formal owner acceptance
 
-The product owner formally accepted R5.12 and the C.1C Foundation Drafting and Measurement milestone at `49deaa8d7b7801efd8bc0a89021e3fe4b41b7896`. C.1C application development is frozen at R5.12. The owner accepted the remaining minor interface inconsistencies for this milestone. [PR #12](https://github.com/homeextent/planarmto/pull/12) merged into staging at `b4457da23c1e1aa9b899218d7b375b2af8520180`. Exact post-merge [staging CI #206](https://github.com/homeextent/planarmto/actions/runs/45928716470) passed all required stages, including isolated WordPress integration. The merge retained the accepted application tree. C.1E is next planned, subject to separately reviewed and authorized specification. Project schema is v3 and production is v2.15.1.
+The product owner formally accepted R5.12 and the C.1C Foundation Drafting and Measurement milestone at `49deaa8d7b7801efd8bc0a89021e3fe4b41b7896`. C.1C application development is frozen at R5.12. The owner accepted the remaining minor interface inconsistencies for this milestone. [PR #12](https://github.com/homeextent/planarmto/pull/12) merged into staging at `b4457da23c1e1aa9b899218d7b375b2af8520180`. Exact post-merge [staging CI #206](https://github.com/homeextent/planarmto/actions/runs/45928716470) passed all required stages, including isolated WordPress integration. The merge retained the accepted application tree. C.1S is next planned as a separately authorized read-only assessment. C.1E requires its own reviewed specification. Project schema is v3 and production is v2.15.1.
 
 The milestone acceptance covers rectangular and irregular foundation assemblies, independent walls and linked layers, rectangular and polygon pad footings, interior and independently traced slabs, and footing, waterproofing, insulation, drainage and granular measurement. It also covers coordinated specification and modification, material-specific reporting, assembly deletion and ownership safeguards, and the common contractor creation and editing workflow.
 
@@ -133,5 +135,5 @@ The milestone acceptance covers rectangular and irregular foundation assemblies,
 | Minor usability and presentation | The owner observed residual interface inconsistencies and accepted them for closeout. No additional specific UI defect was supplied for this register. Shared or ambiguous selections continue to use explicit source or complete-group selection. |
 | Specialist workflow | Open-wall drainage uses a separately traced route. Batch deletion of multiple parent assemblies remains a one-assembly-at-a-time workflow. Dedicated pad-footing exclusions are outside the current pad contract. |
 | Unsupported construction | Curved foundation runs and automatic reconciliation of intersecting angled runs remain outside the supported automated geometry. Complex coverage and nonstandard physical relationships require explicit supported inputs. |
-| Future development | C.1D site drafting is deferred. C.1E integrated measurement coordination is next planned and requires a separately reviewed, authorized specification. C.2 consolidated takeoff, pricing, allowances and reporting remain future development. |
+| Future development | C.1D site drafting is deferred. C.1S is the next planned assessment. C.1E integrated measurement coordination requires a separately reviewed, authorized specification. C.2 consolidated takeoff, pricing, allowances and reporting remain future development. |
 | Measurement integrity | No new material integrity defect was identified in this documentation closeout. Potential overlap, unresolved relationships and duplicate ownership remain subject to the measurement safeguards. Newly confirmed integrity defects require separate review before affected quantities can be accepted. |

@@ -1,5 +1,7 @@
 # C.1C-R5 — Contractor-focused foundation assembly workflow
 
+The [current material takeoff and reporting architecture](../SYSTEM_BIBLE.md#material-takeoff-reporting-and-pricing-boundaries) and [roadmap](../ROADMAP.md) supersede earlier estimating scope and milestone sequencing. Earlier evidence and measurement contracts below are retained. C.1S is next planned and separately authorized.
+
 Current status is recorded in the [formal C.1C acceptance and deferred register](c1c-local-acceptance.md#formal-owner-acceptance). Earlier findings, requirements and gates below describe their historical checkpoints.
 
 Historical proposal. Current workflow requirements are in the [System Bible](../SYSTEM_BIBLE.md#governing-product-design-philosophy), the [coordinated specification](c1c-r5-coordinated-specification.md) and [R5.6C](c1c-r5-6c-workflow.md).
