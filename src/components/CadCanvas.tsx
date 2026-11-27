@@ -3549,7 +3549,7 @@ export const CadCanvas: React.FC<CadCanvasProps> = ({
         {([['wall thickness',perimeterWidth,setPerimeterWidth,true],['wall height',perimeterHeight,setPerimeterHeight,false],['wall base',perimeterBase,setPerimeterBase,false]] as const).map(([label,value,set,section])=>
           <FoundationDimensionInput key={label} label={(rectanglePerimeterTool?'Rectangle ':'Polygon ')+label} className="block w-full bg-slate-800 rounded p-2" value={value} section={section} metric={state.settings.unitSystem==='metric'} onChange={v=>{set(v);setPerimeterCandidate(null)}}/>
         )}
-        {validPerimeterCandidate&&<p aria-label={rectanglePerimeterTool?'Rectangle perimeter quantity':'Polygon perimeter quantity'}>{validPerimeterCandidate.members.length} walls · {validPerimeterCandidate.volume.toFixed(4)} CY</p>}
+        {validPerimeterCandidate&&<p aria-label={rectanglePerimeterTool?'Rectangle perimeter quantity':'Polygon perimeter quantity'}>{validPerimeterCandidate.members.length} walls · {formatFoundationQuantity(validPerimeterCandidate.volume,'CY',state.settings.unitSystem==='metric')}</p>}
         {perimeterError&&<p role="alert" className="text-amber-300">{perimeterError}</p>}
         <div className="flex flex-wrap gap-2"><button className="bg-sky-700 rounded p-2" onClick={()=>{try{
           if(!foundationEntities)throw Error('Foundation workspace unavailable');

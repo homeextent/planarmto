@@ -41,3 +41,27 @@ export function foundationDeletionTarget<T extends {id:string;children:{entityId
  if(touched.length>1||ids.some(id=>!parent.children.some(child=>child.entityId===id)))return {kind:'mixed'} as const;
  return selected.size===parent.children.length?{kind:'complete',parent} as const:{kind:'partial'} as const;
 }
+
+/** Resolve editable independent wall construction from explicit source links, never group labels or proximity. */
+export function independentWallSelection(entities:readonly FoundationEntity[],ids:readonly string[],ownedIds?:ReadonlySet<string>){
+ if(!ids.length||ids.some(id=>ownedIds?.has(id)))return;
+ const selected=entities.filter(entity=>ids.includes(entity.id));
+ if(selected.length!==ids.length)return;
+ const sourceIds=selected.map(entity=>{
+  if(entity.kind==='foundationWall')return entity.id;
+  const strip=entity.foundation?.stripSource;
+  const envelope=entity.foundation?.envelopeSource;
+  const link=strip??envelope;
+  if(!link||strip?.wallIds&&strip.wallIds.length!==1||envelope?.perimeterWallIds||
+     envelope?.sourceIds&&envelope.sourceIds.length!==1)return;
+  const groupSize=entities.filter(member=>(strip?member.foundation?.stripSource:member.foundation?.envelopeSource)?.groupId===link.groupId).length;
+  if(groupSize!==1)return;
+  return strip?.wallId??envelope?.sourceId;
+ });
+ const wallId=sourceIds[0];
+ if(!wallId||ownedIds?.has(wallId)||sourceIds.some(id=>id!==wallId))return;
+ const wall=entities.find(entity=>entity.id===wallId&&entity.kind==='foundationWall');
+ if(!wall)return;
+ const focusedLayer=selected.length===1&&selected[0].id!==wallId?selected[0]:undefined;
+ return {wall,focusedLayer};
+}

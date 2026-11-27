@@ -694,3 +694,38 @@ test('full-height envelope provenance rejects stale coverage while specified cov
  assert.throws(()=>deriveFoundationEnvelope([{...source,heightFt:5}],[source.id],{...config,heightFt:6},next),/Specified coverage exceeds wall height/);
  assert.equal(specified[0].foundation?.envelopeSource?.coverageMode,undefined);
 });
+
+import {independentWallSelection} from '../src/engine/measurements/foundationSelection';
+import {formatFoundationQuantity} from '../src/engine/measurements/foundationUnits';
+
+test('independent wall selection uses explicit links and leaves unrelated or owned selections unresolved',()=>{
+ const source=wall('selection-source',{x:0,y:0},{x:25,y:0});
+ const other=wall('selection-other',{x:40,y:0},{x:60,y:0});
+ let count=0;
+ const id=()=>String(++count);
+ const [strip]=deriveStripFootings([source],[source.id],2,.5,id);
+ const [envelope]=deriveFoundationEnvelope([source],[source.id],{
+  purpose:'waterproofing',material:'sheet waterproofing membrane',layerId:'sheet',heightFt:8,side:'left',
+ },id);
+ const elements=[source,strip,envelope,other];
+ assert.deepEqual(independentWallSelection(elements,[source.id]),{wall:source,focusedLayer:undefined});
+ assert.deepEqual(independentWallSelection(elements,[envelope.id]),{wall:source,focusedLayer:envelope});
+ assert.deepEqual(independentWallSelection(elements,[strip.id,source.id,envelope.id]),{wall:source,focusedLayer:undefined});
+ assert.equal(independentWallSelection(elements,[source.id,other.id]),undefined);
+ assert.equal(independentWallSelection(elements,[envelope.id],new Set([source.id])),undefined);
+ assert.equal(independentWallSelection(elements,[source.id,strip.id],new Set([strip.id])),undefined);
+ const shared={...strip,foundation:{...strip.foundation!,stripSource:{...strip.foundation!.stripSource!,wallIds:[source.id,other.id]}}};
+ assert.equal(independentWallSelection([source,other,shared],[shared.id]),undefined);
+});
+
+test('contractor quantity presentation rounds only at display and formats discrete counts as integers',()=>{
+ const wallQuantity=25*(8/12)*8/27;
+ const stripQuantity=25*2*.5/27;
+ assert.equal(formatFoundationQuantity(wallQuantity,'CY',false),'4.94 CY');
+ assert.equal(formatFoundationQuantity(stripQuantity,'CY',false),'0.93 CY');
+ assert.equal(formatFoundationQuantity(wallQuantity+stripQuantity,'CY',false),'5.86 CY');
+ assert.equal(formatFoundationQuantity(200,'SF',false),'200.00 SF');
+ assert.equal(formatFoundationQuantity(400,'BF',false),'400.00 BF');
+ assert.equal(formatFoundationQuantity(2,'EA',true),'2 EA');
+ assert.equal(formatFoundationQuantity(wallQuantity+stripQuantity,'CY',true),'4.48 m³');
+});

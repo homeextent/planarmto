@@ -37,15 +37,23 @@ function ensureSingleLayer(layer:FoundationEntity,entities:FoundationEntity[]){
    throw Error('Resolve dependent construction before changing this layer.');
 }
 
-export function IndependentWallConstruction({wall,entities,ownedIds,metric,onChange,onPreview,renderWall,onCancelDraft}:{
+export function IndependentWallConstruction({wall,entities,ownedIds,metric,onChange,onPreview,renderWall,onCancelDraft,focusedLayer}:{
  key?:string;wall:FoundationEntity;entities:FoundationEntity[];ownedIds?:ReadonlySet<string>;metric:boolean;onChange:(entities:FoundationEntity[])=>boolean;
- onPreview:(members:FoundationEntity[]|null)=>void;onCancelDraft?:()=>void;
+ onPreview:(members:FoundationEntity[]|null)=>void;onCancelDraft?:()=>void;focusedLayer?:FoundationEntity;
  renderWall:(preview:(entity:FoundationEntity)=>boolean,reset:number,onHeightChange:(value:number|null)=>void)=>React.ReactNode;
 }){
  const pad=wall.kind==='padFooting';
+ const slab=wall.kind==='slab';
+ const title=pad?'Pad footing':slab?'Slab':'Independent wall';
+ const subject=pad?'Pad footing':slab?'Slab':'Wall construction';
  const {tab,selectTab}=useContext(FoundationInspectorContext);
  const formHost=useRef<HTMLDivElement>(null);
- const [draft,setDraft]=useState<LayerDraft>();
+ const savedLayer=()=>focusedLayer?makeDraft(
+   focusedLayer.kind==='stripFooting'?'footing':focusedLayer.foundation?.envelopeSource?.purpose==='waterproofing'?'waterproofing':'verticalInsulation',
+   focusedLayer,
+ ):undefined;
+ const [draft,setDraft]=useState<LayerDraft>(savedLayer);
+ useEffect(()=>{if(focusedLayer)setDraft(savedLayer());},[focusedLayer]);
  const [initialLayers,setInitialLayers]=useState<Partial<Record<LayerKind,LayerDraft>>>({});
  const [heightInput,setHeightInput]=useState<number|null>();
  const wallHeight=heightInput===undefined?('heightFt' in wall?wall.heightFt:null):heightInput;
@@ -192,25 +200,25 @@ export function IndependentWallConstruction({wall,entities,ownedIds,metric,onCha
      </>}
    </fieldset>;
  }
- return <section aria-label={pad?"Pad footing construction":"Independent wall layers"} className="space-y-2 text-xs">
-   <div className="sticky top-0 z-10 space-y-1 border-b border-slate-600 bg-slate-900 py-2" role="group" aria-label={pad?"Pad footing transaction":"Wall construction transaction"}>
-     <p>{draft?draft.remove?'Remove '+layerNames[draft.kind]:layerNames[draft.kind]:pad?'Pad footing':'Independent wall'} · {current?'Preview ready':'Construction'}</p>
+ return <section aria-label={pad||slab?title+' construction':'Independent wall layers'} className="space-y-2 text-xs">
+   <div className="sticky top-0 z-10 space-y-1 border-b border-slate-600 bg-slate-900 py-2" role="group" aria-label={subject+' transaction'}>
+     <p>{draft?draft.remove?'Remove '+layerNames[draft.kind]:layerNames[draft.kind]:title} · {current?'Preview ready':'Construction'}</p>
      {current&&draft?.kind==='footing'&&!wall.foundation?.baseElevationConfirmed&&<p>Uses the wall base as a local estimating reference.</p>}
      <div className="flex gap-2">
        <button className={button} onClick={()=>{if(draft)previewLayer();else formHost.current?.querySelector('form')?.requestSubmit();}}>Preview</button>
        <button className={button} disabled={!current} onClick={()=>{
          if(!current)return;
          if(current.source!==entities||!onChange(current.next)){setError('Preview changed or failed validation. Review the construction again.');return;}
-         clear();setDraft(undefined);setInitialLayers({});setHeightInput(undefined);setReset(value=>value+1);selectTab('Construction');
+         clear();setDraft(savedLayer());setInitialLayers({});setHeightInput(undefined);setReset(value=>value+1);selectTab('Construction');
        }}>Apply</button>
-       <button className={button} onClick={()=>{clear();setDraft(undefined);setInitialLayers({});setHeightInput(undefined);setReset(value=>value+1);selectTab('Construction');onCancelDraft?.();}}>Cancel</button>
+       <button className={button} onClick={()=>{clear();setDraft(savedLayer());setInitialLayers({});setHeightInput(undefined);setReset(value=>value+1);selectTab('Construction');onCancelDraft?.();}}>Cancel</button>
      </div>
      {error?<p role="alert">{error}</p>:!current&&<p className="text-slate-300">Preview this construction before applying.</p>}
    </div>
    <div hidden={tab!=='Construction'} className="space-y-2">
      <div ref={formHost} hidden={!!draft} className="rounded-lg border border-slate-700 border-l-sky-400 border-l-4 p-2"
        onChangeCapture={clear}>{renderWall(previewWall,reset,setHeightInput)}</div>
-     {!pad&&onCancelDraft&&<>
+     {!pad&&!slab&&onCancelDraft&&<>
        <h3 className="font-semibold">Supporting construction and exterior protection</h3>
        {(Object.keys(layerNames) as LayerKind[]).map(kind=>{
          const layer=initialLayers[kind];
@@ -225,7 +233,7 @@ export function IndependentWallConstruction({wall,entities,ownedIds,metric,onCha
        })}
        <details><summary>Advanced independent construction</summary><p>Use the wall elevations and junction controls above for nonstandard construction. Trace drainage separately using Specialist drawing tools.</p></details>
      </>}
-     {!pad&&!onCancelDraft&&<>
+     {!pad&&!slab&&!onCancelDraft&&<>
      <h3 className="font-semibold">Supporting construction</h3>
      {(!related.some(e=>e.kind==='stripFooting'))&&<button className={button} onClick={()=>start(makeDraft('footing'))}>Add strip footing</button>}
      <h3 className="font-semibold">Exterior protection</h3>
@@ -246,11 +254,12 @@ export function IndependentWallConstruction({wall,entities,ownedIds,metric,onCha
          </div>
        </details>;
      })}
+     {draft&&focusedLayer&&<button className={button} onClick={()=>{clear();setDraft(undefined);}}>Edit wall</button>}
      {draft&&!draft.remove&&layerFields(draft,patch=>{clear();setDraft({...draft,...patch});})}
      </>}
    </div>
-   {tab==='Quantities'&&current&&<section aria-label={pad?"Pad footing preview":"Wall construction preview"} className="space-y-1">
-     <h3 className="font-semibold">{pad?'Pad footing preview':'Wall construction preview'}</h3>
+   {tab==='Quantities'&&current&&<section aria-label={subject+' preview'} className="space-y-1">
+     <h3 className="font-semibold">{subject} preview</h3>
      {current.before.length>0&&<div><h4>Before</h4>{current.before.map(row=><p key={row.elementId+row.code}>{show(row)}</p>)}</div>}
      <h4>After</h4>
      {concreteSubtotal!==null&&<p>Concrete subtotal · {formatFoundationQuantity(concreteSubtotal,'CY',metric)}</p>}

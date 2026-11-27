@@ -166,6 +166,8 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
   const measured=useMemo(()=>parent?measureFoundation(workspaceId,workspace.measurements as FoundationEntity[]):null,[parent,workspace,workspaceId]);
   const ownedIds=new Set(parent?.children.map(binding=>binding.entityId));
   const summary=parent&&measured?groupFoundationTakeoff(measured.rows.filter(row=>ownedIds.has(row.elementId)),workspace.measurements as FoundationEntity[],[parent]):[];
+  const focusedRole=(selectedIds?.length??0)<=1?parent?.children.find(child=>child.entityId===selectedId)?.role:undefined;
+  const standardEditing=editing||!!inherited;
   const selectedEdit=parent&&edit?.parentId===parent.id&&edit.revision===parent.revisionId?edit.input:
     parent?{trace:parent.trace,specifications:parent.specifications,overrides:parent.overrides,...(parent.preset?{preset:parent.preset}:{})}:undefined;
   const intent=traced?.input??adoption?.input??selectedEdit;
@@ -415,7 +417,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
       system==='insulation'?foundationColor.insulation:system==='granular'?foundationColor.granular:foundationColor.drainage;
     return <ConstructionCard key={(traced?.id??parent?.revisionId??'adoption')+system} accent={color}
       label={labels[system]} status={scope.status} summary={[label,...dimensions].filter(Boolean).join(' · ')}
-      unresolved={unresolved}>{editor}</ConstructionCard>;
+      unresolved={unresolved} initiallyOpen={focusedRole?.system===system}>{editor}</ConstructionCard>;
   }
   const selectionTarget=foundationDeletionTarget(parents,independentSelection);
   const canDelete=!!parent&&(!independentSelection.length||selectionTarget.kind==='complete'&&selectionTarget.parent.id===parent.id);
@@ -434,7 +436,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
   const unrelatedSelection=!traced&&!adoption&&(mixedSelection||!!selectedId&&!inherited);
   const showConstruction=tab==='Construction'&&!unrelatedSelection;
   return <section className="space-y-2 text-xs" aria-label="Foundation assemblies">
-    {intent&&(traced||adoption||editing)&&!unrelatedSelection&&<div role="group" aria-label="Construction transaction" className="sticky top-0 z-10 bg-slate-900 border-b border-slate-600 py-2 space-y-1">
+    {intent&&(traced||adoption||standardEditing)&&!unrelatedSelection&&<div role="group" aria-label="Construction transaction" className="sticky top-0 z-10 bg-slate-900 border-b border-slate-600 py-2 space-y-1">
         <p>{deleting?'Review assembly deletion':pendingCorrection?'Perimeter correction':activePreview?'Construction preview':traced||edit||adoption?'Construction draft':'Saved construction'}</p>
         <div className="flex flex-wrap gap-2">
         <button className={button} disabled={pickingCorner||deleting} aria-label="Preview assembly changes" onClick={request}>Preview</button>
@@ -468,6 +470,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
     {!traced&&adoptable&&!adoption&&<button className={button} onClick={()=>{setAdoption(adoptable);clearPreview()}}>Configure assembly from selected perimeter</button>}
     {parent&&!adoption&&!unrelatedSelection&&<>
       <p className="text-slate-200">{parent.trace.kind==='slab'?'Selected standalone slab':'Selected foundation perimeter'}</p>
+      {focusedRole&&<p role="status">Editing {focusedRole.system==='exterior'?'exterior protection':focusedRole.system==='wall'?'walls':labels[focusedRole.system]} in this assembly</p>}
       <button className={button} onClick={()=>setEditing(true)}>Edit assembly</button>
       {deleteButton}
     </>}
@@ -499,7 +502,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
     </details>}
     </div>
     <div hidden={!showConstruction}>
-    {intent&&(traced||adoption||editing)&&!pendingCorrection&&!pickingCorner&&!deleting&&<>
+    {intent&&(traced||adoption||standardEditing)&&!pendingCorrection&&!pickingCorner&&!deleting&&<>
       {!traced&&<label className="block">Reference for revised specifications
         <input className={field} value={reference} onChange={e=>setReference(e.target.value)}/>
       </label>}
@@ -593,7 +596,7 @@ export function FoundationAssemblyPanel({project,workspaceId,selectedId,selected
               coverage?.kind==='manualNetSegments'?'Specified net coverage':undefined;
             return <ConstructionCard key={(traced?.id??parent?.revisionId??'adoption')+layer.id} accent={kind==='insulation'?foundationColor.insulation:foundationColor.waterproofing}
               label={(i+1)+'. '+name} status={layer.scope.status} summary={[summary,coverageSummary].filter(Boolean).join(' · ')}
-              unresolved={layer.scope.status==='included'&&(!material||!coverage||kind==='insulation'&&!saved.thicknessFt)} initiallyOpen={newExterior===layer.id}>
+              unresolved={layer.scope.status==='included'&&(!material||!coverage||kind==='insulation'&&!saved.thicknessFt)} initiallyOpen={newExterior===layer.id||focusedRole?.system==='exterior'&&focusedRole.layerId===layer.id}>
             <SystemEditor system="exteriorLayers" initialExterior={exteriorKinds[layer.id]} label={'Exterior layer '+(i+1)}
             metric={metric} wallHeight={scopeFields<WallSpec>(intent.specifications.walls).heightFt?.value} reference={inputReference} scope={layer.scope} onChange={next=>{
               const scope=next as typeof layer.scope;

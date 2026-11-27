@@ -39,7 +39,7 @@ export function displayFoundationDimension(feet: number, unit: FoundationUnit): 
 export function formatFoundationQuantity(quantity:number,unit:string,metric:boolean):string{
   const conversion:Record<string,[number,string]>={CY:[27*.3048**3,'m³'],SF:[.3048**2,'m²'],LF:[.3048,'m']};
   const basis=metric&&Object.prototype.hasOwnProperty.call(conversion,unit)?conversion[unit]:undefined;
-  return (quantity*(basis?.[0]??1)).toFixed(2)+' '+(basis?.[1]??unit);
+  return (quantity*(basis?.[0]??1)).toFixed(unit==='EA'?0:2)+' '+(basis?.[1]??unit);
 }
 
 export function formatCompoundFeet(feet:number):string {
