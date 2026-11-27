@@ -1,5 +1,7 @@
 # PlanarMTO — C.1C-R5 Coordinated Technical Specification
 
+The [current material takeoff and reporting architecture](../SYSTEM_BIBLE.md#material-takeoff-reporting-and-pricing-boundaries) and [roadmap](../ROADMAP.md) supersede earlier estimating scope and milestone sequencing. Earlier evidence and measurement contracts below are retained. C.1S is next planned and separately authorized.
+
 **Status:** Five product specification packages approved by owner, 2026-11-25. R5.1–R5.2 implementation authorized through the accompanying instruction; R5.3 persistence design requires independent approval before implementation. The historical gates below record the original authorization. The revised R5.3 design at `1be740b` subsequently passed independent review. The owner authorized R5.3–R5.5 implementation and R5.6 automated verification. The [technical candidate register](c1c-r5-technical-evidence.md) identifies remaining coverage and independent and owner acceptance gates.
 
 **Repository:** `homeextent/planarmto` · branch `feature/c1c-foundation-measurement` · draft PR #12 → `staging`.

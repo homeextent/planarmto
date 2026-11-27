@@ -1,5 +1,7 @@
 # C.1A — Schema v3 and measurement architecture
 
+The [current material takeoff and reporting architecture](../SYSTEM_BIBLE.md#material-takeoff-reporting-and-pricing-boundaries) and [roadmap](../ROADMAP.md) supersede earlier estimating scope and milestone sequencing. Earlier evidence and measurement contracts below are retained. C.1S is next planned and separately authorized.
+
 Owner approved C1-D01–D09, including retirement of historical project compatibility, schema v3, and non-destructive retention of historical records. Baseline staging 99c5985; production 0423cb6 unchanged. Increment B post-merge push CI success confirmed by owner CLI (55s). No deletion of saved records, no production version bump.
 
 ## Contract and sequencing

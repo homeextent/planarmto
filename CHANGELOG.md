@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — Increments B and C.1A–C.1C (staging release train)
 
+### Product direction — documentation
+- Established the planned standalone material takeoff and Reporting architecture, C.1S assessment sequence and optional material pricing. Preserved the existing HD Price Scraper, rate synchronization, CSV compatibility and historical labour data, and recorded separately gated TIG interoperability. Earlier estimating scope is archival where superseded. [Governing architecture](SYSTEM_BIBLE.md#material-takeoff-reporting-and-pricing-boundaries).
+
 ### C.1C — Owner accepted and staging integrated
 - [PR #12](https://github.com/homeextent/planarmto/pull/12) merged into staging at `b4457da23c1e1aa9b899218d7b375b2af8520180`. Exact post-merge [staging CI #206](https://github.com/homeextent/planarmto/actions/runs/45928716470) passed all required stages, including isolated WordPress integration.
 - The owner accepted R5.12 and C.1C at `49deaa8d7b7801efd8bc0a89021e3fe4b41b7896`, with 342 reported local regressions and exact-candidate CI #204. Application development is frozen. [formal acceptance and deferred-refinement register](docs/c1c-local-acceptance.md#formal-owner-acceptance).

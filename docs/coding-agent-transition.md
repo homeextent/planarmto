@@ -1,5 +1,7 @@
 # PlanarMTO Coding Agent Transition and Completion Package
 
+The [current material takeoff and reporting architecture](../SYSTEM_BIBLE.md#material-takeoff-reporting-and-pricing-boundaries) and [roadmap](../ROADMAP.md) supersede earlier estimating scope and milestone sequencing. Earlier evidence and measurement contracts below are retained. C.1S is next planned and separately authorized.
+
 Historical transition record. The original first task, branch-cleanup manifest and baseline describe the 2026-11-25 handoff. Current work follows [AGENTS.md](../AGENTS.md) and the [roadmap](../ROADMAP.md). The current candidate and acceptance gate are in the [technical evidence register](c1c-r5-technical-evidence.md).
 Date 2026-11-25. Owner approved transition to hybrid ChatGPT/Codex model, documentation and safe branch housekeeping. This is a repository-controlled handoff, not a release or authorization to merge.
 
@@ -59,7 +61,7 @@ Remote audit confirmed PR #12 only open; all other listed PRs merged and all ten
 
 ## Current checkpoint and stop gates
 
-R5.12 is the frozen owner-accepted C.1C application checkpoint. See the [formal acceptance and deferred register](c1c-local-acceptance.md#formal-owner-acceptance). [PR #12](https://github.com/homeextent/planarmto/pull/12) merged into staging at `b4457da23c1e1aa9b899218d7b375b2af8520180`. Exact post-merge [staging CI #206](https://github.com/homeextent/planarmto/actions/runs/45928716470) passed all required stages, including isolated WordPress integration. C.1E is next planned and separately specified. C.2 and production release are separately gated. The historical cleanup manifest and first-task instructions above and below are archival.
+R5.12 is the frozen owner-accepted C.1C application checkpoint. See the [formal acceptance and deferred register](c1c-local-acceptance.md#formal-owner-acceptance). [PR #12](https://github.com/homeextent/planarmto/pull/12) merged into staging at `b4457da23c1e1aa9b899218d7b375b2af8520180`. Exact post-merge [staging CI #206](https://github.com/homeextent/planarmto/actions/runs/45928716470) passed all required stages, including isolated WordPress integration. The next planned work is a separately authorized read-only C.1S Floor and Roof assessment. C.1E follows its own coordinated specification. C.2 and production release are separately gated. The historical cleanup manifest and first-task instructions above and below are archival.
 
 ## Archived first Codex task
 Read AGENTS.md and the transition package plus linked governing documents. Inspect current repository, verify branch/cleanliness/exact head and CI. Complete safe merged branch housekeeping per manifest if permissions permit. Reproduce baseline functional tests using local build and Playwright, recording exact source, selected kinds, actual quantities, diagnostics and evidence. Do not change production application code yet. Return baseline results, confirmed defects vs usability findings, remaining gaps and a bounded R5.0 implementation plan with the unresolved default/material/ownership decisions for owner/ChatGPT review. Preserve draft PR #12, staging and main. Stop at review gate.
