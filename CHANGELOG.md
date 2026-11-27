@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] — Increments B, C.1A and C.1B (staging release train)
 
 ### C.1C — Feature candidate and hybrid handoff (not staging integrated)
+- R5.12 reuses the standard construction editor for unambiguous saved wall and linked-layer selections and standardizes display precision. [R5.12 specification](docs/c1c-r5-12-construction-editor.md).
 - R5.11 routes exact canvas assembly selections to confirmed deletion, coordinates initial independent wall layers and preserves full-height versus specified coverage intent. [R5.11 specification](docs/c1c-r5-11-construction-lifecycle.md).
 - R5.10 adds confirmed independent wall and pad footing drafts, a local estimating reference for conventional centred wall footings and concrete volume subtotals alongside supplementary pad counts. [R5.10 specification](docs/c1c-r5-10-primary-construction.md).
 - R5.9 unifies independent wall and linked-layer editing and groups foundation takeoff by saved material specification. [R5.9 specification](docs/c1c-r5-9-contractor-takeoff.md).

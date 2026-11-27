@@ -2,6 +2,10 @@
 
 Approved checkpoint `c8bf5ab469fa26bd415b781c6384a13cb72e24b2`, 335 local regressions and exact-head CI #202. Draft PR #12 targets staging.
 
+## R5.11 owner acceptance
+
+The owner reported Tests A, B, C and D passed at `130e5b70c1be38ec96aa2b81a5173491017a74a2`, including assembly deletion, coordinated independent wall layers, full-height and specified coverage, and project save/reopen. [CI #203](https://github.com/homeextent/planarmto/actions/runs/45911996359) passed. The saved-editor consistency finding is tracked in [R5.12](c1c-r5-12-construction-editor.md). Full R5 and C.1C acceptance remain separate.
+
 ## R5.10 owner evidence
 
 The owner accepted independent wall creation and exact specifications, centred strip footing without numerical elevation, independent waterproofing, saved layer editing, rectangular and polygon pad creation, exact pad dimensions and depth edits, actual architectural plan tracing, coordinated foundation layers, material-specific quantities, Cancel, undo and redo, and concrete volume subtotals alongside supplementary counts. The owner demonstrated 8.10 CY alongside two pad footings. Practical save/reopen, discoverable assembly deletion, initial independent wall supporting construction and equivalent full-height coverage remained open. This does not constitute full R5 or C.1C acceptance.
