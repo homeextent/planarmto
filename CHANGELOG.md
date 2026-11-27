@@ -12,6 +12,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — Increments B, C.1A and C.1B (staging release train)
 
+### C.1C — Owner accepted, staging integration pending
+- The owner accepted R5.12 and C.1C at `49deaa8d7b7801efd8bc0a89021e3fe4b41b7896`, with 342 reported local regressions and exact-candidate CI #204. Application development is frozen. [formal acceptance and deferred-refinement register](docs/c1c-local-acceptance.md#formal-owner-acceptance).
+
+Earlier entries below describe their publication checkpoints.
+- R5.12 reuses the standard construction editor for unambiguous saved wall and linked-layer selections and standardizes display precision. [R5.12 specification](docs/c1c-r5-12-construction-editor.md).
+- R5.11 routes exact canvas assembly selections to confirmed deletion, coordinates initial independent wall layers and preserves full-height versus specified coverage intent. [R5.11 specification](docs/c1c-r5-11-construction-lifecycle.md).
+- R5.10 adds confirmed independent wall and pad footing drafts, a local estimating reference for conventional centred wall footings and concrete volume subtotals alongside supplementary pad counts. [R5.10 specification](docs/c1c-r5-10-primary-construction.md).
+- R5.9 unifies independent wall and linked-layer editing and groups foundation takeoff by saved material specification. [R5.9 specification](docs/c1c-r5-9-contractor-takeoff.md).
+- R5.8 separates foundation inspector tabs, adds progressively disclosed construction layers and makes independent wall and exterior protection workflows more discoverable. [R5.8 specification](docs/c1c-r5-8-contractor-interface.md).
+- R5.7 adds progressive construction layers, concrete proposals, complete assembly deletion and slab footprint correction. It retains disjoint concrete quantities when an unrelated incomplete run cannot overlap. [R5.7 closeout](docs/c1c-r5-7-foundation-closeout.md).
+- R5.6C keeps construction drafts visible and transaction actions accessible, preserves pending perimeter corrections, and adds coordinated standalone slab construction. R5.6C application candidate `5a6db24aaab462d4dda888a18be08515709df849` retains 322/322 reported local regressions. Independently verified [CI #196](https://github.com/homeextent/planarmto/actions/runs/45825822174) passed, including isolated WordPress integration. Draft PR #12 targets staging. Full R5 practical owner acceptance remains withheld. Schema v3 and production 2.15.1 remain current. [R5.6C workflow](docs/c1c-r5-6c-workflow.md).
+- R5.6B routes new perimeter traces to coordinated specification and quantity review, adds direct editing and drafting aids, and records confirmed residential relationships and exterior system order using optional v3 fields. Independent implementation review and owner practical acceptance remain pending.
+- Recorded the owner-approved [product design philosophy](SYSTEM_BIBLE.md#governing-product-design-philosophy) and reconciled the [R5.6B usability plan](docs/c1c-r5-6b-usability-plan.md) for independent review. Full R5 acceptance remains withheld. Documentation only.
+- R1–R4 foundation geometry, quantities, source-linked assemblies, scope/layers, precision, replacement, persistence and bounded angled runs implemented in draft PR #12. CI #186 at e5e9748, run 45670433567/job 139403930112, 288/288 independently verified.
+- Owner calibration and basic rectangle/L walls and strip quantities passed; remaining functional and usability acceptance outstanding. Contractor-first R5 proposal and Codex transition recorded, no application changes in handoff. See docs/coding-agent-transition.md and docs/c1c-functional-findings.md. No merge/release authorization.
+- R5.0A restores pointer access to roof polygon completion and canvas zoom, displays the foundation selection count and describes missing explicit scope decisions while preserving stored applicability. Independent source review and owner tests A–C passed at `cd782e7f1728d3e6377853677e29cc9611f08497`. Local regression 289/289, targeted Chromium 5/5, and CI #188 (run 45692683476, job 139481964301, including isolated WordPress) passed. [Acceptance and remaining R5 observations](docs/c1c-functional-findings.md#r50a-formal-acceptance).
+
+- Registered the five [owner-approved R5 packages](docs/c1c-r5-coordinated-specification.md). R5.1–R5.2 are authorized, with a separate R5.3 persistence design review before implementation.
+
+- R5.1 adds graphical foundation rectangles and explicit continuous perimeter tracing with endpoint/closure cues. R5.2 adds construction unit entry and context-sensitive materials inside the existing persisted contract. See [coverage and deferred requirements](docs/c1c-r5-1-r5-2-evidence.md).
+
+- R5.3–R5.5 candidate adds optional v3 foundation assemblies, local presets, source-linked regeneration and a contractor assembly inspector. See the [technical register and remaining acceptance gates](docs/c1c-r5-technical-evidence.md).
+
+- R5.6A adds complete-group detachment and explicit re-adoption, plus bounded graphical trace correction with distinct revision and replacement lineage. The [technical register](docs/c1c-r5-technical-evidence.md) tracks review and actual-plan acceptance.
+
 ### C.1B — Staging integrated
 - Independent roof planes, pitch/direction, classified boundaries, opening deductions, soffit and insulation measurements; deterministic rectangular hip/gable/shed/flat preview and atomic application. No irregular automatic skeleton, inferred assembly applicability or consolidated pricing.
 - Keyboard-first exact floor/roof dimensions, guarded repeated correction, workspace-specific history, polygon closure and actionable geometry diagnostics. Fixed delayed viewport auto-fit following trace-supported investigation.

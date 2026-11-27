@@ -502,6 +502,7 @@ export interface ProjectSettings {
 }
 
 export type ActiveTool =
+  | 'foundation_rectangle' | 'foundation_perimeter' | 'foundation_wall' | 'foundation_strip' | 'foundation_pad' | 'foundation_slab' | 'foundation_trench' | 'foundation_excavation' | 'foundation_backfill' | 'foundation_granular' | 'foundation_insulation' | 'foundation_vertical_insulation' | 'foundation_waterproofing' | 'foundation_drainage'
   | 'roof_generate' | 'roof_plane' | 'roof_edge' | 'roof_opening' | 'roof_soffit' | 'roof_insulation' | 'roof_vertex'
   | 'select'
   | 'wall_pen'
@@ -551,7 +552,7 @@ export type ActiveTool =
   | 'calibrate_scale';
 
 export interface SelectionState {
-  type: 'roof' | 'none' | 'node' | 'wall' | 'aperture' | 'stamp' | 'room' | 'deck' | 'hardscape' | 'annotation' | 'underlay' | 'multiple';
+  type: 'foundation' | 'roof' | 'none' | 'node' | 'wall' | 'aperture' | 'stamp' | 'room' | 'deck' | 'hardscape' | 'annotation' | 'underlay' | 'multiple';
   id?: string;
   ids?: string[];
 }

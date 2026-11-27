@@ -2,12 +2,214 @@
 
 ---
 
-## Architectural direction and governing principles — C.1B staging integrated
+## Governing Product Design Philosophy
+
+### 1. Product identity and purpose
+
+PlanarMTO is a contractor-focused, drawing-driven material takeoff and estimating application for residential construction.
+
+Its purpose is to enable contractors to interpret architectural and structural drawings, establish construction geometry, specify applicable materials and construction systems, and produce accurate, traceable material quantities efficiently.
+
+PlanarMTO is not intended to replace architectural drafting software, structural engineering software, general-purpose CAD applications or detailed digital building modelling platforms.
+
+### 2. Governing design principle
+
+**Expose the inputs that determine material quantities. Automate conventional geometric relationships. Request additional information only when it affects measurement accuracy, scope or the physical interpretation of the construction.**
+
+Technical sophistication shall reduce contractor workload rather than increase it.
+
+### 3. Layered construction model
+
+The primary contractor interaction model is:
+
+**Trace once. Build in construction layers. Automate relationships. Specify exceptions. Quantify continuously.**
+
+The contractor establishes the primary construction geometry from calibrated drawings or explicitly confirmed dimensions.
+
+Applicable construction systems are then added to that geometry through familiar material and construction specifications.
+
+Each construction system is independently configurable, with its geometry derived from confirmed source geometry or an appropriate dependent construction footprint wherever supported.
+
+Construction systems shall be presented according to how contractors describe and build residential construction rather than according to the internal organization of the measurement engine.
+
+The layered construction model is dependency-driven. It does not impose an artificial requirement to configure unrelated or inapplicable construction systems in a fixed sequence.
+
+Independent geometry remains available wherever construction cannot appropriately be derived from an existing reference.
+
+### 4. Three levels of functionality
+
+#### Level 1 — Standard contractor workflow
+
+Prioritize efficient, intuitive residential construction estimating.
+
+Expose only the information ordinarily required to specify construction materials, dimensions, coverage and applicable scope.
+
+Automatically establish confirmed conventional geometric relationships.
+
+Provide consistent construction specification workflows for primary construction objects.
+
+Routine estimating shall not require the contractor to manage internal coordinates, elevation references, mathematical offsets, component identities, geometric topology or calculation dependencies.
+
+#### Level 2 — Advanced construction controls
+
+Retain supported advanced capabilities for nonstandard geometry, engineered construction details, custom coverage, explicitly specified elevations, offsets, local overrides and unusual physical relationships.
+
+Make advanced functionality discoverable without unnecessarily complicating the standard workflow.
+
+Request exceptional inputs when they materially affect measurement validity, construction scope or the resulting quantities.
+
+Advanced functionality remains subject to approved technical capabilities and development scope.
+
+#### Level 3 — Measurement and calculation engine
+
+Preserve the sophistication, precision and integrity of the underlying measurement architecture.
+
+The engine remains responsible for:
+
+- Geometric calculations and construction relationships.
+- Source geometry and dependency management.
+- Component ownership and stable identities.
+- Quantity generation and reconciliation.
+- Duplicate and overlap protection.
+- Applicability and unresolved specification tracking.
+- Historical provenance and persistence.
+- Validated atomic transactions.
+- Undo and redo.
+
+A simplified contractor interface shall not justify reducing mathematical accuracy, weakening validation or discarding supported technical capabilities.
+
+### 5. Standard construction workflow
+
+**Trace → Confirm geometry → Specify construction → Preview → Apply.** This is the interface standard for current and future primary construction drawing tools. Confirm the reference and permit supported exact corrections before construction commitment. Keep geometry and specifications in a draft until validated Apply.
+
+Where applicable, the contractor workflow shall follow this model:
+
+1. Import and calibrate architectural drawings.
+2. Trace or identify primary construction geometry.
+3. Include the applicable construction systems.
+4. Specify the materials, dimensions, coverage and scope.
+5. Automatically establish supported conventional relationships.
+6. Review traceable quantities and disclosed estimating assumptions.
+7. Apply validated construction specifications.
+8. Modify existing construction without unnecessary redrafting or duplicate quantities.
+
+Uncommitted geometry shall remain visible throughout specification entry and review.
+
+Primary Preview, Apply and Cancel actions shall remain accessible while construction specifications are being edited.
+
+Confirmed changes shall be applied atomically using the existing validated transaction architecture.
+
+Construction assemblies follow a complete lifecycle. Create and specify the primary geometry, add or remove applicable systems, edit geometry and specifications, review quantities, delete with validated ownership checks, and support undo and redo. The same lifecycle guides future workspaces within their approved technical scope.
+
+#### Standard workspace interface
+
+Use the drawing toolbar for geometry creation and specialist drawing. Organize specifications and dependent construction around the selected geometry in the inspector. Progressively disclose construction layers and show only inputs relevant to the material, measurement basis, scope or a necessary physical relationship. Use distinct Construction, Geometry and Quantities views where applicable. Keep material totals and completeness separately reviewable, and preserve drafts and previews while navigating. Keep Preview, Apply and Cancel available during construction editing. Automate supported conventional relationships and retain discoverable advanced controls. The standard workflow requires no knowledge of internal ownership or record identifiers. **Equivalent construction operations must use consistent terminology, interface presentation, transaction controls and lifecycle behaviour, regardless of how the original geometry was created.** This requirement applies across current and future measurement workspaces. **The interface used to specify and create a construction component or assembly is also its standard editor after commitment.** Creation and editing are states of the same editor. Keep advanced measurement and geometry controls accessible through progressive disclosure and collapsed by default. The lifecycle is **Trace → Specify → Preview → Apply → Select → Modify**. Geometry confirmation remains part of tracing and specifying.
+
+### 6. Construction system dependencies
+
+Dependent construction systems shall use the appropriate confirmed source geometry.
+
+For foundation construction, examples include:
+
+- Foundation walls derived from the confirmed perimeter trace.
+- Strip footings derived from applicable foundation wall geometry.
+- Exterior waterproofing and insulation derived from applicable exterior wall faces.
+- Perimeter drainage derived from a supported confirmed route.
+- Interior slabs derived from confirmed inside-wall geometry.
+- Under-slab insulation and granular base derived from the applicable slab footprint.
+
+These examples establish the interaction and dependency model, not automatic authorization to implement unsupported construction systems.
+
+Optional systems shall not be silently included.
+
+Independent or locally modified construction shall remain available where the drawings specify conditions that cannot be represented by common assembly specifications.
+
+### 7. Conventional relationships and estimating assumptions
+
+Automatically establish supported conventional construction relationships after the contractor confirms their applicability.
+
+Do not require routine manual elevations or offsets where an internal reference and confirmed construction convention are sufficient.
+
+Distinguish internal computational references from actual surveyed, architectural or structural elevations.
+
+Use clearly disclosed estimating conventions where they provide an appropriate material takeoff basis.
+
+For example, supported conventional slab assemblies may use confirmed full-footprint estimating coverage for under-slab materials without requiring detailed vertical modelling of every footing projection.
+
+Do not represent an estimating coverage convention as an independently verified exact net installed quantity.
+
+Do not infer structural dimensions, material specifications, excavation, imported fill, backfill or other unconfirmed construction requirements.
+
+Retain advanced relationships and coverage adjustments where required and supported.
+
+Known conflicts and materially unresolved physical relationships must remain subject to the existing measurement safeguards.
+
+### 8. Measurement integrity
+
+Preserve architect-specified geometry, confirmed dimensions, applicable construction scope, material specifications, estimating assumptions and independent measurements.
+
+Preserve source geometry, canonical units, full internal precision, historical compatibility, stable physical identities and measurement provenance.
+
+Missing information shall not be treated as zero.
+
+Pending, excluded and included scope shall remain distinguishable.
+
+Automatically regenerate dependent quantities when confirmed construction specifications change.
+
+Prevent duplicate material contributions and unsupported overlap reconciliation.
+
+Preserve independently valid quantities wherever possible when another construction relationship remains unresolved.
+
+Unsupported conditions shall be identified explicitly rather than silently approximated.
+
+Workspace takeoff groups authoritative net measurement rows by actual material specification, purchasing attributes and applicable construction use. Preserve the link to component and specification evidence. Group compatible units at full precision and identify absent attributes as unspecified. Keep known partial quantities and outstanding requirements visible.
+
+Routine contractor-facing quantities show at most two decimal places. Display concrete and granular volume to two places and counts as whole numbers. Display areas, lengths and informational board feet to up to two places. Compute compatible-unit subtotals from authoritative unrounded values and round only for presentation. Category subtotals summarize detail rows of compatible units and contribute no additional quantity. Concrete volume remains subtotalled when supplementary construction counts are available. Reference figures and informational derivatives such as eligible insulation board feet remain separate from purchasing totals. Consolidated estimating, pricing, allowances and reporting belong to the separately authorized C.2 scope.
+
+### 9. Application across all workspaces
+
+The layered construction philosophy governs all current and future PlanarMTO measurement workspaces and subsequent estimating functionality.
+
+Examples include foundation assemblies, floor systems, wall systems, roof assemblies and interior finishes derived from their appropriate source geometry.
+
+Each workspace remains subject to its approved specialist measurement authority, technical scope and release gates.
+
+This philosophy does not independently authorize new measurement systems, structural design functionality or changes to the approved roadmap.
+
+### 10. Mandatory design review criteria
+
+Before authorizing a new measurement capability or interface change, evaluate:
+
+- Whether the contractor routinely needs the proposed input or control.
+- Whether it materially affects material quantities or construction scope.
+- Whether the existing engine can establish it automatically from confirmed information.
+- Whether it belongs in the standard workflow or advanced construction tools.
+- Whether it reduces unnecessary contractor interaction.
+- Whether it preserves existing measurement accuracy, provenance and safeguards.
+- Whether the capability can reuse existing geometry, calculation and transaction architecture.
+
+A feature shall not be introduced into the standard workflow solely because the underlying engine is capable of exposing it.
+
+### 11. Documentation authority
+
+This section is the authoritative PlanarMTO product design contract.
+
+All active governing documents, technical specifications, development instructions and future workspace designs shall conform to it.
+
+Earlier contradictory interaction requirements are superseded and shall be reconciled rather than retained as competing active instructions.
+
+Historical proposals, technical evidence and previously accepted mathematical contracts may be preserved for traceability, provided their current authority and limitations are explicitly identified.
+
+Technical implementation, scope expansion, acceptance, integration and release remain subject to the established owner authorization process.
+
+**Powerful underneath. Simple on the surface. Advanced when necessary.**
+
+## Architectural direction and governing principles — C.1B staging; C.1C feature candidate
 
 This section governs all subsequent development and takes precedence over older engine descriptions below. Production v2.15.1 is a separate baseline. Preserve valid historical floor formulas as regression references; do not infer roof, foundation or site quantities from floor gross area. Roof-specific measurement is integrated; generic CAD tools in foundation/site workspaces do not establish specialist measurement authority.
 
 - Four optional typed workspaces (floor, roof, foundation, site), each with independent geometry, calibration and source evidence; project-level settings and rates shared. No automatic cross-sheet spatial registration.
-- Floor retains existing valid framing, finishes, apertures, MEP and siding inputs. Roof owns independently drafted planes, classified edges, openings, soffit/fascia/eavestrough and roof thermal envelope quantities. Foundation owns explicit walls, footings, pads, slabs, building excavation, insulation, drainage and waterproofing. Site owns grading, hardscape, decks and site features. These are ownership boundaries; roof engine is integrated, foundation pending, dedicated site engine deferred.
+- Floor retains existing valid framing, finishes, apertures, MEP and siding inputs. Roof owns independently drafted planes, classified edges, openings, soffit/fascia/eavestrough and roof thermal envelope quantities. Foundation owns explicit walls, footings, pads, slabs, building excavation, insulation, drainage and waterproofing. Site owns grading, hardscape, decks and site features. These are ownership boundaries; roof engine is integrated, foundation is owner accepted at R5.12 on the feature branch, dedicated site engine deferred.
 - Persist source geometry and identities rather than authoritative derived totals. Canonical feet; pitch rise per 12. Quantities carry code, unit, basis, source and stable physical/assembly identity. Missing inputs remain unquantified; exclusions require reason; assignment is not completeness. Distinct layers may share physical features but duplicate contributions to the same assembly/code must be prevented. No structural design, automatic topographic modeling or unsupported geometric assumptions.
 - Specialist engines must identify unsupported topology or incomplete inputs rather than invent quantities. Integrated cross-workspace ownership and completeness are C.1E; consolidated rates, single application of waste and reporting are C.2.
 - Historical unsupported projects retained without automatic deletion; no further legacy compatibility development required. Preserve data safeguards. Project reports remain gated until C.2.
@@ -18,6 +220,10 @@ The authoritative milestone sequence and release gates are in [ROADMAP.md](ROADM
 C.1B staging integration: owner accepted `fb60747f83183016694f4c54ac2dbc609087f5e5` (10/10 local checks; CI #129, 127/127 tests). Documentation-only head `8d707902adbf7365ef6e78a64bdab90ce634732e` passed [CI #132](https://github.com/homeextent/planarmto/actions/runs/45544873706) (127/127, job 138971962757). [PR #10](https://github.com/homeextent/planarmto/pull/10) merged into staging at `3649f546cbf0a6e19b831753181cc8616330c22c`; owner confirmed clean synchronized local staging and successful post-merge CI #133. Merge and branch identity independently verified; CI #133 is owner-reported, with exact run ID/job logs not independently retrieved because the commit lookup omits push runs. No production promotion; main remains v2.15.1 at `0423cb6`.
 
 PR #8 merged into staging at `c1a0bf7` after documentation-only candidate `3d0830e` passed CI #40 ([run 45462442984](https://github.com/homeextent/planarmto/actions/runs/45462442984)). Post-merge staging push [run 45462698052](https://github.com/homeextent/planarmto/actions/runs/45462698052), job 138689310248, completed successfully; owner CLI and job details verified. C.1A formally complete. Production `main` remains v2.15.1 at `0423cb6`.
+
+## C.1C foundation authority and integration boundary
+
+The owner accepted C.1C at R5.12. The existing specialist measurement engines, canonical feet, source-linked ownership, optional v3 assembly records, and atomic history remain authoritative. R5.6A separates non-owning detachment audit from live ownership and records trace corrections independently of specifications. The product and interface rules above govern all subsequent work. [formal acceptance and deferred-refinement register](docs/c1c-local-acceptance.md#formal-owner-acceptance). Draft PR #12 is at independent staging integration review.
 
 ## Typed project architecture — C.1A
 
@@ -285,8 +491,8 @@ The engine supports a 3-tier drywall thickness matrix for wall and ceiling surfa
 - **Walls**: `1/2" Standard`, `5/8" Type X Fire-Rated`, `1/2" Moisture Board / Greenboard`.
 - **Ceilings**: `1/2" Standard`, `5/8" Type X Fire-Rated`.
 
-### 4.5 Division 03 — Concrete Foundations
-Foundation estimation relies on explicit volumetric variables assigned per-room or per-wall:
+### 4.5 Division 03 — Historical floor concrete regression reference
+These formulas document the historical floor estimator. The [specialist foundation specification](docs/c1c-foundation-measurement.md) governs current foundation takeoff. Preserve the historical formulas for regression coverage. Unrelated floor rooms and walls are outside the specialist quantity basis.
 - **Slab Volume**: $V_{\text{slab}} = A_{\text{room}} \times T_{\text{slab}}$
 - **Foundation Wall Volume**: $V_{\text{fnd}} = \sum (L_i \times T_i \times H_i)$
 - **Footing Volume**: $V_{\text{ftg}} = \sum (L_i \times W_{\text{ftg}} \times T_{\text{ftg}})$

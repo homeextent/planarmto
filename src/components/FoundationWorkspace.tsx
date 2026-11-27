@@ -1,0 +1,374 @@
+import {foundationDeletionTarget,independentWallSelection} from '../engine/measurements/foundationSelection';
+import {IndependentWallConstruction} from './IndependentWallConstruction';
+import {describeFoundationTakeoff,groupFoundationTakeoff,type FoundationTakeoffRow} from '../engine/measurements/foundationTakeoff';
+import type {FoundationAssemblyRecord} from '../engine/measurements/foundationAssemblyModel';
+import { FoundationInspectorContext, foundationInspectorTabs, type FoundationInspectorTab } from './FoundationInspectorTabs';
+import { foundationStroke } from './foundationComponentStyle';
+import { formatFoundationQuantity } from '../engine/measurements/foundationUnits';
+import {FoundationDimensionInput, FoundationMetricContext} from './FoundationDimensionInput';
+import {FoundationMaterialInput, foundationMaterialCategory} from './FoundationMaterialInput';
+import {previewFoundationGeneration,foundationReplacement,applyFoundationGeneration} from '../engine/measurements/foundationGeneration';
+import {manualFoundationCoverage} from '../engine/measurements/foundationManualCoverage';
+import {setFoundationApplicability} from '../engine/measurements/foundationApplicability';
+import {assignFoundationAssembly,foundationBaseElevation,convertFoundationElevation,editFoundationRuns} from '../engine/measurements/foundationAssembly';
+import {derivePerimeterDrainage} from '../engine/measurements/foundationDrainageDerivation';
+import {deriveFoundationEnvelope,deriveRectangularEnvelope} from '../engine/measurements/foundationEnvelopeDerivation';
+import type {FoundationEnvelopeSource} from '../engine/measurements/measurementTypes';
+import {deriveStripFootings,foundationAssemblyIds} from '../engine/measurements/foundationDerivation';
+import React,{useMemo,useState,useEffect} from 'react';
+import type {ActiveTool,SelectionState} from '../types';
+import type {FoundationEntity,FoundationMetadata} from '../engine/measurements/measurementTypes';
+import {v4 as uuidv4} from 'uuid';
+import {foundationTools,generateFoundationPerimeter} from '../engine/measurements/foundationDrafting';
+import {type RectangleReference} from '../engine/measurements/foundationGeometry';
+import {validateFoundationTopology} from '../engine/measurements/foundationTopology';
+import {rectanglePoints} from '../engine/precisionDrafting';
+import {measureFoundation} from '../engine/measurements/foundationMeasurements';
+export function FoundationToolbar({activeTool,onSelectTool,onStandardSlab,onStandardPrimary,draftBlocksDrawing}:{activeTool:ActiveTool;draftBlocksDrawing?:boolean;onSelectTool:(t:ActiveTool)=>void;onStandardSlab:(mode:'rectangle'|'polygon')=>void;onStandardPrimary:(tool:'foundation_wall'|'foundation_pad',mode:'rectangle'|'polygon')=>void}){
+ const primary=new Set<ActiveTool>(['foundation_rectangle','foundation_perimeter']);
+ const renderTool=([tool,label]:readonly[ActiveTool,string])=><button key={tool} disabled={draftBlocksDrawing&&tool!=='select'} onClick={()=>onSelectTool(tool)}
+  className={'block w-full text-left text-xs rounded p-2 mb-1 '+(activeTool===tool?'bg-sky-700 text-white':'bg-slate-800 hover:bg-slate-700')}>{label}</button>;
+ return <aside className="w-36 shrink-0 bg-slate-900 border-r border-slate-700 p-2 overflow-y-auto">
+  <h2 className="text-xs uppercase text-slate-400 mb-3">Foundation tools</h2>
+  {draftBlocksDrawing&&<p role="status" className="mb-2 text-xs">Construction draft active. Review, apply or cancel it in Foundation properties before drawing again.</p>}
+  {renderTool(['select','Select'])}
+  {foundationTools.filter(([tool])=>primary.has(tool)).map(renderTool)}
+  <button disabled={draftBlocksDrawing} onClick={()=>onStandardPrimary('foundation_wall','rectangle')} className="block w-full text-left text-xs rounded p-2 mb-1 bg-slate-800 hover:bg-slate-700">Draw foundation wall</button>
+  <button disabled={draftBlocksDrawing} onClick={()=>onStandardPrimary('foundation_pad','rectangle')} className="block w-full text-left text-xs rounded p-2 mb-1 bg-slate-800 hover:bg-slate-700">Draw rectangular pad footing</button>
+  <button disabled={draftBlocksDrawing} onClick={()=>onStandardPrimary('foundation_pad','polygon')} className="block w-full text-left text-xs rounded p-2 mb-1 bg-slate-800 hover:bg-slate-700">Draw polygon pad footing</button>
+  <button disabled={draftBlocksDrawing} onClick={()=>onStandardSlab('rectangle')} className="block w-full text-left text-xs rounded p-2 mb-1 bg-slate-800 hover:bg-slate-700">Draw rectangular slab</button>
+  <button disabled={draftBlocksDrawing} onClick={()=>onStandardSlab('polygon')} className="block w-full text-left text-xs rounded p-2 mb-1 bg-slate-800 hover:bg-slate-700">Draw polygon slab</button>
+  {renderTool(['calibrate_scale','Calibrate scale'])}
+  <details className="text-xs">
+   <summary className="cursor-pointer mb-1">Specialist drawing tools</summary>
+   {foundationTools.filter(([tool])=>!primary.has(tool)).map(renderTool)}
+   {renderTool(['ruler_measure','Measure'])}
+   {renderTool(['text_label','Annotation'])}
+  </details>
+ </aside>;
+}
+const field='block w-full bg-slate-800 border border-slate-600 rounded p-1.5 text-xs';
+const dimension=(label:string,value:string,onChange:(value:string)=>void,section=false,hint?:string)=>
+ <FoundationDimensionInput label={label} value={value} onChange={onChange} className={field} section={section} hint={hint}/>;
+
+function Properties({entity,onSave,previewOnly=false,onHeightChange}:{key?:string;entity:FoundationEntity;onSave:(e:FoundationEntity)=>boolean;previewOnly?:boolean;onHeightChange?:(value:number|null)=>void}){
+ const plainConcrete=['foundationWall','stripFooting','padFooting','slab'].includes(entity.kind);
+ const [material,setMaterial]=useState(entity.foundation?.material??(plainConcrete?'poured concrete':''));
+ const [wallScope,setWallScope]=useState<'legacy'|'included'|'excluded'|'pending'>(entity.scopeApplicability?.status??'legacy');
+ const [wallScopeReason,setWallScopeReason]=useState(entity.scopeApplicability&&'reason' in entity.scopeApplicability?entity.scopeApplicability.reason:'');
+ const [width,setWidth]=useState('widthFt' in entity?String(entity.widthFt??''):'');
+ const [height,setHeight]=useState('heightFt' in entity?String(entity.heightFt??''):'');
+ const [depth,setDepth]=useState('depthFt' in entity?String(entity.depthFt??''):'');
+ const [elevation,setElevation]=useState('elevationFt' in entity?String(entity.elevationFt??''):'');
+ const [elevationBasis,setElevationBasis]=useState<'base'|'top'>('base');
+ const [joinStart,setJoinStart]=useState(String(entity.foundation?.joinStartFt??''));
+ const [joinEnd,setJoinEnd]=useState(String(entity.foundation?.joinEndFt??''));
+ const tracedCentreline=entity.kind==='foundationWall'&&!entity.foundation&&entity.source.reference==='Manual foundation draft';
+ const [centre,setCentre]=useState(!!entity.foundation?.centrelineConfirmed||tracedCentreline);
+ const [layer,setLayer]=useState(entity.foundation?.coverage?.layerId??entity.foundation?.granularLayerId??entity.foundation?.envelopeSource?.layerId??'');
+ const [confirmed,setConfirmed]=useState(!!entity.foundation?.coverage?.confirmed);
+ const [coverageFoam,setCoverageFoam]=useState(!!entity.foundation?.coverage?.foam);
+ const [coverageThickness,setCoverageThickness]=useState(String(entity.foundation?.coverage?.thicknessFt??''));
+ const [openingTreatment,setOpeningTreatment]=useState<''|'none'|'alreadyDeducted'>(entity.foundation?.coverage?.openingTreatment??'');
+ const [error,setError]=useState('');
+ const number=(v:string)=>{if(!v.trim())return null;const n=Number(v);if(!Number.isFinite(n))throw Error('Enter finite dimensions');return n};
+ const input=(label:string,v:string,set:(s:string)=>void)=><label className="block">{label}<input aria-label={label} className={field} value={v} onChange={e=>set(e.target.value)}/></label>;
+ const category=foundationMaterialCategory(entity);
+ const coverage=entity.kind==='foundationLine'||entity.kind==='foundationRegion'&&entity.purpose==='insulation';
+ const elevationFields=<><label className="block">Elevation reference<select aria-label="Elevation reference" className={field} value={elevationBasis} onChange={e=>{try{const next=e.target.value as 'base'|'top';const value=convertFoundationElevation(number(elevation),elevationBasis,next,number('widthFt' in entity?height:depth));setElevationBasis(next);setElevation(value===null?'':String(value));setError('')}catch(err){setError(err instanceof Error?err.message:String(err))}}}><option value="base">Base</option><option value="top">Top</option></select></label>{dimension(elevationBasis==='base'?'Base elevation':'Top elevation',elevation,setElevation,false,'blank unknown')}</>;
+ return <form aria-label={entity.kind==='foundationWall'?'Independent wall construction':entity.kind==='padFooting'&&previewOnly?'Pad footing specifications':'Independent component construction'} className="space-y-2 text-xs" onSubmit={ev=>{ev.preventDefault();try{if(!material.trim())throw Error('Specify construction material');const f:FoundationMetadata={...entity.foundation,version:1,material:material.trim()};if('widthFt' in entity){if(centre){f.centrelineConfirmed=true;const a=number(joinStart),b=number(joinEnd);if(a!==null)f.joinStartFt=a;else delete f.joinStartFt;if(b!==null)f.joinEndFt=b;else delete f.joinEndFt;}else{delete f.centrelineConfirmed;delete f.joinStartFt;delete f.joinEndFt;}}if('elevationFt' in entity){if(elevation.trim())f.baseElevationConfirmed=true;else delete f.baseElevationConfirmed;}if(entity.kind==='foundationRegion'&&entity.purpose==='granular'){if(f.envelopeSource){if(layer.trim()!==f.envelopeSource.layerId)throw Error('Replace derived layer to change its identity');}else if(layer.trim())f.granularLayerId=layer.trim();else delete f.granularLayerId;}if(coverage){const c=manualFoundationCoverage(entity,{layer,confirmed,foam:coverageFoam,thicknessFt:number(coverageThickness),openingTreatment});if(c)f.coverage=c;else delete f.coverage;}let next:FoundationEntity={...entity,foundation:f};if('widthFt' in next){if(entity.source.reference.startsWith('Generated ')&&'widthFt' in entity&&(number(width)!==entity.widthFt||!centre||(f.joinStartFt??0)!==(entity.foundation?.joinStartFt??0)||(f.joinEndFt??0)!==(entity.foundation?.joinEndFt??0)))throw Error('Generated perimeter reference requires regeneration before width or junction changes');next={...next,widthFt:number(width),heightFt:number(height),elevationFt:foundationBaseElevation(number(elevation),elevationBasis,number(height))};}else if('polygon' in next)next={...next,depthFt:number(depth),elevationFt:foundationBaseElevation(number(elevation),elevationBasis,number(depth))};else if(next.kind==='foundationLine'){const h=number(height);next={...next,heightFt:h??undefined}}if(previewOnly&&wallScope!=='legacy'){
+   if(wallScope!=='included'&&!wallScopeReason.trim())throw Error('Enter a reason for this scope decision.');
+   next={...next,scopeApplicability:wallScope==='included'?{status:'included'}:{status:wallScope,reason:wallScopeReason.trim()}};
+ }else if(previewOnly&&wallScope==='legacy'&&next.scopeApplicability)delete next.scopeApplicability;
+ if(!onSave(next))throw Error('Edit rejected; review geometry and dimensions');setError('')}catch(err){setError(err instanceof Error?err.message:String(err))}}}>
+ {entity.kind==='foundationWall'&&<><h3 className="font-semibold">Independent wall construction</h3>
+   <p>Length {formatFoundationQuantity(Math.hypot(entity.end.x-entity.start.x,entity.end.y-entity.start.y),'LF',false)}. Enter wall thickness and height to quantify concrete.</p></>}
+ {previewOnly&&<>
+   <label className="block">Include in takeoff<select className={field} value={wallScope} onChange={e=>setWallScope(e.target.value as typeof wallScope)}>
+     <option value="legacy">No explicit decision</option><option value="included">Included</option>
+     <option value="pending">Pending</option><option value="excluded">Excluded</option>
+   </select></label>
+   {(wallScope==='excluded'||wallScope==='pending')&&<label>Reason<input className={field} value={wallScopeReason} onChange={e=>setWallScopeReason(e.target.value)}/></label>}
+ </>}
+ {category?<FoundationMaterialInput label="Material" category={category} value={material} onChange={setMaterial} className={field}/>:input('Material',material,setMaterial)}
+ {'widthFt' in entity&&<>{dimension(previewOnly&&entity.kind==='foundationWall'?'Wall thickness':'Width',width,setWidth,true)}{dimension(previewOnly?'Wall height':'Height / depth',height,value=>{setHeight(value);onHeightChange?.(value?Number(value):null);},entity.kind==='stripFooting')}{tracedCentreline?<p>Wall thickness is measured about the traced centreline.</p>:<label className="block"><input type="checkbox" checked={centre} onChange={e=>setCentre(e.target.checked)}/> Confirm drafted centreline</label>}{centre&&<details><summary>Advanced wall junctions</summary>{dimension('Start junction extension',joinStart,setJoinStart,false)}{dimension('End junction extension',joinEnd,setJoinEnd,false)}</details>}</>}
+ {'polygon' in entity&&dimension(previewOnly&&entity.kind==='padFooting'?'Footing depth':'Depth',depth,setDepth,entity.purpose!=='excavation'&&entity.purpose!=='backfill')}
+ {'elevationFt' in entity&&(previewOnly?<details><summary>{entity.kind==='padFooting'?'Advanced pad elevations':'Advanced wall elevations'}</summary>{elevationFields}</details>:elevationFields)}
+ {entity.kind==='foundationLine'&&entity.purpose!=='drainage'&&dimension('Coverage height',height,setHeight,false)}
+ {entity.kind==='foundationRegion'&&entity.purpose==='granular'&&input('Granular layer identity',layer,setLayer)}
+ {coverage&&<>{input('Layer identity',layer,setLayer)}<label className="block"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> Confirm explicit route / net coverage, no remaining openings</label>
+ {entity.kind==='foundationLine'&&entity.purpose!=='drainage'&&<><label className="block">Opening treatment<select aria-label="Coverage opening treatment" className={field} value={openingTreatment} onChange={e=>setOpeningTreatment(e.target.value as typeof openingTreatment)}><option value="">Pending confirmation</option><option value="none">Explicit net segments; no remaining openings</option><option value="alreadyDeducted">Legacy already deducted — review required</option></select></label>{openingTreatment==='alreadyDeducted'&&<p className="text-amber-300">Quantities remain pending until actual net coverage segments are confirmed.</p>}</>}
+ {'purpose' in entity&&entity.purpose==='insulation'&&<><label className="block"><input type="checkbox" checked={coverageFoam} onChange={e=>setCoverageFoam(e.target.checked)}/> Calculate foam board feet</label>{entity.kind==='foundationLine'?dimension('Insulation thickness',coverageThickness,setCoverageThickness,true):<p>Horizontal foam thickness uses the entered region depth.</p>}</>}
+ </>}
+ {!previewOnly&&<button className="bg-sky-700 rounded px-2 py-1" type="submit">Apply foundation properties</button>}{error&&<p role="alert" className="text-amber-300">{error}</p>}</form>;
+}
+
+type GhostPreview={source:FoundationEntity[];members:FoundationEntity[];selection?:string;removedIds?:string[]};
+type PreviewSink=(members:FoundationEntity[]|null)=>void;
+function useGhostPreview<T extends GhostPreview>(entities:FoundationEntity[],selection:string|undefined,onPreview:PreviewSink,activePreview:boolean){
+ const [preview,store]=useState<T|null>(null);
+ const valid=activePreview&&preview&&preview.source===entities&&(preview.selection===undefined||preview.selection===selection)?preview:null;
+ // Parent clears all preview state when switching generator; local inputs own only their current candidate.
+ const setPreview=(next:T|null)=>{store(next);onPreview(next?.members??null)};
+ useEffect(()=>{if(preview&&!valid){store(null);onPreview(null)}},[preview,valid]);
+ return [valid,setPreview] as const;
+}
+
+function Perimeter({activePreview,entities,onChange,onPreview}:{entities:FoundationEntity[];onChange:(e:FoundationEntity[])=>boolean;onPreview:PreviewSink;activePreview:boolean}){
+ const [x,setX]=useState(''),[y,setY]=useState(''),[w,setW]=useState(''),[d,setD]=useState(''),[t,setT]=useState(''),[height,setHeight]=useState(''),[z,setZ]=useState('');
+ const [reference,setReference]=useState<RectangleReference>('exterior');
+ const [preview,setPreview]=useGhostPreview<{source:FoundationEntity[];members:FoundationEntity[];volume:number}>(entities,undefined,onPreview,activePreview),[error,setError]=useState('');
+ const input=(label:string,value:string,set:(v:string)=>void)=><label className="block">{label}<input aria-label={label} className={field} value={value} onChange={e=>{set(e.target.value);setPreview(null)}}/></label>;
+ const required=(v:string)=>{if(!v.trim()||!Number.isFinite(Number(v)))throw Error('Enter explicit finite dimensions and origin');return Number(v)};
+ return <details className="space-y-2 text-xs"><summary className="font-semibold">Generate rectangular foundation</summary><p className="text-slate-400">Advanced coordinate entry. Origins are in project feet. Preview only until Apply.</p>
+ <label className="block">Perimeter reference<select aria-label="Perimeter reference" className={field} value={reference} onChange={e=>{setReference(e.target.value as RectangleReference);setPreview(null)}}><option value="exterior">Exterior face</option><option value="centreline">Centreline</option><option value="interior">Interior face</option></select></label>
+ {input('Origin X (ft)',x,setX)}{input('Origin Y (ft)',y,setY)}{dimension('Perimeter width',w,v=>{setW(v);setPreview(null)},false)}{dimension('Perimeter depth',d,v=>{setD(v);setPreview(null)},false)}{dimension('Perimeter wall thickness',t,v=>{setT(v);setPreview(null)},true)}{dimension('Perimeter wall height',height,v=>{setHeight(v);setPreview(null)},false)}{dimension('Perimeter base',z,v=>{setZ(v);setPreview(null)},false, 'blank unknown')}
+ <button className="bg-sky-700 rounded p-2" onClick={()=>{try{const xmin=required(x),ymin=required(y),members=generateFoundationPerimeter({xmin,ymin,xmax:xmin+required(w),ymax:ymin+required(d)},reference,required(t),required(height),z.trim()?required(z):null,uuidv4);const result=previewFoundationGeneration(entities,members);const rows=result.rows.filter(r=>members.some(e=>e.id===r.elementId));if(rows.some(r=>r.status!=='measured'))throw Error('Perimeter overlaps or requires unresolved reconciliation');const volume=rows.reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0);setPreview({source:entities,members,volume});setError('')}catch(err){setPreview(null);setError(err instanceof Error?err.message:String(err))}}}>Preview perimeter</button>
+ {preview&&<div className="space-y-2"><p>4 walls · {formatFoundationQuantity(preview.volume,'CY',false)}</p><button disabled={preview.source!==entities} className="bg-emerald-800 rounded p-2 disabled:opacity-40" onClick={()=>{if(preview.source===entities&&onChange([...entities,...preview.members]))setPreview(null);else setError('Foundation changed or placement rejected')}}>Apply perimeter</button><button className="bg-slate-700 rounded p-2" onClick={()=>setPreview(null)}>Cancel perimeter</button></div>}{error&&<p role="alert" className="text-amber-300">{error}</p>}</details>
+}
+
+
+function StripGenerator({activePreview,entities,ids,onChange,onPreview}:{entities:FoundationEntity[];ids:string[];onChange:(e:FoundationEntity[])=>boolean;onPreview:PreviewSink;activePreview:boolean}){
+ const [replaceExisting,setReplaceExisting]=useState(false);
+ const [width,setWidth]=useState(''),[depth,setDepth]=useState(''),[offset,setOffset]=useState('0'),[error,setError]=useState(''),[preview,setPreview]=useGhostPreview<{source:FoundationEntity[];selection:string;members:FoundationEntity[];removedIds:string[];volume:number}>(entities,JSON.stringify([...ids].sort()),onPreview,activePreview);
+ const key=JSON.stringify([...ids].sort());
+ return <details className="space-y-2 text-xs"><summary className="font-semibold">Derive strip footings</summary><p>Centred below the confirmed wall base unless you specify an offset.</p>
+ {dimension('Footing width',width,v=>{setWidth(v);setPreview(null)},true)}
+ {dimension('Footing depth',depth,v=>{setDepth(v);setPreview(null)},true)}
+ <details><summary>Advanced footing alignment</summary>{dimension('Footing signed offset',offset,v=>{setOffset(v);setPreview(null)},true)}<p>Positive offset is to the left when looking from wall start to end.</p></details>
+ <label className="block"><input type="checkbox" checked={replaceExisting} onChange={e=>{setReplaceExisting(e.target.checked);setPreview(null)}}/> Replace existing strip footings</label>
+ <button className="bg-sky-700 rounded p-2" onClick={()=>{try{if(!offset.trim()||!Number.isFinite(Number(offset)))throw Error('Enter explicit signed offset');const {base,removedIds}=foundationReplacement(entities,ids,'strip',replaceExisting);const members=deriveStripFootings(base,ids,Number(width),Number(depth),uuidv4,Number(offset));const result=previewFoundationGeneration(entities,members,removedIds);const rows=result.rows.filter(r=>members.some(e=>e.id===r.elementId));if(rows.length!==members.length||rows.some(r=>r.status!=='measured'))throw Error('Unresolved footing overlap');setPreview({source:entities,selection:key,members,removedIds,volume:rows.reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0)});setError('')}catch(err){setPreview(null);setError(err instanceof Error?err.message:String(err))}}}>Preview strip footings</button>
+ {preview&&<div className="space-y-2">{preview.removedIds.length>0&&<p className="text-amber-300">Replace {preview.removedIds.length} existing components with {preview.members.length} new components.</p>}<p>{preview.members.length} footings · {formatFoundationQuantity(preview.volume,'CY',false)}</p><button className="bg-emerald-800 rounded p-2" disabled={preview.source!==entities||preview.selection!==key} onClick={()=>{if(preview.source===entities&&preview.selection===key&&onChange(applyFoundationGeneration(entities,preview.members,preview.removedIds)))setPreview(null);else setError('Preview is stale or rejected')}}>Apply strip footings</button><button className="bg-slate-700 rounded p-2" onClick={()=>setPreview(null)}>Cancel strip footings</button></div>}{error&&<p role="alert" className="text-amber-300">{error}</p>}</details>
+}
+
+
+/** Parent-owned details are committed as independent, validated history transactions.
+ * Draft coordinates are explicit; no structural or opening dimensions are assumed.
+ */
+function DetailEditor({entity,entities,onChange}:{key?:string;entity:FoundationEntity;entities:FoundationEntity[];onChange:(e:FoundationEntity[])=>boolean}){
+ const [mode,setMode]=useState<'opening'|'thickening'>('opening');
+ const [a,setA]=useState(''),[b,setB]=useState(''),[w,setW]=useState(''),[h,setH]=useState(''),[depth,setDepth]=useState('');
+ const [basis,setBasis]=useState<'total'|'additional'>('total');
+ const [error,setError]=useState('');
+ const [editing,setEditing]=useState<string|null>(null);
+ const f=entity.foundation;
+ const isWall=entity.kind==='foundationWall';
+ if(!f||f.material!=='poured concrete'||(!isWall&&entity.kind!=='slab'))return null;
+ const wall=f.wallOpenings??[], openings=f.slabOpenings??[], thick=f.slabThickenings??[];
+ const clear=()=>{setA('');setB('');setW('');setH('');setDepth('');setEditing(null);setError('')};
+ const required=(value:string)=>{if(!value.trim()||!Number.isFinite(Number(value)))throw Error('Enter all required finite detail dimensions');return Number(value)};
+ const input=(label:string,value:string,set:(v:string)=>void)=><label className="block">{label}<input aria-label={label} className={field} value={value} onChange={e=>set(e.target.value)}/></label>;
+ const commit=(next:FoundationMetadata)=>{const candidate=entities.map(q=>q.id===entity.id?{...q,foundation:next}:q);validateFoundationTopology(candidate);if(!onChange(candidate))throw Error('Detail change rejected');clear()};
+ const save=()=>{try{
+  const x=required(a),y=required(b),width=required(w),height=required(h),id=editing??uuidv4();
+  if(width<=0||height<=0)throw Error('Opening or zone dimensions must be positive');
+  const next:FoundationMetadata={...f};
+  if(isWall){next.wallOpenings=[...wall.filter(o=>o.id!==editing),{id,offsetFt:x,sillFt:y,widthFt:width,heightFt:height}]}
+  else {const polygon=rectanglePoints({x,y},{x:x+width,y:y+height});next.slabOpenings=openings.filter(o=>o.id!==editing);next.slabThickenings=thick.filter(o=>o.id!==editing);if(mode==='opening')next.slabOpenings.push({id,polygon});else next.slabThickenings.push({id,polygon,depthFt:required(depth),basis})}
+  commit(next);
+ }catch(err){setError(err instanceof Error?err.message:String(err))}};
+ const remove=(id:string)=>{try{const next={...f};if(isWall)next.wallOpenings=wall.filter(o=>o.id!==id);else {next.slabOpenings=openings.filter(o=>o.id!==id);next.slabThickenings=thick.filter(o=>o.id!==id)}commit(next)}catch(err){setError(err instanceof Error?err.message:String(err))}};
+ const editZone=(o:{id:string;polygon:{x:number;y:number}[];depthFt?:number;basis?:'total'|'additional'})=>{const xs=o.polygon.map(p=>p.x),ys=o.polygon.map(p=>p.y),x=Math.min(...xs),y=Math.min(...ys);setEditing(o.id);setMode(o.depthFt===undefined?'opening':'thickening');setA(String(x));setB(String(y));setW(String(Math.max(...xs)-x));setH(String(Math.max(...ys)-y));setDepth(o.depthFt===undefined?'':String(o.depthFt));setBasis(o.basis??'total');setError('')};
+ return <details open className="space-y-2 text-xs"><summary className="font-semibold">Construction details</summary>
+ <p className="text-slate-400">{isWall?'Opening offset is measured along the wall from its start. Sill is relative to wall base. Through-wall openings only.':'Enter absolute project coordinates for rectangular slab exclusions or constant-section thickening.'}</p>
+ {wall.map((o,i)=><div key={o.id} className="flex flex-wrap gap-2"><span>Wall opening {i+1}: {o.widthFt} × {o.heightFt} ft</span><button className="bg-slate-700 rounded px-2" onClick={()=>{setEditing(o.id);setA(String(o.offsetFt));setB(String(o.sillFt));setW(String(o.widthFt));setH(String(o.heightFt));setError('')}}>Edit opening {i+1}</button><button className="bg-red-900 rounded px-2" onClick={()=>remove(o.id)}>Remove opening {i+1}</button></div>)}
+ {openings.map((o,i)=><div key={o.id} className="flex flex-wrap gap-2"><span>Slab exclusion {i+1}</span><button className="bg-slate-700 rounded px-2" onClick={()=>editZone(o)}>Edit exclusion {i+1}</button><button className="bg-red-900 rounded px-2" onClick={()=>remove(o.id)}>Remove exclusion {i+1}</button></div>)}
+ {thick.map((o,i)=><div key={o.id} className="flex flex-wrap gap-2"><span>Thickening {i+1}: {o.depthFt} ft {o.basis}</span><button className="bg-slate-700 rounded px-2" onClick={()=>editZone(o)}>Edit thickening {i+1}</button><button className="bg-red-900 rounded px-2" onClick={()=>remove(o.id)}>Remove thickening {i+1}</button></div>)}
+ {!isWall&&<label className="block">Slab detail type<select aria-label="Slab detail type" className={field} value={mode} onChange={e=>{clear();setMode(e.target.value as typeof mode)}}><option value="opening">Slab exclusion</option><option value="thickening">Slab thickening</option></select></label>}
+ {isWall?dimension('Opening offset',a,setA):input('Detail origin X (ft)',a,setA)}{isWall?dimension('Opening sill',b,setB):input('Detail origin Y (ft)',b,setB)}{dimension(isWall?'Opening width':'Detail width',w,setW)}{dimension(isWall?'Opening height':'Detail length',h,setH)}
+ {!isWall&&mode==='thickening'&&<><label className="block">Thickening basis<select aria-label="Thickening basis" className={field} value={basis} onChange={e=>setBasis(e.target.value as typeof basis)}><option value="total">Total depth</option><option value="additional">Additional depth</option></select></label>{dimension('Thickening depth',depth,setDepth,true)}</>}
+ <div className="flex flex-wrap gap-2"><button className="bg-sky-700 rounded p-2" onClick={save}>{editing?'Save detail edit':isWall?'Add wall opening':mode==='opening'?'Add slab exclusion':'Add slab thickening'}</button>{editing&&<button className="bg-slate-700 rounded p-2" onClick={clear}>Cancel detail edit</button>}</div>{error&&<p role="alert" className="text-amber-300">{error}</p>}
+ </details>
+}
+
+
+function EnvelopeGenerator({activePreview,entities,ids,onChange,onPreview}:{entities:FoundationEntity[];ids:string[];onChange:(e:FoundationEntity[])=>boolean;onPreview:PreviewSink;activePreview:boolean}){
+ const [replaceExisting,setReplaceExisting]=useState(false);
+ const [wholePerimeter,setWholePerimeter]=useState(false);
+ const [belowSlab,setBelowSlab]=useState('0');
+ const [purpose,setPurpose]=useState<FoundationEnvelopeSource['purpose']>('waterproofing'),[side,setSide]=useState<'left'|'right'|''>(''),[height,setHeight]=useState(''),[depth,setDepth]=useState(''),[material,setMaterial]=useState(''),[layer,setLayer]=useState(''),[foam,setFoam]=useState(false),[error,setError]=useState('');
+ const [preview,setPreview]=useGhostPreview<{source:FoundationEntity[];selection:string;members:FoundationEntity[];removedIds:string[];summary:string}>(entities,JSON.stringify([...ids].sort()),onPreview,activePreview);
+ const wallOnly=ids.length===1&&entities.some(e=>e.id===ids[0]&&e.kind==='foundationWall');
+ const key=JSON.stringify([...ids].sort()),vertical=purpose==='waterproofing'||purpose==='verticalInsulation',insulation=purpose==='verticalInsulation'||purpose==='horizontalInsulation';
+ const input=(label:string,value:string,set:(v:string)=>void)=><label className="block">{label}<input aria-label={label} className={field} value={value} onChange={e=>{set(e.target.value);setPreview(null)}}/></label>;
+ return <details className="space-y-2 text-xs"><summary className="font-semibold">Exterior protection and slab layers</summary><p>Choose a construction layer for the selected geometry. Preview highlights the resulting coverage on the drawing.</p>
+ <label className="block">Derived layer type<select aria-label="Derived layer type" className={field} value={purpose} onChange={e=>{setPurpose(e.target.value as typeof purpose);setMaterial('');setPreview(null)}}><option value="waterproofing">Wall waterproofing</option><option value="verticalInsulation">Vertical insulation</option>{!wallOnly&&<><option value="horizontalInsulation">Horizontal insulation</option><option value="granular">Under-slab granular</option></>}</select></label>
+ {vertical&&<>{!wallOnly&&<label className="block"><input type="checkbox" checked={wholePerimeter} onChange={e=>{setWholePerimeter(e.target.checked);setPreview(null)}} aria-label="Complete orthogonal exterior"/> Complete orthogonal exterior</label>}{!wholePerimeter&&<label className="block">Exterior side<select aria-label="Exterior side" className={field} value={side} onChange={e=>{setSide(e.target.value as typeof side);setPreview(null)}}><option value="">Select exterior side</option><option value="left">Left, looking from start to end</option><option value="right">Right, looking from start to end</option></select></label>}{dimension('Derived coverage height',height,v=>{setHeight(v);setPreview(null)},false)}</>}
+ {insulation&&<label><input type="checkbox" checked={foam} onChange={e=>{setFoam(e.target.checked);setPreview(null)}}/> Foam board-foot calculation</label>}
+ {(!vertical||purpose==='verticalInsulation')&&dimension('Derived layer thickness',depth,v=>{setDepth(v);setPreview(null)},true)}
+ {!vertical&&<>{dimension('Layer top below slab base',belowSlab,v=>{setBelowSlab(v);setPreview(null)},true)}<p>Zero places the layer directly beneath the slab. For lower layers, specify the total thickness above their top.</p></>}
+ <FoundationMaterialInput key={purpose} label="Derived layer material" category={purpose==='waterproofing'||purpose==='granular'?purpose:'insulation'} value={material} onChange={v=>{setMaterial(v);setPreview(null)}} className={field}/>{wallOnly?<details><summary>Advanced coverage identity</summary>{input('Derived layer identity',layer,setLayer)}</details>:input('Derived layer identity',layer,setLayer)}
+ <label className="block"><input type="checkbox" checked={replaceExisting} onChange={e=>{setReplaceExisting(e.target.checked);setPreview(null)}}/> Replace existing envelope layer</label>
+ <button className="bg-sky-700 rounded p-2" onClick={()=>{try{if(vertical&&!wholePerimeter&&!side)throw Error('Select the exterior side of the wall before previewing.');if(!vertical&&(!belowSlab.trim()||!Number.isFinite(Number(belowSlab))||Number(belowSlab)<0))throw Error('Specify nonnegative below-slab offset');const config={purpose,material:material.trim(),layerId:layer.trim()||material.trim(),...(!vertical?{offsetBelowSlabFt:Number(belowSlab)}:{}),...(vertical?{side:side||undefined,heightFt:Number(height)}:{}),...(!vertical||purpose==='verticalInsulation'?{depthFt:Number(depth)}:{}),...(insulation&&foam?{foam:true as const}:{})};if(config.depthFt!==undefined&&(!Number.isFinite(config.depthFt)||config.depthFt<=0))throw Error('Specify positive layer thickness');const {base,removedIds}=foundationReplacement(entities,ids,'envelope',replaceExisting,config.purpose,config.layerId);const members=vertical&&wholePerimeter?deriveRectangularEnvelope(base,ids,config,uuidv4):deriveFoundationEnvelope(base,ids,config,uuidv4);const result=previewFoundationGeneration(entities,members,removedIds);const rows=result.rows.filter(r=>members.some(e=>e.id===r.elementId));if(!rows.length||rows.some(r=>r.status!=='measured'))throw Error('Unresolved derived coverage or material overlap');const totals=new Map<string,number>();for(const r of rows)if(r.status==='measured')totals.set(r.unit,(totals.get(r.unit)??0)+r.quantity);setPreview({source:entities,selection:key,members,removedIds,summary:[...totals].map(([u,v])=>formatFoundationQuantity(v,u,false)).join(' · ')});setError('')}catch(err){setPreview(null);setError(err instanceof Error?err.message:String(err))}}}>Preview envelope</button>
+ {preview&&<div className="space-y-2">{preview.removedIds.length>0&&<p className="text-amber-300">Replace {preview.removedIds.length} existing components with {preview.members.length} new components.</p>}<p>{preview.summary}</p><button className="bg-emerald-800 rounded p-2" disabled={preview.source!==entities||preview.selection!==key} onClick={()=>{if(preview.source===entities&&preview.selection===key&&onChange(applyFoundationGeneration(entities,preview.members,preview.removedIds)))setPreview(null);else setError('Preview is stale or rejected')}}>Apply envelope</button><button className="bg-slate-700 rounded p-2" onClick={()=>setPreview(null)}>Cancel envelope</button></div>}{error&&<p role="alert" className="text-amber-300">{error}</p>}</details>
+}
+
+
+function DrainageGenerator({activePreview,entities,ids,onChange,onPreview}:{entities:FoundationEntity[];ids:string[];onChange:(e:FoundationEntity[])=>boolean;onPreview:PreviewSink;activePreview:boolean}){
+ const [replaceExisting,setReplaceExisting]=useState(false);
+ const [offset,setOffset]=useState(''),[material,setMaterial]=useState(''),[layer,setLayer]=useState(''),[error,setError]=useState('');
+ const [preview,setPreview]=useGhostPreview<{source:FoundationEntity[];selection:string;members:FoundationEntity[];removedIds:string[];length:number}>(entities,JSON.stringify([...ids].sort()),onPreview,activePreview);
+ const key=JSON.stringify([...ids].sort());
+ const input=(label:string,value:string,set:(v:string)=>void)=><label className="block">{label}<input aria-label={label} className={field} value={value} onChange={e=>{set(e.target.value);setPreview(null)}}/></label>;
+ return <details className="space-y-2 text-xs"><summary className="font-semibold">Derive perimeter drainage</summary><p>Select all walls of one verified orthogonal perimeter assembly (4–64 walls). Offset measured from exterior concrete face to route centreline. Plan LF only.</p>
+ {dimension('Drainage exterior offset',offset,v=>{setOffset(v);setPreview(null)},true)}<FoundationMaterialInput label="Drainage material" category="drainage" value={material} onChange={v=>{setMaterial(v);setPreview(null)}} className={field}/>{input('Drainage layer identity',layer,setLayer)}
+ <label className="block"><input type="checkbox" checked={replaceExisting} onChange={e=>{setReplaceExisting(e.target.checked);setPreview(null)}}/> Replace existing drainage</label>
+ <button className="bg-sky-700 rounded p-2" onClick={()=>{try{if(!offset.trim())throw Error('Specify exterior offset explicitly');const {base,removedIds}=foundationReplacement(entities,ids,'drainage',replaceExisting);const members=derivePerimeterDrainage(base,ids,Number(offset),material.trim(),layer.trim()||material.trim(),uuidv4);const result=previewFoundationGeneration(entities,members,removedIds);const rows=result.rows.filter(r=>members.some(e=>e.id===r.elementId));if(rows.length!==members.length||rows.some(r=>r.status!=='measured'))throw Error('Unresolved drainage route overlap');setPreview({source:entities,selection:key,members,removedIds,length:rows.reduce((n,r)=>n+(r.status==='measured'?r.quantity:0),0)});setError('')}catch(err){setPreview(null);setError(err instanceof Error?err.message:String(err))}}}>Preview drainage</button>
+ {preview&&<div className="space-y-2">{preview.removedIds.length>0&&<p className="text-amber-300">Replace {preview.removedIds.length} existing components with {preview.members.length} new components.</p>}<p>{formatFoundationQuantity(preview.length,'LF',false)}</p><button className="bg-emerald-800 rounded p-2" disabled={preview.source!==entities||preview.selection!==key} onClick={()=>{if(preview.source===entities&&preview.selection===key&&onChange(applyFoundationGeneration(entities,preview.members,preview.removedIds)))setPreview(null);else setError('Preview is stale or rejected')}}>Apply drainage</button><button className="bg-slate-700 rounded p-2" onClick={()=>setPreview(null)}>Cancel drainage</button></div>}{error&&<p role="alert" className="text-amber-300">{error}</p>}</details>
+}
+
+function CoordinatedRunEditor({entities,ids,onChange}:{key?:string;entities:FoundationEntity[];ids:string[];onChange:(e:FoundationEntity[])=>boolean}){
+ const runs=entities.filter(e=>ids.includes(e.id)&&'widthFt' in e);
+ const [values,setValues]=useState(()=>Object.fromEntries(runs.map(e=>[e.id,'widthFt' in e?[String(e.widthFt??''),String(e.heightFt??''),String(e.elevationFt??''),String(e.foundation?.joinStartFt??0),String(e.foundation?.joinEndFt??0)]:[]])));
+ const [error,setError]=useState('');
+ if(runs.length!==ids.length||runs.length<2)return null;
+ const fields=['Width','Height / depth','Base elevation','Start extension','End extension'];
+ return <details className="space-y-2 text-xs"><summary className="font-semibold">Coordinated run dimensions</summary><p>Review each run explicitly. All selected dimensions commit together. No automatic junction design.</p>{runs.map((e,i)=><fieldset key={e.id} className="border border-slate-700 rounded p-2 space-y-1"><legend>Run {i+1} · {e.id.slice(0,8)}</legend>{fields.map((label,j)=><FoundationDimensionInput key={label} label={label} accessibleLabel={'Run '+(i+1)+' '+label} className={field} section={j===0||j===1&&e.kind==='stripFooting'} value={values[e.id]?.[j]??''} onChange={v=>setValues(old=>({...old,[e.id]:old[e.id].map((x,k)=>k===j?v:x)}))}/>)}</fieldset>)}<button className="bg-sky-700 rounded p-2" onClick={()=>{try{const edits=runs.map(e=>{const v=values[e.id];if(v.some(x=>!x.trim()||!Number.isFinite(Number(x))))throw Error('Complete all run dimensions explicitly');const [widthFt,heightFt,baseFt,joinStartFt,joinEndFt]=v.map(Number);return {id:e.id,widthFt,heightFt,baseFt,joinStartFt,joinEndFt}});if(!onChange(editFoundationRuns(entities,edits)))throw Error('Coordinated edit rejected');setError('')}catch(err){setError(err instanceof Error?err.message:String(err))}}}>Apply coordinated run dimensions</button>{error&&<p role="alert" className="text-amber-300">{error}</p>}</details>
+}
+
+const componentNames:Record<string,string>={
+  foundationWall:'Walls',stripFooting:'Strip footings',padFooting:'Pad footings',slab:'Slabs',
+  foundationTrench:'Trenches','foundationLine:waterproofing':'Waterproofing',
+  'foundationLine:insulation':'Exterior insulation','foundationLine:drainage':'Drainage',
+  'foundationRegion:insulation':'Horizontal insulation','foundationRegion:granular':'Granular base',
+  'foundationRegion:excavation':'Excavation','foundationRegion:backfill':'Backfill',
+};
+const componentName=(kind:string)=>componentNames[kind]??kind.replace(':',' · ');
+
+export function FoundationInspector({assemblyControls,assemblies,activeConstructionDraft,primaryDraft,onCancelPrimaryDraft,ownedComponentIds,metric,workspaceId,entities,selection,onChange,onSelect,onDelete,onPreview,filter,onFilter}:{key?:string;assemblyControls?:React.ReactNode;assemblies?:FoundationAssemblyRecord[];activeConstructionDraft?:boolean;primaryDraft?:FoundationEntity;onCancelPrimaryDraft?:()=>void;ownedComponentIds?:ReadonlySet<string>;metric:boolean;workspaceId:string;entities:FoundationEntity[];selection:SelectionState;onChange:(e:FoundationEntity[])=>boolean;onSelect:(s:SelectionState)=>void;onDelete:()=>void;onPreview:PreviewSink;filter:string;onFilter:(kind:string)=>void}){
+ const [tab,selectTab]=useState<FoundationInspectorTab>('Construction');
+ const ids=selection.type==='foundation'?(selection.ids??(selection.id?[selection.id]:[])):[],selected=ids.length===1?entities.find(e=>e.id===ids[0]):undefined;
+ const selectionKey=JSON.stringify([...ids].sort());
+ useEffect(()=>{if(ids.length||primaryDraft)selectTab('Construction')},[selectionKey,primaryDraft?.id]);
+ const result=useMemo(()=>{try{return measureFoundation(workspaceId,entities)}catch(err){return {rows:[],warnings:[err instanceof Error?err.message:String(err)],detailBreakdown:[],footprintReferences:[],scopeDiagnostics:[]}}},[workspaceId,entities]);
+ const [activeGenerator,setActiveGenerator]=useState('');
+ const [assemblyError,setAssemblyError]=useState('');
+ const [scopeStatus,setScopeStatus]=useState<'included'|'excluded'|'pending'>('included');
+ const [scopeReason,setScopeReason]=useState('');
+ const [scopeError,setScopeError]=useState('');
+ const scopeSelectionKey=JSON.stringify(entities.filter(e=>ids.includes(e.id)).map(e=>[e.id,e.scopeApplicability??null]));
+ useEffect(()=>{const selectedScope=entities.filter(e=>ids.includes(e.id)).map(e=>e.scopeApplicability);const first=selectedScope[0];const same=selectedScope.length>0&&selectedScope.every(s=>JSON.stringify(s??null)===JSON.stringify(first??null));setScopeStatus(same&&first?first.status:'included');setScopeReason(same&&first&&'reason' in first?first.reason:'');setScopeError('')},[scopeSelectionKey]);
+ const sink=(owner:string):PreviewSink=>members=>{if(members){setActiveGenerator(owner);onPreview(members)}else if(activeGenerator===owner)onPreview(null)};
+ const filterKind=(e:FoundationEntity)=>e.kind==='foundationLine'||e.kind==='foundationRegion'?e.kind+':'+e.purpose:e.kind;
+ const breakdown=result.detailBreakdown.find(b=>b.elementId===selected?.id);
+ const footprint=result.footprintReferences.find(b=>b.elementId===selected?.id);
+ const totals=useMemo(()=>groupFoundationTakeoff(result.rows,entities,assemblies),[result.rows,entities,assemblies]);
+ const wallSelection=independentWallSelection(entities,ids,ownedComponentIds);
+ const independentWall=wallSelection?.wall;
+ const parentTarget=foundationDeletionTarget(assemblies??[],ids);
+ const mixed=ids.length>1&&!wallSelection&&(parentTarget.kind==='independent'||parentTarget.kind==='mixed');
+ const sharedLink=!!selected&&!wallSelection&&!ownedComponentIds?.has(selected.id)&&!!(selected.foundation?.stripSource||selected.foundation?.envelopeSource);
+ const selectedRunGroups=new Set(entities.filter(entity=>ids.includes(entity.id)).map(entity=>entity.assemblyId));
+ const sameRunGroup=selectedRunGroups.size===1;
+ const completeRunGroup=sameRunGroup&&entities.every(entity=>!selectedRunGroups.has(entity.assemblyId)||ids.includes(entity.id));
+ const standardComponent=primaryDraft??independentWall??(selected&&(selected.kind==='padFooting'||selected.kind==='slab')&&!ownedComponentIds?.has(selected.id)?selected:undefined);
+ const independentWallEditor=standardComponent&&<IndependentWallConstruction key={standardComponent.id+':'+selectionKey}
+   wall={standardComponent} focusedLayer={wallSelection?.focusedLayer} entities={entities} ownedIds={ownedComponentIds} metric={metric} onCancelDraft={primaryDraft?onCancelPrimaryDraft:undefined} onChange={onChange} onPreview={onPreview}
+   renderWall={(preview,reset,onHeightChange)=><Properties onHeightChange={onHeightChange} key={JSON.stringify(standardComponent)+reset}
+     entity={standardComponent} onSave={preview} previewOnly/>}/>;
+ const groupedWarnings=new Map<string,{label:string;reason:string;count:number}>();
+ const assemblyIds=[...new Set(entities.map(entity=>entity.assemblyId))];
+ for(const row of result.rows){
+   if(row.status!=='unquantified')continue;
+   const entity=entities.find(entry=>entry.id===row.elementId);
+   if(!entity)continue;
+   const key=JSON.stringify([entity.assemblyId,row.reason]);
+   const label=entity.assemblyId===entity.id?componentName(filterKind(entity)):'Construction '+(assemblyIds.indexOf(entity.assemblyId)+1);
+   const group=groupedWarnings.get(key)??{label,reason:row.reason,count:0};
+   group.count++;
+   groupedWarnings.set(key,group);
+ }
+ const geometryTools=<>{ids.length>0&&<button className="bg-red-900 rounded px-2 py-1 text-xs" onClick={onDelete}>Delete selected foundation components</button>}{selected&&<button className="bg-slate-700 rounded p-2 text-xs" onClick={()=>onSelect({type:'foundation',ids:foundationAssemblyIds(entities,selected.id)})}>Select entire foundation assembly</button>}{ids.length>1&&<><p className="text-xs">{ids.length} foundation components selected</p><details className="space-y-2 text-xs"><summary>Advanced selected geometry</summary><button className="bg-sky-700 rounded p-2" onClick={()=>{try{const next=assignFoundationAssembly(entities,ids,uuidv4());if(!onChange(next))throw Error('Assembly assignment rejected');setAssemblyError('')}catch(err){setAssemblyError(err instanceof Error?err.message:String(err))}}}>Assign selected to new assembly</button><p>Confirm actual junction extensions and elevations first. Existing assemblies must be selected in full.</p>{assemblyError&&<p role="alert" className="text-amber-300">{assemblyError}</p>}{sameRunGroup&&<CoordinatedRunEditor key={JSON.stringify(entities.filter(e=>ids.includes(e.id)))} entities={entities} ids={ids} onChange={onChange}/>}</details></>}</>;
+ const independentTools=<>{ids.length>0&&(!mixed||completeRunGroup)&&<section aria-label="Foundation scope applicability" className="space-y-2 text-xs border border-slate-700 rounded p-2"><h3 className="font-semibold">Scope applicability</h3><p>Selected scope: {ids.map(id=>entities.find(e=>e.id===id)?.scopeApplicability?.status??'No explicit decision').filter((v,i,a)=>a.indexOf(v)===i).join(', ')}</p><select aria-label="Foundation applicability" className={field} value={scopeStatus} onChange={e=>setScopeStatus(e.target.value as typeof scopeStatus)}><option value="included">Included</option><option value="excluded">Excluded</option><option value="pending">Pending decision</option></select>{scopeStatus!=='included'&&<label className="block">Scope decision reason<input aria-label="Scope decision reason" className={field} value={scopeReason} onChange={e=>setScopeReason(e.target.value)}/></label>}<button className="bg-sky-700 rounded p-2" onClick={()=>{try{const next=setFoundationApplicability(entities,ids,scopeStatus==='included'?{status:'included'}:{status:scopeStatus,reason:scopeReason});if(!onChange(next))throw Error('Scope change rejected');setScopeError('')}catch(err){setScopeError(err instanceof Error?err.message:String(err))}}}>Apply foundation applicability</button>{scopeError&&<p role="alert" className="text-amber-300">{scopeError}</p>}</section>}{selected&&!standardComponent&&<Properties key={'properties:'+JSON.stringify(selected)} entity={selected} onSave={e=>onChange(entities.map(q=>q.id===e.id?e:q))}/>}{selected&&<DetailEditor key={'details:'+JSON.stringify(selected)} entity={selected} entities={entities} onChange={onChange}/>}{!ids.length&&<Perimeter activePreview={activeGenerator==='perimeter'} entities={entities} onChange={onChange} onPreview={sink('perimeter')}/>}{ids.length>0&&entities.some(e=>ids.includes(e.id)&&e.kind==='foundationWall')&&<StripGenerator activePreview={activeGenerator==='strip'} entities={entities} ids={ids} onChange={onChange} onPreview={sink('strip')}/>}{ids.length>0&&entities.some(e=>ids.includes(e.id)&&(e.kind==='foundationWall'||e.kind==='slab'))&&<EnvelopeGenerator activePreview={activeGenerator==='envelope'} entities={entities} ids={ids} onChange={onChange} onPreview={sink('envelope')}/>}{independentWall?<p className="text-xs text-slate-400">For an open wall, draw the specified drainage route with Specialist drawing tools. Automatic drainage derivation requires a closed perimeter.</p>:ids.length>=4?<DrainageGenerator activePreview={activeGenerator==='drainage'} entities={entities} ids={ids} onChange={onChange} onPreview={sink('drainage')}/>:null}</>;
+ const selectedQuantities=<>{footprint&&<section aria-label="Selected foundation footprint reference" className="text-xs space-y-1 border border-slate-700 rounded p-2"><h3 className="font-semibold">{footprint.code==='foundation.slab.area'?'Slab':'Pad footing'} footprint (reference only)</h3><p className="text-slate-400">Not an additional concrete material quantity.</p>{([['Gross footprint',footprint.grossSF],['Exclusion area',footprint.exclusionSF],['Net footprint',footprint.netSF]] as const).map(([label,value])=><div key={label} className="flex justify-between gap-2"><span>{label}</span><span>{value===null?'Pending':formatFoundationQuantity(value,'SF',metric)}</span></div>)}{footprint.reason&&<p className="text-amber-300">{footprint.reason}</p>}</section>}{breakdown&&(selected?.foundation?.wallOpenings?.length||selected?.foundation?.slabOpenings?.length||selected?.foundation?.slabThickenings?.length)?<section aria-label="Selected concrete volume breakdown" className="text-xs space-y-1 border border-slate-700 rounded p-2"><h3 className="font-semibold">Selected concrete volume</h3><p className="text-slate-400">Reference breakdown only — net is the material quantity.</p>{([['Gross concrete',breakdown.grossCY],['Opening deduction',breakdown.deductionCY],['Additional thickening',breakdown.additionalCY],['Net concrete',breakdown.netCY]] as const).map(([label,value])=><div key={label} className="flex justify-between gap-2"><span>{label}</span><span>{value===null?'Pending':formatFoundationQuantity(value,'CY',metric)}</span></div>)}</section>:null}</>;
+ return <FoundationMetricContext.Provider value={metric}><FoundationInspectorContext.Provider value={{tab,selectTab}}>
+ <aside className="w-80 shrink-0 bg-slate-900 border-l border-slate-700 flex flex-col">
+   <header className="px-3 pt-3 pb-2 border-b border-slate-700">
+     <h2 className="text-sm font-semibold">Foundation properties</h2>
+     <div role="tablist" aria-label="Foundation inspector" className="grid grid-cols-3 gap-1 mt-2">
+       {foundationInspectorTabs.map((name,index)=><button type="button" key={name} role="tab"
+         id={'foundation-tab-'+name} aria-selected={tab===name} aria-controls="foundation-inspector-content"
+         tabIndex={tab===name?0:-1}
+         onKeyDown={event=>{
+           if(event.key!=='ArrowLeft'&&event.key!=='ArrowRight')return;
+           event.preventDefault();
+           const next=foundationInspectorTabs[(index+(event.key==='ArrowRight'?1:2))%3];
+           selectTab(next);document.getElementById('foundation-tab-'+next)?.focus();
+         }}
+         className={'rounded px-1 py-1.5 text-xs '+(tab===name?'bg-sky-800 text-white':'bg-slate-800 text-slate-200')} onClick={()=>selectTab(name)}>{name}</button>)}
+     </div>
+   </header>
+   <div id="foundation-inspector-content" role="tabpanel" aria-labelledby={'foundation-tab-'+tab} className="min-h-0 overflow-y-auto p-3 space-y-3">
+   {independentWallEditor}
+   {sharedLink&&tab==='Construction'&&<p className="text-xs">Select the source construction or its complete linked group to review this layer.</p>}
+   {mixed&&tab==='Construction'&&<section aria-label="Construction selection summary" className="text-xs space-y-1">
+     <h3 className="font-semibold">{ids.length} foundation components selected</h3>
+     <p>Select one construction or source-linked group to edit its specifications.</p>
+   </section>}
+   {assemblyControls}
+   <div hidden={tab!=='Geometry'} className="space-y-2">
+    {standardComponent?.kind==='padFooting'&&<PadGeometry entity={standardComponent} metric={metric}/>}
+
+<label className="block text-xs">Visible components<select aria-label="Foundation component filter" className={field} value={filter} onChange={e=>onFilter(e.target.value)}><option value="all">All components</option>{[...new Set(entities.map(filterKind))].sort().map(k=><option key={k} value={k}>{componentName(k)}</option>)}</select></label><p className="text-xs text-slate-400">The filter changes what you see and select on the drawing.</p><select aria-label="Select foundation entity" className={field} value={selected?.id??''} onChange={e=>{onSelect(e.target.value?{type:'foundation',id:e.target.value}:{type:'none'});selectTab('Construction')}}><option value="">Select component</option>{entities.filter(e=>filter==='all'||filterKind(e)===filter).map((e,i)=><option key={e.id} value={e.id}>{e.kind} {'purpose' in e?e.purpose:''} {i+1}</option>)}</select>{!ids.some(id=>ownedComponentIds?.has(id))&&geometryTools}</div>
+   <div hidden={tab!=='Construction'} className="space-y-2">
+     {activeConstructionDraft||primaryDraft||ids.some(id=>ownedComponentIds?.has(id))?null:standardComponent||mixed||sharedLink?
+       <details><summary>Advanced independent construction</summary>{independentTools}</details>:independentTools}
+   </div>
+   <div hidden={tab!=='Quantities'} className="space-y-2">
+   {(!ids.some(id=>ownedComponentIds?.has(id)))&&selectedQuantities}
+   <h3 className="text-sm font-semibold">Workspace material totals</h3><p className="text-xs text-slate-400">Raw quantities only. Missing inputs remain pending.</p>{result.scopeDiagnostics.some(d=>d.status==='excluded'||d.status==='pending')&&<section aria-label="Foundation scope decisions" className="text-xs space-y-1"><h3 className="font-semibold">Scope decisions</h3>{result.scopeDiagnostics.filter(d=>d.status==='excluded'||d.status==='pending').map(d=><p key={d.elementId}>{componentName(filterKind(entities.find(e=>e.id===d.elementId)!))} · {d.status} · {d.reason}</p>)}</section>}<WorkspaceTakeoff rows={totals} entities={entities} metric={metric}/>{result.warnings.length>0&&<details><summary className="text-xs text-amber-300">Measurement checks</summary>
+   {groupedWarnings.size===0&&result.warnings.map((warning,i)=><p key={i} className="text-xs text-amber-300">{warning}</p>)}
+   {[...groupedWarnings].map(([key,group])=><p key={key} className="text-xs text-amber-300">{group.label}: {group.reason}{group.count>1?' ('+group.count+' items)':''}</p>)}
+   <details><summary className="text-xs">Technical details</summary>{result.warnings.map((w,i)=><p key={i} className="text-xs text-amber-300 break-words">{w}</p>)}</details></details>}</div></div></aside></FoundationInspectorContext.Provider></FoundationMetricContext.Provider>;
+}
+
+
+function WorkspaceTakeoff({rows,entities,metric}:{rows:FoundationTakeoffRow[];entities:FoundationEntity[];metric:boolean}){
+ const categories=new Map<FoundationTakeoffRow['category'],FoundationTakeoffRow[]>();
+ const byId=new Map(entities.map(entity=>[entity.id,entity]));
+ for(const row of rows){
+   const items=categories.get(row.category)??[];
+   items.push(row);
+   categories.set(row.category,items);
+ }
+ return <div className="space-y-2">{[...categories].map(([category,items])=>{
+   const supplemental=items.filter(item=>item.code==='foundation.footing.pad.count');
+   const materialItems=items.filter(item=>!supplemental.includes(item));
+   const showSubtotal=materialItems.length>1||supplemental.length>0;
+   const subtotals=new Map<string,number>();
+   if(category!=='Informational')for(const item of materialItems)if(item.known)
+     subtotals.set(item.unit,(subtotals.get(item.unit)??0)+item.quantity);
+   return <details key={category} open={categories.size===1} className="rounded-lg border border-slate-700 bg-slate-800/40">
+     <summary className="cursor-pointer rounded px-2 py-2 font-semibold text-xs">{category}
+       {showSubtotal&&subtotals.size===1&&<span className="ml-2 text-slate-300">
+         {[...subtotals].map(([unit,value])=>formatFoundationQuantity(value,unit,metric))} subtotal{materialItems.some(item=>item.pending)?' + pending':''}
+       </span>}
+     </summary>
+     <ul className="space-y-2 p-2 text-xs">
+       {[...materialItems,...supplemental].map(item=>{
+         const entity=byId.get(item.contributions[0].elementId);
+         return <React.Fragment key={item.key}>{item===supplemental[0]&&<li className="font-semibold">Supplementary construction quantities</li>}<li className="flex items-start justify-between gap-2 border-l-2 pl-2"
+           style={{borderInlineStartColor:entity&&foundationStroke(entity)}}>
+           <div><span className="block">{item.code.replace('foundation.','').replaceAll('.',' ')}</span>
+             <span className="text-slate-300">{describeFoundationTakeoff(item,metric)}</span></div>
+           <span className="shrink-0 text-right tabular-nums">{item.known?formatFoundationQuantity(item.quantity,item.unit,metric)+(item.pending?' + pending':''):'Not quantified'}</span>
+         </li></React.Fragment>;
+       })}
+     </ul>
+     {showSubtotal&&subtotals.size===1&&<p className="px-2 pb-2 text-xs text-slate-300">Subtotal summarizes these material rows.</p>}
+     {category==='Informational'&&<p className="px-2 pb-2 text-xs text-slate-300">Reference quantities only.</p>}
+   </details>;
+ })}</div>;
+}
+
+function PadGeometry({entity,metric}:{entity:FoundationEntity;metric:boolean}){
+ if(!('polygon' in entity))return null;
+ const xs=[...new Set(entity.polygon.map(point=>point.x))].sort((a,b)=>a-b);
+ const ys=[...new Set(entity.polygon.map(point=>point.y))].sort((a,b)=>a-b);
+ const rectangular=entity.polygon.length===4&&xs.length===2&&ys.length===2;
+ return <section aria-label="Pad footing geometry" className="space-y-1 text-xs">
+   <h3 className="font-semibold">Pad footing footprint</h3>
+   {rectangular?<p>Width {formatFoundationQuantity(xs[1]-xs[0],'LF',metric)} · Length {formatFoundationQuantity(ys[1]-ys[0],'LF',metric)}</p>:
+     <p>{entity.polygon.length} traced corners</p>}
+ </section>;
+}

@@ -29,10 +29,34 @@ export type RoofEntity = Identity & (
   | { kind: 'roofOpening'; polygon: Point[]; planeId: string; deduction?: Applicability }
   | { kind: 'roofSurface'; derivation?: RoofDerivationMetadata; polygon: Point[]; purpose: 'soffit'|'insulation'; pitchRise: number | null; depthFt?: number; insulationType?: string; surfaceBasis?: 'horizontal'|'sloped' }
 );
-export type FoundationEntity = Identity & (
+/** Explicit v3 foundation semantics; absent metadata on older records is not confirmation. */
+export type WallOpening={id:string;offsetFt:number;widthFt:number;sillFt:number;heightFt:number};
+export type SlabOpening={id:string;polygon:Point[]};
+export type SlabThickening={id:string;polygon:Point[];depthFt:number;basis:'total'|'additional'};
+export type FoundationCoverage = { layerId:string; confirmed:true; foam?:true; thicknessFt?:number; openingTreatment?:'none'|'alreadyDeducted' };
+export type FoundationStripSource={version:1;wallIds?:string[];wallId:string;groupId:string;offsetFt:number;widthFt:number;depthFt:number};
+export type FoundationEnvelopeSource={sourceIds?:string[];offsetBelowSlabFt?:number;perimeterWallIds?:string[];version:1;sourceId:string;groupId:string;purpose:'waterproofing'|'verticalInsulation'|'horizontalInsulation'|'granular';side?:'left'|'right';heightFt?:number;coverageMode?:'fullWallHeight';depthFt?:number;material:string;layerId:string;foam?:true};
+export type FoundationDrainageSource={version:1;wallIds:string[];groupId:string;edge:number;offsetFt:number;material:string;layerId:string};
+export type FoundationPerimeterReference={version:1;kind:'rectangle'|'orthogonal';reference:'exterior'|'centreline'|'interior';points:Point[];widthFt:number;edge:number};
+export const foundationSlabFootprintEstimate='Estimated full slab footprint; actual net installed coverage may differ';
+export type ElevationReference =
+  | {kind:'assembly';id:string}
+  | {kind:'project'|'unresolved'|'historical'};
+
+export function comparableFoundationElevations(a:FoundationEntity,b:FoundationEntity):boolean{
+  const x=a.foundation?.elevationReference,y=b.foundation?.elevationReference;
+  const left=x?.kind??'historical',right=y?.kind??'historical';
+  if(left!==right||left==='unresolved')return false;
+  return left!=='assembly'||x?.kind==='assembly'&&y?.kind==='assembly'&&x.id===y.id;
+}
+
+export type FoundationMetadata = { elevationReference?:ElevationReference; perimeterReference?:FoundationPerimeterReference; granularLayerId?:string; drainageSource?:FoundationDrainageSource; envelopeSource?:FoundationEnvelopeSource; stripSource?:FoundationStripSource; coverage?:FoundationCoverage; wallOpenings?:WallOpening[]; slabOpenings?:SlabOpening[]; slabThickenings?:SlabThickening[]; version:1; material:string; baseElevationConfirmed?:true; centrelineConfirmed?:true; joinStartFt?:number; joinEndFt?:number };
+export type FoundationApplicability={status:'included'}|{status:'excluded'|'pending';reason:string};
+export type FoundationEntity = Identity & { foundation?:FoundationMetadata; scopeApplicability?:FoundationApplicability } & (
   | { kind: 'foundationWall'|'stripFooting'; start: Point; end: Point; widthFt: number | null; heightFt: number | null; elevationFt: number | null }
   | { kind: 'padFooting'|'slab'|'foundationRegion'; polygon: Point[]; depthFt: number | null; purpose: 'concrete'|'insulation'|'excavation'|'backfill'|'granular'; elevationFt: number | null }
-  | { kind: 'foundationLine'; start: Point; end: Point; purpose: 'drainage'|'waterproofing'; heightFt?: number }
+  | { kind:'foundationTrench'; start:Point; end:Point; widthFt:number|null; heightFt:number|null; elevationFt:number|null }
+  | { kind: 'foundationLine'; start: Point; end: Point; purpose: 'drainage'|'waterproofing'|'insulation'; heightFt?: number }
 );
 export type SiteEntity = Identity & (
   | { kind: 'siteRegion'; polygon: Point[]; purpose: 'hardscape'|'excavation'|'fill'|'deck'|'landscape'|'reference'; depthFt: number | null; elevationFt: number | null }
@@ -50,7 +74,7 @@ export type ScopeAssignment = { status: 'unquantified' } | { status: 'excluded';
 export const specialistKinds = ['roof','foundation','site'] as const;
 const allowed = {
   roof: ['roofPlane','roofEdge','roofOpening','roofSurface'],
-  foundation: ['foundationWall','stripFooting','padFooting','slab','foundationRegion','foundationLine'],
+  foundation: ['foundationWall','stripFooting','padFooting','slab','foundationRegion','foundationLine','foundationTrench'],
   site: ['siteRegion','siteLine','siteCount']
 };
 const obj = (x: unknown): x is Record<string, any> => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -82,6 +106,7 @@ export function validateSpecialistEntities(type: string, entities: unknown): ass
     check(!physicalKeys.has(key),'duplicate specialist physical identity'); physicalKeys.add(key);
     check(e.source.note===undefined||typeof e.source.note==='string','invalid source note');
     check(allowed[type as SpecialistKind].includes(e.kind),'entity incompatible with workspace');
+    if(e.scopeApplicability!==undefined){const a=e.scopeApplicability;check(type==='foundation'&&obj(a)&&(a.status==='included'?a.reason===undefined:['excluded','pending'].includes(a.status)&&str(a.reason)),'invalid foundation scope applicability');}
     if(e.roofGroupId!==undefined)check((e.kind==='roofPlane'||e.kind==='roofEdge')&&str(e.roofGroupId),'invalid roof group identity');
     if(e.derivation!==undefined){
       const d=e.derivation;
@@ -94,14 +119,42 @@ export function validateSpecialistEntities(type: string, entities: unknown): ass
       check(d.material===e.insulationType&&d.thicknessFt===e.depthFt,'derived surface material/thickness mismatch');
       check(d.purpose==='soffit'?d.basis==='horizontal'&&d.exclusions.length===0&&d.material===undefined&&d.thicknessFt===undefined:d.boundaryConfirmed===true&&str(d.material),'invalid derivation confirmation');
     }
+    if(e.foundation!==undefined){
+      const f=e.foundation;
+      check(type==='foundation'&&obj(f)&&f.version===1&&str(f.material),'invalid foundation metadata');
+      check(f.baseElevationConfirmed===undefined||f.baseElevationConfirmed===true,'invalid foundation datum confirmation');
+      if(f.elevationReference!==undefined){
+        const r=f.elevationReference;
+        check(obj(r)&&(r.kind==='assembly'?str(r.id)&&Object.keys(r).length===2:['project','unresolved','historical'].includes(r.kind)&&Object.keys(r).length===1),'invalid foundation elevation reference');
+      }
+      check(f.centrelineConfirmed===undefined||((e.kind==='foundationWall'||e.kind==='stripFooting'||e.kind==='foundationTrench')&&f.centrelineConfirmed===true),'invalid foundation centreline confirmation');
+      if(f.drainageSource!==undefined){const s=f.drainageSource;check(e.kind==='foundationLine'&&e.purpose==='drainage'&&obj(s)&&s.version===1&&Array.isArray(s.wallIds)&&s.wallIds.length>=4&&s.wallIds.length<=64&&s.wallIds.every(str)&&new Set(s.wallIds).size===s.wallIds.length&&str(s.groupId)&&Number.isInteger(s.edge)&&s.edge>=0&&s.edge<s.wallIds.length&&num(s.offsetFt)&&s.offsetFt>=0&&str(s.material)&&str(s.layerId),'invalid perimeter drainage source');}
+      if(f.granularLayerId!==undefined)check(e.kind==='foundationRegion'&&e.purpose==='granular'&&str(f.granularLayerId),'invalid granular layer identity');
+      if(f.envelopeSource!==undefined){const s=f.envelopeSource;check(obj(s)&&s.version===1&&str(s.sourceId)&&(s.sourceIds===undefined||Array.isArray(s.sourceIds)&&s.sourceIds.length>0&&s.sourceIds.every(str)&&new Set(s.sourceIds).size===s.sourceIds.length&&s.sourceIds.includes(s.sourceId))&&str(s.groupId)&&str(s.material)&&str(s.layerId)&&['waterproofing','verticalInsulation','horizontalInsulation','granular'].includes(s.purpose),'invalid foundation envelope source');check(s.foam===undefined||s.foam===true&&['verticalInsulation','horizontalInsulation'].includes(s.purpose),'invalid derived foam');check(s.coverageMode===undefined||s.coverageMode==='fullWallHeight'&&['verticalInsulation','waterproofing'].includes(s.purpose)&&s.perimeterWallIds===undefined&&Array.isArray(s.sourceIds)&&s.sourceIds.length===1,'invalid full-height coverage source');check(s.offsetBelowSlabFt===undefined||(['horizontalInsulation','granular'].includes(s.purpose)&&num(s.offsetBelowSlabFt)&&s.offsetBelowSlabFt>=0),'invalid below-slab offset');check(s.perimeterWallIds===undefined||(['waterproofing','verticalInsulation'].includes(s.purpose)&&Array.isArray(s.perimeterWallIds)&&s.perimeterWallIds.length>=4&&s.perimeterWallIds.length<=64&&s.perimeterWallIds.every(str)&&new Set(s.perimeterWallIds).size===s.perimeterWallIds.length&&s.perimeterWallIds.includes(s.sourceId)),'invalid envelope perimeter sources');check(['waterproofing','verticalInsulation'].includes(s.purpose)?e.kind==='foundationLine'&&e.purpose===(s.purpose==='waterproofing'?'waterproofing':'insulation')&&['left','right'].includes(s.side)&&num(s.heightFt)&&s.heightFt>0&&(s.depthFt===undefined||s.purpose==='verticalInsulation'&&num(s.depthFt)&&s.depthFt>0):e.kind==='foundationRegion'&&e.purpose===(s.purpose==='granular'?'granular':'insulation')&&s.side===undefined&&s.heightFt===undefined&&num(s.depthFt)&&s.depthFt>0,'invalid foundation envelope dimensions');}
+      if(f.perimeterReference!==undefined){const p=f.perimeterReference;check(e.kind==='foundationWall'&&obj(p)&&p.version===1&&['rectangle','orthogonal'].includes(p.kind)&&['exterior','centreline','interior'].includes(p.reference)&&Array.isArray(p.points)&&p.points.length>=4&&p.points.length<=64&&p.points.every(point)&&(p.kind!=='rectangle'||p.points.length===4)&&num(p.widthFt)&&p.widthFt>0&&Number.isInteger(p.edge)&&p.edge>=0&&p.edge<p.points.length,'invalid foundation perimeter reference');}
+      if(f.stripSource!==undefined){const s=f.stripSource;check(e.kind==='stripFooting'&&obj(s)&&s.version===1&&str(s.wallId)&&(s.wallIds===undefined||Array.isArray(s.wallIds)&&s.wallIds.length>0&&s.wallIds.every(str)&&new Set(s.wallIds).size===s.wallIds.length&&s.wallIds.includes(s.wallId))&&str(s.groupId)&&num(s.offsetFt)&&num(s.widthFt)&&s.widthFt>0&&num(s.depthFt)&&s.depthFt>0,'invalid strip footing derivation');}
+      if(f.coverage!==undefined){
+        const c=f.coverage;
+        check((e.kind==='foundationLine'||e.kind==='foundationRegion'&&e.purpose==='insulation')&&obj(c)&&str(c.layerId)&&c.confirmed===true,'invalid foundation coverage');
+        check(c.foam===undefined||c.foam===true&&e.purpose==='insulation','invalid foam coverage');
+        check(c.thicknessFt===undefined||e.purpose==='insulation'&&num(c.thicknessFt)&&c.thicknessFt>0,'invalid coverage thickness');
+        check(c.openingTreatment===undefined||e.kind==='foundationLine'&&e.purpose!=='drainage'&&['none','alreadyDeducted'].includes(c.openingTreatment),'invalid coverage opening treatment');
+      }
+      if(f.wallOpenings!==undefined)check(e.kind==='foundationWall'&&Array.isArray(f.wallOpenings)&&f.wallOpenings.every(o=>obj(o)&&str(o.id)&&num(o.offsetFt)&&o.offsetFt>=0&&num(o.widthFt)&&o.widthFt>0&&num(o.sillFt)&&o.sillFt>=0&&num(o.heightFt)&&o.heightFt>0),'invalid wall openings');
+      if(f.slabOpenings!==undefined)check(e.kind==='slab'&&Array.isArray(f.slabOpenings)&&f.slabOpenings.every(o=>obj(o)&&str(o.id)&&polygon(o.polygon)),'invalid slab openings');
+      if(f.slabThickenings!==undefined)check(e.kind==='slab'&&Array.isArray(f.slabThickenings)&&f.slabThickenings.every(o=>obj(o)&&str(o.id)&&polygon(o.polygon)&&num(o.depthFt)&&o.depthFt>0&&['total','additional'].includes(o.basis)),'invalid slab thickening');
+      const detailIds=[...(f.wallOpenings??[]),...(f.slabOpenings??[]),...(f.slabThickenings??[])].map(o=>o.id);
+      check(new Set(detailIds).size===detailIds.length,'duplicate foundation detail ID');
+      for(const k of ['joinStartFt','joinEndFt'])check(f[k]===undefined||((e.kind==='foundationWall'||e.kind==='stripFooting'||e.kind==='foundationTrench')&&f.centrelineConfirmed===true&&num(f[k])&&f[k]>=0),'invalid foundation junction extension');
+    }
     switch(e.kind) {
       case 'roofPlane': check(polygon(e.polygon)&&pitch(e.pitchRise)&&finiteOrMissing(e.elevationFt)&&(e.slopeDegrees===null||(num(e.slopeDegrees)&&e.slopeDegrees>=0&&e.slopeDegrees<360)),'roof plane'); break;
       case 'roofEdge': check(line(e)&&Array.isArray(e.planeIds)&&e.planeIds.length>0&&e.planeIds.length<=2&&new Set(e.planeIds).size===e.planeIds.length&&['eave','rake','ridge','hip','valley','abutment','parapet','unclassified'].includes(e.edgeType),'roof edge'); check(e.applicability===undefined||(obj(e.applicability)&&Object.keys(e.applicability).every(k=>['fascia','gutter','soffit'].includes(k))&&Object.values(e.applicability).every(applicability)),'edge applicability'); break;
       case 'roofOpening': check(polygon(e.polygon)&&str(e.planeId),'roof opening'); check(applicability(e.deduction),'opening deduction'); break;
       case 'roofSurface': check(polygon(e.polygon)&&['soffit','insulation'].includes(e.purpose)&&pitch(e.pitchRise)&&(e.depthFt===undefined||num(e.depthFt)&&e.depthFt>0),'roof surface'); check((e.insulationType===undefined||str(e.insulationType))&&(e.surfaceBasis===undefined||['horizontal','sloped'].includes(e.surfaceBasis))&&(e.surfaceBasis!=='horizontal'||e.pitchRise===0),'surface basis'); break;
-      case 'foundationWall': case 'stripFooting': check(line(e)&&positiveOrMissing(e.widthFt)&&positiveOrMissing(e.heightFt)&&finiteOrMissing(e.elevationFt),'foundation line assembly'); break;
+      case 'foundationWall': case 'stripFooting': case 'foundationTrench': check(line(e)&&positiveOrMissing(e.widthFt)&&positiveOrMissing(e.heightFt)&&finiteOrMissing(e.elevationFt),'foundation line assembly'); break;
       case 'padFooting': case 'slab': case 'foundationRegion': check(polygon(e.polygon)&&positiveOrMissing(e.depthFt)&&finiteOrMissing(e.elevationFt)&&['concrete','insulation','excavation','backfill','granular'].includes(e.purpose)&&(!['padFooting','slab'].includes(e.kind)||e.purpose==='concrete'),'foundation region'); break;
-      case 'foundationLine': check(line(e)&&['drainage','waterproofing'].includes(e.purpose)&&(e.heightFt===undefined||num(e.heightFt)&&e.heightFt>0),'foundation linear feature'); break;
+      case 'foundationLine': check(line(e)&&['drainage','waterproofing','insulation'].includes(e.purpose)&&(e.heightFt===undefined||num(e.heightFt)&&e.heightFt>0),'foundation linear feature'); break;
       case 'siteRegion': check(polygon(e.polygon)&&positiveOrMissing(e.depthFt)&&finiteOrMissing(e.elevationFt)&&['hardscape','excavation','fill','deck','landscape','reference'].includes(e.purpose),'site region'); break;
       case 'siteLine': check(line(e)&&['fence','curb','drainage','ledger','railing','open','retainingWall'].includes(e.purpose)&&(e.heightFt===undefined||num(e.heightFt)&&e.heightFt>0)&&(e.widthFt===undefined||num(e.widthFt)&&e.widthFt>0),'site line'); break;
       case 'siteCount': check(point(e.point)&&Number.isSafeInteger(e.count)&&e.count>0&&['post','bollard','catchBasin'].includes(e.purpose),'site count'); break;

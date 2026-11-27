@@ -1,3 +1,8 @@
+import {foundationDeletionTarget} from './engine/measurements/foundationSelection';
+import { createTracedAssembly, FoundationAssemblyPanel, type TracedAssembly } from './components/FoundationAssemblyPanel';
+import { applyAssemblyPreview } from './engine/measurements/foundationAssemblyController';
+import type { AssemblyPreview, AssemblyTrace, FoundationPreset } from './engine/measurements/foundationAssemblyModel';
+import {planFoundationDeletion} from './engine/measurements/foundationDerivation';
 import {planRoofDeletion} from './engine/measurements/roofSelection';
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -37,10 +42,11 @@ import { RateCustomizerModal } from './components/RateCustomizerModal';
 import { GlobalProjectSettingsModal } from './components/GlobalProjectSettingsModal';
 import { ProjectDirectoryModal } from './components/ProjectDirectoryModal';
 
+import { FoundationToolbar, FoundationInspector } from './components/FoundationWorkspace';
 import { RoofToolbar, RoofInspector } from './components/RoofWorkspace';
-import type { RoofEntity } from './engine/measurements/measurementTypes';
+import type { RoofEntity, FoundationEntity, SpecialistEntity } from './engine/measurements/measurementTypes';
 import { validateRoofTopology } from './engine/measurements/roofMeasurements';
-import { replaceSpecialistEntities, restoreWorkspaceSnapshot } from './engine/workspaceController';
+import { replaceFoundationPresets, replaceSpecialistEntities, restoreWorkspaceSnapshot } from './engine/workspaceController';
 import { WorkspaceBar } from './components/WorkspaceBar';
 import { createProjectDocument, workspaceRenderView, commitWorkspaceRenderView, serializeProjectDocument } from './engine/projectDocument';
 import type { ProjectDocument, WorkspaceType } from './engine/projectDocument';
@@ -67,6 +73,10 @@ function AppContent() {
   const state = useMemo(() => workspaceRenderView(document), [document]);
   const [recovery, setRecovery] = useState(() => getAutoSaveState());
   const activeWorkspace = document.workspaces.find(w => w.id === document.activeWorkspaceId)!;
+  const foundationEntities = activeWorkspace.type === 'foundation' ? activeWorkspace.measurements as FoundationEntity[] : undefined;
+  const [foundationGhost,setFoundationGhost]=useState<{workspaceId:string;source:FoundationEntity[];members:FoundationEntity[]}|null>(null);
+  const [foundationFilter,setFoundationFilter]=useState<{workspaceId:string;kind:string}>({workspaceId:'',kind:'all'});
+  const visibleFoundationKind=foundationFilter.workspaceId===activeWorkspace.id?foundationFilter.kind:'all';
   const roofEntities = activeWorkspace.type === 'roof' ? activeWorkspace.measurements as RoofEntity[] : undefined;
   const reportable = canReportProjectEstimate(document);
   // Internal CAD views use immutable shared references; persisted documents remain canonical.
@@ -128,7 +138,11 @@ function AppContent() {
   const histories = useRef(new Map<string, { history: WorkspaceSnapshot[]; redo: WorkspaceSnapshot[] }>());
 
   // Active drafting tool
+  const [traceEdit,setTraceEdit]=useState<{document:typeof document;trace:AssemblyTrace;onMove:(index:number,point:{x:number;y:number})=>void}>();
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
+  const [standardSlab,setStandardSlab]=useState(false);
+  const [standardPrimary,setStandardPrimary]=useState(false);
+  const [slabMode,setSlabMode]=useState<'rectangle'|'polygon'>('rectangle');
 
   // Active wall preset for drafting
   const [activeWallPreset, setActiveWallPreset] = useState<WallPreset>('interior_2x4');
@@ -167,21 +181,21 @@ function AppContent() {
 
   // The exact immutable document produced by placement is the correction lease.
   const placementRef = useRef<{ token: string; document: typeof document } | null>(null);
-  const commitDraftPlacement = (token: string, next: FloorplanState | RoofEntity[], replace = false): boolean => {
+  const commitDraftPlacement = (token: string, next: FloorplanState | SpecialistEntity[], replace = false): boolean => {
     if(currentDocument.current!==document)return false;
     const prior=placementRef.current;
     if(replace&&(!prior||prior.token!==token||prior.document!==document))return false;
     try {
       let updated: typeof document;
       if(Array.isArray(next)){
-        if(activeWorkspace.type!=='roof')return false;
-        validateRoofTopology(next);
+        if(activeWorkspace.type!=='roof'&&activeWorkspace.type!=='foundation')return false;
+        if(activeWorkspace.type==='roof')validateRoofTopology(next as RoofEntity[]);
         updated=replaceSpecialistEntities(document,activeWorkspace.id,next);
       }else{
         if(activeWorkspace.type!=='floor')return false;
         updated=commitWorkspaceRenderView(document,activeWorkspace.id,{...next,settings:document.settings},true);
       }
-      if(!replace)setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements}]);
+      if(!replace)setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements,foundationAssemblies:activeWorkspace.foundationAssemblies}]);
       setRedoStack([]);
       currentDocument.current=updated;placementRef.current={token,document:updated};
       setDocument(updated);setIsDirty(true);setStorageWarning('');return true;
@@ -194,7 +208,7 @@ function AppContent() {
     try {
       const updated = commitWorkspaceRenderView(document, document.activeWorkspaceId, newState, pushHistory);
       if (pushHistory) {
-        const snap = {view: historicalSnapshot || state, measurements: activeWorkspace.measurements};
+        const snap = {view: historicalSnapshot || state, measurements: activeWorkspace.measurements, foundationAssemblies: activeWorkspace.foundationAssemblies};
         setHistory(prev => [...prev.slice(-30), snap]);
         setRedoStack([]);
       }
@@ -207,10 +221,57 @@ function AppContent() {
     try {
       validateRoofTopology(entities);
       const updated=replaceSpecialistEntities(document,activeWorkspace.id,entities);
-      setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements}]);setRedoStack([]);
+      setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements,foundationAssemblies:activeWorkspace.foundationAssemblies}]);setRedoStack([]);
       currentDocument.current=updated;setDocument(updated);setIsDirty(true);setStorageWarning('');return true;
     }catch(err){setStorageWarning(err instanceof Error?err.message:String(err));return false;}
   },[document,activeWorkspace,state]);
+  const handleFoundationChange = useCallback((entities:FoundationEntity[]):boolean=>{
+    if(currentDocument.current!==document||activeWorkspace.type!=='foundation')return false;
+    try{const updated=replaceSpecialistEntities(document,activeWorkspace.id,entities);setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements,foundationAssemblies:activeWorkspace.foundationAssemblies}]);setRedoStack([]);currentDocument.current=updated;setDocument(updated);setIsDirty(true);setStorageWarning('');return true;}catch(err){setStorageWarning(err instanceof Error?err.message:String(err));return false;}
+  },[document,activeWorkspace,state]);
+  const handleAssemblyApply = (preview:AssemblyPreview):boolean => {
+    if(currentDocument.current!==document||activeWorkspace.type!=='foundation')return false;
+    try{
+      const updated=applyAssemblyPreview(document,preview);
+      if(updated===document)return false;
+      setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements,foundationAssemblies:activeWorkspace.foundationAssemblies}]);
+      setRedoStack([]);currentDocument.current=updated;setDocument(updated);setIsDirty(true);setStorageWarning('');
+      const parent=updated.workspaces.find(w=>w.id===activeWorkspace.id)?.foundationAssemblies?.find(a=>a.id===preview.assemblyId);
+      setSelection(parent?.children.length?{type:'foundation',ids:parent.children.map(c=>c.entityId)}:{type:'none'});
+      return true;
+    }catch(err){setStorageWarning(err instanceof Error?err.message:String(err));return false;}
+  };
+  const [pendingCorrectionOutline,setPendingCorrectionOutline]=useState<{workspaceId:string;points:AssemblyTrace['vertices'][number]['point'][]}>();
+  const [tracedAssemblies,setTracedAssemblies]=useState<Record<string,TracedAssembly>>({});
+  const activeTrace=tracedAssemblies[activeWorkspace.id];
+  const [primaryDrafts,setPrimaryDrafts]=useState<Record<string,FoundationEntity>>({});
+  const primaryDraft=primaryDrafts[activeWorkspace.id];
+  function clearPrimaryDraft(){
+    setPrimaryDrafts(drafts=>{
+      const {[activeWorkspace.id]:_removed,...remaining}=drafts;
+      return remaining;
+    });
+  }
+
+  const handleTracedAssembly = (...args:Parameters<typeof createTracedAssembly>) => {
+    if(activeTrace)throw Error('Apply or cancel the current construction draft first.');
+    const draft=createTracedAssembly(...args);
+    setTracedAssemblies(old=>({...old,[activeWorkspace.id]:draft}));
+    setSelection({type:'none'});
+  };
+  function clearTracedAssembly(){
+    setTracedAssemblies(old=>{
+      const {[activeWorkspace.id]:_removed,...remaining}=old;
+      return remaining;
+    });
+  }
+  const handleFoundationPresets = (presets:FoundationPreset[]):boolean => {
+    if(currentDocument.current!==document)return false;
+    try{
+      const updated=replaceFoundationPresets(document,presets);
+      currentDocument.current=updated;setDocument(updated);setIsDirty(true);setStorageWarning('');return true;
+    }catch(err){setStorageWarning(err instanceof Error?err.message:String(err));return false;}
+  };
   const restoreSnapshot = (snapshot:WorkspaceSnapshot) => {
     const doc=currentDocument.current;
     const next=restoreWorkspaceSnapshot(doc,doc.activeWorkspaceId,snapshot);
@@ -220,19 +281,48 @@ function AppContent() {
     if (!history.length || currentDocument.current!==document) return;
     try{
       restoreSnapshot(history[history.length-1]);
-      setRedoStack(prev=>[{view:state,measurements:activeWorkspace.measurements},...prev]);setHistory(prev=>prev.slice(0,-1));
+      setRedoStack(prev=>[{view:state,measurements:activeWorkspace.measurements,foundationAssemblies:activeWorkspace.foundationAssemblies},...prev]);setHistory(prev=>prev.slice(0,-1));
     }catch(err){setStorageWarning(err instanceof Error?err.message:String(err))}
   },[history,state,document,activeWorkspace]);
   const handleRedo = useCallback(() => {
     if (!redoStack.length || currentDocument.current!==document) return;
     try{
       restoreSnapshot(redoStack[0]);
-      setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements}]);setRedoStack(prev=>prev.slice(1));
+      setHistory(prev=>[...prev.slice(-30),{view:state,measurements:activeWorkspace.measurements,foundationAssemblies:activeWorkspace.foundationAssemblies}]);setRedoStack(prev=>prev.slice(1));
     }catch(err){setStorageWarning(err instanceof Error?err.message:String(err))}
   },[redoStack,state,document,activeWorkspace]);
 
+  const [assemblyDeletion,setAssemblyDeletion]=useState<{project:typeof document;workspaceId:string;parentId:string}>();
+
   // Handle Deleting Selected CAD Element
   const handleDeleteSelected = useCallback(() => {
+    if(selection.type==='foundation'&&foundationEntities){
+      const ids=selection.ids??(selection.id?[selection.id]:[]);
+      if(!ids.length)return;
+      const owners=activeWorkspace.foundationAssemblies??[];
+      const target=foundationDeletionTarget(owners,ids);
+      if(primaryDraft||activeTrace){
+        setStorageWarning('Apply or cancel the active construction draft before deleting.');
+        return;
+      }
+      if(target.kind==='complete'){
+        setStorageWarning('');
+        setAssemblyDeletion({project:document,workspaceId:activeWorkspace.id,parentId:target.parent.id});
+        return;
+      }
+      if(target.kind!=='independent'){
+        setStorageWarning(target.kind==='partial'?'Select all assembly components in Geometry, then choose Delete assembly.':'Delete one complete assembly at a time. Select independent components separately.');
+        return;
+      }
+      const plan=planFoundationDeletion(foundationEntities,ids);
+      const affected=new Set(plan.removed.map(entity=>entity.id));
+      if(owners.some(parent=>parent.children.some(child=>affected.has(child.entityId)))){
+        setStorageWarning('An assembly depends on this selection. Resolve that dependency before deleting.');
+        return;
+      }
+      if(window.confirm('Delete '+ids.length+' selected foundation components and '+plan.dependentCount+' dependent components?')&&handleFoundationChange(plan.remaining))setSelection({type:'none'});
+      return;
+    }
     if(selection.type==='roof'&&roofEntities){
       if(selection.ids?.length){
         try{
@@ -316,7 +406,7 @@ function AppContent() {
     });
 
     setSelection({ type: 'none' });
-  }, [selection, state, handleStateChange, roofEntities, handleRoofChange]);
+  }, [selection, state, handleStateChange, roofEntities, handleRoofChange, foundationEntities, handleFoundationChange, activeWorkspace, document, primaryDraft, activeTrace]);
 
   // Clipboard Operations
   const handleCopy = useCallback(() => {
@@ -459,6 +549,8 @@ function AppContent() {
   }, [selection, state, handlePaste]);
 
   function resetWorkspaceInteraction() {
+    setPendingCorrectionOutline(undefined);
+    setTraceEdit(undefined);
     generation.current++;
     setWorkspaceEpoch(n => n + 1);
     setSelection({ type: 'none' }); setContextMenu(null); setClipboard(null);
@@ -467,6 +559,8 @@ function AppContent() {
   }
   function installDocument(next: ProjectDocument, dirty: boolean, reset = true) {
     if (reset) {
+      setTracedAssemblies({});
+      setPrimaryDrafts({});
       histories.current.clear(); setHistory([]); setRedoStack([]); resetWorkspaceInteraction();
     }
     currentDocument.current = next; setDocument(next); setIsDirty(dirty);
@@ -548,7 +642,7 @@ function AppContent() {
       }
 
       if (e.ctrlKey || e.metaKey) {
-        if(roofEntities && ['c','x','v','d'].includes(e.key.toLowerCase()))return;
+        if((roofEntities||foundationEntities) && ['c','x','v','d'].includes(e.key.toLowerCase()))return;
         switch (e.key.toLowerCase()) {
           case 'c':
             e.preventDefault();
@@ -586,7 +680,7 @@ function AppContent() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleCopy, handleCut, handlePaste, handleDuplicate, handleDeleteSelected, handleUndo, handleRedo, recovery, roofEntities]);
+  }, [handleCopy, handleCut, handlePaste, handleDuplicate, handleDeleteSelected, handleUndo, handleRedo, recovery, roofEntities, foundationEntities]);
 
   const handleNewBlankProject = async () => {
     if (isDirty && !window.confirm('Replace the current unsaved project?')) return;
@@ -668,7 +762,13 @@ function AppContent() {
     });
   }, []);
 
+  const draftBlocksDrawing=!!primaryDraft||!!activeTrace||pendingCorrectionOutline?.workspaceId===activeWorkspace.id||!!traceEdit;
   const handleToolChange = useCallback((tool: ActiveTool) => {
+    if(draftBlocksDrawing&&tool!=='select'){
+      setStorageWarning('Review, apply or cancel the active construction draft before starting another drawing operation.');
+      return;
+    }
+    setTraceEdit(undefined);
     if (tool === 'calibrate_scale' && activeTool !== 'calibrate_scale') {
       saveSnapSetting({ enabled: state.settings.gridSnap, size: state.settings.gridSnapSize });
       handleUpdateSettings({ ...state.settings, gridSnap: false }, false);
@@ -686,7 +786,7 @@ function AppContent() {
     if (tool !== 'select' && tool !== 'roof_opening' && tool !== 'roof_vertex' && tool !== 'roof_generate') {
       setSelection({ type: 'none' });
     }
-  }, [activeTool, state.settings, handleUpdateSettings, previousSnapSetting, saveSnapSetting, clearSnapSetting]);
+  }, [activeTool, draftBlocksDrawing, state.settings, handleUpdateSettings, previousSnapSetting, saveSnapSetting, clearSnapSetting]);
 
   // Real-Time Material Take-Off calculation
   const emptyReport = useMemo(() => calculateMTO(createBlankProject()), []);
@@ -730,11 +830,15 @@ function AppContent() {
         onRename={(id, name) => changeWorkspace(doc => renameWorkspace(doc, id, name))}
         onMove={(id, direction) => changeWorkspace(doc => moveWorkspace(doc, id, direction))}
         onDelete={id => changeWorkspace(doc => removeWorkspace(doc, id))}/>
-      {!reportable && <div role="status" className="bg-amber-950 text-amber-100 px-3 py-1.5 text-xs">{roofEntities?'Roof measurement preview — raw quantities only. Consolidated pricing and reporting unavailable until C.2.':'Workspace editing preview — consolidated project quantities and costs unavailable until C.2.'}</div>}
+      {!reportable && <div role="status" className="bg-amber-950 text-amber-100 px-3 py-1.5 text-xs">{foundationEntities?'Foundation measurement preview — raw quantities only. Consolidated pricing and reporting unavailable until C.2.':roofEntities?'Roof measurement preview — raw quantities only. Consolidated pricing and reporting unavailable until C.2.':'Workspace editing preview — consolidated project quantities and costs unavailable until C.2.'}</div>}
       {/* 2. MAIN 3-PANEL WORKSPACE */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left CAD Tool Palette */}
-        {roofEntities ? <RoofToolbar activeTool={activeTool} onSelectTool={handleToolChange}/> : <Toolbar
+        {foundationEntities ? <FoundationToolbar activeTool={activeTool} draftBlocksDrawing={draftBlocksDrawing} onSelectTool={tool=>{
+          setStandardPrimary(false);
+          if(tool==='foundation_slab'){setSlabMode('rectangle');setStandardSlab(false);}
+          handleToolChange(tool);
+        }} onStandardPrimary={(tool,mode)=>{setStandardPrimary(true);setSlabMode(mode);handleToolChange(tool)}} onStandardSlab={mode=>{setStandardPrimary(false);setStandardSlab(true);setSlabMode(mode);handleToolChange('foundation_slab')}}/> : roofEntities ? <RoofToolbar activeTool={activeTool} onSelectTool={handleToolChange}/> : <Toolbar
           activeTool={activeTool}
           onSelectTool={handleToolChange}
           activeWallPreset={activeWallPreset}
@@ -744,6 +848,21 @@ function AppContent() {
         {/* Center Interactive 2D CAD Canvas */}
         <CadCanvas
           key={workspaceEpoch}
+          foundationEntities={foundationEntities}
+          foundationPreview={foundationGhost?.workspaceId===activeWorkspace.id&&foundationGhost.source===foundationEntities?foundationGhost.members:undefined}
+          foundationFilter={visibleFoundationKind}
+          slabMode={slabMode}
+          standardSlab={standardSlab}
+          standardPrimary={standardPrimary}
+          primaryDraft={primaryDraft}
+          onConfigurePrimary={draft=>{
+            setPrimaryDrafts(drafts=>({...drafts,[activeWorkspace.id]:draft}));
+            setSelection({type:'none'});
+          }}
+          onFoundationChange={handleFoundationChange}
+          onConfigureTracedAssembly={handleTracedAssembly}
+          assemblyDraftOutline={activeTrace?.input.trace.vertices.map(v=>v.point)??(pendingCorrectionOutline?.workspaceId===activeWorkspace.id?pendingCorrectionOutline.points:undefined)}
+          traceCorrection={traceEdit?.document===document?traceEdit:undefined}
           roofEntities={roofEntities}
           onRoofChange={handleRoofChange}
           commitDraftPlacement={commitDraftPlacement}
@@ -755,7 +874,7 @@ function AppContent() {
           onSelect={setSelection}
           onDeleteSelected={handleDeleteSelected}
           activeWallPreset={activeWallPreset}
-          onContextMenu={roofEntities ? undefined : (e, worldPos) => {
+          onContextMenu={roofEntities||foundationEntities ? undefined : (e, worldPos) => {
             setContextMenu({
               x: e.clientX,
               y: e.clientY,
@@ -765,6 +884,24 @@ function AppContent() {
           }}
         />
 
+        {foundationEntities && <FoundationInspector primaryDraft={primaryDraft} onCancelPrimaryDraft={clearPrimaryDraft} assemblies={activeWorkspace.foundationAssemblies} activeConstructionDraft={!!activeTrace} ownedComponentIds={new Set(activeWorkspace.foundationAssemblies?.flatMap(parent=>parent.children.map(child=>child.entityId)))} assemblyControls={primaryDraft?null:<FoundationAssemblyPanel project={document} workspaceId={activeWorkspace.id} traced={activeTrace} deletionRequest={assemblyDeletion?.project===document&&assemblyDeletion.workspaceId===activeWorkspace.id?assemblyDeletion:undefined} onCancelTrace={clearTracedAssembly}
+          onDraftChange={draft=>setTracedAssemblies(old=>({...old,[activeWorkspace.id]:draft}))}
+          selectedIds={selection.type==='foundation'?selection.ids:undefined} selectedId={selection.type==='foundation'?(selection.id??selection.ids?.[0]):undefined} metric={state.settings.unitSystem==='metric'}
+          onTraceEdit={(trace,onMove)=>{
+            setActiveTool('select');
+            setTraceEdit(trace&&onMove?{document,trace,onMove:(index,point)=>{setTraceEdit(undefined);onMove(index,point)}}:undefined);
+          }} onApply={handleAssemblyApply} onPresets={handleFoundationPresets} onPreview={(members,outline)=>{
+            setPendingCorrectionOutline(outline?{workspaceId:activeWorkspace.id,points:outline}:undefined);
+            setFoundationGhost(members?{workspaceId:activeWorkspace.id,source:foundationEntities,members}:null);
+          }}
+          onSelectChildren={ids=>setSelection(ids.length?{type:'foundation',ids}:{type:'none'})}/>} metric={state.settings.unitSystem==='metric'} key={activeWorkspace.id} onPreview={members=>setFoundationGhost(members?{workspaceId:activeWorkspace.id,source:foundationEntities,members}:null)} filter={visibleFoundationKind} onFilter={kind=>{setFoundationFilter({workspaceId:activeWorkspace.id,kind});setSelection({type:'none'})}} workspaceId={activeWorkspace.id} entities={foundationEntities} selection={selection} onChange={entities=>{
+          if(!handleFoundationChange(entities))return false;
+          if(primaryDraft&&entities.some(entity=>entity.id===primaryDraft.id)){
+            clearPrimaryDraft();
+            setSelection({type:'foundation',id:primaryDraft.id});
+          }
+          return true;
+        }} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
         {roofEntities && <RoofInspector workspaceId={activeWorkspace.id} entities={roofEntities} selection={selection} onChange={handleRoofChange} onSelect={setSelection} onDelete={handleDeleteSelected}/>}
         {/* Right Real-time MTO Take-Off Matrix */}
         {reportable && <MtoMatrixPanel
@@ -780,7 +917,7 @@ function AppContent() {
         />}
 
         {/* Floating Context Inspector for selected item */}
-          {selection.type!=='roof' && <InspectorPanel
+          {selection.type!=='roof' && selection.type!=='foundation' && <InspectorPanel
             state={state}
             onChange={handleStateChange}
             selection={selection}
