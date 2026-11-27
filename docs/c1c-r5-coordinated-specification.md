@@ -205,7 +205,9 @@ Final validation layers: Codex local automated tests; ChatGPT independent source
 
 Fixture clarifications: CA02 exterior ring area = 1200 − (40−2t)(30−2t), t=8/12 ft, times height/27. CA07 t=10/12 ft. CA05 centred uniform strip volume = width × 2[(40−t)+(30−t)] × depth /27; exterior coverage 140×6; drainage offset from wall face = (24−8)/2+8=16 in; route 140+8×16/12=150.666667 LF. Retain historical 156 LF fixture for 2 ft wall-face offset; do not change baseline to match new convention. CA03 L fixture 40×40 minus 20×20 notch, 12 in wall ×8 ft. CA09 independent slab is not an automatically derived interior slab. All dimensions are synthetic verification data, not factory presets or structural recommendations.
 
-## 8. Implementation sequence and authorization
+## 8. Historical implementation sequence and authorization
+
+The original implementation gates below are archival. R5.12 is the frozen [owner-accepted C.1C checkpoint](c1c-local-acceptance.md#formal-owner-acceptance). The System Bible governs subsequent work. Independent integration review and explicit staging merge authorization are the active gates.
 
 | Increment | Scope | Gate |
 |---|---|---|

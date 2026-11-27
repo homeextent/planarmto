@@ -1,5 +1,7 @@
 # C.1C R5 technical candidate and acceptance register
 
+Current status is recorded in the [formal C.1C acceptance and deferred register](c1c-local-acceptance.md#formal-owner-acceptance). Earlier findings, requirements and gates below describe their historical checkpoints.
+
 R5.6C application candidate `5a6db24aaab462d4dda888a18be08515709df849` retains 322/322 reported local regressions. Independently verified [CI #196](https://github.com/homeextent/planarmto/actions/runs/45825822174) passed, including isolated WordPress integration. Draft PR #12 targets staging. Full R5 practical owner acceptance remains withheld. Schema v3 and production 2.15.1 remain current. Earlier entries are preserved as milestone evidence.
 
 R5.3–R5.5 implementation against the approved coordinated specification and the revised v3 persistence design at `1be740b`. The 296-test R5.1–R5.2 candidate remains the regression baseline. Review applies to draft PR #12. Actual-plan owner acceptance and staging approval remain separate.

@@ -1,4 +1,6 @@
 # C.1C — Foundation drafting and measurement
+
+Current status is recorded in the [formal C.1C acceptance and deferred register](c1c-local-acceptance.md#formal-owner-acceptance). Earlier findings, requirements and gates below describe their historical checkpoints.
 Owner approved D01–D14 and C.1C-A–G on 2026-11-25. Baseline a064baeeb13b3ede95faf04e9aad19a7ab413882; main 0423cb605d99d32b6a537f01e7115157388b9ccd. Implementation authorized on one isolated feature branch, not staging integration or production. Preserve 127 existing regressions. No new dependencies, hosting, spending or version bump.
 
 ## Approved decisions

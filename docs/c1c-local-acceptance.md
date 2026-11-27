@@ -1,6 +1,6 @@
 # C.1C — Local owner acceptance procedure and compliance traceability
 
-Historical pre-R5 procedure and evidence. For current practical acceptance use the [R5.6C procedure](c1c-r5-6c-workflow.md). The references below describe the original candidate and checks.
+Historical pre-R5 procedure and evidence. Earlier procedures and per-case results are retained below for traceability. The [formal owner decision](#formal-owner-acceptance) governs current acceptance. The references below describe the original candidate and checks.
 
 ## Gate and evidence
 Automated candidate 537b03f9e0a3199e876857e064f0761a72c12480: CI #185, run 45669559089, job 139400816281, 288/288 (17+23+7+5+50+110+76). All validation stages passed. This document is an acceptance plan, not owner acceptance. Run exact feature HEAD CI after this documentation commit. No staging integration or release authorization. Production remains 2.15.1, schema 3.
@@ -115,3 +115,23 @@ At initial procedure preparation no owner checks had been run. Subsequent partia
 ### R5.0A acceptance boundary
 
 The three bounded stabilization checks A–C passed on `cd782e7`. See [formal acceptance](c1c-functional-findings.md#r50a-formal-acceptance) for exact-SHA evidence and the exclusion quantity check. The broader C.1C contractor-workflow acceptance remains open.
+
+## Formal owner acceptance
+
+The product owner formally accepted R5.12 and the C.1C Foundation Drafting and Measurement milestone at `49deaa8d7b7801efd8bc0a89021e3fe4b41b7896`. C.1C application development is frozen at R5.12. The owner accepted the remaining minor interface inconsistencies for this milestone. Draft PR #12 targets staging and awaits independent integration review and explicit owner merge authorization. Project schema is v3 and production is v2.15.1.
+
+The milestone acceptance covers rectangular and irregular foundation assemblies, independent walls and linked layers, rectangular and polygon pad footings, interior and independently traced slabs, and footing, waterproofing, insulation, drainage and granular measurement. It also covers coordinated specification and modification, material-specific reporting, assembly deletion and ownership safeguards, and the common contractor creation and editing workflow.
+
+**Owner practical evidence.** Earlier reports document actual-plan foundation tracing, independent walls, pad footings, coordinated layers, quantity review and transaction history. R5.11 Tests A–D passed for deletion, initial wall layers, both exterior coverage modes and save/reopen. The R5.12 authorization records the formal milestone decision. It supplies no new individual case results. Historical case statuses above remain as recorded.
+
+**Automated evidence.** The accepted application baseline reported 342 unique local regressions across batches, including 243 Node and 99 Chromium cases. Exact-head [CI #204](https://github.com/homeextent/planarmto/actions/runs/45926069625), job `140267541307`, passed all required checks, including isolated WordPress integration. The [technical evidence register](c1c-r5-technical-evidence.md) preserves the R5 progression and verification scope. The [System Bible](../SYSTEM_BIBLE.md#governing-product-design-philosophy) remains authoritative for product, interface and measurement standards.
+
+### Deferred-refinement register
+
+| Classification | Established limitation or deferred scope |
+| --- | --- |
+| Minor usability and presentation | The owner observed residual interface inconsistencies and accepted them for closeout. No additional specific UI defect was supplied for this register. Shared or ambiguous selections continue to use explicit source or complete-group selection. |
+| Specialist workflow | Open-wall drainage uses a separately traced route. Batch deletion of multiple parent assemblies remains a one-assembly-at-a-time workflow. Dedicated pad-footing exclusions are outside the current pad contract. |
+| Unsupported construction | Curved foundation runs and automatic reconciliation of intersecting angled runs remain outside the supported automated geometry. Complex coverage and nonstandard physical relationships require explicit supported inputs. |
+| Future development | C.1D site drafting is deferred. C.1E integrated measurement coordination is next planned and requires a separately reviewed, authorized specification. C.2 consolidated takeoff, pricing, allowances and reporting remain future development. |
+| Measurement integrity | No new material integrity defect was identified in this documentation closeout. Potential overlap, unresolved relationships and duplicate ownership remain subject to the measurement safeguards. Newly confirmed integrity defects require separate review before affected quantities can be accepted. |

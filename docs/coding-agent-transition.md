@@ -57,12 +57,9 @@ Remote audit confirmed PR #12 only open; all other listed PRs merged and all ten
 | hotfix/v2.15.1 | c9122dc62312d026c057a03267dfa909e0cfb137 | 3 |
 | release/v2.15.0 | a2c36ec3ad9c58e728881ffc00c8e8b504a6604e | 2 |
 
-## Remaining roadmap / stop gates
-1. Baseline reproduction and R5.0A stabilization are complete. [R5.0A acceptance](c1c-functional-findings.md#r50a-formal-acceptance) records accepted application SHA `cd782e7`, CI #188 and owner findings. The owner approved the [coordinated R5 specification](c1c-r5-coordinated-specification.md). The revised R5.3 persistence design was independently reviewed and approved at `1be740b`. R5.3–R5.5 and R5.6 automated verification are authorized. See the [technical candidate](c1c-r5-technical-evidence.md) and stop for independent and practical owner review.
-2. R5.1–6 contractor workflow on same feature branch; technical checks and new CA01–12, real plan owner acceptance. Reconcile five docs, explicitly authorized merge #12, postmerge CI.
-3. C.1E separate specification: cross-workspace ownership/physical identity, completeness independent of assignment, included/excluded/pending, duplicate prevention, reference areas nonadditive, measured vs manual/allowance/quote provenance; optional site not required. No consolidated pricing until C.2. Owner approval then branch from validated staging.
-4. C.2 separate specification: consolidated MTO, contractor manual quantities and allowances/quotes, pricing/rates, waste applied once, completeness/reporting gates, traceable unit and cost basis, existing floor costs protected but not automatically authoritative. No site cost exclusion just because site engine deferred.
-5. Separate v2.16.0 release decision, PR staging→main, exact CI, deploy/live checks. C.1D dedicated site drafting deferred beyond release; D drawing library/revisions, E overlays, F optional 3D future only. No blanket authorization to complete future milestones autonomously.
+## Current checkpoint and stop gates
+
+R5.12 is the frozen owner-accepted C.1C application checkpoint. See the [formal acceptance and deferred register](c1c-local-acceptance.md#formal-owner-acceptance). Draft PR #12 awaits independent review and explicit staging merge authorization. C.1E is next planned and separately specified. C.2 and production release are separately gated. The historical cleanup manifest and first-task instructions above and below are archival.
 
 ## Archived first Codex task
 Read AGENTS.md and the transition package plus linked governing documents. Inspect current repository, verify branch/cleanliness/exact head and CI. Complete safe merged branch housekeeping per manifest if permissions permit. Reproduce baseline functional tests using local build and Playwright, recording exact source, selected kinds, actual quantities, diagnostics and evidence. Do not change production application code yet. Return baseline results, confirmed defects vs usability findings, remaining gaps and a bounded R5.0 implementation plan with the unresolved default/material/ownership decisions for owner/ChatGPT review. Preserve draft PR #12, staging and main. Stop at review gate.

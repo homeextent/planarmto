@@ -25,4 +25,4 @@ The inspector only resolved a standard independent wall editor when exactly one 
 3. Select the wall, window-select the complete construction, then select each linked layer separately. Verify the same standard editor, saved material and dimension values, and unchanged quantities. Select an unrelated construction with the wall and confirm the guidance.
 4. Change a linked layer, Preview and Cancel. Repeat and Apply, then test undo, redo and export/reopen. Verify a pad count displays as a whole number alongside concrete volume.
 
-R5.12 remains at independent implementation review and targeted owner acceptance. Full R5 and C.1C remain subject to explicit owner acceptance.
+The owner formally accepted R5.12 and C.1C. The [closeout](c1c-local-acceptance.md#formal-owner-acceptance) records the accepted SHA and independent staging review gate. The procedure above is retained as historical acceptance guidance.

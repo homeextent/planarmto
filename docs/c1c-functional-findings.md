@@ -1,5 +1,7 @@
 # C.1C — actual owner functional findings (2026-11-25)
 
+Current status is recorded in the [formal C.1C acceptance and deferred register](c1c-local-acceptance.md#formal-owner-acceptance). Earlier findings, requirements and gates below describe their historical checkpoints.
+
 Evidence: owner screenshots and narrative in ChatGPT acceptance conversation, after docs-only e5e9748 candidate; exact local SHA was not independently captured. CI #186 on e5e9748 passed 288/288. Preserve the distinction between owner evidence and automated verification. No customer plans or screenshots committed. L01 owner PASS; other L checks not fully accepted. Local testing paused for contractor UX reassessment, subsequently agreed to complete technical checks with agent assistance before R5. No staging merge.
 
 | Check | Actual result | Classification / next action |
