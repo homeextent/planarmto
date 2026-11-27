@@ -10,9 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 
-## [Unreleased] — Increments B, C.1A and C.1B (staging release train)
+## [Unreleased] — Increments B and C.1A–C.1C (staging release train)
 
-### C.1C — Owner accepted, staging integration pending
+### C.1C — Owner accepted and staging integrated
+- [PR #12](https://github.com/homeextent/planarmto/pull/12) merged into staging at `b4457da23c1e1aa9b899218d7b375b2af8520180`. Exact post-merge [staging CI #206](https://github.com/homeextent/planarmto/actions/runs/45928716470) passed all required stages, including isolated WordPress integration.
 - The owner accepted R5.12 and C.1C at `49deaa8d7b7801efd8bc0a89021e3fe4b41b7896`, with 342 reported local regressions and exact-candidate CI #204. Application development is frozen. [formal acceptance and deferred-refinement register](docs/c1c-local-acceptance.md#formal-owner-acceptance).
 
 Earlier entries below describe their publication checkpoints.

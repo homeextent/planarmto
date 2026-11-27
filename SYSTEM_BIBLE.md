@@ -204,12 +204,12 @@ Technical implementation, scope expansion, acceptance, integration and release r
 
 **Powerful underneath. Simple on the surface. Advanced when necessary.**
 
-## Architectural direction and governing principles — C.1B staging; C.1C feature candidate
+## Architectural direction and governing principles — C.1C staging
 
 This section governs all subsequent development and takes precedence over older engine descriptions below. Production v2.15.1 is a separate baseline. Preserve valid historical floor formulas as regression references; do not infer roof, foundation or site quantities from floor gross area. Roof-specific measurement is integrated; generic CAD tools in foundation/site workspaces do not establish specialist measurement authority.
 
 - Four optional typed workspaces (floor, roof, foundation, site), each with independent geometry, calibration and source evidence; project-level settings and rates shared. No automatic cross-sheet spatial registration.
-- Floor retains existing valid framing, finishes, apertures, MEP and siding inputs. Roof owns independently drafted planes, classified edges, openings, soffit/fascia/eavestrough and roof thermal envelope quantities. Foundation owns explicit walls, footings, pads, slabs, building excavation, insulation, drainage and waterproofing. Site owns grading, hardscape, decks and site features. These are ownership boundaries; roof engine is integrated, foundation is owner accepted at R5.12 on the feature branch, dedicated site engine deferred.
+- Floor retains existing valid framing, finishes, apertures, MEP and siding inputs. Roof owns independently drafted planes, classified edges, openings, soffit/fascia/eavestrough and roof thermal envelope quantities. Foundation owns explicit walls, footings, pads, slabs, building excavation, insulation, drainage and waterproofing. Site owns grading, hardscape, decks and site features. These are ownership boundaries; roof engine is integrated, foundation is owner accepted at R5.12 and staging integrated, dedicated site engine deferred.
 - Persist source geometry and identities rather than authoritative derived totals. Canonical feet; pitch rise per 12. Quantities carry code, unit, basis, source and stable physical/assembly identity. Missing inputs remain unquantified; exclusions require reason; assignment is not completeness. Distinct layers may share physical features but duplicate contributions to the same assembly/code must be prevented. No structural design, automatic topographic modeling or unsupported geometric assumptions.
 - Specialist engines must identify unsupported topology or incomplete inputs rather than invent quantities. Integrated cross-workspace ownership and completeness are C.1E; consolidated rates, single application of waste and reporting are C.2.
 - Historical unsupported projects retained without automatic deletion; no further legacy compatibility development required. Preserve data safeguards. Project reports remain gated until C.2.
@@ -223,7 +223,7 @@ PR #8 merged into staging at `c1a0bf7` after documentation-only candidate `3d083
 
 ## C.1C foundation authority and integration boundary
 
-The owner accepted C.1C at R5.12. The existing specialist measurement engines, canonical feet, source-linked ownership, optional v3 assembly records, and atomic history remain authoritative. R5.6A separates non-owning detachment audit from live ownership and records trace corrections independently of specifications. The product and interface rules above govern all subsequent work. [formal acceptance and deferred-refinement register](docs/c1c-local-acceptance.md#formal-owner-acceptance). Draft PR #12 is at independent staging integration review.
+The owner accepted C.1C at R5.12. The existing specialist measurement engines, canonical feet, source-linked ownership, optional v3 assembly records, and atomic history remain authoritative. R5.6A separates non-owning detachment audit from live ownership and records trace corrections independently of specifications. The product and interface rules above govern all subsequent work. [formal acceptance and deferred-refinement register](docs/c1c-local-acceptance.md#formal-owner-acceptance). [PR #12](https://github.com/homeextent/planarmto/pull/12) merged into staging at `b4457da23c1e1aa9b899218d7b375b2af8520180`. Exact post-merge [staging CI #206](https://github.com/homeextent/planarmto/actions/runs/45928716470) passed all required stages, including isolated WordPress integration.
 
 ## Typed project architecture — C.1A
 

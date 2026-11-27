@@ -18,7 +18,7 @@ C.1C owner accepted R5.12 at `49deaa8d7b7801efd8bc0a89021e3fe4b41b7896`, with 34
 | B | Workspace management | Owner accepted and staging integrated |
 | C.1A | Measurement architecture | Established and staging integrated. [Record](docs/c1a-measurement-architecture.md) |
 | C.1B | Roof drafting and measurement | Owner accepted and staging integrated. [Record](docs/c1b-roof-measurement.md) |
-| C.1C | Foundation drafting and measurement | Owner accepted. Draft PR #12 awaits independent review and explicit staging merge authorization |
+| C.1C | Foundation drafting and measurement | Complete. Owner accepted at R5.12 and integrated through PR #12. [staging CI #206](https://github.com/homeextent/planarmto/actions/runs/45928716470) passed |
 | C.1D | Site drafting and measurement | Deferred |
 | C.1E | Integrated measurement coordination | Next planned milestone, subject to separately reviewed and authorized coordinated specification |
 | C.2 | Consolidated material takeoff and estimating | Future development after C.1E |
@@ -45,4 +45,4 @@ Use isolated feature/documentation branches and PRs to staging, exact-head CI, t
 
 ## Next authorization gates
 
-Independent review of draft PR #12 and explicit owner staging merge authorization are required. The next planned milestone is C.1E. Its coordinated technical specification requires separate review and authorization before implementation.
+C.1C integration is complete. [PR #12](https://github.com/homeextent/planarmto/pull/12) merged into staging at `b4457da23c1e1aa9b899218d7b375b2af8520180`. Exact post-merge [staging CI #206](https://github.com/homeextent/planarmto/actions/runs/45928716470) passed all required stages, including isolated WordPress integration. The next planned milestone is C.1E. Its coordinated technical specification requires separate review and authorization before implementation.

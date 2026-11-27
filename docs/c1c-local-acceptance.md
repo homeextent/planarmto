@@ -118,7 +118,7 @@ The three bounded stabilization checks A–C passed on `cd782e7`. See [formal ac
 
 ## Formal owner acceptance
 
-The product owner formally accepted R5.12 and the C.1C Foundation Drafting and Measurement milestone at `49deaa8d7b7801efd8bc0a89021e3fe4b41b7896`. C.1C application development is frozen at R5.12. The owner accepted the remaining minor interface inconsistencies for this milestone. Draft PR #12 targets staging and awaits independent integration review and explicit owner merge authorization. Project schema is v3 and production is v2.15.1.
+The product owner formally accepted R5.12 and the C.1C Foundation Drafting and Measurement milestone at `49deaa8d7b7801efd8bc0a89021e3fe4b41b7896`. C.1C application development is frozen at R5.12. The owner accepted the remaining minor interface inconsistencies for this milestone. [PR #12](https://github.com/homeextent/planarmto/pull/12) merged into staging at `b4457da23c1e1aa9b899218d7b375b2af8520180`. Exact post-merge [staging CI #206](https://github.com/homeextent/planarmto/actions/runs/45928716470) passed all required stages, including isolated WordPress integration. The merge retained the accepted application tree. C.1E is next planned, subject to separately reviewed and authorized specification. Project schema is v3 and production is v2.15.1.
 
 The milestone acceptance covers rectangular and irregular foundation assemblies, independent walls and linked layers, rectangular and polygon pad footings, interior and independently traced slabs, and footing, waterproofing, insulation, drainage and granular measurement. It also covers coordinated specification and modification, material-specific reporting, assembly deletion and ownership safeguards, and the common contractor creation and editing workflow.
 
